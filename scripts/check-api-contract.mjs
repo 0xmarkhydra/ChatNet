@@ -31,6 +31,17 @@ function walk(directory) {
 
 walk(sourceRoot);
 
+// Gateway/service health endpoints are operational checks, not public API contracts.
+// Keep them out of route-to-spec and catalog comparisons.
+const excludedSourceRoutes = new Set([
+  'GET /api/live',
+  'GET /api/ready',
+]);
+const excludedCatalogRoutes = new Set([
+  ...excludedSourceRoutes,
+  'GET /api/health',
+]);
+
 const specRoutes = new Set();
 const operationIds = new Set();
 for (const [route, operations] of Object.entries(spec.paths ?? {})) {
@@ -56,8 +67,12 @@ for (const [route, operations] of Object.entries(spec.paths ?? {})) {
   }
 }
 
-const missing = [...sourceRoutes].filter((route) => !specRoutes.has(route)).sort();
-const stale = [...specRoutes].filter((route) => !sourceRoutes.has(route) && route !== 'GET /api/health').sort();
+const missing = [...sourceRoutes]
+  .filter((route) => !excludedSourceRoutes.has(route) && !specRoutes.has(route))
+  .sort();
+const stale = [...specRoutes]
+  .filter((route) => !excludedSourceRoutes.has(route) && !sourceRoutes.has(route))
+  .sort();
 if (missing.length || stale.length) {
   if (missing.length) console.error(`Missing OpenAPI routes (${missing.length}):\n${missing.join('\n')}`);
   if (stale.length) console.error(`Stale OpenAPI routes (${stale.length}):\n${stale.join('\n')}`);
@@ -66,8 +81,12 @@ if (missing.length || stale.length) {
 
 const catalogRoutes = new Set([...catalog.matchAll(/^\| (GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \| (\/api\/[^ |]+) \|/gm)]
   .map((match) => `${match[1]} ${match[2]}`));
-const missingCatalog = [...sourceRoutes].filter((route) => !catalogRoutes.has(route)).sort();
-const staleCatalog = [...catalogRoutes].filter((route) => !sourceRoutes.has(route)).sort();
+const missingCatalog = [...sourceRoutes]
+  .filter((route) => !excludedCatalogRoutes.has(route) && !catalogRoutes.has(route))
+  .sort();
+const staleCatalog = [...catalogRoutes]
+  .filter((route) => !excludedCatalogRoutes.has(route) && !sourceRoutes.has(route))
+  .sort();
 if (missingCatalog.length || staleCatalog.length) {
   if (missingCatalog.length) console.error(`Missing catalog routes (${missingCatalog.length}):\n${missingCatalog.join('\n')}`);
   if (staleCatalog.length) console.error(`Stale catalog routes (${staleCatalog.length}):\n${staleCatalog.join('\n')}`);
@@ -78,4 +97,5 @@ const inventory = Object.keys(spec.paths).flatMap((route) => Object.values(spec.
   .filter((operation) => operation && operation['x-chatnet-contract-status'] === 'route-inventory'));
 const verified = Object.keys(spec.paths).flatMap((route) => Object.values(spec.paths[route])
   .filter((operation) => operation && operation['x-chatnet-contract-status'] === 'verified'));
-console.log(`PASS: source, catalog, and OpenAPI routes match (${sourceRoutes.size}); verified=${verified.length}; route-inventory=${inventory.length}`);
+const comparableSourceRouteCount = [...sourceRoutes].filter((route) => !excludedSourceRoutes.has(route)).length;
+console.log(`PASS: source, catalog, and OpenAPI routes match (${comparableSourceRouteCount}); excluded internal health=${excludedSourceRoutes.size}; verified=${verified.length}; route-inventory=${inventory.length}`);

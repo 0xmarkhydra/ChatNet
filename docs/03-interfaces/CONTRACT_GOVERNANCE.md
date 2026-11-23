@@ -1,11 +1,11 @@
 ---
 document_id: API-GOV-001
 title: ChatNet API and Event Contract Governance
-version: 1.2.0
+version: 1.5.0
 status: Draft
 owner: API Architecture
-baseline_commit: 05a3caab51b55cc5393c8f47fee625fc1eaaa19d
-last_updated: 2026-11-21
+baseline_commit: 835138fc698ff8c030923ad0844ed22b053fc961
+last_updated: 2026-11-22
 normative_basis: "RFC 9110"
 ---
 
@@ -19,7 +19,7 @@ Khi đổi handler, rà method, path, auth, mã lỗi, khả năng retry và tá
 
 The current backend uses Go net/http ServeMux route registrations and handler-defined request/response behavior. The Gateway route table and service route registrations are the source of truth for the committed baseline.
 
-[Danh mục route](API_CATALOG.md) và [danh mục realtime](REALTIME_EVENT_CATALOG.md) mô tả baseline. [OpenAPI](openapi.json) ghi 21 thao tác đã đối chiếu tới handler và kiểm kê 163 thao tác khác dưới nhãn `route-inventory`. [AsyncAPI](realtime.asyncapi.json) mô tả hai loại sự kiện trên một stream SSE. Các đặc tả này chưa bao phủ toàn bộ API, payload lồng, transport provider hay tương thích runtime.
+[Danh mục route](API_CATALOG.md) và [danh mục realtime](REALTIME_EVENT_CATALOG.md) mô tả baseline. OpenAPI 0.3.3 ghi 31 thao tác đã đối chiếu tới handler và kiểm kê 160 thao tác khác dưới nhãn `route-inventory`. [AsyncAPI](realtime.asyncapi.json) mô tả hai loại sự kiện trên một stream SSE. Các đặc tả này chưa bao phủ toàn bộ API, payload lồng, transport provider hay tương thích runtime.
 
 ## 2. Target contract format
 
@@ -53,7 +53,7 @@ Breaking changes SHOULD use a versioning or compatibility strategy approved by t
 
 ## 5. Verification record and future quality gates
 
-Kiểm ngày 2026-11-21 trên OpenAPI `0.3.0` và AsyncAPI `0.1.1` của baseline `05a3caa`. Dùng Python `jsonschema` 4.26.0 khi kiểm schema. Kiểm tra route-to-spec dùng script không thêm dependency tại `scripts/check-api-contract.mjs`.
+Kiểm ngày 2026-11-21 trên OpenAPI `0.3.1` và AsyncAPI `0.1.1` của baseline `835138f`. Dùng Python `jsonschema` 4.26.0 khi kiểm schema. Kiểm tra route-to-spec dùng script không thêm dependency tại `scripts/check-api-contract.mjs`.
 
 | Hiện vật | Bộ kiểm / nguồn | Kết quả |
 |---|---|---|
@@ -62,23 +62,48 @@ Kiểm ngày 2026-11-21 trên OpenAPI `0.3.0` và AsyncAPI `0.1.1` của baselin
 
 Chín kiểm tra fixture tổng hợp cũng đạt. Các fixture bao gồm health thiếu thành phần, Checkout có thêm trường `status`, SSE `friend.updated` với `conversationId` bằng 0, trường Call tùy chọn và payload rỗng của `session-revoked`.
 
-PASS của schema và fixture không chứng minh khớp payload runtime, phân quyền, khả năng sinh mã, hay tương thích client. 163 route inventory vẫn cần handler extraction riêng.
+PASS của schema và fixture không chứng minh khớp payload runtime, phân quyền, khả năng sinh mã, hay tương thích client. 160 route inventory vẫn cần handler extraction riêng.
 
-### 5.1 Bản ghi kiểm OpenAPI 0.3.0
+### 5.1 Bản ghi kiểm OpenAPI 0.3.1
 
-Kiểm ngày 2026-11-21 trên baseline `05a3caa`. Bản `0.3.0` đối chiếu 21 thao tác rủi ro cao từ auth, chat, feed, call và translation; 163 thao tác còn lại giữ nhãn `route-inventory`. Route inventory có `operationId`, thẻ dịch vụ, tham số đường dẫn chưa xác minh và phản hồi `default` ghi rõ chưa mô hình hóa. Không có schema, mã trạng thái hay yêu cầu xác thực nào được suy ra cho inventory.
+Kiểm ngày 2026-11-21 trên baseline `835138f`. Bản `0.3.1` đối chiếu 21 thao tác rủi ro cao từ auth, chat, feed, call và translation; 169 thao tác còn lại giữ nhãn `route-inventory`. Route inventory có `operationId`, thẻ dịch vụ, tham số đường dẫn chưa xác minh và phản hồi `default` ghi rõ chưa mô hình hóa. Không có schema, mã trạng thái hay yêu cầu xác thực nào được suy ra cho inventory.
 
 | Kiểm tra | Cách làm | Kết quả |
 |---|---|---|
 | Cấu trúc theo OAS 3.2 | `jsonschema` với [schema-base 2026-11-12](https://spec.openapis.org/oas/3.2/schema-base/2026-11-12), cài vào thư mục tạm, không thêm vào repo | PASS, 0 lỗi |
-| Nhất quán nội bộ | `operationId` duy nhất. Mọi tham số `{x}` trong đường dẫn được khai báo. Không có hai đường dẫn tương đương mẫu | PASS (184 thao tác) |
-| Route trong source, catalog và OpenAPI | `node scripts/check-api-contract.mjs`; quét route registration trong `backend/cmd` (bỏ test), [danh mục API](API_CATALOG.md) và OpenAPI | PASS, 184/184 route, 0 lệch; 21 verified, 163 route-inventory |
-| Danh mục so với OpenAPI | Đếm thao tác `/api/*` | 184/184 |
-| Gateway so với OpenAPI | Mỗi đường dẫn `/api/*` phải khớp route source và Gateway proxy | PASS, 184 thao tác, 0 lệch |
+| Nhất quán nội bộ | `operationId` duy nhất. Mọi tham số `{x}` trong đường dẫn được khai báo. Không có hai đường dẫn tương đương mẫu | PASS (190 thao tác) |
+| Route trong source, catalog và OpenAPI | `node scripts/check-api-contract.mjs`; quét route registration trong `backend/cmd` (bỏ test), [danh mục API](API_CATALOG.md) và OpenAPI | PASS, 190/190 route, 0 lệch; 21 verified, 169 route-inventory; loại hai health route nội bộ |
+| Danh mục so với OpenAPI | Đếm thao tác `/api/*` | 190/190 |
+| Gateway so với OpenAPI | Mỗi đường dẫn `/api/*` phải khớp route source và Gateway proxy | PASS, 190 thao tác, 0 lệch |
 
 Ghi chú về phạm vi so sánh: Chat có thêm `GET /health` nội bộ và Translation có `GET /health/provider`. Cả hai nằm ngoài OpenAPI vì là điểm sức khỏe nội bộ của từng dịch vụ. Gateway có `GET /__chatnet_copy_image` là helper media không thuộc `/api/*`, nên bị loại có chủ đích. Marketplace được đăng ký qua hàm `add()` trong `backend/cmd/feed/marketplace.go`, được đối chiếu riêng.
 
-**Không chứng minh:** khớp runtime, schema, phân quyền hay khả năng sinh mã. 9 fixture của bản `0.1.1` không được chạy lại cho bản này. 163 thao tác inventory vẫn thiếu schema, mã trạng thái và yêu cầu xác thực đã đối chiếu.
+**Không chứng minh:** khớp runtime, schema, phân quyền hay khả năng sinh mã. 9 fixture của bản `0.1.1` không được chạy lại cho bản này. 169 thao tác inventory vẫn thiếu schema, mã trạng thái và yêu cầu xác thực đã đối chiếu.
+
+### 5.2 Bản ghi kiểm OpenAPI 0.3.2
+
+Rà ngày 2026-11-22 trên working tree của `toan-nguyen-dev`, HEAD `835138f`. Sáu story like/highlight route được đối chiếu với handler và chuyển sang `verified`. Ticket SSE thêm phản hồi `429` cùng header `Retry-After`.
+
+| Kiểm tra | Cách làm | Kết quả |
+|---|---|---|
+| JSON syntax | `node -e` với `JSON.parse` trên `openapi.json` | PASS |
+| Route, catalog và OpenAPI parity | `node scripts/check-api-contract.mjs` | PASS, 191 route; 28 verified, 163 route-inventory; loại hai health route nội bộ |
+| OpenAPI JSON Schema 3.2.1 | Chưa chạy validator đầy đủ cho bản `0.3.2` | NOT RUN |
+
+Route parity không chứng minh mọi handler response, auth hay schema đều đúng. Sáu story operation và ticket `429` đã được đối chiếu tĩnh với source; runtime contract test chưa chạy.
+
+### 5.3 Bản ghi kiểm OpenAPI 0.3.3
+
+Rà ngày 2026-11-22 trên working tree `toan-nguyen-dev`, HEAD `835138f`. Thêm contract cursor search cho user, post, community và published product; thêm contract refresh cookie cho browser web và cập nhật số lượng route đã đối chiếu. Legacy response shape vẫn giữ khi client không gửi `sort`, `cursor` hoặc `since`.
+
+| Kiểm tra | Cách làm | Kết quả |
+|---|---|---|
+| JSON syntax | `node -e` với `JSON.parse` trên `openapi.json` | PASS |
+| Route, catalog và OpenAPI parity | `node scripts/check-api-contract.mjs` | PASS, 191 route; 31 verified, 160 route-inventory; loại hai health route nội bộ |
+| Go handler/integration tests | `go test ./...` | BLOCKED, Go và Docker engine không khả dụng trên host |
+| OpenAPI JSON Schema 3.2.1 | Chưa chạy validator đầy đủ cho bản `0.3.3` | NOT RUN |
+
+Cookie contract: exact configured web Origin, allowlisted CORS credentials, host-only `HttpOnly; Secure; SameSite=Strict; Path=/api/auth` refresh cookie. Native clients giữ refresh token JSON. Search cursor riêng từng endpoint; page size 1–50, default 10; optional `since` RFC3339 UTC. Route parity và static source review không chứng minh runtime behavior.
 
 ### Quality gates for integration
 
@@ -100,6 +125,9 @@ Ghi chú về phạm vi so sánh: Chat có thêm `GET /health` nội bộ và Tr
 
 ## Lịch sử thay đổi
 
+- 1.5.0 (2026-11-22) — Thêm OpenAPI 0.3.3 cho browser refresh cookie và cursor search; đồng bộ số route.
+- 1.4.0 (2026-11-22) — Đối chiếu schema sáu story like/highlight route; thêm phản hồi 429 vào SSE ticket contract; đồng bộ số route.
+- 1.3.0 (2026-11-21) — Đồng bộ sáu story route, loại hai health route nội bộ khỏi checker, thêm route-to-spec gate vào Web CI.
 - 1.2.0 (2026-11-21) — Thêm 21 handler-verified operations, route checker `scripts/check-api-contract.mjs`, và ghi nhận 163 route inventory còn lại.
 - 1.1.0 (2026-11-19) — Thêm bản ghi kiểm OpenAPI 0.2.0, kiểm tra route-to-catalog và Gateway-to-service.
 - 1.0.0 (2026-11-19) — Chuẩn hóa nội dung và đối chiếu baseline.

@@ -2,15 +2,15 @@
   "openapi": "3.2.1",
   "info": {
     "title": "ChatNet — Hợp đồng HTTP đối chiếu từ source",
-    "version": "0.3.0",
-    "description": "Draft contract. Health, SSE, and selected high-risk auth, chat, feed, call, and translation operations are handler-verified. Remaining registered routes stay route inventory and must not drive code generation."
+    "version": "0.3.3",
+    "description": "Draft contract. Handler-verified routes include browser refresh-cookie and cursor-search contracts. Remaining registered routes stay route inventory and must not drive code generation."
   },
   "servers": [
     {
       "url": "/"
     }
   ],
-  "x-source-baseline": "05a3caab51b55cc5393c8f47fee625fc1eaaa19d",
+  "x-source-baseline": "835138fc698ff8c030923ad0844ed22b053fc961",
   "paths": {
     "/api/health": {
       "get": {
@@ -47,13 +47,13 @@
         "operationId": "subscribeChatEvents",
         "x-source": "backend/cmd/chat/main.go",
         "summary": "Mở stream SSE theo tài khoản",
-        "description": "SSE phát update hoặc session-revoked. Không có cursor hoặc cam kết replay. Web dùng EventSource với token trong query. Không ghi token hoặc URL chứa token vào log.",
+        "description": "SSE phát update hoặc session-revoked. Không có cursor hoặc cam kết replay. Web lấy one-time ticket ngắn hạn trước khi mở EventSource. Không ghi token hoặc URL chứa token vào log.",
         "security": [
           {
             "bearerAuth": []
           },
           {
-            "eventSourceQuery": []
+            "eventTicketQuery": []
           }
         ],
         "responses": {
@@ -93,6 +93,71 @@
               "text/plain": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-chatnet-contract-status": "verified"
+      }
+    },
+    "/api/events/ticket": {
+      "post": {
+        "operationId": "issueChatEventsTicket",
+        "x-source": "backend/cmd/chat/sse_ticket.go",
+        "summary": "Cấp one-time ticket cho SSE",
+        "description": "Yêu cầu bearer hợp lệ. Ticket dùng một lần, hết hạn sau thời gian ngắn và chỉ dùng để mở GET /api/events.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ticket SSE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventTicket"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Phiên không hợp lệ.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-user ticket limit reached. Retry after the stated number of seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until another ticket may be requested.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Realtime ticket store không sẵn sàng.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
                 }
               }
             }
@@ -364,6 +429,14 @@
                   "$ref": "#/components/schemas/AuthSessionResponse"
                 }
               }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Set only for requests from exact CHATNET_WEB_URL. Cookie is HttpOnly; Secure; SameSite=Strict; Path=/api/auth; host-only; Max-Age=90 days.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "201": {
@@ -372,6 +445,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Set only for requests from exact CHATNET_WEB_URL. Cookie is HttpOnly; Secure; SameSite=Strict; Path=/api/auth; host-only; Max-Age=90 days.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -440,7 +521,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": " Browser web requests from exact CHATNET_WEB_URL receive refresh cookie; JSON omits refreshToken. Native requests keep refreshToken JSON."
       }
     },
     "/api/auth/register/resend": {
@@ -488,7 +570,8 @@
           }
         },
         "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/auth/main.go"
+        "x-chatnet-source": "backend/cmd/auth/main.go",
+        "description": " Browser web requests from exact CHATNET_WEB_URL receive refresh cookie; JSON omits refreshToken. Native requests keep refreshToken JSON."
       }
     },
     "/api/auth/email/resend": {
@@ -521,6 +604,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Set only for requests from exact CHATNET_WEB_URL. Cookie is HttpOnly; Secure; SameSite=Strict; Path=/api/auth; host-only; Max-Age=90 days.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -569,7 +660,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": " Browser web requests from exact CHATNET_WEB_URL receive refresh cookie; JSON omits refreshToken. Native requests keep refreshToken JSON."
       }
     },
     "/api/auth/refresh": {
@@ -588,6 +680,14 @@
                   "$ref": "#/components/schemas/AuthSessionResponse"
                 }
               }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Refresh cookie remains fixed-expiry.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "400": {
@@ -602,6 +702,16 @@
           },
           "401": {
             "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cookie request has an untrusted Origin.",
             "content": {
               "application/json": {
                 "schema": {
@@ -634,7 +744,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": " Browser requests use chatnet_refresh cookie and require exact CHATNET_WEB_URL Origin; native requests use refreshToken JSON. Cookie CORS uses exact allowlist with credentials."
       }
     },
     "/api/auth/logout": {
@@ -646,10 +757,28 @@
         "summary": "Revoke refresh session",
         "responses": {
           "204": {
-            "description": "Session revoked or already absent."
+            "description": "Session revoked or already absent.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Cookie cleared on cookie-backed logout, including when server session is already absent.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "description": "Handler error (400).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cookie request has an untrusted Origin.",
             "content": {
               "application/json": {
                 "schema": {
@@ -673,7 +802,7 @@
         "x-chatnet-source": "backend/cmd/auth/main.go",
         "x-source": "backend/cmd/auth/session.go",
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -682,7 +811,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": " Browser requests use chatnet_refresh cookie and require exact CHATNET_WEB_URL Origin; native requests use refreshToken JSON. Cookie CORS uses exact allowlist with credentials."
       }
     },
     "/api/auth/sessions/list": {
@@ -726,6 +856,16 @@
               }
             }
           },
+          "403": {
+            "description": "Cookie request has an untrusted Origin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Handler error (503).",
             "content": {
@@ -750,7 +890,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": " Browser requests use chatnet_refresh cookie and require exact CHATNET_WEB_URL Origin; native requests use refreshToken JSON. Cookie CORS uses exact allowlist with credentials."
       }
     },
     "/api/auth/sessions/revoke": {
@@ -762,7 +903,15 @@
         "summary": "Revoke one owned session",
         "responses": {
           "204": {
-            "description": "Session revoked."
+            "description": "Session revoked.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Cookie cleared when current session is revoked.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "description": "Handler error (400).",
@@ -776,6 +925,16 @@
           },
           "401": {
             "description": "Handler error (401).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cookie request has an untrusted Origin.",
             "content": {
               "application/json": {
                 "schema": {
@@ -813,12 +972,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SessionManagementRequest"
+                "$ref": "#/components/schemas/SessionRevokeRequest"
               }
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": " Browser requests use chatnet_refresh cookie and require exact CHATNET_WEB_URL Origin; native requests use refreshToken JSON. Cookie CORS uses exact allowlist with credentials."
       }
     },
     "/api/auth/sessions/revoke-others": {
@@ -852,6 +1012,16 @@
               }
             }
           },
+          "403": {
+            "description": "Cookie request has an untrusted Origin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Handler error (503).",
             "content": {
@@ -876,7 +1046,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": " Browser requests use chatnet_refresh cookie and require exact CHATNET_WEB_URL Origin; native requests use refreshToken JSON. Cookie CORS uses exact allowlist with credentials."
       }
     },
     "/api/auth/me": {
@@ -1380,17 +1551,125 @@
     },
     "/api/users/search": {
       "get": {
-        "operationId": "chat_get_api_users_search",
+        "operationId": "chatSearchUsers",
         "tags": [
           "chat"
         ],
+        "summary": "Search users within user privacy and block rules",
+        "description": "When sort, cursor or since is supplied, returns {items,nextCursor}. Cursor is endpoint-specific and must be reused with same q, sort and since. q searches only allowed public/searchable records; since uses RFC3339 UTC.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "relevance",
+                "newest"
+              ],
+              "default": "relevance"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Opaque cursor returned by same endpoint."
+            }
+          }
+        ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Search results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/UserSearchItem"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/UserSearchPage"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid search or cursor parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Search unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/chat/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/chat/main.go",
+        "x-source": "backend/cmd/chat/main.go",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/users/suggestions": {
@@ -2588,17 +2867,125 @@
     },
     "/api/groups/public": {
       "get": {
-        "operationId": "chat_get_api_groups_public",
+        "operationId": "chatSearchPublicCommunities",
         "tags": [
           "chat"
         ],
+        "summary": "Search public communities only",
+        "description": "When sort, cursor or since is supplied, returns {items,nextCursor}. Cursor is endpoint-specific and must be reused with same q, sort and since. q searches only allowed public/searchable records; since uses RFC3339 UTC.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "relevance",
+                "newest"
+              ],
+              "default": "relevance"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Opaque cursor returned by same endpoint."
+            }
+          }
+        ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Search results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CommunitySearchItem"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunitySearchPage"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid search or cursor parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Search unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/chat/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/chat/communities.go",
+        "x-source": "backend/cmd/chat/communities.go",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/groups/{id}/join": {
@@ -4315,10 +4702,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Post"
-                  }
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Post"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/PostSearchPage"
+                    }
+                  ]
                 }
               }
             }
@@ -4402,8 +4796,40 @@
                 "following"
               ]
             }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "relevance",
+                "newest"
+              ],
+              "default": "relevance"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Opaque cursor returned by same endpoint."
+            }
           }
-        ]
+        ],
+        "description": " Supplying sort, cursor or since returns {items,nextCursor}; search mode restricts results to public posts."
       },
       "post": {
         "operationId": "feedCreatePost",
@@ -4911,17 +5337,122 @@
     },
     "/api/marketplace/products": {
       "get": {
-        "operationId": "feed_get_api_marketplace_products",
+        "operationId": "feedSearchPublishedProducts",
         "tags": [
           "feed"
         ],
+        "summary": "Search published marketplace products only",
+        "description": "When sort, cursor or since is supplied, returns {items,nextCursor}. Cursor is endpoint-specific and must be reused with same q, sort and since. q searches only allowed public/searchable records; since uses RFC3339 UTC.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "relevance",
+                "newest"
+              ],
+              "default": "relevance"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Opaque cursor returned by same endpoint."
+            }
+          }
+        ],
         "responses": {
-          "default": {
-            "description": "Chưa mô hình hóa. Mã trạng thái, thân phản hồi và yêu cầu xác thực chưa được đối chiếu tới handler."
+          "200": {
+            "description": "Search results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/MarketProductsResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MarketProductSearchPage"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid search or cursor parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Search unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
           }
         },
-        "x-chatnet-contract-status": "route-inventory",
-        "x-chatnet-source": "backend/cmd/feed/"
+        "x-chatnet-contract-status": "verified",
+        "x-chatnet-source": "backend/cmd/feed/marketplace.go",
+        "x-source": "backend/cmd/feed/marketplace.go",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "post": {
         "operationId": "feed_post_api_marketplace_products",
@@ -5328,6 +5859,611 @@
         "x-chatnet-contract-status": "route-inventory",
         "x-chatnet-source": "backend/cmd/feed/"
       }
+    },
+    "/api/stories/{id}/like": {
+      "get": {
+        "operationId": "feedGetStoryLikes",
+        "tags": [
+          "feed"
+        ],
+        "summary": "Get viewer state or owner-paginated story likers.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Story ID.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Return liker IDs greater than this cursor; page size is 50.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Viewer sees liked state; story owner sees paginated likers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/StoryLikeState"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StoryLikePage"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid story ID or cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer session is invalid.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Story is missing, expired, or hidden by a block.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Story likes could not be loaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          }
+        },
+        "x-chatnet-contract-status": "verified",
+        "x-source": "backend/cmd/feed/story_likes.go",
+        "x-chatnet-source": "backend/cmd/feed/story_likes.go"
+      },
+      "put": {
+        "operationId": "feedLikeStory",
+        "tags": [
+          "feed"
+        ],
+        "summary": "Like a visible story.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Story ID.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Like stored; duplicate requests remain idempotent."
+          },
+          "400": {
+            "description": "Invalid story ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer session is invalid.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Story is missing, expired, owned by caller, or hidden by a block.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-user feed write limit reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until another request may be sent.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Story like could not be stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Rate limiter unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          }
+        },
+        "x-chatnet-contract-status": "verified",
+        "x-source": "backend/cmd/feed/story_likes.go",
+        "x-chatnet-source": "backend/cmd/feed/story_likes.go"
+      },
+      "delete": {
+        "operationId": "feedUnlikeStory",
+        "tags": [
+          "feed"
+        ],
+        "summary": "Remove caller like from a visible story.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Story ID.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Like removed; repeated requests remain idempotent."
+          },
+          "400": {
+            "description": "Invalid story ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer session is invalid.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Story is missing, expired, owned by caller, or hidden by a block.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-user feed write limit reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until another request may be sent.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Story like could not be removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Rate limiter unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          }
+        },
+        "x-chatnet-contract-status": "verified",
+        "x-source": "backend/cmd/feed/story_likes.go",
+        "x-chatnet-source": "backend/cmd/feed/story_likes.go"
+      }
+    },
+    "/api/stories/highlights": {
+      "get": {
+        "operationId": "feedListStoryHighlights",
+        "tags": [
+          "feed"
+        ],
+        "summary": "List up to 100 highlights for a username.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": true,
+            "description": "Highlight owner username.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Visible highlights; blocked users receive an empty list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StoryHighlight"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Username is required and must be at most 128 characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer session is invalid.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Story highlights could not be loaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          }
+        },
+        "x-chatnet-contract-status": "verified",
+        "x-source": "backend/cmd/feed/story_highlights.go",
+        "x-chatnet-source": "backend/cmd/feed/story_highlights.go"
+      }
+    },
+    "/api/stories/{id}/highlight": {
+      "put": {
+        "operationId": "feedAddStoryHighlight",
+        "tags": [
+          "feed"
+        ],
+        "summary": "Add or update a story highlight title.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Story ID.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryHighlightRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Highlight saved."
+          },
+          "400": {
+            "description": "Invalid story ID or title. Title must contain 1–40 characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer session is invalid.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Story is missing, expired, or not owned by caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Owner already has 100 highlights.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-user feed write limit reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until another request may be sent.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Story highlight could not be saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Rate limiter unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          }
+        },
+        "x-chatnet-contract-status": "verified",
+        "x-source": "backend/cmd/feed/story_highlights.go",
+        "x-chatnet-source": "backend/cmd/feed/story_highlights.go"
+      },
+      "delete": {
+        "operationId": "feedRemoveStoryHighlight",
+        "tags": [
+          "feed"
+        ],
+        "summary": "Remove a story highlight title.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Story ID.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Highlight removed."
+          },
+          "400": {
+            "description": "Invalid story ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer session is invalid.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Story is missing, expired, or not owned by caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-user feed write limit reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until another request may be sent.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Story highlight could not be removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Rate limiter unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            }
+          }
+        },
+        "x-chatnet-contract-status": "verified",
+        "x-source": "backend/cmd/feed/story_highlights.go",
+        "x-chatnet-source": "backend/cmd/feed/story_highlights.go"
+      }
     }
   },
   "components": {
@@ -5337,11 +6473,17 @@
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
-      "eventSourceQuery": {
+      "eventTicketQuery": {
         "type": "apiKey",
         "in": "query",
-        "name": "token",
-        "description": "Chỉ cho GET /api/events khi không có bearer trong Authorization. Vẫn kiểm trạng thái phiên phía server."
+        "name": "ticket",
+        "description": "One-time SSE ticket ngắn hạn. Không phải bearer token."
+      },
+      "refreshCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "chatnet_refresh",
+        "description": "HttpOnly; Secure; SameSite=Strict; Path=/api/auth; host-only. Browser cookie authentication requires exact configured CHATNET_WEB_URL Origin."
       }
     },
     "schemas": {
@@ -5354,6 +6496,18 @@
         },
         "required": [
           "error"
+        ]
+      },
+      "EventTicket": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "minLength": 32
+          }
+        },
+        "required": [
+          "ticket"
         ]
       },
       "GatewayHealth": {
@@ -5477,7 +6631,8 @@
             "type": "string"
           },
           "refreshToken": {
-            "type": "string"
+            "type": "string",
+            "description": "Present only for native clients. Web clients receive host-only HttpOnly Secure SameSite=Strict cookie at Path=/api/auth."
           },
           "user": {
             "$ref": "#/components/schemas/AuthUser"
@@ -5485,9 +6640,9 @@
         },
         "required": [
           "token",
-          "refreshToken",
           "user"
-        ]
+        ],
+        "description": "Browser web response omits refreshToken and sets HttpOnly refresh cookie. Native clients receive refreshToken in JSON."
       },
       "VerificationResponse": {
         "type": "object",
@@ -5562,7 +6717,8 @@
           "refreshToken": {
             "type": "string"
           }
-        }
+        },
+        "description": "Native clients send refreshToken. Browser clients send an empty JSON object and use chatnet_refresh cookie."
       },
       "SessionManagementRequest": {
         "type": "object",
@@ -5574,9 +6730,24 @@
             "type": "string"
           }
         },
+        "required": [],
+        "description": "Native clients send refreshToken. Browser clients use chatnet_refresh cookie; revoke requests also send sessionId."
+      },
+      "SessionRevokeRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
         "required": [
-          "refreshToken"
-        ]
+          "sessionId"
+        ],
+        "description": "Native clients send refreshToken. Browser clients use chatnet_refresh cookie and exact CHATNET_WEB_URL Origin."
       },
       "ManagedSession": {
         "type": "object",
@@ -6217,6 +7388,309 @@
           "author",
           "content"
         ]
+      },
+      "StoryLikeState": {
+        "type": "object",
+        "properties": {
+          "liked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "liked"
+        ]
+      },
+      "StoryLiker": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "displayName"
+        ]
+      },
+      "StoryLikePage": {
+        "type": "object",
+        "properties": {
+          "likers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoryLiker"
+            }
+          },
+          "next": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "likers"
+        ]
+      },
+      "StoryHighlightRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "StoryHighlight": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "author": {
+            "type": "string"
+          },
+          "authorDisplayName": {
+            "type": "string"
+          },
+          "attachment": {
+            "$ref": "#/components/schemas/MediaAttachment"
+          },
+          "text": {
+            "type": "string"
+          },
+          "background": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "title",
+          "createdAt",
+          "expiresAt"
+        ]
+      },
+      "UserSearchItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "displayName",
+          "online"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "online": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CommunitySearchItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "topic",
+          "visibility",
+          "memberCount"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "rules": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public"
+            ]
+          },
+          "memberCount": {
+            "type": "integer"
+          }
+        }
+      },
+      "MarketProduct": {
+        "type": "object",
+        "required": [
+          "id",
+          "sellerId",
+          "title",
+          "description",
+          "priceAmount",
+          "priceUnit",
+          "stock",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sellerId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "priceAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "priceUnit": {
+            "type": "string"
+          },
+          "stock": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "published"
+            ]
+          }
+        }
+      },
+      "UserSearchPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSearchItem"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CommunitySearchPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunitySearchItem"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PostSearchPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Post"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MarketProductSearchPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarketProduct"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MarketProductsResponse": {
+        "type": "object",
+        "required": [
+          "products"
+        ],
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarketProduct"
+            }
+          }
+        }
       }
     }
   },

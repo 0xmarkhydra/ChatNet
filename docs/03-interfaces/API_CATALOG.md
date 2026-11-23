@@ -1,11 +1,11 @@
 ---
 document_id: API-CAT-001
 title: ChatNet HTTP API Catalog
-version: 1.2.0
+version: 1.5.0
 status: Draft
 owner: Backend Engineering
-baseline_commit: 05a3caab51b55cc5393c8f47fee625fc1eaaa19d
-last_updated: 2026-11-21
+baseline_commit: 835138fc698ff8c030923ad0844ed22b053fc961
+last_updated: 2026-11-22
 normative_basis: OpenAPI Specification 3.2.1; IETF RFC 9110
 ---
 
@@ -19,7 +19,7 @@ Tra method và path theo dịch vụ. Khai báo route không xác nhận quyền
 
 This catalog is derived from Go ServeMux registrations in the committed source baseline. It records route patterns and owning services; it is not a complete OpenAPI contract. Request schemas, response schemas, status-code matrices, authorization rules and examples still require handler-level extraction and validation.
 
-[OpenAPI 3.2.1](openapi.json) đặc tả 21 thao tác đã đối chiếu tới handler và kiểm kê 163 thao tác còn lại. Route gắn `route-inventory` chưa có schema, mã trạng thái hoặc yêu cầu xác thực đã đối chiếu. Route trong bảng không đồng nghĩa đã xác nhận đầy đủ schema hay quyền. Xem [danh mục lỗi](ERROR_CATALOG.md).
+[OpenAPI 3.2.1](openapi.json) đặc tả 31 thao tác đã đối chiếu tới handler và kiểm kê 160 thao tác còn lại. Route gắn `route-inventory` chưa có schema, mã trạng thái hoặc yêu cầu xác thực đã đối chiếu. Route trong bảng không đồng nghĩa đã xác nhận đầy đủ schema hay quyền. Xem [danh mục lỗi](ERROR_CATALOG.md).
 
 ## 2. Public API routing
 
@@ -29,7 +29,7 @@ The Gateway routes these path families:
 |---|---|
 | /api/auth/ | Auth |
 | /api/messages, /api/messages/ | Chat |
-| /api/events | Chat |
+| /api/events, /api/events/ticket | Chat |
 | /api/push/ | Chat |
 | /api/media/ | Chat |
 | /api/profile, /api/profile/ | Chat |
@@ -228,6 +228,7 @@ Source: backend/cmd/chat/main.go
 | POST | /api/conversations/{id}/e2ee/bootstrap |
 | POST | /api/conversations/{id}/e2ee/events |
 | GET | /api/events |
+| POST | /api/events/ticket |
 
 ## 5. Call service
 
@@ -289,6 +290,12 @@ Source: backend/cmd/feed/main.go
 | GET | /api/stories |
 | POST | /api/stories |
 | DELETE | /api/stories/{id} |
+| GET | /api/stories/{id}/like |
+| PUT | /api/stories/{id}/like |
+| DELETE | /api/stories/{id}/like |
+| GET | /api/stories/highlights |
+| PUT | /api/stories/{id}/highlight |
+| DELETE | /api/stories/{id}/highlight |
 
 ## 7. Marketplace routes hosted by Feed
 
@@ -327,7 +334,8 @@ The Gateway path map is not the complete security policy. Service handlers and m
 
 ## 10. Contract gaps
 
-- OpenAPI mô tả đầy đủ route cho 184 thao tác `/api/*`; 21 thao tác đã đối chiếu handler, 163 thao tác còn ở trạng thái `route-inventory`.
+- OpenAPI khớp 191 route trong source và catalog; 31 thao tác đã đối chiếu handler, 160 thao tác còn ở trạng thái `route-inventory`. Hai health route nội bộ (`/api/live`, `/api/ready`) bị loại khỏi so sánh.
+- Cursor search cho user, post, community và published product dùng query `sort`, `cursor`, `since`; client không gửi các tham số này vẫn nhận response shape cũ.
 - Request and response schemas are not fully captured in this catalog.
 - Error response schemas and status-code guarantees need handler-level verification.
 - Pagination, idempotency, rate limits and authorization requirements vary by route.
@@ -338,6 +346,9 @@ See [Contract governance](CONTRACT_GOVERNANCE.md) before generating a machine-re
 
 ## Lịch sử thay đổi
 
+- 1.5.0 (2026-11-22) — Đồng bộ API Catalog với OpenAPI 0.3.3: cursor search, browser refresh cookie và số route đã verified.
+- 1.4.0 (2026-11-22) — Đối chiếu schema sáu story like/highlight route; mô tả phản hồi 429 của SSE ticket; đồng bộ số route và contract status.
+- 1.3.0 (2026-11-21) — Thêm sáu story like/highlight route vào OpenAPI và catalog; checker loại hai health route nội bộ; route-to-spec gate chạy trong Web CI.
 - 1.2.0 (2026-11-21) — Đối chiếu 21 thao tác rủi ro cao; đồng bộ 184 route với source; thêm kiểm tra route-to-spec cho CI.
 - 1.1.0 (2026-11-19) — Cập nhật trạng thái OpenAPI sang bản kiểm kê route.
 - 1.0.0 (2026-11-19) — Chuẩn hóa nội dung và đối chiếu baseline.
