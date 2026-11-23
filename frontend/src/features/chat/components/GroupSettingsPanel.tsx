@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from 'react'
+import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { ArrowLeft, Bell, Check, ChevronRight, Clock3, FileText, Files, Info, ScrollText, Search, ShieldCheck, UserPlus, UsersRound, X } from 'lucide-react'
 import type { GroupMember, Conversation } from '../types'
 import type { FriendConnection } from '../../contacts'
@@ -42,7 +42,11 @@ type Props = {
   onMembersChanged: () => Promise<void>
 }
 
-export default function GroupSettingsPanel({
+export default function GroupSettingsPanel(props: Props) {
+  return <GroupSettingsPanelScope key={JSON.stringify([props.activeConversation.id, props.initialSection ?? 'members'])} {...props} />
+}
+
+function GroupSettingsPanelScope({
   activeGroupMember,
   initialSection = 'members',
   setGroupSettingsOpen,
@@ -75,6 +79,17 @@ export default function GroupSettingsPanel({
 }: Props) {
   const [activeSection, setActiveSection] = useState<GroupManagementSection>(initialSection)
   const [memberSearch, setMemberSearch] = useState('')
+  const inviting = useRef(false)
+
+  async function submitInvites() {
+    if (inviting.current || groupBusy || groupInviteSelection.length === 0) return
+    inviting.current = true
+    try {
+      await inviteGroupMembers()
+    } finally {
+      inviting.current = false
+    }
+  }
   const filteredMembers = groupMembers.filter(member => `${member.displayName} ${member.username}`.toLocaleLowerCase('vi-VN').includes(memberSearch.trim().toLocaleLowerCase('vi-VN')))
   const isOwner = activeGroupMember?.role === 'owner'
   const isManager = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
@@ -179,7 +194,7 @@ export default function GroupSettingsPanel({
               </div>
             </div>
             <button type="button" className="group-invite-submit"
-              onClick={() => void inviteGroupMembers()} disabled={groupBusy || !groupInviteSelection.length}>
+              onClick={() => void submitInvites()} disabled={groupBusy || !groupInviteSelection.length}>
               <UserPlus size={16} aria-hidden="true" /> Mời {groupInviteSelection.length} thành viên
             </button>
           </div>}
