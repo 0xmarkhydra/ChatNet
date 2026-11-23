@@ -102,7 +102,7 @@ export function PostCardToolbar({
   const commentsId = useId()
   return (
     <>
-      <div className="post-toolbar feed-post-toolbar grid! grid-cols-3! gap-1! mt-0! mx-4! pt-1! border-t! border-[#e8ecf5]!">
+      <div className="post-toolbar feed-post-toolbar grid! grid-cols-3! gap-1! mt-0! mx-4! pt-1! border-t! border-border-subtle!">
         <FeedLikeButton post={post} busy={busy} onLike={(emoji) => void like(post, emoji)} />
         <button type="button" className={`post-stat post-detail-trigger ${postActionClassName}`}
           aria-expanded={onToggleComments ? Boolean(discussion) : undefined}

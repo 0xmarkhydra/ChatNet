@@ -1,6 +1,6 @@
 /* Friends overview: scoped layout and styling; directory/invitations remain owned by Agent 2. */
 .contacts-overview {
-  --co-blue: #2563eb;
+  --co-blue: var(--soco-blue);
   --co-ink: #182b4d;
   --co-muted: #7183a4;
   --co-line: #e7edf7;
@@ -351,7 +351,7 @@
 .co-count-pill {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 23px; height: 23px; padding: 2px 7px; border-radius: 999px;
-  background: #eaf0ff; color: #2563eb; font-size: 12px; letter-spacing: 0;
+  background: #eaf0ff; color: var(--soco-blue); font-size: 12px; letter-spacing: 0;
 }
 .co-request-card, .co-suggestion, .co-side > .co-qr-wrap, .co-privacy {
   transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
@@ -417,7 +417,7 @@
   white-space: nowrap;
 }
 .co-qr-wrap .fd-qr-actions .fd-secondary { background: #edf2ff; color: #225ed8; }
-.co-qr-wrap .fd-qr-actions .fd-primary { background: #2563eb; color: #fff; }
+.co-qr-wrap .fd-qr-actions .fd-primary { background: var(--soco-blue); color: #fff; }
 .co-qr-wrap .fd-qr-actions .fd-secondary:hover { background: #dfe9ff; }
 .co-qr-wrap .fd-qr-actions .fd-primary:hover { background: #174fcb; }
 .co-qr-wrap .fd-security-tip { display: none; }
@@ -445,7 +445,7 @@
 .co-discover-banner > div:nth-child(2) { display: grid; gap: 4px; min-width: 0; flex: 1; }
 .co-discover-banner strong { font-size: 13px; }
 .co-discover-banner span { font-size: 11px; color: #637a9e; line-height: 1.5; }
-.co-discover-banner button { background: #2563eb; color: white; border: none; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+.co-discover-banner button { background: var(--soco-blue); color: white; border: none; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
 .co-discover-banner button:hover { background: #164fcf; }
 .co-skeleton-list { display: flex; align-items: center; gap: 13px; min-height: 90px; padding: 16px 6px; }
 .co-skeleton-avatar { display: block; width: 53px; height: 53px; flex: 0 0 53px; border-radius: 50%; background: #e8edf7; }

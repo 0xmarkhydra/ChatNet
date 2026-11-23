@@ -3,7 +3,7 @@
 /* Scroll desktop content in each column, leaving both sets of controls visible. */
 .post-detail-backdrop.post-comments-page {
   --detail-secondary: color-mix(in srgb, var(--soco-text) 62%, var(--soco-muted));
-  --detail-like: #ee416a;
+  --detail-like: var(--soco-reaction-like);
   --detail-like-soft: color-mix(in srgb, var(--detail-like) 8%, var(--soco-surface));
   --detail-rule: var(--soco-line);
   box-sizing: border-box;

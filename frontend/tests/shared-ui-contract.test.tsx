@@ -28,7 +28,7 @@ describe('SocCO shared UI component contracts', () => {
     expect(html).toContain('bg-destructive')
     expect(html).toContain('rounded-ui-md')
     expect(html).toContain('text-[length:var(--soco-type-body)]')
-    expect(html).toContain('h-9')
+    expect(html).toContain('h-control-sm')
   })
 
   it('supports native input types and a11y props without losing visual tokens', () => {
