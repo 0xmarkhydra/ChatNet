@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Check, Image as ImageIcon, Package, SearchX, UsersRound, Video } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
+import { Skeleton } from '@/shared/ui/skeleton'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { ApiRequest } from '../../../shared/types/api'
@@ -63,7 +64,7 @@ function Section({ title, count, onSeeAll, children }: { title: string; count?: 
 }
 
 function Status<T>({ source, label, hasMore = false }: { source: Remote<T>; label: string; hasMore?: boolean }) {
-  if (source.loading) return <div className="grid gap-ui-2 py-ui-1" aria-hidden="true">{[0, 1, 2].map(index => <span key={index} className="h-11 animate-pulse rounded-ui-sm bg-muted motion-reduce:animate-none" />)}</div>
+  if (source.loading) return <div className="grid gap-ui-2 py-ui-1" aria-hidden="true">{[0, 1, 2].map(index => <Skeleton key={index} className="h-11" />)}</div>
   if (source.error) return <div className={inline} role="alert">{source.error} <button type="button" className={link} onClick={source.retry}>Thử lại</button></div>
   if (source.items.length === 0 && hasMore) return <p className={inline}>Chưa thấy {label} khớp bộ lọc trong các kết quả đã tải.</p>
   if (source.items.length === 0) return <p className={inline}>Không có {label} phù hợp.</p>

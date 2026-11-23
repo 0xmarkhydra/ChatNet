@@ -19,7 +19,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-(--soco-z-modal) grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-ui-lg border border-border bg-card p-6 text-foreground shadow-xl outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "fixed top-1/2 left-1/2 z-(--soco-z-modal) grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-ui-4 overflow-y-auto rounded-ui-lg border border-border bg-card p-ui-6 text-foreground shadow-xl outline-none focus-visible:ring-2 focus-visible:ring-ring",
           className,
         )}
         {...props}
@@ -28,7 +28,7 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             aria-label="Đóng hộp thoại"
-            className="absolute top-4 right-4 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+            className="absolute top-ui-4 right-ui-4 inline-flex size-9 items-center justify-center rounded-ui-sm max-lg:size-control-touch text-muted-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
           >
             <X size={18} aria-hidden="true" />
           </DialogPrimitive.Close>
@@ -39,11 +39,11 @@ function DialogContent({
 }
 
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="dialog-header" className={cn("flex flex-col gap-2 text-left", className)} {...props} />;
+  return <div data-slot="dialog-header" className={cn("flex flex-col gap-ui-2 text-left", className)} {...props} />;
 }
 
 function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="dialog-footer" className={cn("flex flex-wrap justify-end gap-2", className)} {...props} />;
+  return <div data-slot="dialog-footer" className={cn("flex flex-wrap justify-end gap-ui-2", className)} {...props} />;
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {

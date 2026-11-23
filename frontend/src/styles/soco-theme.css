@@ -89,7 +89,7 @@ html { background: var(--soco-canvas); }
 body { color: var(--soco-text); background: #eff3fa; }
 button, input, select, textarea { font-family: inherit; }
 button, [role="button"] { -webkit-tap-highlight-color: transparent; }
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+button:focus-visible:not([data-slot]), a:focus-visible, input:focus-visible:not([data-slot]), textarea:focus-visible:not([data-slot]), select:focus-visible {
   outline: 3px solid var(--soco-focus-ring);
   outline-offset: 2px;
 }

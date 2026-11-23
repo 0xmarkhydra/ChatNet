@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Button } from './button'
 import { Input } from './input'
+import { Skeleton } from './skeleton'
+import { Textarea } from './textarea'
 
 const theme = readFileSync(new URL('../../styles/soco-theme.css', import.meta.url), 'utf8')
 const tailwind = readFileSync(new URL('../../styles/tailwind.css', import.meta.url), 'utf8')
@@ -44,5 +46,25 @@ describe('shared UI design token contract', () => {
     expect(renderToStaticMarkup(<Button size="lg">Large</Button>)).toContain('h-control-touch')
     expect(renderToStaticMarkup(<Button size="icon">Icon</Button>)).toContain('size-control-md')
     expect(renderToStaticMarkup(<Input aria-label="Search" />)).toContain('h-control-md')
+  })
+})
+describe('shared UI states and accessibility', () => {
+  it('flags invalid inputs and textareas with the destructive colour', () => {
+    expect(renderToStaticMarkup(<Input aria-label="Email" />)).toContain('aria-invalid:border-destructive')
+    expect(renderToStaticMarkup(<Textarea aria-label="Bio" />)).toContain('aria-invalid:border-destructive')
+  })
+
+  it('exposes data-slot so the legacy global focus outline does not double the shared ring', () => {
+    expect(renderToStaticMarkup(<Button>Save</Button>)).toContain('data-slot="button"')
+    expect(renderToStaticMarkup(<Input aria-label="Name" />)).toContain('data-slot="input"')
+    expect(renderToStaticMarkup(<Textarea aria-label="Bio" />)).toContain('data-slot="textarea"')
+    expect(theme).toContain('input:focus-visible:not([data-slot])')
+  })
+
+  it('renders decorative skeletons that respect reduced motion', () => {
+    const markup = renderToStaticMarkup(<Skeleton className="h-11" />)
+    expect(markup).toContain('aria-hidden="true"')
+    expect(markup).toContain('motion-reduce:animate-none')
+    expect(markup).toContain('h-11')
   })
 })
