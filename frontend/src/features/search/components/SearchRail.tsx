@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { UsersRound } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
+import { Skeleton } from '@/shared/ui/skeleton'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import type { useRailData } from '../hooks/useRailData'
 import { avatar, card, cardTitle, iconTile, rowCopy, rowMeta, rowTitle } from './ui'
@@ -16,10 +17,10 @@ export type SearchRailProps = {
 const ROWS = 4
 const item = 'flex items-center gap-ui-3 py-ui-2 [&+&]:border-t [&+&]:border-border'
 
-function Skeleton() {
+function RailSkeleton() {
   return (
     <div className="grid gap-ui-2" aria-hidden="true">
-      {[0, 1, 2].map(index => <span key={index} className="h-12 animate-pulse rounded-ui-sm bg-muted motion-reduce:animate-none" />)}
+      {[0, 1, 2].map(index => <Skeleton key={index} className="h-12" />)}
     </div>
   )
 }
@@ -38,7 +39,7 @@ export default function SearchRail({ data, className, onOpenProfile, onOpenCommu
       {showPeople && (
         <section className={card} aria-labelledby={idPrefix + 'people'}>
           <h2 id={idPrefix + 'people'} className={cn(cardTitle, 'mb-ui-3')}>Gợi ý kết nối</h2>
-          {data.people.loading ? <Skeleton /> : (
+          {data.people.loading ? <RailSkeleton /> : (
             <ul className="m-0 grid list-none p-0">
               {people.map(person => (
                 <li key={person.id} className={item}>
@@ -57,7 +58,7 @@ export default function SearchRail({ data, className, onOpenProfile, onOpenCommu
       {showCommunities && (
         <section className={card} aria-labelledby={idPrefix + 'communities'}>
           <h2 id={idPrefix + 'communities'} className={cn(cardTitle, 'mb-ui-3')}>Cộng đồng nổi bật</h2>
-          {data.communities.loading ? <Skeleton /> : (
+          {data.communities.loading ? <RailSkeleton /> : (
             <ul className="m-0 grid list-none p-0">
               {communities.map(community => (
                 <li key={community.id} className={item}>

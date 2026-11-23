@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Bell, BookmarkCheck, Clock, FileText, Package, UserRoundCheck, UsersRound, X } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
+import { Skeleton } from '@/shared/ui/skeleton'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import type { ApiRequest } from '../../../shared/types/api'
 import { usePostSearch } from '../../feed'
@@ -60,7 +61,7 @@ function SavedSearchCard({ saved, request, sessionId, onOpen, onRemove }: {
       </header>
       {search.loading && (
         <div className="grid gap-ui-2" aria-hidden="true">
-          {[0, 1].map(index => <span key={index} className="h-14 animate-pulse rounded-ui-sm bg-muted motion-reduce:animate-none" />)}
+          {[0, 1].map(index => <Skeleton key={index} className="h-14" />)}
         </div>
       )}
       {search.error && <div className={inline} role="alert">{search.error} <button type="button" className={link} onClick={search.retry}>Thử lại</button></div>}
