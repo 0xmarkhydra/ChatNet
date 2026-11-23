@@ -4,7 +4,7 @@ Read this project policy and the relevant local skills before editing code.
 
 **Parallel-agent requirement:** follow `docs/engineering/AGENT_FILE_OWNERSHIP.md`. Only one active writer may edit a given file; coordinate ownership and check other worktrees/PRs before editing. Isolated branches alone do not prevent conflicts.
 
-**Frontend mandatory policy (all AI agents and human contributors):** `docs/engineering/FRONTEND_STANDARDS.md`. Read it before any `frontend/` change; follow `docs/engineering/FRONTEND_STRUCTURE.md` for the directory map. New code must not copy legacy architecture or React Hooks violations. No unreviewed baseline increases or CI bypasses.
+**Frontend mandatory policy (all AI agents and human contributors):** New UI uses Tailwind v4 and SocCO tokens; no handwritten CSS in new or existing stylesheets without explicit user approval. The PR CSS gate enforces this. Follow `docs/engineering/FRONTEND_STANDARDS.md`. Read it before any `frontend/` change; follow `docs/engineering/FRONTEND_STRUCTURE.md` for the directory map. New code must not copy legacy architecture or React Hooks violations. No unreviewed baseline increases or CI bypasses.
 
 ## Product and implementation context
 - Phase 1 delivers **Web and PWA**. Do not add native iOS/Android release work without an explicit request; preserve existing mobile source and compatibility.
