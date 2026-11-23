@@ -18,7 +18,7 @@ export type SearchFilterPanelProps = {
   showTypes?: boolean
 }
 
-const priceInput = 'h-10 min-w-0 flex-1 rounded-ui-sm border border-border bg-card px-ui-3 text-[length:var(--soco-type-body)] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring max-lg:h-11'
+const priceInput = 'h-10 min-w-0 flex-1 rounded-ui-sm border border-border bg-card px-ui-3 text-[length:var(--soco-type-body)] text-foreground outline-none! focus-visible:ring-2 focus-visible:ring-ring max-lg:h-11'
 
 export default function SearchFilterPanel({ type, values, minPrice, maxPrice, onType, onFilter, onPrice, onReset, showTypes = true }: SearchFilterPanelProps) {
   const [openGroup, setOpenGroup] = useState<FilterId | null>(null)

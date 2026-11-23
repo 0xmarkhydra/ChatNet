@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import SearchResultsPage from './SearchResultsPage'
 import type { ApiRequest } from '../../shared/types/api'
+import type { Post } from '../feed'
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
 const stored = new Map<string, string>()
@@ -59,7 +60,8 @@ async function mount(request: ApiRequest, route: string) {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
-  const props = { request, sessionId: 'session-' + (sessionNumber += 1), onOpenProfile: vi.fn(), onOpenPost: vi.fn() }
+  const props = { request, sessionId: 'session-' + (sessionNumber += 1), onOpenProfile: vi.fn(), onOpenPost: vi.fn(),
+    renderPosts: (posts: Post[], onOpen: (id: number) => void) => posts.map(post => <button key={post.id} type="button" data-testid="post-card" onClick={() => onOpen(post.id)}>{post.content}</button>) }
   roots.push(async () => { await act(async () => root.unmount()) })
   await act(async () => root.render(
     <MemoryRouter initialEntries={[route]}><SearchResultsPage {...props} /><RouteLocation /></MemoryRouter>,

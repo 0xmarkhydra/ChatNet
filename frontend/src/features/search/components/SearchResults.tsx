@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, Image as ImageIcon, Package, SearchX, UsersRound, Video } from 'lucide-react'
+import { Check, Package, SearchX, UsersRound } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -10,7 +10,7 @@ import type { Post } from '../../feed'
 import { joinCommunity, type CommunityResult, type PersonResult, type ProductResult } from '../api/search'
 import { formatPrice, type SearchType } from '../lib/searchFilters'
 import type { OpenedResult } from '../lib/searchHistory'
-import { avatar, avatarSmall, card, cardHead, cardTitle, clamp2, emptyIcon, iconTile, inline, link, plainButton, rowCopy, rowMeta, rowTitle, touchButton } from './ui'
+import { avatar, card, cardHead, cardTitle, clamp2, emptyIcon, iconTile, inline, link, plainButton, rowCopy, rowMeta, rowTitle, touchButton } from './ui'
 
 type Remote<T> = { items: T[]; loading: boolean; error: string; retry: () => void }
 type PostRemote = Remote<Post> & { hasMore: boolean; loadingMore: boolean; loadMore: () => void }
@@ -29,6 +29,8 @@ export type SearchResultsProps = {
   onResetFilters: () => void
   onOpenProfile: (username: string) => void
   onOpenPost: (postId: number) => void
+  /** Posts are drawn by the feed card so they behave like they do in the feed. */
+  renderPosts: (posts: Post[], onOpen: (postId: number) => void) => ReactNode
   onOpened: (item: OpenedResult) => void
   /** A past search of the user's that matches the query without accents or case, offered as a correction. */
   suggestion?: string
@@ -41,18 +43,17 @@ export type SearchResultsProps = {
 
 const row = 'flex items-center gap-ui-3 py-ui-2 [&+&]:border-t [&+&]:border-border max-sm:flex-wrap'
 const rowAction = 'max-lg:h-11 max-sm:ml-15'
-const tag = 'inline-flex items-center gap-ui-1 rounded-full bg-muted px-ui-2 py-0.5 text-[length:var(--soco-type-caption)] text-muted-foreground'
+
 
 const PREVIEW = { people: 3, posts: 3, communities: 3, products: 4 }
 type JoinState = 'joining' | 'joined' | 'pending' | 'error'
 const noJoins: Record<number, JoinState> = {}
 
-const postTime = (value: string) => new Date(value).toLocaleDateString('vi-VN', { day: 'numeric', month: 'short', year: 'numeric' })
 const snippet = (text: string, length = 220) => text.length > length ? text.slice(0, length).trimEnd() + '…' : text
 
-function Section({ title, count, onSeeAll, children }: { title: string; count?: number; onSeeAll?: () => void; children: ReactNode }) {
+function Section({ title, count, onSeeAll, bare, children }: { title: string; count?: number; onSeeAll?: () => void; bare?: boolean; children: ReactNode }) {
   return (
-    <section className={card} aria-label={title}>
+    <section className={bare ? 'grid gap-ui-3' : card} aria-label={title}>
       <header className={cardHead}>
         <h2 className={cardTitle}>{title}</h2>
         {onSeeAll && <button type="button" className={link} onClick={onSeeAll}>Xem tất cả{count ? ' (' + count + ')' : ''}</button>}
@@ -75,6 +76,11 @@ export default function SearchResults(props: SearchResultsProps) {
   const [joins, setJoins] = useScopedState<Record<number, JoinState>>(props.sessionId, noJoins)
   const all = type === 'all'
   const show = (key: Exclude<SearchType, 'all'>) => all || type === key
+  const openPost = (id: number) => {
+    const post = posts.items.find(item => item.id === id)
+    if (post) props.onOpened({ kind: 'post', id, title: post.authorDisplayName || post.author, subtitle: snippet(post.content, 80) })
+    props.onOpenPost(id)
+  }
   const limit = <T,>(items: T[], key: keyof typeof PREVIEW) => all ? items.slice(0, PREVIEW[key]) : items
   const sources: { loading: boolean; error: string; items: unknown[] }[] = []
   if (show('people')) sources.push(people)
@@ -162,36 +168,9 @@ export default function SearchResults(props: SearchResultsProps) {
       )}
 
       {show('posts') && (!all || posts.items.length > 0 || posts.hasMore || posts.loading || Boolean(posts.error)) && (
-        <Section title="Bài viết" onSeeAll={all && (posts.items.length > PREVIEW.posts || posts.hasMore) ? () => props.onType('posts') : undefined}>
+        <Section bare title="Bài viết" onSeeAll={all && (posts.items.length > PREVIEW.posts || posts.hasMore) ? () => props.onType('posts') : undefined}>
           <Status source={posts} label="bài viết" hasMore={posts.hasMore} />
-          <ul className="m-0 grid list-none divide-y divide-border p-0">
-            {limit(posts.items, 'posts').map(post => {
-              const author = post.authorDisplayName || post.author
-              const image = post.attachments?.some(item => item.kind === 'image')
-              const video = post.attachments?.some(item => item.kind === 'video')
-              return (
-                <li key={post.id} className="grid gap-ui-2 py-ui-3 first:pt-0">
-                  <div className="flex items-center gap-ui-2">
-                    <UserAvatar name={author} username={post.author} className={avatarSmall} />
-                    <div className={rowCopy}>
-                      <button type="button" className={cn(plainButton, 'justify-self-start text-[length:var(--soco-type-body)]! font-semibold! hover:underline')} onClick={() => props.onOpenProfile(post.author)}>{author}</button>
-                      <small className={rowMeta}>{postTime(post.createdAt)}</small>
-                    </div>
-                  </div>
-                  <p className="m-0 text-[length:var(--soco-type-body)] leading-normal whitespace-pre-line [overflow-wrap:anywhere] text-foreground">{snippet(post.content) || 'Bài viết không có nội dung chữ.'}</p>
-                  <div className="flex flex-wrap items-center gap-ui-2">
-                    {image && <span className={tag}><ImageIcon size={14} aria-hidden="true" /> Ảnh</span>}
-                    {video && <span className={tag}><Video size={14} aria-hidden="true" /> Video</span>}
-                    <span className={rowMeta}>{post.likes} lượt thích · {post.comments.length} bình luận</span>
-                    <button type="button" className={cn(link, 'ml-auto')} onClick={() => {
-                      props.onOpened({ kind: 'post', id: post.id, title: author, subtitle: snippet(post.content, 80) })
-                      props.onOpenPost(post.id)
-                    }}>Xem bài viết <ArrowRight size={14} aria-hidden="true" /></button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+          <div className="feed zalo-feed grid gap-ui-3">{props.renderPosts(limit(posts.items, 'posts'), openPost)}</div>
           {!all && posts.hasMore && (
             <Button variant="secondary" className="mt-ui-3 h-11 w-full" onClick={posts.loadMore} disabled={posts.loadingMore}>
               {posts.loadingMore ? 'Đang tải…' : 'Tải thêm bài viết'}
