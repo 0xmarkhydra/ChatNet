@@ -27,7 +27,7 @@ export default function FeedLikeButton({
         onLike(selectedReaction || '❤️')
       }}
     >
-      <Heart size={22} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
+      <Heart size={18} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
       <span>{liked ? 'Đã thích' : 'Thích'}</span>
     </button>
   )
