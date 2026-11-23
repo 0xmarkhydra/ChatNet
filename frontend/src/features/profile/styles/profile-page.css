@@ -403,19 +403,6 @@
 }
 
 @media (min-width: 761px) {
-  .modern-shell.app-layout .chatnet-appbar.app-section-header .appbar-search-anchor {
-    flex: 0 1 307px;
-    width: min(28vw, 307px);
-  }
-  .modern-shell.app-layout .chatnet-appbar.app-section-header .appbar-search {
-    height: 47px;
-    border: 1px solid transparent;
-    background: #f8fafe;
-  }
-  .modern-shell.app-layout .chatnet-appbar.app-section-header .appbar-search:focus-within {
-    border-color: #c7d7fc;
-  }
-  .modern-shell.app-layout .chatnet-appbar.app-section-header .appbar-actions { gap: 10px; }
   .modern-shell.app-layout .profile-page-header-new { background: #eff3ff; color: #2563eb; }
   .modern-shell.app-layout .profile-page-header-account {
     display: grid;

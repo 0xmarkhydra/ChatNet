@@ -3,8 +3,7 @@
  * Scoped to the desktop chat so mobile, feed and other social pages retain their layouts.
  * Reference board: 1586x992 / 250px navigation / 86px header / 347+605+292 chat panes.
  */
-.social-chat-list-header,
-.social-chat-ai-banner {
+.social-chat-list-header {
   display: none;
 }
 
@@ -398,49 +397,6 @@
     color: #fff;
   }
 
-  .modern-shell.app-layout .social-chat-layout .social-chat-ai-banner {
-    box-sizing: border-box;
-    display: flex;
-    flex: 0 0 42px;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    height: 42px;
-    margin: 0 15px 0;
-    padding: 0 12px;
-    border: 1px solid #e5ecff;
-    border-radius: 10px;
-    background: #eff3ff;
-    color: #637ba9;
-    font-size: 11px;
-  }
-  .social-chat-ai-banner.is-enabled > svg {
-    color: #366bdb;
-  }
-  .social-chat-ai-banner > span {
-    flex: 1 1 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .social-chat-ai-banner button {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    flex: 0 0 auto;
-    padding: 6px 2px;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: #3768bd;
-    font-size: 11px;
-    font-weight: 650;
-    cursor: pointer;
-  }
-  .social-chat-ai-banner button:hover {
-    color: #18479b;
-  }
-
   .modern-shell.app-layout .social-chat-layout .media-composer.composer {
     box-sizing: border-box;
     min-height: 90px;
@@ -825,10 +781,6 @@
   }
   .modern-shell.app-layout .social-chat-layout .chat-photo-stamp {
     display: none;
-  }
-  .modern-shell.app-layout .social-chat-layout .social-chat-ai-banner {
-    border-color: transparent;
-    border-radius: 13px;
   }
   .modern-shell.app-layout .social-chat-layout .media-composer.composer {
     position: relative;
@@ -1438,15 +1390,6 @@
   outline: none;
   background: transparent;
   box-shadow: none;
-}
-.modern-shell.app-layout .social-chat-layout .social-chat-ai-banner > button {
-  position: static;
-  align-self: center;
-  justify-content: center;
-  min-height: 32px;
-  margin: 0;
-  line-height: 18px;
-  white-space: nowrap;
 }
 /* Keep the mobile composer compact while preserving 44px touch targets. */
 @media (max-width: 760px) {

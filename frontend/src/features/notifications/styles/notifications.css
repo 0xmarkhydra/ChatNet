@@ -10,23 +10,6 @@
   border-color: #eff4ff;
 }
 
-.notification-test-button {
-  min-height: 40px;
-  padding: 0 12px !important;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.notification-test-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.notification-test-icon {
-  display: none;
-}
-
 .push-onboarding {
   display: flex;
   flex: 0 0 auto;
@@ -84,22 +67,6 @@
     width: 38px;
     min-width: 38px;
     min-height: 38px;
-  }
-
-  .notification-test-button {
-    width: 38px;
-    min-width: 38px;
-    min-height: 38px;
-    padding: 0 !important;
-    font-size: 16px;
-  }
-
-  .notification-test-label {
-    display: none;
-  }
-
-  .notification-test-icon {
-    display: inline;
   }
 }
 .outgoing-preview { opacity: .75; }

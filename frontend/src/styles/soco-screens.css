@@ -202,7 +202,6 @@
 /* Feed stories, post interactions, account preferences, notifications */
 .modern-shell .story-card { background: #fff; }
 .modern-shell .story-camera, .modern-shell .story-avatar-mini { border-color: white; }
-.modern-shell .story-progress > span.running { background: var(--soco-blue); }
 .modern-shell .post-box textarea,
 .modern-shell .comment-box input,
 .modern-shell .feed-comment-compose textarea {

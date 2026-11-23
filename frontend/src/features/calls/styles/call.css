@@ -147,19 +147,6 @@
 .call-connecting-state span { max-width: 360px; font-size: 12px; line-height: 1.45; }
 .call-secure-spinner { width: 54px; height: 54px; border-radius: 50%; border: 3px solid rgba(255,255,255,.08); border-top-color: #4d8dff; animation: call-spin .8s linear infinite; }
 @keyframes call-spin { to { transform: rotate(360deg); } }
-
-.call-caption-stack {
-  position: absolute;
-  z-index: 3;
-  left: 50%;
-  bottom: 106px;
-  width: min(760px, calc(100% - 28px));
-  transform: translateX(-50%);
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  pointer-events: none;
-}
 .call-caption-line {
   max-width: 100%;
   display: flex;
@@ -177,7 +164,6 @@
 .call-caption-line strong { color: #7fb0ff; white-space: nowrap; }
 .call-caption-line span { min-width: 0; overflow-wrap: anywhere; }
 .call-caption-line small { color: rgba(255,255,255,.52); white-space: nowrap; }
-.call-caption-line.is-interim { color: rgba(255,255,255,.68); font-style: italic; }
 .call-translation-error {
   position: absolute;
   z-index: 4;
@@ -239,7 +225,6 @@
   .secure-call-controls { gap: 1px; overflow-x: auto; justify-content: space-around; }
   .secure-call-controls button { min-width: 54px; width: 54px; }
   .secure-call-controls button svg { width: 42px; height: 42px; }
-  .call-caption-stack { bottom: 102px; width: calc(100% - 20px); }
   .call-caption-line { font-size: 13px; }
   .call-caption-line small { display: none; }
 }

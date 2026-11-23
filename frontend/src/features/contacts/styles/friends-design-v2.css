@@ -106,11 +106,6 @@
 .fd-profile-options>div:nth-child(2)>button{background:transparent;border:0;padding:1px;font-size:11px;color:#7185a9}
 .fd-profile-options>div:nth-child(2)>button:hover{color:var(--soco-blue);text-decoration:underline}
 .fd-profile-options>div:nth-child(2)>span{font-size:11px;color:#a8b4ca}
-.fd-options{position:absolute;right:10px;top:9px;z-index:5}
-.fd-options>button{display:grid;place-items:center;width:29px;height:29px;background:transparent;border:0;color:#7e90b1;border-radius:9px}
-.fd-option-popover{position:absolute;z-index:10;right:0;top:35px;width:195px;background:white;padding:7px;border:1px solid #e2e8f5;box-shadow:0 12px 28px #1c316229;border-radius:11px;max-height:260px;overflow-y:auto}
-.fd-option-popover button{display:block;width:100%;text-align:left;border:0;background:none;color:#344b75;font-size:12px;padding:8px;border-radius:7px}
-.fd-option-popover button:hover{background:#eef2ff}
 .fd-profile-placeholder{margin:auto}
 .fd-invitation-tabs{flex:0 0 auto;min-height:68px;background:#fff;border-radius:15px;display:flex;gap:13px;align-items:center;padding:10px 17px}
 .fd-invitation-tabs .fd-back{flex:0 0 44px;width:44px;height:44px;border:0;background:#f3f6ff;border-radius:11px;color:#6080bf;display:grid;place-items:center}

@@ -3,7 +3,6 @@
  * Keep the existing React screens, data and actions shared across desktop and mobile.
  * Desktop owns the rail and split chat; phone owns a bottom tab bar and one chat pane.
  */
-.social-chat-groups-link { display: none; }
 .bottom-navigation .nav-label { display: none; }
 .category-filter-mobile-icon { display: none; }
 
@@ -199,7 +198,6 @@
     font-weight: 800;
     letter-spacing: -.4px;
   }
-  .modern-shell.app-layout .social-chat-groups-link,
   .modern-shell.app-layout .social-chat-new {
     display: grid;
     place-items: center;

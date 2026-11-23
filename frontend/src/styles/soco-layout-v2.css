@@ -106,15 +106,6 @@
 .feed-empty { margin: 12px 0 26px; border: 1px solid var(--soco-hairline); border-radius: 20px; background: white; }
 
 /* Main conversation list: native list grouped under an unambiguous title. */
-.modern-shell .soco-chat-list-heading {
-  flex: 0 0 auto;
-  align-items: center;
-  padding: 23px 17px 15px;
-  background: #fff;
-  border-bottom: 1px solid var(--soco-hairline);
-}
-.modern-shell .soco-chat-list-heading h2 { font-size: 24px; }
-.modern-shell .soco-chat-list-heading p { font-size: 11px; margin-top: 6px; }
 .modern-shell .zalo-conversation-list { min-height: 0; }
 .modern-shell .conversation-copy { min-width: 0; }
 .modern-shell .conversation-copy > div { min-width: 0; }
@@ -170,7 +161,6 @@
   box-shadow: var(--soco-card-shadow);
 }
 .modern-shell .zalo-post-composer textarea { min-width: 0; font-size: 16px; background: transparent; }
-.modern-shell .post-content { overflow-wrap: anywhere; }
 
 /* Profile: full-width glass cover, identity and consistent grouped settings. */
 .modern-shell .profile-view { background: #f6f8fd; }
@@ -262,7 +252,6 @@
 
 /* Tablet/desktop: main sections have comfortably contained reading widths. */
 @media (min-width: 761px) {
-  .modern-shell .soco-chat-list-heading { padding: 22px 20px; }
   .modern-shell .contacts-view > .soco-section-heading,
   .modern-shell .contacts-view > .contacts-suggestions,
   .modern-shell .contacts-view > .contact-shortcuts { max-width: 980px; margin-left: auto; margin-right: auto; }
@@ -286,9 +275,6 @@
   .modern-shell .modern-frame > .messenger-layout { min-width: 0; min-height: 0; }
   .modern-shell .conversation-sidebar,
   .modern-shell .conversation-panel { min-height: 0; }
-  .modern-shell .soco-chat-list-heading { padding: 17px 16px 14px; }
-  .modern-shell .soco-chat-list-heading h2 { font-size: 23px; }
-  .modern-shell .soco-chat-list-heading p { max-width: 210px; font-size: 11px; }
   .modern-shell .soco-section-heading { padding: 19px 15px 13px; gap: 8px; }
   .modern-shell .soco-section-heading h2 { font-size: 24px; }
   .modern-shell .soco-section-heading p { font-size: 11px; }
@@ -314,7 +300,6 @@
 
 /* At 320px, prioritize usable tap areas and prevent horizontal viewport movement. */
 @media (max-width: 370px) {
-  .modern-shell .soco-chat-list-heading .soco-section-heading-copy p { max-width: 170px; }
   .modern-shell .soco-text-action { padding-inline: 8px; font-size: 11px; }
   .modern-shell .soco-section-heading h2 { font-size: 22px; }
   .modern-shell .settings-current-locale { max-width: 38%; }
@@ -382,7 +367,6 @@
   min-height: 0;
   overflow-y: auto;
 }
-.modern-shell .soco-chat-list-heading { flex: 0 0 auto; }
 @media (max-width: 760px) {
   .modern-shell .simple-view.profile-view {
     display: block;
@@ -392,8 +376,7 @@
     overflow-x: hidden;
     padding-bottom: max(90px, env(safe-area-inset-bottom));
   }
-  .modern-shell .soco-section-heading,
-  .modern-shell .soco-chat-list-heading {
+  .modern-shell .soco-section-heading {
     min-width: 0;
     box-sizing: border-box;
   }
@@ -1014,7 +997,6 @@
     font-size: 12px;
   }
   .modern-shell .profile-hero .profile-email { margin-top: 4px; font-size: 11px; }
-  .modern-shell .profile-hero .profile-media-hint { display: none; }
   .modern-shell .profile-view > .profile-edit-card {
     box-sizing: border-box;
     width: 100%;
@@ -1130,7 +1112,6 @@
     font-size: 11px;
     color: #667691;
   }
-  .modern-shell .profile-identity-copy .profile-media-hint { display: none; }
 
   .modern-shell .profile-view > .profile-edit-card {
     box-sizing: border-box;

@@ -309,43 +309,6 @@
   opacity: .55;
   cursor: not-allowed;
 }
-.conversation-channel-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.conversation-channel-list button {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 10px 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #405571;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-.conversation-channel-list button:hover,
-.conversation-channel-list button[aria-current="true"] {
-  background: #eff4ff;
-  color: #225fc4;
-}
-.conversation-channel-list button span {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.conversation-channel-list-header {
-  margin: 8px 3px 4px;
-  color: #7388a1;
-  font-size: 12px;
-}
 @media (max-width: 760px) {
   .group-channel-current-name {
     max-width: 104px;

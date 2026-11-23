@@ -170,12 +170,6 @@
     gap: 15px;
     min-height: 49px;
   }
-  .social-feed-me-avatar {
-    flex: 0 0 46px;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-  }
   .social-feed-launcher-prompt {
     flex: 1 1 auto;
     height: 49px;
@@ -257,9 +251,6 @@
   }
   .social-feed-launcher-publish:hover {
     background: #1d52ce;
-  }
-  .social-feed-launcher-publish-plus {
-    display: none;
   }
 
   /* Social V4 filter row */
