@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef } from 'react'
 import type { Tab } from '../../shared/types/navigation'
 import { formatUnreadMessageDescription, type UI_MESSAGES } from '../../features/i18n/lib/i18n'
 import UiIcon from '../../shared/ui/UiIcon'
+import { useScrollHideChrome } from './useScrollHideChrome'
 
 type Props = {
   tab: Tab
@@ -25,6 +26,7 @@ export default function BottomNavigation({
   const pillRef = useRef<HTMLSpanElement>(null)
   const previousActiveKey = useRef<string | null>(null)
   const slideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useScrollHideChrome(navRef, tab === 'feed')
 
   useLayoutEffect(() => {
     const nav = navRef.current
