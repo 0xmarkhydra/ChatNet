@@ -18,7 +18,7 @@ export type SearchFilterPanelProps = {
   showTypes?: boolean
 }
 
-const priceInput = 'h-10 min-w-0 flex-1 rounded-ui-sm border border-border bg-card px-ui-3 text-[length:var(--soco-type-body)] text-foreground outline-none! focus-visible:ring-2 focus-visible:ring-ring max-lg:h-11'
+const priceInput = 'h-10 min-w-0 flex-1 rounded-ui-sm border border-border bg-card px-ui-3 text-[length:var(--soco-type-body)] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring max-lg:h-11'
 
 export default function SearchFilterPanel({ type, values, minPrice, maxPrice, onType, onFilter, onPrice, onReset, showTypes = true }: SearchFilterPanelProps) {
   const [openGroup, setOpenGroup] = useState<FilterId | null>(null)
@@ -88,10 +88,10 @@ export default function SearchFilterPanel({ type, values, minPrice, maxPrice, on
           <legend className="mb-ui-2 p-0 text-[length:var(--soco-type-body)] font-semibold text-foreground">Khoảng giá</legend>
           <div className="flex items-center gap-ui-2 text-muted-foreground">
             <input type="number" inputMode="numeric" min={0} aria-label="Giá thấp nhất" placeholder="Tối thiểu"
-              className={priceInput} value={minPrice} onChange={event => onPrice('min', event.target.value)} />
+              data-slot="input" className={priceInput} value={minPrice} onChange={event => onPrice('min', event.target.value)} />
             <span aria-hidden="true">–</span>
             <input type="number" inputMode="numeric" min={0} aria-label="Giá cao nhất" placeholder="Tối đa"
-              className={priceInput} value={maxPrice} onChange={event => onPrice('max', event.target.value)} />
+              data-slot="input" className={priceInput} value={maxPrice} onChange={event => onPrice('max', event.target.value)} />
           </div>
         </fieldset>
       )}
