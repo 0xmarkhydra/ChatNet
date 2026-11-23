@@ -67,4 +67,23 @@ describe('sharing a post link through chat', () => {
     await expect(submit(request, conversation, () => current)).rejects.toThrow()
     expect(request).toHaveBeenCalledTimes(1)
   })
+  it('never falls back to plaintext when an encrypted group cannot be sent directly', async () => {
+    const request = vi.fn().mockResolvedValue(Response.json({ mode: 'e2ee' }))
+    const group = { ...conversation, type: 'group' as const, otherUserId: undefined }
+    await expect(submit(request, group)).rejects.toMatchObject({ openChat: true })
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(sendEncrypted).not.toHaveBeenCalled()
+  })
+
+  it('does not send after the signed-in session changes before encrypted delivery', async () => {
+    let current = true
+    const request = vi.fn().mockImplementation(async () => {
+      current = false
+      return Response.json({ mode: 'e2ee' })
+    })
+    await expect(submit(request, conversation, () => current)).rejects.toThrow()
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(sendEncrypted).not.toHaveBeenCalled()
+  })
+
 })
