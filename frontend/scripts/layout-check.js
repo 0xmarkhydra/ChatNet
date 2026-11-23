@@ -106,7 +106,7 @@ async (page) => {
       assert(Math.abs(avatar.y - author.y) < 2, 'Avatar detached from author')
       await p.screenshot({ path: `output/playwright/layout-feed-${width}.png` })
       await p.locator('.feed-view').evaluate((el) => { el.scrollTop = el.scrollHeight })
-      await p.locator('.zalo-post').last().locator('.post-toolbar').scrollIntoViewIfNeeded()
+      await p.locator('.feed-post-card').last().locator('.feed-post-toolbar').scrollIntoViewIfNeeded()
       await p.waitForTimeout(300)
       await p.locator('.feed-view').evaluate((el) => { el.scrollTop = el.scrollHeight })
       const lastPost = await p.locator('.zalo-post').last().boundingBox()

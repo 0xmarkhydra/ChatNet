@@ -170,9 +170,6 @@
   box-shadow: var(--soco-card-shadow);
 }
 .modern-shell .zalo-post-composer textarea { min-width: 0; font-size: 16px; background: transparent; }
-.modern-shell .zalo-post { border: 1px solid var(--soco-hairline); box-shadow: var(--soco-card-shadow); }
-.modern-shell .post-body { min-width: 0; }
-.modern-shell .post-author { min-width: 0; }
 .modern-shell .post-content { overflow-wrap: anywhere; }
 
 /* Profile: full-width glass cover, identity and consistent grouped settings. */
