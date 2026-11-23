@@ -1,0 +1,97 @@
+/* Mobile floating glass bottom navigation: icon-only, content scrolls behind it. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout {
+    --bottom-nav-height: 64px;
+    --bottom-nav-offset: max(16px, env(safe-area-inset-bottom));
+    --bottom-nav-space: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 12px);
+    position: relative;
+  }
+
+  .modern-shell.app-layout > .bottom-navigation {
+    position: absolute;
+    z-index: 15;
+    right: max(24px, env(safe-area-inset-right));
+    bottom: var(--bottom-nav-offset);
+    left: max(24px, env(safe-area-inset-left));
+    box-sizing: border-box;
+    width: auto;
+    height: var(--bottom-nav-height);
+    min-height: var(--bottom-nav-height);
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, .75);
+    border-radius: 32px;
+    background: rgba(255, 255, 255, .7);
+    box-shadow: 0 8px 32px rgba(17, 24, 39, .18), inset 0 1px 0 rgba(255, 255, 255, .8);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  .modern-shell.app-layout > .bottom-navigation > button {
+    min-height: 52px;
+    border-radius: 26px;
+    color: #374151;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .15s ease-out;
+  }
+  .modern-shell.app-layout > .bottom-navigation > button:active {
+    transform: scale(.9);
+  }
+  .modern-shell.app-layout > .bottom-navigation > button.active {
+    color: #4f46e5;
+  }
+  .modern-shell.app-layout > .bottom-navigation > button:focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: -2px;
+  }
+
+  .modern-shell.app-layout > .bottom-navigation .nav-label {
+    display: none;
+  }
+  .modern-shell.app-layout > .bottom-navigation .nav-icon {
+    transition: transform .42s cubic-bezier(.34, 1.56, .64, 1), color .2s ease;
+  }
+  .modern-shell.app-layout > .bottom-navigation > button.active .nav-icon {
+    transform: scale(1.12);
+  }
+  .modern-shell.app-layout > .bottom-navigation .nav-icon b {
+    top: -2px;
+    right: -6px;
+    border: 2px solid rgba(255, 255, 255, .9);
+    box-sizing: content-box;
+  }
+
+  .modern-shell.app-layout > .bottom-navigation .nav-liquid-pill {
+    border: 0;
+    border-radius: 26px;
+    background: rgba(79, 70, 229, .14);
+    box-shadow: none;
+  }
+  .modern-shell.app-layout > .bottom-navigation .nav-liquid-pill::after {
+    background: none;
+  }
+
+  /* The nav floats over the page, so every routed page reserves its space. */
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame {
+    box-sizing: border-box;
+    padding-bottom: var(--bottom-nav-space);
+  }
+  /* The feed scrolls behind the glass; only its end reserves the space. */
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="feed"] {
+    padding-bottom: 0;
+  }
+  .modern-shell.app-layout .feed-view.zalo-feed-view.social-feed {
+    scroll-padding-bottom: var(--bottom-nav-space);
+  }
+  .modern-shell.app-layout .feed-view.zalo-feed-view.social-feed > :last-child {
+    margin-bottom: var(--bottom-nav-space);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout > .bottom-navigation > button,
+  .modern-shell.app-layout > .bottom-navigation .nav-icon {
+    transition: none;
+    transform: none;
+  }
+}
