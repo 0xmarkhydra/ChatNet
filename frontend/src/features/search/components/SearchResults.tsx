@@ -35,6 +35,8 @@ export type SearchResultsProps = {
   /** The user's other recent searches, offered when nothing matches. */
   recentQueries: string[]
   onSearch: (query: string) => void
+  /** Shown under the empty state, e.g. discovery suggestions. */
+  below?: ReactNode
 }
 
 const row = 'flex items-center gap-ui-3 py-ui-2 [&+&]:border-t [&+&]:border-border max-sm:flex-wrap'
@@ -131,6 +133,7 @@ export default function SearchResults(props: SearchResultsProps) {
             </ul>
           </section>
         )}
+        {props.below}
       </div>
     )
   }

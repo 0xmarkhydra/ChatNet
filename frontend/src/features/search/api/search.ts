@@ -40,6 +40,20 @@ export async function listRecentProducts(request: ApiRequest, signal: AbortSigna
   return (await readJson<{ products: ProductResult[] }>(response, 'Không thể tải sản phẩm.')).products
 }
 
+export type SuggestedPerson = { id: number; username: string; displayName: string; reason: string }
+
+export async function listSuggestedPeople(request: ApiRequest, signal: AbortSignal) {
+  const response = await request('/api/users/suggestions', { signal, cache: 'no-store' })
+  const data = await readJson<unknown>(response, 'Không thể tải gợi ý kết nối.')
+  if (!Array.isArray(data)) throw new Error('Dữ liệu gợi ý không hợp lệ.')
+  return data.filter((user): user is SuggestedPerson => Boolean(user) && Number.isSafeInteger(user.id) && typeof user.username === 'string')
+}
+
+export async function listPopularCommunities(request: ApiRequest, signal: AbortSignal) {
+  const response = await request('/api/groups/public?limit=5&q=', { signal, cache: 'no-store' })
+  return readJson<CommunityResult[]>(response, 'Không thể tải cộng đồng.')
+}
+
 export function joinCommunity(request: ApiRequest, id: number) {
   return request('/api/groups/' + id + '/join', { method: 'POST' })
 }

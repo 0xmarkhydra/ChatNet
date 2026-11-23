@@ -246,3 +246,23 @@ it('offers an accent-insensitive correction and recent searches when nothing mat
   await view.click(view.button('thiết kế UI'))
   expect(view.route()).toContain('q=thi%E1%BA%BFt+k%E1%BA%BF+UI')
 })
+
+it('offers suggested people and popular communities beside results and under an empty state', async () => {
+  const suggestions = () => ok([{ id: 21, username: 'zed', displayName: 'Zed Tran', reason: '2 nhóm chung' }])
+  const withResults = await mount(routes({ '/api/users/suggestions': suggestions }), '/search?q=thi%E1%BA%BFt')
+  expect(withResults.host.textContent).toContain('Gợi ý kết nối')
+  expect(withResults.host.textContent).toContain('Cộng đồng nổi bật')
+  expect(withResults.host.querySelectorAll('aside[aria-label="Gợi ý cho bạn"]')).toHaveLength(1)
+  await withResults.click([...withResults.host.querySelectorAll('aside[aria-label="Gợi ý cho bạn"] button')][0])
+  expect(withResults.props.onOpenProfile).toHaveBeenCalledWith('zed')
+
+  const empty = routes({ '/api/users/search': () => ok([]), '/api/groups/public': () => ok([]), '/api/marketplace/products': () => ok({ products: [] }), '/api/posts': () => ok([]), '/api/users/suggestions': suggestions })
+  const none = await mount(empty, '/search?q=zzz')
+  expect(none.host.textContent).toContain('Không có kết quả cho “zzz”')
+  expect(none.host.querySelectorAll('aside[aria-label="Gợi ý cho bạn"]')).toHaveLength(2)
+})
+
+it('leaves the suggestion rail out when its requests fail', async () => {
+  const view = await mount(routes({ '/api/groups/public': () => failed() }), '/search?q=thi%E1%BA%BFt')
+  expect(view.host.querySelector('aside[aria-label="Gợi ý cho bạn"]')).toBeNull()
+})

@@ -8,6 +8,7 @@ import { usePostSearch } from '../feed'
 import type { ApiRequest } from '../../shared/types/api'
 import { listRecentProducts, searchCommunities, searchPeople } from './api/search'
 import type { SuggestConfig } from './hooks/useSuggestions'
+import { useRailData } from './hooks/useRailData'
 import { useRemoteList } from './hooks/useRemoteList'
 import {
   FILTER_GROUPS, SEARCH_TYPES, activeFilters, foldText, effectiveFilters, filterCommunities, filterPeople, filterPosts, filterProducts,
@@ -19,6 +20,7 @@ import {
 import SearchFilterPanel from './components/SearchFilterPanel'
 import SearchForm from './components/SearchForm'
 import SearchHome from './components/SearchHome'
+import SearchRail from './components/SearchRail'
 import SearchResults from './components/SearchResults'
 import { card, emptyIcon, link, plainButton } from './components/ui'
 
@@ -80,6 +82,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
   const pastQueries = useMemo(() => [...history.saved.map(item => item.query), ...history.recent], [history])
   const suggestion = query ? pastQueries.find(item => item !== query && foldText(item) === foldedQuery) : undefined
   const recentQueries = history.recent.filter(item => item !== query).slice(0, 6)
+  const rail = useRailData(request, sessionId, !isHome)
   const chips = activeFilters(type, values)
   const priceActive = parsePrice(minPrice) !== null || parsePrice(maxPrice) !== null
   const activeCount = chips.length + Number(priceActive)
@@ -149,6 +152,11 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
       else next.set(key, value)
     }, true),
   }
+  const railBlock = (className: string) => (
+    <SearchRail data={rail} className={className}
+      onOpenProfile={(username, title) => { recordOpened({ kind: 'person', username, title }); onOpenProfile(username) }}
+      onOpenCommunity={name => startSearch(name, { type: 'communities' })} />
+  )
   const saveButton = query && (
     <Button size="sm" variant={saved ? 'secondary' : 'outline'} className={cn('max-lg:h-11', saved && 'text-primary')} aria-pressed={saved}
       onClick={() => updateHistory(sessionId, current => toggleSaved(current, query, Date.now()))}>
@@ -167,7 +175,8 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
           <SearchFilterPanel {...panelProps} />
         </aside>
 
-        <div className="mx-auto flex w-full max-w-180 min-w-0 flex-col gap-ui-3 px-ui-4 pt-ui-5 pb-ui-8 max-lg:max-w-none max-lg:gap-ui-2 max-lg:px-ui-3 max-lg:pt-0 max-lg:pb-ui-6">
+        <div className="flex min-w-0 justify-center gap-ui-5 px-ui-4 max-lg:block max-lg:px-0">
+        <div className="flex w-full max-w-180 min-w-0 flex-col gap-ui-3 pt-ui-5 pb-ui-8 max-lg:max-w-none max-lg:gap-ui-2 max-lg:px-ui-3 max-lg:pt-0 max-lg:pb-ui-6">
           <div className="sticky top-0 z-2 -mx-ui-3 hidden grid-cols-[minmax(0,1fr)] gap-ui-2 border-b border-border bg-card px-ui-3 py-ui-2 max-lg:grid">
             <div className="flex items-center gap-ui-2">
               <button type="button" aria-label="Quay lại" className={cn(plainButton, 'inline-grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted')}
@@ -219,6 +228,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
                 items: filterPosts(posts.posts, values, openedAt), loading: posts.loading, error: posts.error, retry: posts.retry,
                 hasMore: posts.hasMore, loadingMore: posts.loadingMore, loadMore: () => void posts.loadMore(),
               }}
+              below={railBlock('min-[1280px]:hidden')}
               suggestion={suggestion} recentQueries={recentQueries} onSearch={value => startSearch(value, type === 'all' ? {} : { type })}
               onType={setType} onResetFilters={resetFilters} onOpenProfile={onOpenProfile} onOpenPost={onOpenPost} onOpened={recordOpened} />
           ) : (
@@ -228,6 +238,10 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
               <p className="m-0 text-[length:var(--soco-type-body)] text-muted-foreground">Bộ lọc bạn chọn sẽ được giữ khi tìm kiếm.</p>
             </div>
           )}
+        </div>
+        <div className="hidden w-80 shrink-0 pt-ui-5 pb-ui-8 min-[1280px]:block">
+          {railBlock('sticky top-ui-4')}
+        </div>
         </div>
       </div>
 
