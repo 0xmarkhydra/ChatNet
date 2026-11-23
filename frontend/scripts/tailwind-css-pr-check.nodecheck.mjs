@@ -1,5 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { addedCssDeclarations, hasCurrentOwnerApproval, runCssGuard } from './tailwind-css-pr-check.mjs'
 
 const cssDiff = `diff --git a/frontend/src/features/feed/styles/social-feed.css b/frontend/src/features/feed/styles/social-feed.css
@@ -92,5 +94,5 @@ test('executes git diff at the repository root, even when CI runs from frontend'
   })
   assert.equal(args.at(-1), 'frontend')
   assert.equal(args.includes('origin/main...HEAD'), true)
-  assert.match(options.cwd.replaceAll('\\\\', '/'), /ChatNet.*enforce-tailwind-css-pr-gate-20261122$/i)
+  assert.equal(options.cwd, resolve(fileURLToPath(new URL('../../', import.meta.url))))
 })
