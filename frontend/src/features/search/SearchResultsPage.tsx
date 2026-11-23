@@ -19,6 +19,7 @@ import {
 } from './lib/searchHistory'
 import SearchFilterPanel from './components/SearchFilterPanel'
 import SearchForm from './components/SearchForm'
+import SearchHeader from './components/SearchHeader'
 import SearchHome from './components/SearchHome'
 import SearchRail from './components/SearchRail'
 import SearchResults, { type SearchResultsProps } from './components/SearchResults'
@@ -41,6 +42,8 @@ const PLACEHOLDER: Record<SearchType, string> = {
 }
 const page = 'min-h-full w-full min-w-0 overflow-x-clip bg-background text-foreground'
 const activeChip = 'inline-flex min-h-8 cursor-pointer items-center gap-ui-1 rounded-full border-0 bg-card py-0 pr-ui-2 pl-ui-3 shadow-ui-sm text-[length:var(--soco-type-label)]! font-semibold! text-primary max-lg:min-h-11'
+// Focusing on a phone would open the keyboard over the home content (checked once in the component).
+const HOME_PLACEHOLDER = 'Tìm người, bài viết, cộng đồng, sản phẩm…'
 const FILTER_KEYS = [...Object.keys(FILTER_GROUPS), 'range', 'min', 'max']
 
 export default function SearchResultsPage({ request, sessionId, onOpenProfile, onOpenPost, renderPosts }: SearchResultsPageProps) {
@@ -55,6 +58,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [openedAt] = useState(() => Date.now())
   const isHome = !query && !params.has('type')
+  const [focusField] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
 
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 1024px)')
@@ -134,18 +138,6 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
     else startSearch(item.title, { type: 'communities' })
   }
 
-  if (isHome) {
-    return (
-      <section className={page} aria-label="Tìm kiếm">
-        <SearchHome history={history} request={request} sessionId={sessionId} suggest={suggest}
-          onSearch={startSearch} onOpenSaved={openSaved} onOpenOpened={openOpened}
-          onRemoveRecent={value => updateHistory(sessionId, current => removeRecent(current, value))}
-          onClearRecent={() => updateHistory(sessionId, current => ({ ...current, recent: [] }))}
-          onToggleSaved={value => updateHistory(sessionId, current => toggleSaved(current, value, Date.now()))} />
-      </section>
-    )
-  }
-
   const panelProps = {
     type, values, minPrice, maxPrice, onType: setType, onFilter: setFilter, onReset: resetFilters,
     onPrice: (key: 'min' | 'max', value: string) => change(next => {
@@ -158,21 +150,36 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
       onOpenProfile={(username, title) => { recordOpened({ kind: 'person', username, title }); onOpenProfile(username) }}
       onOpenCommunity={name => startSearch(name, { type: 'communities' })} />
   )
-  const saveButton = query && (
-    <Button size="sm" variant={saved ? 'secondary' : 'outline'} className={cn('max-lg:h-11', saved && 'text-primary')} aria-pressed={saved}
+  // Same control in two places: next to the header field on desktop, above the results on phones.
+  // Always drawn (disabled until there is a query) so the field keeps the same width before and after a search starts.
+  const saveButton = (className: string, compact: boolean) => (
+    <Button size="sm" variant={saved ? 'secondary' : 'outline'} className={cn(className, saved && 'text-primary')} aria-pressed={saved} disabled={!query} title={saved ? 'Đã lưu tìm kiếm' : query ? 'Lưu tìm kiếm' : 'Nhập từ khóa để lưu tìm kiếm'}
       onClick={() => updateHistory(sessionId, current => toggleSaved(current, query, Date.now()))}>
       {saved ? <BellRing size={16} aria-hidden="true" /> : <Bell size={16} aria-hidden="true" />}
-      {saved ? 'Đã lưu tìm kiếm' : 'Lưu tìm kiếm'}
+      <span className={cn(compact && 'max-xl:sr-only')}>{saved ? 'Đã lưu tìm kiếm' : 'Lưu tìm kiếm'}</span>
     </Button>
   )
 
   return (
-    <section className={page} aria-label="Kết quả tìm kiếm">
+    <section className={page} aria-label={isHome ? 'Tìm kiếm' : 'Kết quả tìm kiếm'}>
+      <SearchHeader className={isHome ? undefined : 'max-lg:hidden'}>
+        <div className="flex items-center gap-ui-2">
+          <div className="min-w-0 flex-1">
+            <SearchForm large suggest={suggest} initialQuery={query} autoFocus={isHome && focusField} placeholder={isHome ? HOME_PLACEHOLDER : PLACEHOLDER[type]}
+              onSubmit={value => isHome ? startSearch(value) : submit(value)} />
+          </div>
+          {saveButton('h-control-touch shrink-0 max-xl:px-3', true)}
+        </div>
+      </SearchHeader>
+      {isHome ? (
+        <SearchHome history={history} request={request} sessionId={sessionId}
+          onSearch={startSearch} onOpenSaved={openSaved} onOpenOpened={openOpened}
+          onRemoveRecent={value => updateHistory(sessionId, current => removeRecent(current, value))}
+          onClearRecent={() => updateHistory(sessionId, current => ({ ...current, recent: [] }))}
+          onToggleSaved={value => updateHistory(sessionId, current => toggleSaved(current, value, Date.now()))} />
+      ) : (
       <div className="grid min-h-full grid-cols-[340px_minmax(0,1fr)] max-xl:grid-cols-[300px_minmax(0,1fr)] max-lg:block">
-        <aside className="flex min-w-0 flex-col gap-ui-3 border-r border-border bg-card p-ui-4 max-lg:hidden" aria-label="Tìm kiếm và bộ lọc">
-          {/* Legacy global h1 rules are unlayered, so these utilities need the important modifier. */}
-          <h1 className="m-0! text-[length:var(--soco-type-page)]! font-bold text-foreground">Kết quả tìm kiếm</h1>
-          <SearchForm key={'desktop' + query + type} suggest={suggest} initialQuery={query} placeholder={PLACEHOLDER[type]} onSubmit={submit} />
+        <aside className="flex min-w-0 flex-col gap-ui-3 border-r border-border bg-card p-ui-4 max-lg:hidden" aria-label="Bộ lọc tìm kiếm">
           <SearchFilterPanel {...panelProps} />
         </aside>
 
@@ -198,9 +205,9 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
           </div>
 
           {query && (
-            <header className="flex flex-wrap items-center justify-between gap-ui-3 max-lg:pt-ui-2">
-              <h2 className="m-0 min-w-0 text-[length:var(--soco-type-page)] font-bold [overflow-wrap:anywhere] text-foreground max-lg:text-[length:var(--soco-type-section)]">Kết quả cho “{query}”</h2>
-              {saveButton}
+            <header className="flex items-center justify-between gap-ui-3 max-lg:pt-ui-2 lg:sr-only">
+              <h2 className="sr-only">Kết quả cho “{query}”</h2>
+              <div className="ml-auto lg:hidden">{saveButton('h-11', false)}</div>
             </header>
           )}
 
@@ -246,6 +253,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
         </div>
         </div>
       </div>
+      )}
 
       <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
         <DialogContent className="top-auto bottom-0 left-0 w-full max-w-none max-h-[85dvh] translate-x-0 translate-y-0 gap-ui-3 rounded-b-none p-ui-4 pb-[calc(var(--soco-space-4)+env(safe-area-inset-bottom))]">
