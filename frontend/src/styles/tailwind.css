@@ -6,6 +6,10 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
+/* App layout breakpoint: mobile <= 760px, desktop >= 761px. Prefer these over min-[761px]/max-[760px]. */
+@custom-variant app-mobile (@media (max-width: 760px));
+@custom-variant app-desktop (@media (min-width: 761px));
+
 @theme inline {
   --font-sans: var(--soco-font-sans);
   --font-mono: var(--soco-font-mono);

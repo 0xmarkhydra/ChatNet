@@ -551,7 +551,7 @@ export default function ProfileSection({
                   </div>
                 )}
 
-                <div className="feed zalo-feed max-[760px]:-mx-3! max-[760px]:w-[calc(100%+24px)]!">
+                <div className="feed zalo-feed app-mobile:-mx-3! app-mobile:w-[calc(100%+24px)]!">
                   {pendingPost && (
                     <article
                       className="outgoing-preview mb-3.5 grid grid-cols-[42px_minmax(0,1fr)] gap-2.5 overflow-hidden rounded-ui-xl border border-border bg-card px-3 pt-3.5 pb-3 text-foreground shadow-[0_4px_22px_rgba(38,61,120,0.043)]"
