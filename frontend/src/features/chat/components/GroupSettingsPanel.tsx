@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { ArrowLeft, Bell, Check, ChevronRight, Clock3, Copy, Crown, FileText, Files, Info, LogOut, MoreHorizontal, ScrollText, Search, ShieldCheck, ShieldOff, UserMinus, UserPlus, UserCheck, UsersRound, X } from 'lucide-react'
 import type { GroupMember, Conversation } from '../types'
 import type { FriendConnection } from '../../contacts'
@@ -77,6 +77,11 @@ export default function GroupSettingsPanel({
   const [activeSection, setActiveSection] = useState<GroupManagementSection>(initialSection)
   const [memberSearch, setMemberSearch] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
+  const closeMemberMenu = useCallback((restoreFocus = true) => {
+    setOpenMemberMenu(null)
+    if (restoreFocus) menuTriggerRef.current?.focus({ preventScroll: true })
+  }, [])
   const filteredMembers = groupMembers.filter(member => `${member.displayName} ${member.username}`.toLocaleLowerCase('vi-VN').includes(memberSearch.trim().toLocaleLowerCase('vi-VN')))
   const isOwner = activeGroupMember?.role === 'owner'
   const isManager = activeGroupMember?.role === 'owner' || activeGroupMember?.role === 'admin'
@@ -84,11 +89,11 @@ export default function GroupSettingsPanel({
   useEffect(() => {
     if (openMemberMenu === null) return
     const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setOpenMemberMenu(null)
+      if (!menuRef.current?.contains(event.target as Node)) closeMemberMenu(false)
     }
     document.addEventListener('pointerdown', closeOnOutsideClick)
     return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
-  }, [openMemberMenu])
+  }, [openMemberMenu, closeMemberMenu])
 
   useLayoutEffect(() => {
     if (openMemberMenu === null) return
@@ -113,15 +118,15 @@ export default function GroupSettingsPanel({
     const onEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       event.stopPropagation() // Escape navigates this sidebar view before closing the whole sidebar.
-      if (openMemberMenu !== null) setOpenMemberMenu(null)
+      if (openMemberMenu !== null) closeMemberMenu()
       else setMemberViewOpen(false)
     }
     document.addEventListener('keydown', onEscape, true)
     return () => document.removeEventListener('keydown', onEscape, true)
-  }, [memberViewOpen, openMemberMenu])
+  }, [memberViewOpen, openMemberMenu, closeMemberMenu, setMemberViewOpen])
 
   async function copyMemberUsername(username: string) {
-    setOpenMemberMenu(null)
+    closeMemberMenu()
     try {
       await navigator.clipboard.writeText('@' + username)
       notify('Đã sao chép @' + username)
@@ -299,12 +304,15 @@ export default function GroupSettingsPanel({
               </span>
             </button>
             <div className="group-member-menu-anchor" ref={menuOpen ? menuRef : null}>
-              <button type="button" className="group-member-more"
+              <button ref={menuOpen ? menuTriggerRef : undefined} type="button" className="group-member-more"
                 aria-label={`Tùy chọn của ${member.displayName || member.username}`}
                 aria-expanded={menuOpen} aria-haspopup="menu"
                 onClick={() => {
-                  if (!menuOpen) setMenuDirection('down')
-                  setOpenMemberMenu(menuOpen ? null : member.id)
+                  if (menuOpen) closeMemberMenu()
+                  else {
+                    setMenuDirection('down')
+                    setOpenMemberMenu(member.id)
+                  }
                 }}>
                 <MoreHorizontal size={20} aria-hidden="true" />
               </button>
@@ -316,7 +324,7 @@ export default function GroupSettingsPanel({
                   <button type="button" role="menuitem"
                     disabled={friendActionBusy || relationship === 'outgoing'}
                     onClick={() => {
-                      setOpenMemberMenu(null)
+                      closeMemberMenu()
                       void onMemberFriendAction(member)
                     }}>
                     {relationship === 'incoming'
@@ -331,21 +339,21 @@ export default function GroupSettingsPanel({
                 )}
                 {canSetRole && <>
                   <button type="button" role="menuitem" disabled={groupBusy}
-                    onClick={() => { setOpenMemberMenu(null); void changeGroupMemberRole(member, member.role === 'admin' ? 'member' : 'admin') }}>
+                    onClick={() => { closeMemberMenu(); void changeGroupMemberRole(member, member.role === 'admin' ? 'member' : 'admin') }}>
                     {member.role === 'admin' ? <ShieldOff size={16} aria-hidden="true" /> : <ShieldCheck size={16} aria-hidden="true" />}
                     {member.role === 'admin' ? 'Gỡ quyền admin' : 'Đặt làm admin'}
                   </button>
                   <button type="button" role="menuitem" disabled={groupBusy}
-                    onClick={() => { setOpenMemberMenu(null); void changeGroupMemberRole(member, 'owner') }}>
+                    onClick={() => { closeMemberMenu(); void changeGroupMemberRole(member, 'owner') }}>
                     <Crown size={16} aria-hidden="true" /> Chuyển quyền chủ nhóm
                   </button>
                 </>}
                 {canRemove && <button type="button" role="menuitem" className="danger" disabled={groupBusy}
-                  onClick={() => { setOpenMemberMenu(null); void removeGroupMember(member) }}>
+                  onClick={() => { closeMemberMenu(); void removeGroupMember(member) }}>
                   <UserMinus size={16} aria-hidden="true" /> Xóa khỏi nhóm
                 </button>}
                 {canLeave && <button type="button" role="menuitem" className="danger" disabled={groupBusy}
-                  onClick={() => { setOpenMemberMenu(null); void removeGroupMember(member) }}>
+                  onClick={() => { closeMemberMenu(); void removeGroupMember(member) }}>
                   <LogOut size={16} aria-hidden="true" /> Rời nhóm
                 </button>}
               </div>}
