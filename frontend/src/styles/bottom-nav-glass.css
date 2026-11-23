@@ -85,7 +85,12 @@
   /* Feed scroll down: header collapses upward, nav slides below the screen. */
   .modern-shell.app-layout > .bottom-navigation,
   .modern-shell.app-layout > header {
-    transition: transform .45s cubic-bezier(.4, 0, .2, 1), opacity .45s ease, margin-top .45s cubic-bezier(.4, 0, .2, 1);
+    transition: transform .6s cubic-bezier(.4, 0, .2, 1), opacity .6s ease, margin-top .6s cubic-bezier(.4, 0, .2, 1);
+  }
+  /* Hiding waits briefly so a short flick does not trigger it; showing is immediate. */
+  .modern-shell.app-layout[data-chrome-hidden] > .bottom-navigation,
+  .modern-shell.app-layout[data-chrome-hidden] > header {
+    transition-delay: .2s;
   }
   .modern-shell.app-layout[data-chrome-hidden] > .bottom-navigation {
     transform: translateY(calc(100% + var(--bottom-nav-offset) + 8px));
