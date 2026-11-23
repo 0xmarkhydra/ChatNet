@@ -267,6 +267,7 @@ func main() {
 	mux.Handle("GET /api/conversations/{id}/join-requests", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupJoinRequests)))
 	mux.Handle("POST /api/conversations/{id}/join-requests/{requestId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reviewGroupJoinRequest)))
 	mux.Handle("GET /api/conversations/{id}/admin-audit", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupAudit)))
+	mux.Handle("POST /api/events/ticket", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.eventTicket)))
 	mux.Handle("GET /api/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.events)))
 
 	port := config.Env("PORT", "8082")
@@ -508,6 +509,15 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
+	page, paged, pageErr := searchx.ParsePageRequest(r.URL.Query())
+	if pageErr != nil {
+		httpx.Error(w, http.StatusBadRequest, pageErr.Error())
+		return
+	}
+	if paged {
+		s.searchUsersPage(w, r, page)
+		return
+	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 	q = strings.TrimPrefix(q, "@")
@@ -564,6 +574,145 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	httpx.JSON(w, http.StatusOK, items)
+}
+
+type userSearchCursor struct {
+	Rank      int       `json:"r"`
+	Username  string    `json:"u,omitempty"`
+	ID        int64     `json:"i"`
+	CreatedAt time.Time `json:"t,omitempty"`
+}
+
+type userSearchItem struct {
+	ID          int64  `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName"`
+	Online      bool   `json:"online"`
+}
+
+func (s *server) searchUsersPage(w http.ResponseWriter, r *http.Request, page searchx.PageRequest) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
+	q = strings.TrimPrefix(q, "@")
+	if len(q) > 254 {
+		httpx.Error(w, http.StatusBadRequest, "search query must be <= 254 bytes")
+		return
+	}
+	items := make([]userSearchItem, 0)
+	if q == "" {
+		httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nil})
+		return
+	}
+
+	var cursor userSearchCursor
+	if page.Cursor != "" {
+		var err error
+		cursor, err = searchx.DecodeCursor[userSearchCursor](page.Cursor)
+		if err != nil || cursor.ID <= 0 ||
+			(page.Sort == "newest" && cursor.CreatedAt.IsZero()) ||
+			(page.Sort == "relevance" && (cursor.Rank < 0 || cursor.Rank > 5 || cursor.Username == "")) {
+			httpx.Error(w, http.StatusBadRequest, "invalid cursor")
+			return
+		}
+	}
+
+	rankSQL := `CASE
+		WHEN searchable_by_username AND lower(username)=$2 THEN 0
+		WHEN searchable_by_email AND lower(email)=$2 THEN 1
+		WHEN searchable_by_username AND strpos(` + searchx.FoldSQL("username") + `, ` + searchx.FoldSQL("$2") + `)=1 THEN 2
+		WHEN searchable_by_username AND strpos(` + searchx.FoldSQL("username") + `, ` + searchx.FoldSQL("$2") + `)>0 THEN 3
+		WHEN searchable_by_name AND strpos(` + searchx.FoldSQL("display_name") + `, ` + searchx.FoldSQL("$2") + `)=1 THEN 4
+		ELSE 5 END`
+	query := `WITH candidates AS (
+		SELECT id,username,display_name,show_online_status,created_at,` + rankSQL + ` AS rank
+		FROM users
+		WHERE id<>$1
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=users.id)
+		       OR (b.blocker_id=users.id AND b.blocked_id=$1)
+		  )
+		  AND (
+			(searchable_by_username AND strpos(` + searchx.FoldSQL("username") + `, ` + searchx.FoldSQL("$2") + `)>0)
+			OR (searchable_by_email AND lower(email)=$2)
+			OR (searchable_by_name AND strpos(` + searchx.FoldSQL("display_name") + `, ` + searchx.FoldSQL("$2") + `)>0)
+		  )
+		  AND ($3::timestamptz IS NULL OR created_at >= $3)
+	)
+	SELECT id,username,display_name,show_online_status,rank,created_at FROM candidates`
+	args := []any{claims.UserID, q, page.Since}
+	if cursor.ID > 0 {
+		if page.Sort == "newest" {
+			query += ` WHERE (created_at,id)<($4::timestamptz,$5::bigint)`
+			args = append(args, cursor.CreatedAt, cursor.ID)
+		} else {
+			query += ` WHERE (rank,username,id)>($4::integer,$5::text,$6::bigint)`
+			args = append(args, cursor.Rank, cursor.Username, cursor.ID)
+		}
+	}
+	if page.Sort == "newest" {
+		query += ` ORDER BY created_at DESC,id DESC`
+	} else {
+		query += ` ORDER BY rank ASC,username ASC,id ASC`
+	}
+	query += ` LIMIT $` + strconv.Itoa(len(args)+1)
+	args = append(args, page.Limit+1)
+
+	rows, err := s.db.Query(r.Context(), query, args...)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot search users")
+		return
+	}
+	type result struct {
+		item      userSearchItem
+		rank      int
+		createdAt time.Time
+	}
+	results := make([]result, 0, page.Limit+1)
+	for rows.Next() {
+		var item result
+		var showOnline bool
+		if rows.Scan(&item.item.ID, &item.item.Username, &item.item.DisplayName, &showOnline, &item.rank, &item.createdAt) != nil {
+			rows.Close()
+			httpx.Error(w, http.StatusInternalServerError, "cannot search users")
+			return
+		}
+		if showOnline && s.redis != nil {
+			item.item.Online = s.redis.Exists(r.Context(), presenceKey(item.item.ID)).Val() > 0
+		}
+		results = append(results, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		httpx.Error(w, http.StatusInternalServerError, "cannot search users")
+		return
+	}
+	rows.Close()
+	hasMore := len(results) > page.Limit
+	if hasMore {
+		results = results[:page.Limit]
+	}
+	for _, result := range results {
+		items = append(items, result.item)
+	}
+	var nextCursor any
+	if hasMore && len(results) > 0 {
+		last := results[len(results)-1]
+		value := userSearchCursor{ID: last.item.ID}
+		if page.Sort == "newest" {
+			value.CreatedAt = last.createdAt
+		} else {
+			value.Rank = last.rank
+			value.Username = last.item.Username
+		}
+		encoded, err := searchx.EncodeCursor(value)
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot create search cursor")
+			return
+		}
+		nextCursor = encoded
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nextCursor})
 }
 
 func (s *server) getTranslationPreferences(w http.ResponseWriter, r *http.Request) {

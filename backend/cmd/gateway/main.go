@@ -80,6 +80,7 @@ func main() {
 	mux.Handle("/api/messages", chatProxy)
 	mux.Handle("/api/messages/", chatProxy)
 	mux.Handle("/api/events", chatProxy)
+	mux.Handle("/api/events/ticket", chatProxy)
 	mux.Handle("/api/push/", chatProxy)
 	mux.Handle("/api/media/", chatProxy)
 	mux.Handle("/api/profile", chatProxy)

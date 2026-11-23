@@ -109,6 +109,15 @@ func TestUserSearchIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Exec(ctx, "DELETE FROM users WHERE id=$1", id)
+	for i := 0; i < 2; i++ {
+		pageUsername := fmt.Sprintf("%s_page%d", username, i)
+		var pageID int64
+		if err := db.QueryRow(ctx, `INSERT INTO users(email,username,password_hash,display_name)
+			VALUES($1,$2,'!',$3) RETURNING id`, pageUsername+"@example.com", pageUsername, "Page "+pageUsername).Scan(&pageID); err != nil {
+			t.Fatal(err)
+		}
+		defer db.Exec(ctx, "DELETE FROM users WHERE id=$1", pageID)
+	}
 	viewer := username + "_viewer"
 	var viewerID int64
 	if err := db.QueryRow(ctx, `INSERT INTO users(email,username,password_hash,display_name)
@@ -177,6 +186,42 @@ func TestUserSearchIntegration(t *testing.T) {
 	handler.ServeHTTP(w, r)
 	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != "[]" {
 		t.Fatal("search included self")
+	}
+	searchPage := func(cursor string) (int, []struct {
+		ID       int64  `json:"id"`
+		Username string `json:"username"`
+	}, *string) {
+		t.Helper()
+		path := "/api/users/search?q=" + url.QueryEscape(username) + "&sort=relevance&limit=1"
+		if cursor != "" {
+			path += "&cursor=" + url.QueryEscape(cursor)
+		}
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		var response struct {
+			Items      []struct {
+				ID       int64  `json:"id"`
+				Username string `json:"username"`
+			} `json:"items"`
+			NextCursor *string `json:"nextCursor"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("search page JSON: %v: %s", err, rec.Body.String())
+		}
+		if rec.Code != http.StatusOK {
+			t.Fatalf("search page status %d: %s", rec.Code, rec.Body.String())
+		}
+		return rec.Code, response.Items, response.NextCursor
+	}
+	_, firstPage, next := searchPage("")
+	if len(firstPage) != 1 || firstPage[0].ID != id || next == nil || *next == "" {
+		t.Fatalf("invalid first search page: items=%+v cursor=%v", firstPage, next)
+	}
+	_, secondPage, lastCursor := searchPage(*next)
+	if len(secondPage) != 1 || secondPage[0].Username == firstPage[0].Username || lastCursor == nil {
+		t.Fatalf("invalid second search page: items=%+v cursor=%v", secondPage, lastCursor)
 	}
 }
 

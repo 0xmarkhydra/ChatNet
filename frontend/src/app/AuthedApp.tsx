@@ -1933,6 +1933,7 @@ export default function AuthedApp({
     sessionRef,
     apiFetch,
     setStatus,
+    setNotice,
     refreshConversations,
     refreshPosts,
     refreshStories,

@@ -10,6 +10,7 @@ import { canMarkConversationRead } from '../../features/chat/utils/conversationR
 import { clearPendingSend, loadPendingSend } from '../../features/chat/lib/chatPersistence'
 import type { Message, MessageDraft } from '../../features/chat/types'
 import { parseRealtimeEvent } from './parseRealtimeEvent'
+import { requestSseTicketWithRetry } from '../../shared/lib/sseTicket'
 import type { IncomingMessageSound } from '../../features/notifications/lib/incomingSound'
 import type { AppDataContext } from '../../shared/types/api'
 import type { Tab } from '../../shared/types/navigation'
@@ -17,7 +18,7 @@ import type { useConversationData } from '../../features/chat/hooks/useConversat
 import type { useFeedData } from '../../features/feed/hooks/useFeedData'
 import type { useContactData } from '../../features/contacts/hooks/useContactData'
 
-type Options = Omit<AppDataContext, 'setNotice'> &
+type Options = AppDataContext &
   Pick<ReturnType<typeof useConversationData>,
     'refreshConversations' | 'reconcileConversationMemberships' | 'revokedConversationIds' |
     'membershipSnapshot' | 'membershipEventSequence' | 'membershipSyncSequence' | 'setConversations'> &
@@ -62,6 +63,7 @@ export function useAppRealtime({
   sessionRef,
   apiFetch,
   setStatus,
+  setNotice,
   refreshConversations,
   refreshPosts,
   refreshStories,
@@ -101,6 +103,7 @@ export function useAppRealtime({
     checkSession,
     apiFetch,
     setStatus,
+    setNotice,
     refreshConversations,
     refreshPosts,
     refreshStories,
@@ -136,11 +139,20 @@ export function useAppRealtime({
       lastFriendPollAt = now
       void handlers.current.refreshFriendConnections()
     }
-    const events = new EventSource(
-      `${API}/api/events?token=${encodeURIComponent(session.token)}`,
-    )
-    events.onopen = () => {
-      if (!active || sessionRef.current !== session) return
+    let events: EventSource | null = null
+    let ticketRequest: AbortController | null = null
+    let reconnectAttempt = 0
+    let stableConnectionTimer = 0
+    const bindEvents = (ticket: string) => {
+      const source = new EventSource(`${API}/api/events?ticket=${encodeURIComponent(ticket)}`)
+      events = source
+      source.onopen = () => {
+      if (!active || sessionRef.current !== session || events !== source) return
+      window.clearTimeout(stableConnectionTimer)
+      stableConnectionTimer = window.setTimeout(() => {
+        stableConnectionTimer = 0
+        reconnectAttempt = 0
+      }, 60_000)
       const reconnected = hasOpened || hadConnectionError
       hasOpened = true
       hadConnectionError = false
@@ -154,21 +166,28 @@ export function useAppRealtime({
       lastFriendPollAt = Date.now()
       void handlers.current.refreshFriendConnections()
       void handlers.current.reconcileConversationMemberships()
-    }
-    events.onerror = () => {
-      if (!active || sessionRef.current !== session) return
-      hadConnectionError = true
-      handlers.current.setStatus('Đang kết nối lại...')
-      if (Date.now() - lastSSECheckAt < 30_000) return
-      lastSSECheckAt = Date.now()
-      if (document.visibilityState === 'visible' && sessionRef.current?.sessionId === session.sessionId) {
-        void handlers.current.checkSession().catch(() => undefined)
       }
-    }
-    events.addEventListener('session-revoked', () => {
+      source.onerror = () => {
+        if (!active || sessionRef.current !== session || events !== source) return
+        window.clearTimeout(stableConnectionTimer)
+        stableConnectionTimer = 0
+        hadConnectionError = true
+        handlers.current.setStatus('Đang kết nối lại...')
+        source.close()
+        events = null
+        const backoffMs = Math.min(1000 * 2 ** Math.min(reconnectAttempt, 5), 30_000)
+        reconnectAttempt += 1
+        requestConnection(backoffMs)
+        if (Date.now() - lastSSECheckAt < 30_000) return
+        lastSSECheckAt = Date.now()
+        if (document.visibilityState === 'visible' && sessionRef.current?.sessionId === session.sessionId) {
+          void handlers.current.checkSession().catch(() => undefined)
+        }
+      }
+      source.addEventListener('session-revoked', () => {
       if (active && sessionRef.current?.sessionId === session.sessionId) handlers.current.expireSession()
-    })
-    events.addEventListener('update', (event) => {
+      })
+      source.addEventListener('update', (event) => {
       if (!active || sessionRef.current?.sessionId !== session.sessionId) return
       const update = parseRealtimeEvent((event as MessageEvent).data)
       if (!update) return
@@ -410,7 +429,23 @@ export function useAppRealtime({
           }
         }
       }
-    })
+      })
+    }
+    const requestConnection = (initialDelayMs = 0) => {
+      if (!active || ticketRequest) return
+      const controller = new AbortController()
+      ticketRequest = controller
+      void requestSseTicketWithRetry(handlers.current.apiFetch, controller.signal, initialDelayMs)
+        .then(ticket => { if (active && sessionRef.current === session) bindEvents(ticket) })
+        .catch(() => {
+          if (!active) return
+          handlers.current.setStatus('Đang kết nối lại...')
+          handlers.current.setNotice('Không thể kết nối thông báo trực tiếp. Tải lại trang để thử lại.', 'error')
+          void handlers.current.checkSession().catch(() => undefined)
+        })
+        .finally(() => { if (ticketRequest === controller) ticketRequest = null })
+    }
+    requestConnection()
 
     const refreshTimer = window.setInterval(() => {
       if (!active || sessionRef.current?.sessionId !== session.sessionId || document.visibilityState !== 'visible') return
@@ -437,7 +472,9 @@ export function useAppRealtime({
     document.addEventListener('visibilitychange', checkVisibleMembership)
     return () => {
       active = false
-      events.close()
+      events?.close()
+      ticketRequest?.abort()
+      window.clearTimeout(stableConnectionTimer)
       window.clearInterval(refreshTimer)
       window.clearInterval(membershipTimer)
       window.removeEventListener('online', checkMembership)
