@@ -66,6 +66,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final avatarScrollController = ScrollController();
   final conversationListScrollController = ScrollController();
   List<Json> conversations = [];
+  bool conversationListStarted = false;
   int conversationOffset = 0;
   bool hasMoreConversations = false;
   bool conversationLoadingMore = false;
@@ -167,9 +168,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _refresh() async {
     try {
-      final data = objects(
-        await widget.api.request('GET', '/api/conversations?limit=25'),
-      );
+      final notifier = ref.read(conversationsProvider.notifier);
+      final isInitialRead = !conversationListStarted;
+      conversationListStarted = true;
+      final loaded = isInitialRead
+          ? await notifier.initialLoad()
+          : await notifier.refresh();
+      final data = loaded.map((conversation) => conversation.toJson()).toList();
       if (!mounted) return;
       setState(() {
         data.sort(compareConversationRows);

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/api.dart';
 import 'package:soco/app.dart';
@@ -12,7 +12,7 @@ class _ConversationApi extends DemoApi {
   final StreamController<void> _eventController =
       StreamController<void>.broadcast();
   final List<String> conversationRequests = [];
-  Completer<List<Json>>? pendingConversationResponse;
+  final List<Completer<List<Json>>> pendingConversationResponses = [];
   bool failConversationReads = false;
 
   @override
@@ -29,8 +29,9 @@ class _ConversationApi extends DemoApi {
       if (failConversationReads) {
         throw const ApiError('Synthetic conversation failure');
       }
-      final pending = pendingConversationResponse;
-      if (pending != null) return pending.future;
+      if (pendingConversationResponses.isNotEmpty) {
+        return pendingConversationResponses.removeAt(0).future;
+      }
       return rooms.map((room) => Map<String, dynamic>.from(room)).toList();
     }
     return super.request(method, path, body);
@@ -74,17 +75,17 @@ void main() {
   testWidgets('initial conversation read shows loading then data', (
     tester,
   ) async {
-    final api = _ConversationApi()
-      ..pendingConversationResponse = Completer<List<Json>>();
+    final response = Completer<List<Json>>();
+    final api = _ConversationApi()..pendingConversationResponses.add(response);
     addTearDown(api.closeEvents);
 
     await _pumpApp(tester, api);
     await tester.pump();
 
-    expect(find.byType(CircularProgressIndicator), findsWidgets);
+    expect(find.text('Synthetic room'), findsNothing);
     expect(api.conversationRequests, ['/api/conversations?limit=25']);
 
-    api.pendingConversationResponse!.complete([
+    response.complete([
       _room(
         41,
         'Synthetic room',
@@ -114,8 +115,39 @@ void main() {
     await _pumpApp(tester, api);
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.forum_outlined), findsOneWidget);
+    expect(find.byType(EmptyState), findsOneWidget);
     expect(find.byKey(const ValueKey('rail-room-41')), findsNothing);
+  });
+
+  testWidgets('SSE revision refreshes an in-flight initial read', (
+    tester,
+  ) async {
+    final initialResponse = Completer<List<Json>>();
+    final refreshResponse = Completer<List<Json>>();
+    final api = _ConversationApi()
+      ..pendingConversationResponses.addAll([initialResponse, refreshResponse]);
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pump();
+    expect(api.conversationRequests, ['/api/conversations?limit=25']);
+
+    api.emitEvent();
+    await tester.pump();
+    expect(api.conversationRequests, [
+      '/api/conversations?limit=25',
+      '/api/conversations?limit=25',
+    ]);
+
+    refreshResponse.complete([_room(47, 'SSE room')]);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rail-room-47')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rail-room-48')), findsNothing);
+
+    initialResponse.complete([_room(48, 'Initial room')]);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rail-room-47')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rail-room-48')), findsOneWidget);
   });
 
   testWidgets('initial conversation failure can retry successfully', (
@@ -129,13 +161,13 @@ void main() {
 
     await _pumpApp(tester, api);
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.cloud_off_outlined), findsOneWidget);
+    expect(find.byType(EmptyState), findsOneWidget);
 
     api.failConversationReads = false;
     await tester.tap(
       find.descendant(
         of: find.byType(EmptyState),
-        matching: find.byType(FilledButton),
+        matching: find.text('Thử lại'),
       ),
     );
     await tester.pumpAndSettle();

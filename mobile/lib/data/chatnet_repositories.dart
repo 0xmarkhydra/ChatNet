@@ -11,11 +11,9 @@ class ChatRepository {
     int limit = 25,
     int offset = 0,
   }) async {
+    final query = offset == 0 ? 'limit=$limit' : 'limit=$limit&offset=$offset';
     final items = objects(
-      await api.request(
-        'GET',
-        '/api/conversations?limit=$limit&offset=$offset',
-      ),
+      await api.request('GET', '/api/conversations?$query'),
     );
     return List.unmodifiable(items.map(Conversation.fromJson));
   }
