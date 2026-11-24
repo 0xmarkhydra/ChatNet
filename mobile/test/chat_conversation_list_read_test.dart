@@ -13,7 +13,9 @@ class _ConversationApi extends DemoApi {
       StreamController<void>.broadcast();
   final List<String> conversationRequests = [];
   final List<Completer<List<Json>>> pendingConversationResponses = [];
+  final List<dynamic> pageResponses = [];
   bool failConversationReads = false;
+  bool failPageReads = false;
 
   @override
   Stream<void> events() => _eventController.stream;
@@ -24,8 +26,15 @@ class _ConversationApi extends DemoApi {
 
   @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
-    if (method == 'GET' && path == '/api/conversations?limit=25') {
+    if (method == 'GET' && path.startsWith('/api/conversations?limit=25')) {
       conversationRequests.add(path);
+      if (path != '/api/conversations?limit=25') {
+        if (failPageReads) {
+          throw const ApiError('Synthetic page failure');
+        }
+        if (pageResponses.isNotEmpty) return pageResponses.removeAt(0);
+        return <Json>[];
+      }
       if (failConversationReads) {
         throw const ApiError('Synthetic conversation failure');
       }
@@ -43,6 +52,7 @@ Map<String, dynamic> _room(
   String name, {
   int unreadCount = 0,
   List<String> avatarMembers = const [],
+  String? lastMessageAt,
 }) => {
   'id': id,
   'type': 'group',
@@ -52,9 +62,22 @@ Map<String, dynamic> _room(
   'online': false,
   'lastMessage': 'Synthetic last message',
   'createdAt': '2026-11-25T10:00:00Z',
-  'lastMessageAt': '2026-11-25T10:00:00Z',
+  'lastMessageAt': lastMessageAt ?? '2026-11-25T10:00:00Z',
   'avatarMembers': avatarMembers,
 };
+
+List<Json> _conversationPage(int firstId, int count) => [
+  for (var offset = 0; offset < count; offset++)
+    _room(
+      firstId + offset,
+      'Room ${firstId + offset}',
+      lastMessageAt: DateTime.utc(
+        2026,
+        11,
+        25,
+      ).subtract(Duration(minutes: firstId + offset)).toIso8601String(),
+    ),
+];
 
 void _setViewport(WidgetTester tester) {
   tester.view.physicalSize = const Size(390, 844);
@@ -230,5 +253,125 @@ void main() {
 
     expect(find.byKey(const ValueKey('rail-room-45')), findsNothing);
     expect(find.byKey(const ValueKey('rail-room-46')), findsOneWidget);
+  });
+
+  testWidgets(
+    'conversation pages use offsets, keep activity order and stop on short page',
+    (tester) async {
+      final api = _ConversationApi();
+      api.rooms
+        ..clear()
+        ..addAll(_conversationPage(1, 25));
+      api.pageResponses
+        ..add(_conversationPage(26, 25))
+        ..add(_conversationPage(51, 1));
+      addTearDown(api.closeEvents);
+
+      await _pumpApp(tester, api);
+      await tester.pumpAndSettle();
+
+      final rail = find.byKey(const ValueKey('mobile-avatar-rail'));
+      await tester.drag(rail, const Offset(0, -10000));
+      await tester.pumpAndSettle();
+      expect(
+        api.conversationRequests,
+        contains('/api/conversations?limit=25&offset=25'),
+      );
+
+      await tester.drag(rail, const Offset(0, -10000));
+      await tester.pumpAndSettle();
+      expect(
+        api.conversationRequests,
+        contains('/api/conversations?limit=25&offset=50'),
+      );
+      expect(find.text('Tải thêm hội thoại'), findsNothing);
+
+      final lastExisting = tester.getTopLeft(
+        find.byKey(const ValueKey('rail-room-50')),
+      );
+      final lastPage = tester.getTopLeft(
+        find.byKey(const ValueKey('rail-room-51')),
+      );
+      expect(lastExisting.dy, lessThan(lastPage.dy));
+    },
+  );
+
+  testWidgets('conversation page failure retains loaded rows', (tester) async {
+    final api = _ConversationApi()..failPageReads = true;
+    api.rooms
+      ..clear()
+      ..addAll(_conversationPage(1, 25));
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('mobile-avatar-rail')),
+      const Offset(0, -10000),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      api.conversationRequests,
+      contains('/api/conversations?limit=25&offset=25'),
+    );
+    expect(find.byKey(const ValueKey('rail-room-25')), findsOneWidget);
+  });
+
+  testWidgets('SSE refresh wins over stale duplicate in in-flight page', (
+    tester,
+  ) async {
+    final pageResponse = Completer<List<Json>>();
+    final refreshResponse = Completer<List<Json>>();
+    final api = _ConversationApi();
+    api.rooms
+      ..clear()
+      ..addAll(_conversationPage(1, 25));
+    api.pageResponses.add(pageResponse.future);
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('mobile-avatar-rail')),
+      const Offset(0, -10000),
+    );
+    await tester.pump();
+    expect(
+      api.conversationRequests,
+      contains('/api/conversations?limit=25&offset=25'),
+    );
+
+    api.pendingConversationResponses.add(refreshResponse);
+    api.emitEvent();
+    await tester.pump();
+    expect(api.conversationRequests, hasLength(3));
+    refreshResponse.complete([_room(1, 'Fresh SSE room')]);
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('mobile-avatar-rail')),
+      const Offset(0, 10000),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Fresh SSE room'), findsOneWidget);
+
+    pageResponse.complete([
+      _room(1, 'Stale page duplicate'),
+      _room(26, 'Page room', lastMessageAt: '2026-11-24T00:00:00Z'),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fresh SSE room'), findsOneWidget);
+    expect(find.text('Stale page duplicate'), findsNothing);
+    await tester.drag(
+      find.byKey(const ValueKey('mobile-avatar-rail')),
+      const Offset(0, -10000),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rail-room-26')), findsOneWidget);
+    expect(
+      api.conversationRequests,
+      contains('/api/conversations?limit=25&offset=25'),
+    );
   });
 }
