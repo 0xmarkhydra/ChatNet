@@ -237,109 +237,46 @@ func (s *server) providerHealth(w http.ResponseWriter, r *http.Request) {
 func (s *server) translate(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 
-	var body struct {
-		Text      string `json:"text"`
-		Target    string `json:"target"`
-		MessageID int64  `json:"messageId,omitempty"`
-	}
+	var body translateInput
 	if err := httpx.DecodeJSON(w, r, &body, 64<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
 
-	target := languagecatalog.Normalize(body.Target)
-	if target == "" {
-		httpx.Error(w, http.StatusBadRequest, "target is required")
+	result, failure := s.translateText(r.Context(), claims, requestIP(r, s.trustedProxyCIDRs), body)
+	if failure != nil {
+		writeTranslationFailure(w, failure)
 		return
 	}
-	if !languagecatalog.Valid(target) {
-		httpx.Error(w, http.StatusBadRequest, "unsupported target language")
-		return
-	}
+	httpx.JSON(w, http.StatusOK, result)
+}
 
-	text := strings.TrimSpace(body.Text)
-	if body.MessageID > 0 {
-		var stored string
-		err := s.db.QueryRow(r.Context(), `
-			SELECT m.text, COALESCE(mt.translated_text,'')
-			FROM messages m
-			JOIN conversation_members cm
-			  ON cm.conversation_id=m.conversation_id AND cm.user_id=$2
-			LEFT JOIN message_translations mt
-			  ON mt.message_id=m.id AND mt.target_language=$3
-			WHERE m.id=$1`,
-			body.MessageID, claims.UserID, target,
-		).Scan(&text, &stored)
-		if err != nil {
-			httpx.Error(w, http.StatusNotFound, "message not found in your conversations")
-			return
-		}
-		if strings.TrimSpace(stored) != "" {
-			httpx.JSON(w, http.StatusOK, map[string]string{
-				"translatedText": stored,
-				"provider":       s.provider,
-				"model":          s.model,
-				"cache":          "thread",
-			})
-			return
-		}
+func writeTranslationFailure(w http.ResponseWriter, failure *translationFailure) {
+	status, message := http.StatusInternalServerError, "translation failed"
+	switch failure.kind {
+	case translationTargetRequired:
+		status, message = http.StatusBadRequest, "target is required"
+	case translationTargetUnsupported:
+		status, message = http.StatusBadRequest, "unsupported target language"
+	case translationMessageNotFound:
+		status, message = http.StatusNotFound, "message not found in your conversations"
+	case translationTextInvalid:
+		status, message = http.StatusBadRequest, "text is required and must be <= 8000 characters"
+	case translationNotConfigured:
+		status, message = http.StatusServiceUnavailable, "AI translation is not configured"
+	case translationRateLimited:
+		status, message = http.StatusTooManyRequests, "too many translation requests; try again later"
+		w.Header().Set("Retry-After", strconv.Itoa(int(translationRateLimitWindow.Seconds())))
+	case translationLimiterUnavailable:
+		status, message = http.StatusServiceUnavailable, "rate limiter unavailable"
+	case translationProviderBusy:
+		status, message = http.StatusServiceUnavailable, "translation provider is busy"
+	case translationProviderFailed:
+		status, message = http.StatusBadGateway, "AI translation failed"
+	default:
+		// Unknown failure kinds indicate a code defect; keep response generic.
 	}
-
-	if text == "" || len(text) > 8000 {
-		httpx.Error(w, http.StatusBadRequest, "text is required and must be <= 8000 characters")
-		return
-	}
-	if s.apiKey == "" || s.baseURL == "" || s.model == "" {
-		httpx.Error(w, http.StatusServiceUnavailable, "AI translation is not configured")
-		return
-	}
-	if !s.allowTranslation(w, r, claims) {
-		return
-	}
-
-	key := s.cacheKey(text, target)
-	if s.redis != nil {
-		if cached, err := s.redis.Get(r.Context(), key).Result(); err == nil && cached != "" {
-			if body.MessageID > 0 {
-				_ = s.saveMessageTranslation(r.Context(), body.MessageID, target, cached)
-			}
-			httpx.JSON(w, http.StatusOK, map[string]string{
-				"translatedText": cached,
-				"provider":       s.provider,
-				"model":          s.model,
-				"cache":          "hit",
-			})
-			return
-		}
-	}
-	translated, usedStyle, err := s.callAI(r, text, target)
-	if err != nil {
-		var callErr *aiCallError
-		if errors.As(err, &callErr) && callErr.Status == http.StatusServiceUnavailable && errors.Is(callErr.Err, errProviderBusy) {
-			httpx.Error(w, http.StatusServiceUnavailable, "translation provider is busy")
-			return
-		}
-		log.Printf("translate error provider=%s model=%s style=%s: %v", s.provider, s.model, s.apiStyle, err)
-		httpx.Error(w, http.StatusBadGateway, "AI translation failed")
-		return
-	}
-
-	if s.redis != nil {
-		_ = s.redis.Set(r.Context(), key, translated, 24*time.Hour).Err()
-	}
-	if body.MessageID > 0 {
-		if err := s.saveMessageTranslation(r.Context(), body.MessageID, target, translated); err != nil {
-			log.Printf("save message translation failed message=%d target=%s: %v", body.MessageID, target, err)
-		}
-	}
-
-	httpx.JSON(w, http.StatusOK, map[string]string{
-		"translatedText": translated,
-		"provider":       s.provider,
-		"model":          s.model,
-		"apiStyle":       usedStyle,
-		"cache":          "miss",
-	})
+	httpx.Error(w, status, message)
 }
 
 func (s *server) saveMessageTranslation(ctx context.Context, messageID int64, target, translated string) error {
@@ -358,11 +295,19 @@ func (s *server) saveMessageTranslation(ctx context.Context, messageID int64, ta
 }
 
 func (s *server) callAI(r *http.Request, text, target string) (string, string, error) {
-	return s.callAIWithInstructions(r, translationInstructions(languageName(target)), text, 700)
+	return s.callAIContext(r.Context(), text, target)
+}
+
+func (s *server) callAIContext(ctx context.Context, text, target string) (string, string, error) {
+	return s.callAIWithInstructionsContext(ctx, translationInstructions(languageName(target)), text, 700)
 }
 
 func (s *server) callAIWithInstructions(r *http.Request, instructions, text string, maxTokens int) (string, string, error) {
-	release, err := s.acquireProvider(r.Context())
+	return s.callAIWithInstructionsContext(r.Context(), instructions, text, maxTokens)
+}
+
+func (s *server) callAIWithInstructionsContext(ctx context.Context, instructions, text string, maxTokens int) (string, string, error) {
+	release, err := s.acquireProvider(ctx)
 	if err != nil {
 		return "", "", &aiCallError{Status: http.StatusServiceUnavailable, Err: err}
 	}
@@ -373,13 +318,13 @@ func (s *server) callAIWithInstructions(r *http.Request, instructions, text stri
 	}
 	switch s.apiStyle {
 	case "responses":
-		value, err := s.callResponsesWithLimit(r.Context(), instructions, text, maxTokens)
+		value, err := s.callResponsesWithLimit(ctx, instructions, text, maxTokens)
 		return value, "responses", err
 	case "chat_completions":
-		value, err := s.callChatCompletionsWithLimit(r.Context(), instructions, text, maxTokens)
+		value, err := s.callChatCompletionsWithLimit(ctx, instructions, text, maxTokens)
 		return value, "chat_completions", err
 	default:
-		value, err := s.callResponsesWithLimit(r.Context(), instructions, text, maxTokens)
+		value, err := s.callResponsesWithLimit(ctx, instructions, text, maxTokens)
 		if err == nil {
 			return value, "responses", nil
 		}
@@ -387,7 +332,7 @@ func (s *server) callAIWithInstructions(r *http.Request, instructions, text stri
 		var callErr *aiCallError
 		if errors.As(err, &callErr) && shouldFallbackToChatCompletions(callErr.Status) {
 			log.Printf("provider %s does not appear to support /responses (status=%d), falling back to /chat/completions", s.provider, callErr.Status)
-			value, fallbackErr := s.callChatCompletionsWithLimit(r.Context(), instructions, text, maxTokens)
+			value, fallbackErr := s.callChatCompletionsWithLimit(ctx, instructions, text, maxTokens)
 			return value, "chat_completions", fallbackErr
 		}
 		return "", "responses", err
@@ -407,37 +352,51 @@ func (s *server) acquireProvider(ctx context.Context) (func(), error) {
 }
 
 func (s *server) allowTranslation(w http.ResponseWriter, r *http.Request, claims *authx.Claims) bool {
-	if !s.rateLimitEnabled {
+	userID := int64(0)
+	if claims != nil {
+		userID = claims.UserID
+	}
+	err := s.checkTranslationLimit(r.Context(), userID, requestIP(r, s.trustedProxyCIDRs))
+	if err == nil {
 		return true
 	}
-	if s.limiter.Redis == nil {
-		httpx.Error(w, http.StatusServiceUnavailable, "rate limiter unavailable")
+	if errors.Is(err, errTranslationRateLimited) {
+		w.Header().Set("Retry-After", strconv.Itoa(int(translationRateLimitWindow.Seconds())))
+		httpx.Error(w, http.StatusTooManyRequests, "too many translation requests; try again later")
 		return false
 	}
-	userID := "unknown"
-	if claims != nil && claims.UserID > 0 {
-		userID = strconv.FormatInt(claims.UserID, 10)
+	httpx.Error(w, http.StatusServiceUnavailable, "rate limiter unavailable")
+	return false
+}
+
+func (s *server) checkTranslationLimit(ctx context.Context, userID int64, clientIP string) error {
+	if !s.rateLimitEnabled {
+		return nil
+	}
+	if s.limiter.Redis == nil {
+		return errTranslationRateLimiterUnavailable
+	}
+	user := "unknown"
+	if userID > 0 {
+		user = strconv.FormatInt(userID, 10)
 	}
 	for _, limit := range []struct {
 		scope   string
 		subject string
 		limit   int64
 	}{
-		{scope: "translate:user", subject: "u:" + userID, limit: translationUserRateLimit},
-		{scope: "translate:ip", subject: "ip:" + requestIP(r, s.trustedProxyCIDRs), limit: translationIPRateLimit},
+		{scope: "translate:user", subject: "u:" + user, limit: translationUserRateLimit},
+		{scope: "translate:ip", subject: "ip:" + clientIP, limit: translationIPRateLimit},
 	} {
-		allowed, _, err := s.limiter.Allow(r.Context(), limit.scope, limit.subject, limit.limit, translationRateLimitWindow)
+		allowed, _, err := s.limiter.Allow(ctx, limit.scope, limit.subject, limit.limit, translationRateLimitWindow)
 		if err != nil {
-			httpx.Error(w, http.StatusServiceUnavailable, "rate limiter unavailable")
-			return false
+			return errTranslationRateLimiterUnavailable
 		}
 		if !allowed {
-			w.Header().Set("Retry-After", strconv.Itoa(int(translationRateLimitWindow.Seconds())))
-			httpx.Error(w, http.StatusTooManyRequests, "too many translation requests; try again later")
-			return false
+			return errTranslationRateLimited
 		}
 	}
-	return true
+	return nil
 }
 
 func requestIP(r *http.Request, trustedProxyCIDRs []*net.IPNet) string {
