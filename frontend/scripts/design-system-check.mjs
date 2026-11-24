@@ -14,6 +14,11 @@ export const tokenGroups = {
   radius: ['sm', 'md', 'lg', 'xl'],
   shadow: ['sm', 'md', 'overlay'],
   statuses: ['success', 'warning', 'danger', 'info'],
+  controls: ['sm', 'md', 'touch'],
+  icons: ['sm', 'md', 'lg'],
+  surfaces: ['input', 'page'],
+  reactions: ['like', 'like-hover'],
+  layers: ['raised', 'dropdown', 'overlay', 'modal'],
 }
 
 // Scan declarations rather than raw text so values in comments/documentation don't falsely fail.
@@ -64,6 +69,31 @@ export function checkTokenContract(theme, tailwind) {
     requireToken(theme, `--soco-${status}:`, 'semantic status token')
     requireToken(tailwind, `--color-${status}: var(--soco-${status})`, 'Tailwind status mapping')
   }
+  for (const name of tokenGroups.controls) {
+    requireToken(theme, `--soco-control-${name}:`, 'control size token')
+    requireToken(tailwind, `--spacing-control-${name}: var(--soco-control-${name})`, 'Tailwind control size mapping')
+  }
+  for (const name of tokenGroups.icons) {
+    requireToken(theme, `--soco-icon-${name}:`, 'icon size token')
+    requireToken(tailwind, `--spacing-icon-${name}: var(--soco-icon-${name})`, 'Tailwind icon size mapping')
+  }
+  for (const name of tokenGroups.surfaces) {
+    requireToken(theme, `--soco-surface-${name}:`, 'surface token')
+    requireToken(tailwind, `--color-surface-${name}: var(--soco-surface-${name})`, 'Tailwind surface mapping')
+  }
+  for (const name of tokenGroups.reactions) {
+    requireToken(theme, `--soco-reaction-${name}:`, 'reaction color token')
+    requireToken(tailwind, `--color-reaction-${name}: var(--soco-reaction-${name})`, 'Tailwind reaction mapping')
+  }
+  for (const name of tokenGroups.layers) requireToken(theme, `--soco-z-${name}:`, 'z-index layer token')
+  requireToken(theme, 'outline: 3px solid var(--soco-focus-ring)', 'focus ring token usage')
+  requireToken(theme, 'input:focus-visible:not([data-slot])', 'legacy focus ring opt-out for shared UI (data-slot)')
+  requireToken(tailwind, '@custom-variant app-desktop (@media (min-width: 761px))', 'app-desktop breakpoint variant')
+  requireToken(tailwind, '@custom-variant app-mobile (@media (max-width: 760px))', 'app-mobile breakpoint variant')
+  requireToken(tailwind, '@custom-variant app-wide (@media (min-width: 1121px))', 'app-wide breakpoint variant')
+  requireToken(tailwind, '@custom-variant app-full (@media (min-width: 1331px))', 'app-full breakpoint variant')
+  requireToken(theme, '--soco-border-subtle:', 'subtle border token')
+  requireToken(tailwind, '--color-border-subtle: var(--soco-border-subtle)', 'Tailwind subtle border mapping')
   if (!tailwind.includes('Preflight is intentionally disabled')) {
     issues.push('Missing no-Preflight policy comment')
   }

@@ -6,6 +6,12 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
+/* App layout breakpoint: mobile <= 760px, desktop >= 761px. Prefer these over min-[761px]/max-[760px]. */
+@custom-variant app-mobile (@media (max-width: 760px));
+@custom-variant app-desktop (@media (min-width: 761px));
+@custom-variant app-wide (@media (min-width: 1121px));
+@custom-variant app-full (@media (min-width: 1331px));
+
 @theme inline {
   --font-sans: var(--soco-font-sans);
   --font-mono: var(--soco-font-mono);
@@ -23,6 +29,12 @@
   --spacing-ui-5: var(--soco-space-5);
   --spacing-ui-6: var(--soco-space-6);
   --spacing-ui-8: var(--soco-space-8);
+  --spacing-control-sm: var(--soco-control-sm);
+  --spacing-control-md: var(--soco-control-md);
+  --spacing-control-touch: var(--soco-control-touch);
+  --spacing-icon-sm: var(--soco-icon-sm);
+  --spacing-icon-md: var(--soco-icon-md);
+  --spacing-icon-lg: var(--soco-icon-lg);
   --radius-ui-sm: var(--soco-radius-sm);
   --radius-ui-md: var(--soco-radius-md);
   --radius-ui-lg: var(--soco-radius-lg);
@@ -37,6 +49,11 @@
   --color-background: var(--soco-canvas);
   --color-foreground: var(--soco-text);
   --color-card: var(--soco-surface);
+  --color-surface-input: var(--soco-surface-input);
+  --color-surface-page: var(--soco-surface-page);
+  --color-border-subtle: var(--soco-border-subtle);
+  --color-reaction-like: var(--soco-reaction-like);
+  --color-reaction-like-hover: var(--soco-reaction-like-hover);
   --color-card-foreground: var(--soco-text);
   --color-popover: var(--soco-surface);
   --color-popover-foreground: var(--soco-text);

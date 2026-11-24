@@ -2287,7 +2287,7 @@ export default function AuthedApp({
     if (tab === 'profile') void loadProfilePosts(false, true);
   }
 
-  const renderPosts = (items: Post[], showSave = false) =>
+  const renderPosts = (items: Post[], showSave = false, onOpen: (id: number) => void = openFeedPostDetails) =>
     items.map((post) => (
       <FeedPostCard
         key={post.id}
@@ -2304,7 +2304,7 @@ export default function AuthedApp({
         token={session.token}
         translationPreferencesLoaded={translationPreferencesLoaded}
         targetLanguage={targetLanguage}
-        setActivePostId={openFeedPostDetails}
+        setActivePostId={onOpen}
         onToggleComments={() => setInlineCommentsId((current) => current === post.id ? null : post.id)}
         discussion={inlineCommentsId === post.id ? renderPostDiscussion(post, openVisitor) : null}
         showSave={showSave}
@@ -2531,10 +2531,11 @@ export default function AuthedApp({
       )}
         </>
       }
-      header={tab === "profile" && desktopProfileOverview && !profileEditorOpen ? null : (
+      // The search page owns its search field and title, so the shared header is omitted there.
+      header={isSearchResultsRoute || tab === "market" || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
         <AppHeader
           mobileSearchActions={tab === "feed"}
-          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
+          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" ? "mobile-section-header" : ""}`}
           start={
             <HeaderTitle
               tab={tab}
@@ -2689,6 +2690,7 @@ export default function AuthedApp({
             sessionId: session.sessionId,
             onOpenProfile: username => openVisitorProfile(username),
             onOpenPost: postId => navigate(feedPostPath(postId)),
+            renderPosts: (items, onOpen) => renderPosts(items, false, onOpen),
           },
           discover: {
             request: apiFetch,

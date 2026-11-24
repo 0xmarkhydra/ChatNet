@@ -287,7 +287,7 @@
 
 .auth-feature-icon--blue {
   background: linear-gradient(135deg, #eff6ff, #dbeafe);
-  color: #2563eb;
+  color: var(--soco-blue);
 }
 
 .auth-feature-icon--emerald {

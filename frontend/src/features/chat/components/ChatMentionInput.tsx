@@ -37,17 +37,35 @@ export default function ChatMentionInput({ members, inputRef, text, setText, pla
   const activeIndex = Math.min(selected, Math.max(0, candidates.length - 1))
   const tokens = splitMessageMentions(text, members)
 
-  // Let mentions wrap normally; a one-row textarea otherwise scrolls a second tag out of view.
+  // The textarea owns the real caret, while the mirror paints @mentions. Match their
+  // computed text metrics (including responsive overrides) so the caret stays on the
+  // visible glyph when typing, wrapping, or scrolling through multiple lines.
   useLayoutEffect(() => {
     const input = inputRef.current
-    if (!input) return
+    const mirror = mirrorRef.current
+    if (!input || !mirror) return
     const resize = () => {
       input.style.height = 'auto'
       input.style.height = `${Math.min(154, Math.max(43, input.scrollHeight))}px`
-      if (mirrorRef.current) {
-        mirrorRef.current.scrollTop = input.scrollTop
-        mirrorRef.current.scrollLeft = input.scrollLeft
+
+      const computed = getComputedStyle(input)
+      for (const property of [
+        'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
+        'font-stretch', 'line-height', 'letter-spacing', 'word-spacing',
+        'text-align', 'text-indent', 'text-transform', 'direction',
+        'white-space', 'overflow-wrap', 'word-break', 'tab-size',
+        'padding-top', 'padding-bottom', 'padding-left',
+      ]) {
+        mirror.style.setProperty(property, computed.getPropertyValue(property))
       }
+      // Non-overlay scrollbars consume text width in the textarea, but not in
+      // the absolutely positioned mirror. Reserve exactly the same space.
+      const scrollbarWidth = Math.max(0, input.offsetWidth - input.clientWidth
+        - (parseFloat(computed.borderLeftWidth) || 0)
+        - (parseFloat(computed.borderRightWidth) || 0))
+      mirror.style.paddingRight = `${(parseFloat(computed.paddingRight) || 0) + scrollbarWidth}px`
+      mirror.scrollTop = input.scrollTop
+      mirror.scrollLeft = input.scrollLeft
     }
     resize()
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null

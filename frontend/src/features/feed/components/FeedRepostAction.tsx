@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Copy, MessageCircle, Quote, Repeat2, Share2 } from 'lucide-react'
+import { Copy, MessageCircle, Quote, Repeat2, Share } from 'lucide-react'
 import { Button } from '../../../shared/ui/button'
 import type { ApiRequest } from '../../../shared/types/api'
 import { publishRepost, undoRepost } from '../api/posts'
@@ -85,9 +85,9 @@ export default function FeedRepostAction({ post, request, onUpdated, onRemoved, 
   }
 
   return <>
-    <button type="button" className={`post-stat feed-share-action feed-repost-action ${postActionClassName} data-[reposted=true]:text-primary!`} data-reposted={Boolean(removedId)} aria-haspopup="dialog"
+    <button type="button" className={`feed-share-action feed-repost-action ${postActionClassName} data-[reposted=true]:text-primary!`} data-reposted={Boolean(removedId)} aria-haspopup="dialog"
       aria-expanded={open} aria-label="Chia sẻ bài viết" onClick={() => { setError(''); setQuote(false); setOpen(true) }}>
-      <Share2 size={20} aria-hidden="true" /><span>Chia sẻ</span>
+      <Share size={18} aria-hidden="true" /><span>Chia sẻ</span>
     </button>
     {open && <dialog ref={dialog} aria-labelledby={title} aria-busy={busy}
       className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] overflow-auto rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl backdrop:bg-black/50"

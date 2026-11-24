@@ -24,13 +24,13 @@ describe('Profile Editor Tailwind parity', () => {
       onChangeAvatar={() => {}} onChangeCover={() => {}}
     />)
 
-    expect((markup.match(/class="profile-editor-field min-\[761px\]:grid/g) ?? [])).toHaveLength(6)
-    expect((markup.match(/min-\[761px\]:font-\[690\]/g) ?? [])).toHaveLength(6)
-    expect((markup.match(/min-\[761px\]:font-\[510\]/g) ?? [])).toHaveLength(6)
+    expect((markup.match(/class="profile-editor-field app-desktop:grid/g) ?? [])).toHaveLength(6)
+    expect((markup.match(/app-desktop:font-\[690\]/g) ?? [])).toHaveLength(6)
+    expect((markup.match(/app-desktop:font-\[510\]/g) ?? [])).toHaveLength(6)
     for (const field of ['displayName', 'username', 'bio', 'city', 'workplace', 'school']) {
       expect(markup).toContain(`name="${field}"`)
     }
-    expect(markup).toContain('min-[761px]:font-[780]')
+    expect(markup).toContain('app-desktop:font-[780]')
     expect(profileEditorInputClass).toContain('focus-visible:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]')
   })
 
@@ -40,7 +40,7 @@ describe('Profile Editor Tailwind parity', () => {
       fieldClass="unrelated-form-field" disabled={false}
     />)
     expect(markup).toContain('unrelated-form-field')
-    expect(markup).not.toContain('min-[761px]:h-[45px]')
+    expect(markup).not.toContain('app-desktop:h-[45px]')
     expect(profileEditorFieldClass).toContain('profile-editor-field')
     expect(profileEditorLabelClass).toContain('font-[690]')
   })

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEventHandler, ReactNode, RefObject } from "react";
 import { ArrowLeft, Search } from "lucide-react";
 import { Input } from "../../shared/ui/input";
+import { SearchField } from "../../shared/ui/search-field";
 
 export type HeaderSearchProps = {
   anchorRef: RefObject<HTMLDivElement | null>;
@@ -44,7 +45,21 @@ export default function HeaderSearch({
       <button className="appbar-mobile-search-back" type="button" aria-label="Đóng tìm kiếm" onClick={closeMobileSearch}>
         <ArrowLeft size={22} aria-hidden="true" />
       </button>
-      <label className="appbar-search">
+      <SearchField
+        className="app-mobile:hidden"
+        value={value}
+        onValueChange={onChange}
+        maxLength={maxLength}
+        aria-expanded={expanded}
+        aria-controls={controls}
+        aria-label={ariaLabel}
+        placeholder={placeholder}
+        onFocus={onFocus}
+        onClick={onClick}
+        onKeyDown={onKeyDown}
+      />
+      {/* Phones keep the legacy expanding search overlay (.appbar-search rules); desktop uses SearchField above. */}
+      <span className="contents app-desktop:hidden"><label className="appbar-search">
         {icon}
         <Input
           ref={inputRef}
@@ -63,7 +78,7 @@ export default function HeaderSearch({
           placeholder={placeholder}
           aria-label={ariaLabel}
         />
-      </label>
+      </label></span>
       {results}
     </div>
   );

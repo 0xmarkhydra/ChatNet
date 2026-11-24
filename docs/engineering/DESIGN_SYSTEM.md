@@ -28,6 +28,7 @@ Read [FRONTEND_STANDARDS.md](FRONTEND_STANDARDS.md), [UI_SKILL_ORCHESTRATION.md]
 
 - Radius tokens: sm **8px** (chips), md **12px** (buttons/inputs), lg **16px** (panels), xl **22px** (brand cards). Use the token, not a novel radius per component.
 - Control heights: sm **36px** (dense desktop only), md **40px**, touch **44px**. Primary mobile interactive targets should be **at least 44 × 44px**, including icons. Spacing around compact visual icons can expand the actual hit target.
+- Tailwind aliases: `h-control-sm` / `h-control-md` / `h-control-touch` and `size-control-md` map to the existing control-height tokens. `size-icon-sm` / `size-icon-md` / `size-icon-lg` map to the 16/20/24px icon tokens. Height tokens name a *dimension*, not permission to use a 36px mobile touch target.
 - Icon sizes: **16, 20, 24px** for compact, default, prominent. Use the same Lucide stroke conventions and align icon centers with text baselines. All icon-only buttons need an accessible name.
 - Avoid arbitrary icon scaling or oversized title/action chrome.
 
@@ -44,6 +45,8 @@ Existing identity is **Indigo/Blue-violet**. Use semantic tokens first:
 | Border | `--soco-line` |
 | Success / warning / danger / information | `--soco-success` / `--soco-warning` / `--soco-danger` / `--soco-info` |
 
+- Additional opt-in surfaces preserve existing colors rather than restyling screens: `bg-surface-input` = `#f8fafe`, `bg-surface-page` = `#f7f9fd`, and `border-border-subtle` = `#e8ecf5`. Use `bg-card`, `bg-background`, `border-border` when their semantic role matches instead; do not automatically replace visually similar colors. These surface values are **not** global background replacements.
+- Feed like/reaction is not a primary action color: preserve the approved `#ee416a` / `#fff2f6` as `text-reaction-like` / `bg-reaction-like-hover` (source: `--soco-reaction-*`), never collapse it into `primary`.
 - Selected states must be distinguishable beyond color (indicator, contrast, icon, weight or accessible state). Do not use violet/blue/orange indiscriminately as arbitrary decoration.
 - Contrast goals: normal text **≥ 4.5:1**, large text **≥ 3:1**; focus visibly distinct; check actual layered gradient/glass backgrounds. The semantic status colors are **text/icon hues**, not automatically accessible background/foreground combinations. Validate contrast before creating status fills.
 - Use accessible hover, focus-visible, active, selected, loading, disabled, empty, error and retry states. Do not signal validation errors through color alone.

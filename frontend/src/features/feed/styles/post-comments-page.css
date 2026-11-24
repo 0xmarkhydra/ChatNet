@@ -3,7 +3,7 @@
 /* Scroll desktop content in each column, leaving both sets of controls visible. */
 .post-detail-backdrop.post-comments-page {
   --detail-secondary: color-mix(in srgb, var(--soco-text) 62%, var(--soco-muted));
-  --detail-like: #ee416a;
+  --detail-like: var(--soco-reaction-like);
   --detail-like-soft: color-mix(in srgb, var(--detail-like) 8%, var(--soco-surface));
   --detail-rule: var(--soco-line);
   box-sizing: border-box;
@@ -100,42 +100,6 @@
 }
 .post-comments-stats .feed-post-likes { display: inline-flex; align-items: center; gap: 8px; }
 .post-comments-stats .feed-post-likes svg { flex: none; color: var(--detail-like); }
-
-.post-comments-post-actions.post-toolbar-compact {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: center;
-  gap: 4px;
-  min-height: 48px;
-  padding-top: 4px;
-  border-top: 1px solid var(--soco-line);
-}
-.post-comments-post-actions.post-toolbar-compact > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  min-height: 43px;
-  margin: 0;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--soco-text);
-  font-size: 13px;
-  cursor: pointer;
-}
-.post-comments-post-actions.post-toolbar-compact > button > span { display: inline; }
-.post-comments-post-actions.post-toolbar-compact > button:hover { background: var(--soco-canvas); }
-.post-comments-post-actions.post-toolbar-compact > button.feed-like-button.is-liked { color: #ef426b; }
-.post-comments-post-actions.post-toolbar-compact > button.feed-like-button.is-liked:hover { background: var(--detail-like-soft); }
-.post-comments-post-actions.post-toolbar-compact > button:not(:disabled):active { background: var(--soco-soft-blue); }
-.post-comments-post-actions.post-toolbar-compact > button:disabled {
-  background: var(--soco-canvas); color: var(--detail-secondary); opacity: .55; cursor: not-allowed;
-}
 
 .post-comments-thread { display: flex; flex-direction: column; }
 .post-comments-thread-heading {
@@ -324,12 +288,6 @@
   :is(.feed-inline-comments, .post-comments-thread) .feed-comment-actions > span[aria-hidden="true"] { display: none; }
   .post-comments-original,
   .post-comments-post-footer { padding-inline: 12px; }
-  .post-comments-post-actions.post-toolbar-compact > button { gap: 4px; }
-  .post-comments-post-actions.post-toolbar-compact > button span { font-size: 11px; }
   .post-comments-composer .feed-comment-form { padding: 8px 12px; }
   .post-comments-composer .feed-comment-compose textarea { font-size: 16px; }
-}
-
-.post-comments-post-actions.post-toolbar-compact > .feed-repost-action[data-reposted='true'] {
-  color: var(--soco-blue);
 }

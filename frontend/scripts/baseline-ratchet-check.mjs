@@ -22,6 +22,19 @@ export function increasedLintDebt(previous, current) {
   return increases
 }
 
+export function increasedDesignDebt(previous, current) {
+  const increases = []
+  for (const [metric, total] of Object.entries(current.totals)) {
+    const old = previous.totals[metric] ?? 0
+    if (total > old) increases.push(`total ${metric}: ${old} -> ${total}`)
+  }
+  for (const [key, count] of Object.entries(current.counts)) {
+    const old = previous.counts[key] ?? 0
+    if (count > old) increases.push(`${key}: ${old} -> ${count}`)
+  }
+  return increases
+}
+
 function readBaselineAt(ref, filename) {
   const original = execFileSync('git', ['show', `${ref}:${filename}`], {
     cwd: repository, encoding: 'utf8',
@@ -45,9 +58,21 @@ function run() {
     readBaselineAt(baseRef, lintPath),
     JSON.parse(fs.readFileSync(path.join(repository, lintPath), 'utf8')),
   )
+  const designPath = 'frontend/design-debt-baseline.json'
+  let designIncreases = []
+  try {
+    designIncreases = increasedDesignDebt(
+      readBaselineAt(baseRef, designPath),
+      JSON.parse(fs.readFileSync(path.join(repository, designPath), 'utf8')),
+    )
+  } catch (error) {
+    // The first PR that introduces the baseline has nothing to compare against.
+    if (!/exists on disk, but not in|does not exist in|path .* exists/.test(String(error.stderr || error.message))) throw error
+  }
   assert.deepEqual(architectureAdded, [], `Architecture baseline must never add violations:\n${architectureAdded.join('\n')}`)
   assert.deepEqual(lintIncreases, [], `Lint baseline must not increase:\n${lintIncreases.join('\n')}`)
-  console.log('PASS: architecture and lint baselines only ratchet down')
+  assert.deepEqual(designIncreases, [], `Design-debt baseline must not increase:\n${designIncreases.join('\n')}`)
+  console.log('PASS: architecture, lint and design-debt baselines only ratchet down')
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) run()

@@ -36,8 +36,6 @@
 .personal-timeline-label h2 { margin: 0; color: var(--soco-navy); font-size: 18px; }
 .personal-timeline-content > .post-box { margin: 0; }
 .personal-timeline-content .feed { padding-top: 10px; }
-.personal-timeline-content .post { min-width: 0; }
-.personal-timeline-content .post-body { min-width: 0; overflow-wrap: anywhere; }
 .personal-timeline-content > .soco-load-more { width: 100%; }
 .personal-timeline-error { padding: 12px; border: 1px solid var(--soco-line); border-radius: 14px; background: var(--soco-surface); }
 .personal-timeline-error p { margin-top: 0; }

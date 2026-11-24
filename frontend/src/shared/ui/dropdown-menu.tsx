@@ -17,7 +17,7 @@ function DropdownMenuContent({ className, sideOffset = 6, ...props }: React.Comp
       <DropdownPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
-        className={cn("z-100 min-w-44 overflow-hidden rounded-ui-md border border-border bg-popover p-1 text-popover-foreground shadow-lg outline-none", className)}
+        className={cn("z-(--soco-z-overlay) min-w-44 overflow-hidden rounded-ui-md border border-border bg-popover p-1 text-popover-foreground shadow-lg outline-none", className)}
         {...props}
       />
     </DropdownPrimitive.Portal>
@@ -28,7 +28,7 @@ function DropdownMenuItem({ className, inset, ...props }: React.ComponentProps<t
   return (
     <DropdownPrimitive.Item
       data-slot="dropdown-menu-item"
-      className={cn("relative flex min-h-10 cursor-default select-none items-center gap-2 rounded-ui-sm px-3 py-2 text-[length:var(--soco-type-body)] outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", inset && "pl-8", className)}
+      className={cn("relative flex min-h-control-md max-lg:min-h-control-touch cursor-default select-none items-center gap-2 rounded-ui-sm px-3 py-2 text-[length:var(--soco-type-body)] outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50", inset && "pl-8", className)}
       {...props}
     />
   );
@@ -43,7 +43,7 @@ function DropdownMenuCheckboxItem({ className, children, checked, ...props }: Re
     <DropdownPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       checked={checked}
-      className={cn("relative flex min-h-10 cursor-default select-none items-center rounded-ui-sm py-2 pr-3 pl-8 text-[length:var(--soco-type-body)] outline-none focus:bg-accent data-[disabled]:opacity-50", className)}
+      className={cn("relative flex min-h-control-md max-lg:min-h-control-touch cursor-default select-none items-center rounded-ui-sm py-2 pr-3 pl-8 text-[length:var(--soco-type-body)] outline-none focus:bg-accent data-[disabled]:opacity-50", className)}
       {...props}
     >
       <span className="absolute left-2 flex size-4 items-center justify-center">

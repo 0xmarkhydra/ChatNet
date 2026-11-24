@@ -1210,12 +1210,12 @@ try {
   await sidebar.getByRole('button', { name: 'Bảng tin' }).click()
   const feed = page.locator('.social-feed')
   await feed.waitFor({ state: 'visible' })
-  const feedCards = feed.locator('.social-feed-center .post.zalo-post')
+  const feedCards = feed.locator('.social-feed-center .feed-post-card')
   await feedCards.first().waitFor({ state: 'visible' })
   if (!postHeaderOnly) {
   const socialGeometry = await page.evaluate(() => {
     const keys = ['.social-feed-stories-card', '.social-feed-launcher', '.social-feed-filter-bar',
-      '.social-feed-center .post.zalo-post', '.social-feed-suggestions']
+      '.social-feed-center .feed-post-card', '.social-feed-suggestions']
     return Object.fromEntries(keys.map(key => {
       const rect = document.querySelector(key)?.getBoundingClientRect()
       return [key, rect ? {x:rect.x,y:rect.y,width:rect.width,height:rect.height} : null]
@@ -1233,7 +1233,7 @@ try {
   }
   const launcherRect = socialGeometry['.social-feed-launcher']
   const filterRect = socialGeometry['.social-feed-filter-bar']
-  const firstPostRect = socialGeometry['.social-feed-center .post.zalo-post']
+  const firstPostRect = socialGeometry['.social-feed-center .feed-post-card']
   assert(launcherRect && launcherRect.height <= 85 && filterRect && firstPostRect
     && filterRect.y >= launcherRect.y + launcherRect.height + 8
     && filterRect.y <= launcherRect.y + launcherRect.height + 24
@@ -1247,7 +1247,7 @@ try {
   const sideWidth = sideRect.width
   assert(centerWidth >= 540 && centerWidth <= 640 && sideWidth >= 260 && sideWidth <= 330
     && sideRect.x >= centerRect.x + centerWidth + 14
-    && ['.social-feed-launcher', '.social-feed-filter-bar', '.social-feed-center .post.zalo-post']
+    && ['.social-feed-launcher', '.social-feed-filter-bar', '.social-feed-center .feed-post-card']
       .every(selector => approx(socialGeometry[selector].x, centerRect.x, 2)
         && approx(socialGeometry[selector].width, centerWidth, 2)),
     'Feed cards, composer and stories must share a compact central column next to a narrower rail: '
@@ -1259,7 +1259,7 @@ try {
     const headerGeometry = await postCard.evaluate(card => {
       const header = card.querySelector('.feed-post-header')
       const avatar = header?.querySelector('.avatar')
-      const author = header?.querySelector('.post-author')
+      const author = header?.querySelector('.feed-post-author')
       const name = author?.querySelector('strong')
       if (!header || !avatar || !author || !name) return null
       return Object.fromEntries([['card', card], ['header', header], ['avatar', avatar],
@@ -1495,7 +1495,7 @@ try {
     process.exit(0)
   }
   const likeLayout = await postCard.evaluate(card => {
-    const row = card.querySelector('.post-engagement-summary')
+    const row = card.querySelector('.feed-post-engagement')
     const likes = card.querySelector('.feed-post-likes')
     const comments = card.querySelector('.feed-post-conversation-stats')
     const rowBox = row.getBoundingClientRect(), likesBox = likes.getBoundingClientRect(), commentsBox = comments.getBoundingClientRect()
@@ -1525,7 +1525,7 @@ try {
     const visitor = page.getByRole('dialog', { name: 'Trang cá nhân người dùng' })
     await visitor.locator('.post').first().waitFor({ state: 'visible' })
     const visitorAlignment = await visitor.locator('.post').first().evaluate(card => {
-      const row = card.querySelector('.post-engagement-summary').getBoundingClientRect()
+      const row = card.querySelector('.feed-post-engagement').getBoundingClientRect()
       const likes = card.querySelector('.feed-post-likes').getBoundingClientRect()
       const comments = card.querySelector('.feed-post-conversation-stats').getBoundingClientRect()
       return { rowLeft: row.left, rowRight: row.right, likesLeft: likes.left, likesRight: likes.right, commentsLeft: comments.left, commentsRight: comments.right }

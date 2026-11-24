@@ -453,14 +453,14 @@ try {
       await page.waitForTimeout(300)
       check(searchRequestCount === 0, 'Feed search must debounce until user stops typing')
       await firstPage
-      await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 5)
+      await page.waitForFunction(() => document.querySelectorAll('.feed .feed-post-card').length === 5)
       check(await scroller.evaluate(element => element.scrollTop) === 0, 'New search should reset feed scroll to top')
       await page.waitForTimeout(200)
-      check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 5,
+      check(await page.locator('.feed .feed-post-card').count() === 5,
         'Search must not auto-fetch a second page before scrolling')
       await scroller.evaluate(element => { element.scrollTop = element.scrollHeight })
-      await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length >= 10, null, { timeout: 7000 })
-      check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() >= 10,
+      await page.waitForFunction(() => document.querySelectorAll('.feed .feed-post-card').length >= 10, null, { timeout: 7000 })
+      check(await page.locator('.feed .feed-post-card').count() >= 10,
         'Scrolling did not load the next five matching posts')
       const contentPage = page.waitForResponse(response => {
         const url = new URL(response.url())
@@ -468,7 +468,7 @@ try {
       })
       await keyword.fill('Bài viết')
       await contentPage
-      await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 5)
+      await page.waitForFunction(() => document.querySelectorAll('.feed .feed-post-card').length === 5)
       check(await scroller.evaluate(element => element.scrollTop) === 0,
         'Changing from author to content search should reset scroll to top')
       await keyword.fill('')
@@ -729,11 +729,11 @@ try {
   }))
   check(activeNavStyle.bg === 'rgba(0, 0, 0, 0)' && (activeNavStyle.indicator === 'none' || activeNavStyle.indicator === 'normal'),
     'Bulky active navigation highlight was not removed')
-  check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() >= 15,
+  check(await page.locator('.feed .feed-post-card').count() >= 15,
     'Feed should have its first 15 posts')
   await page.locator('.feed-view.zalo-feed-view').evaluate(element => { element.scrollTop = element.scrollHeight })
-  await page.waitForFunction(() => document.querySelectorAll('.feed .zalo-post:not(.outgoing-preview)').length === 18, null, { timeout: 7000 })
-  check(await page.locator('.feed .zalo-post:not(.outgoing-preview)').count() === 18,
+  await page.waitForFunction(() => document.querySelectorAll('.feed .feed-post-card').length === 18, null, { timeout: 7000 })
+  check(await page.locator('.feed .feed-post-card').count() === 18,
     'Feed load more did not append the remaining 3 posts')
   check(await page.getByRole('button', { name: 'Tải thêm bài viết' }).count() === 0,
     'Feed load more should stop at the end of the list')

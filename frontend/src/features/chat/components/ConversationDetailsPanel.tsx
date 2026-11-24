@@ -1,17 +1,14 @@
-import { useScopedState } from '../../../shared/hooks/useScopedState'
-import { Ban, Bell, BellOff, ChevronRight, Camera, MoreHorizontal, Plus, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
-
-import type { GroupActivityKind } from './GroupActivities'
+import { useState } from 'react'
+import { Ban, Bell, BellOff, ChevronRight, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
 import type { Conversation } from '../types'
 import type { GroupChannel } from '../utils/groupChannels'
+import type { GroupActivityKind } from '../types/groupActivities'
 import type { GroupManagementSection } from './GroupSettingsPanel'
-import UserAvatar from '../../../shared/ui/UserAvatar'
-import ConversationAvatar from './ConversationAvatar'
-
-import GroupAvatarEditor, { type GroupPhotoTarget } from './GroupAvatarEditor'
+import type { GroupPhotoTarget } from '../utils/groupPhotoTarget'
+import GroupAvatarEditor from './GroupAvatarEditor'
 import ConversationSharedPreview from './ConversationSharedPreview'
-import GroupChannelControls from './GroupChannelControls'
-import GroupChannelCreateForm from './GroupChannelCreateForm'
+import ConversationDetailsIdentity from './ConversationDetailsIdentity'
+import ConversationGroupManagementMenu from './ConversationGroupManagementMenu'
 
 type Props = {
   conversation: Conversation
@@ -46,7 +43,14 @@ type Props = {
   onClearHistory: () => void
 }
 
-export default function ConversationDetailsPanel({
+export default function ConversationDetailsPanel(props: Props) {
+  const { conversation, selectedChannelId } = props
+  const scope = conversation.type === 'group' ? selectedChannelId : 0
+  return <ConversationDetailsPanelScope key={JSON.stringify([conversation.id, scope])} {...props} />
+}
+
+function ConversationDetailsPanelScope({
+
   conversation, busy, notificationBusy, onToggleNotifications, onClose, onProfile, onSearch, onShared, request,
   selectedChannelId, channel, userId, canLeaveGroup, notify, onGroupRenamed,
   onChannelsChanged, onChannelDeleted, onLeftGroup, onGroupManagement,
@@ -55,12 +59,8 @@ export default function ConversationDetailsPanel({
 }: Props) {
   const isGroup = conversation.type === 'group'
   const isChannel = isGroup && selectedChannelId !== 0
-  const displayName = isChannel ? channel.name : conversation.name
-  const displayAvatar = isChannel ? channel.avatarUrl : conversation.avatarUrl
-  const blocked = !isGroup && Boolean(conversation.blockedByMe || conversation.blockedByOther)
-  const [creatingChannel, setCreatingChannel] = useScopedState(conversation.id, false)
-  const [photoTarget, setPhotoTarget] = useScopedState<GroupPhotoTarget | null>(conversation.id, null)
-
+  const [creatingChannel, setCreatingChannel] = useState(false)
+  const [photoTarget, setPhotoTarget] = useState<GroupPhotoTarget | null>(null)
 
   return (
     <aside className="conversation-info-panel social-chat-details" id="conversation-details-panel" aria-label="Thông tin hội thoại">
@@ -72,32 +72,10 @@ export default function ConversationDetailsPanel({
         </button>
       </div>
 
-      <div className="conversation-info-panel-identity social-chat-details-identity">
-        {isGroup ? (
-          <div className="group-photo-avatar-wrap">
-            {isChannel
-              ? <UserAvatar name={displayName} className="conversation-info-panel-avatar social-chat-details-avatar" group imageUrl={displayAvatar} />
-              : <ConversationAvatar conversation={conversation} className="conversation-info-panel-avatar social-chat-details-avatar" />}
+      <ConversationDetailsIdentity conversation={conversation} channel={channel} selectedChannelId={selectedChannelId}
+        canEditGroupPhotos={canEditGroupPhotos} photoBusy={photoBusy} onEditPhoto={setPhotoTarget} />
 
-            {canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
-              aria-label={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'} title={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'}
-              onClick={() => setPhotoTarget({ name: displayName, avatarUrl: displayAvatar,
-                kind: isChannel ? 'channel' : 'group', channelId: isChannel ? selectedChannelId : undefined })}>
-              <Camera size={17} aria-hidden="true" />
-            </button>}
-          </div>
-        ) : (
-          <UserAvatar username={conversation.otherUsername} name={conversation.name}
-            className="conversation-info-panel-avatar social-chat-details-avatar"
-            online={conversation.online} />
-        )}
-        <strong title={displayName}>{displayName}</strong>
-        <span>{blocked ? (conversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này')
-          : isChannel ? `Kênh của nhóm ${conversation.name}` : isGroup ? `${conversation.memberCount} thành viên`
-          : conversation.online ? '● Đang hoạt động' : 'Chat riêng'}</span>
-      </div>
-
-      <ConversationSharedPreview key={`${conversation.id}:${isGroup ? selectedChannelId : 0}`} conversationId={conversation.id}
+      <ConversationSharedPreview conversationId={conversation.id}
         channelId={isGroup ? selectedChannelId : 0}
         request={request} onOpen={onShared} />
 
@@ -120,37 +98,15 @@ export default function ConversationDetailsPanel({
           <ChevronRight size={16} aria-hidden="true" />
         </button>}
 
-        {isGroup && <div className="conversation-info-group-menu" aria-label={isChannel ? 'Quản lý kênh' : 'Quản lý nhóm'}>
-          <strong className="conversation-info-group-menu-heading">{isChannel ? 'Quản lý kênh' : 'Quản lý nhóm'}</strong>
-            {!isChannel && <>
-              <button type="button" onClick={() => onGroupManagement('members')}><Users size={18} />Thành viên</button>
-              <button type="button" onClick={() => onGroupManagement('details')}><MoreHorizontal size={18} />Thông tin cộng đồng</button>
-              {canManageGroup && <>
-                <button type="button" onClick={() => onGroupManagement('permissions')}><ShieldCheck size={18} />Quyền quản trị</button>
-                <button type="button" onClick={() => onGroupManagement('requests')}><Users size={18} />Yêu cầu tham gia</button>
-                <button type="button" onClick={() => onGroupManagement('activity')}><MoreHorizontal size={18} />Nhật ký hoạt động</button>
-              </>}
-              <button type="button" onClick={() => onGroupManagement('rules')}><ShieldCheck size={18} />Nội quy nhóm</button>
-              <button type="button" onClick={() => onCreateGroupActivity('poll')}><MoreHorizontal size={18} />Bình chọn</button>
-              <button type="button" onClick={() => onCreateGroupActivity('note')}><MoreHorizontal size={18} />Ghi chú</button>
-              <button type="button" onClick={() => onCreateGroupActivity('reminder')}><MoreHorizontal size={18} />Nhắc hẹn</button>
-              {canCreateChannel && (creatingChannel
-                ? <GroupChannelCreateForm busy={channelCreateBusy} onCreate={onCreateChannel}
-                    onCancel={() => setCreatingChannel(false)} />
-                : <button type="button" onClick={() => setCreatingChannel(true)}><Plus size={18} />Tạo kênh</button>)}
-              <button type="button" disabled={notificationBusy} onClick={onToggleNotifications}>
-                {conversation.muted ? <Bell size={18} /> : <BellOff size={18} />}
-                {conversation.muted ? 'Bật thông báo nhóm' : 'Tắt thông báo nhóm'}
-              </button>
-            </>}
-            <GroupChannelControls key={`${conversation.id}:${channel.id}`} groupId={conversation.id}
-              groupName={conversation.name} channel={channel} userId={userId}
-              canEdit={canEditGroupPhotos} canLeave={canLeaveGroup}
-              scope={isChannel ? 'channel' : 'group'} hideGroupNotification
-              request={request} notify={notify} onGroupRenamed={onGroupRenamed}
-              onChannelsChanged={onChannelsChanged} onChannelDeleted={onChannelDeleted}
-              onLeftGroup={onLeftGroup} />
-        </div>}
+        {isGroup && <ConversationGroupManagementMenu conversation={conversation} channel={channel}
+          selectedChannelId={selectedChannelId} userId={userId} creatingChannel={creatingChannel} setCreatingChannel={setCreatingChannel}
+          canManageGroup={canManageGroup} canCreateChannel={canCreateChannel} channelCreateBusy={channelCreateBusy}
+          onCreateChannel={onCreateChannel} notificationBusy={notificationBusy} onToggleNotifications={onToggleNotifications}
+          onGroupManagement={onGroupManagement} onCreateGroupActivity={onCreateGroupActivity}
+          canEditGroupPhotos={canEditGroupPhotos} canLeaveGroup={canLeaveGroup} request={request} notify={notify}
+          onGroupRenamed={onGroupRenamed} onChannelsChanged={onChannelsChanged}
+          onChannelDeleted={onChannelDeleted} onLeftGroup={onLeftGroup} />}
+
         {!isGroup && conversation.otherUserId && !conversation.blockedByOther && (
           <button type="button" className="conversation-options-danger" disabled={busy}
             onClick={conversation.blockedByMe ? onUnblock : onBlock}>
@@ -164,7 +120,7 @@ export default function ConversationDetailsPanel({
           <ChevronRight size={16} aria-hidden="true" />
         </button>}
       </nav>
-      {photoTarget && <GroupAvatarEditor key={`${conversation.id}:${selectedChannelId}`} target={photoTarget}
+      {photoTarget && <GroupAvatarEditor target={photoTarget}
         busy={photoBusy} onSave={onSavePhoto} onClose={() => setPhotoTarget(null)} />}
       <p className="conversation-info-panel-privacy social-chat-details-privacy">
         <ShieldCheck size={19} aria-hidden="true" />

@@ -18,7 +18,6 @@ export default function MarketSection({
   searchQuery,
   apiFetch,
   session,
-  switchTab,
 }: MarketSectionProps) {
   return (
       <ErrorBoundary resetKey={session.sessionId} fallback={(retry) => <AsyncSectionFallback title="Chợ" onRetry={retry} onReload={() => window.location.reload()} />}>
@@ -28,7 +27,6 @@ export default function MarketSection({
               key={session.sessionId}
               userId={session.user.id}
               request={apiFetch}
-              onBack={() => switchTab("discover")}
             />
           </Suspense>
       </ErrorBoundary>

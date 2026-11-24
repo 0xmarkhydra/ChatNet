@@ -74,7 +74,7 @@ async (page) => {
     await like.evaluate((button) => button.click())
     assert(counts.get('POST /api/posts/10/like') === 1, 'Duplicate like')
     await reply(likeRoute, { error: 'Like rejected' }, 500)
-    await p.waitForFunction(() => document.querySelector('.zalo-post .post-toolbar button')?.getAttribute('aria-pressed') === 'false')
+    await p.waitForFunction(() => document.querySelector('.feed-post-card .feed-post-toolbar button')?.getAttribute('aria-pressed') === 'false')
     assert(await like.isEnabled(), 'Like stayed locked after failure')
 
     const input = p.getByRole('textbox', { name: 'Nội dung bài viết' })

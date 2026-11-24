@@ -16,6 +16,12 @@
   --soco-surface: #ffffff;
   --soco-canvas: #f5f7fd;
   --soco-soft-blue: #eff4ff;
+  /* Existing feature surface values, named by role without changing their appearance. */
+  --soco-surface-input: #f8fafe;
+  --soco-surface-page: #f7f9fd;
+  --soco-border-subtle: #e8ecf5;
+  --soco-reaction-like: #ee416a;
+  --soco-reaction-like-hover: #fff2f6;
   --soco-gradient: linear-gradient(115deg, #1769f8 0%, #4267fd 49%, #8955f6 100%);
   --soco-shadow: 0 14px 40px rgba(33, 56, 130, .09);
   --soco-radius-card: 22px;
@@ -57,6 +63,11 @@
   --soco-shadow-sm: 0 2px 8px rgba(33, 56, 130, .06);
   --soco-shadow-md: 0 8px 24px rgba(33, 56, 130, .09);
   --soco-shadow-overlay: 0 20px 60px rgba(15, 23, 42, .18);
+  /* Layering for new UI; values match what shared/ui already used. Legacy layers (>= 1000) are migrated per feature. */
+  --soco-z-raised: 1;
+  --soco-z-dropdown: 20;
+  --soco-z-overlay: 100;
+  --soco-z-modal: 101;
   --soco-motion-fast: 120ms;
   --soco-motion-normal: 200ms;
   --soco-motion-slow: 320ms;
@@ -78,8 +89,8 @@ html { background: var(--soco-canvas); }
 body { color: var(--soco-text); background: #eff3fa; }
 button, input, select, textarea { font-family: inherit; }
 button, [role="button"] { -webkit-tap-highlight-color: transparent; }
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, .42);
+button:focus-visible:not([data-slot]), a:focus-visible, input:focus-visible:not([data-slot]), textarea:focus-visible:not([data-slot]), select:focus-visible {
+  outline: 3px solid var(--soco-focus-ring);
   outline-offset: 2px;
 }
 button { transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease; }
@@ -353,17 +364,13 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
 
 /* News feed, story cards and user profile */
 .zalo-feed-view { padding: 13px 16px 22px; }
-.zalo-post-composer, .zalo-post {
+.zalo-post-composer {
   border: 1px solid var(--soco-line);
   border-radius: var(--soco-radius-card);
   background: #fff;
   box-shadow: 0 8px 28px rgba(29,50,106,.055);
 }
 .zalo-post-composer { margin-bottom: 14px; padding: 14px; }
-.zalo-post { margin-bottom: 14px; overflow: hidden; }
-.zalo-post .post-author strong { color: var(--soco-navy); }
-.zalo-post .post-toolbar { border-color: #edf0f8; }
-.zalo-post .post-toolbar button.liked { color: #e76d85; }
 .composer-shortcuts button { background: #f0f4fe; color: #3754a7; }
 .composer-shortcuts button:hover { background: #e6edff; }
 @media (max-width: 430px) {
@@ -554,7 +561,6 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   .modern-shell .story-visual { height: 106px; border-radius: 15px; }
   .modern-shell .story-card > span { font-size: 10px; }
   .zalo-post-composer { margin: 0 0 12px; border-radius: 19px; padding: 11px; }
-  .zalo-post { border-radius: 19px; margin-bottom: 12px; }
   .profile-hero { margin: 10px 11px 0; border-radius: 20px; }
   .contact-shortcuts, .contacts-suggestions { margin-inline: 11px; border-radius: 19px; }
   .friend-search-panel.connect-modal {

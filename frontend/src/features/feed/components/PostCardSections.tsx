@@ -1,4 +1,3 @@
-import { Heart } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import UiIcon from '../../../shared/ui/UiIcon'
@@ -45,15 +44,15 @@ export function PostCardHeader({
   openPost: () => void
 }) {
   return (
-    <header className="feed-post-header post-card-header flex! w-full! min-w-0! items-center! gap-[9px]!">
-      <UserAvatar username={post.author} name={authorLabel} className="avatar size-11! basis-11! shrink-0! rounded-full!" />
-      <div className="post-author flex! min-h-11! min-w-0! flex-1! items-center! justify-between!">
-        <div className="min-w-0!">
-          <strong className="block! truncate! text-[14px]! font-bold! text-[#142443]!">
+    <header className="feed-post-header post-card-header flex w-full min-w-0 items-center gap-[9px]">
+      <UserAvatar username={post.author} name={authorLabel} className="avatar size-10! basis-10! shrink-0! rounded-full! bg-none! bg-secondary! text-primary!" />
+      <div className="feed-post-author flex min-h-10 min-w-0 flex-1 items-center justify-between">
+        <div className="grid min-w-0 gap-[3px]">
+          <strong className="block! truncate! text-base! font-bold! text-[#142443]!">
             {onAuthorOpen ? <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(post.author)}>{authorLabel}</button> : authorLabel}
           </strong>
           {post.repostKind && <span className="block text-sm text-muted-foreground">{post.repostKind === 'quick' ? 'Đã đăng lại' : 'Đã trích dẫn'}</span>}
-          <small className="block! text-[11px]! text-[#7889aa]!">
+          <small className="block! text-xs! text-[#7889aa]!">
             <button type="button" className="feed-post-open-date" aria-label="Mở bài viết" onClick={openPost}>{relativeDate(post.createdAt)}</button>
             {' · '}{post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}
           </small>
@@ -78,13 +77,12 @@ export function PostCardEngagement({ post, onReactionUsers }: {
 }) {
   const commentsCount = post.comments?.length ?? 0
   return (
-    <div className="post-engagement-summary feed-post-engagement flex! flex-wrap! items-center! justify-between! gap-x-3! gap-y-1.5! px-0.5! py-2! text-[11px]! text-[#7585a7]!">
-      <button type="button" className="feed-post-likes feed-reaction-users-trigger inline-flex! items-center! gap-2! [&_svg]:size-[19px]! [&_svg]:text-[#f34373]!"
+    <div className="feed-post-engagement whitespace-nowrap flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-2 text-ui-label! text-[#7585a7]!">
+      <button type="button" className="feed-post-likes feed-reaction-users-trigger inline-flex items-center gap-2"
         disabled={post.likes === 0} aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`} onClick={() => onReactionUsers(post)}>
-        <Heart size={22} fill="currentColor" aria-hidden="true" />
         <span>{formatCount(post.likes)} lượt thích</span>
       </button>
-      <span className="feed-post-conversation-stats ml-auto! text-right!">
+      <span className="feed-post-conversation-stats ml-auto text-right">
         {commentsCount.toLocaleString('vi-VN')} bình luận{Boolean(post.repostCount) && ` · ${formatCount(post.repostCount ?? 0)} lượt đăng lại`}
       </span>
     </div>
@@ -104,13 +102,13 @@ export function PostCardToolbar({
   const commentsId = useId()
   return (
     <>
-      <div className="post-toolbar feed-post-toolbar grid! grid-cols-3! gap-1! mt-0! pt-[5px]! border-t! border-[#e8ecf5]!">
+      <div className="feed-post-toolbar grid grid-cols-3 items-center gap-1 mt-0 mx-4 pt-1 border-t border-border-subtle">
         <FeedLikeButton post={post} busy={busy} onLike={(emoji) => void like(post, emoji)} />
-        <button type="button" className={`post-stat post-detail-trigger ${postActionClassName}`}
+        <button type="button" className={`post-detail-trigger ${postActionClassName}`}
           aria-expanded={onToggleComments ? Boolean(discussion) : undefined}
           aria-controls={discussion ? commentsId : undefined}
           onClick={onToggleComments ?? openPost}>
-          <UiIcon name="comment" size={22} /><span>Bình luận</span>
+          <UiIcon name="comment" size={18} /><span>Bình luận</span>
         </button>
         <FeedRepostAction post={post} request={actions.apiFetch} onUpdated={actions.syncFeedPost} onRemoved={actions.removeFeedPost}
           onChanged={actions.onRepostChanged} onShareToChat={actions.onShareToChat} onFeedback={actions.setNotice} />
