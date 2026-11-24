@@ -379,7 +379,7 @@ func TestCreatePostPushesMentionsOnlyAfterCommit(t *testing.T) {
 
 func TestCreatePostRollsBackWhenMentionPersistenceFails(t *testing.T) {
 	db := openFeedCreateCharacterizationDB(t)
-	authorID, _ := insertFeedCreateCharacterizationUser(t, db, "rollback-author")
+	authorID, authorName := insertFeedCreateCharacterizationUser(t, db, "rollback-author")
 	recipientID, recipient := insertFeedCreateCharacterizationUser(t, db, "rollback-recipient")
 	low, high := authorID, recipientID
 	if low > high {
@@ -388,18 +388,52 @@ func TestCreatePostRollsBackWhenMentionPersistenceFails(t *testing.T) {
 	if _, err := db.Exec(context.Background(), `INSERT INTO friend_connections(user_low,user_high,requested_by,status) VALUES($1,$2,$3,'accepted')`, low, high, authorID); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(context.Background(), `INSERT INTO push_subscriptions(subscription_id,user_id) VALUES(gen_random_uuid(),$1)`, recipientID); err != nil {
+		t.Fatal(err)
+	}
+	pushAttempted := make(chan struct{}, 1)
+	previousTransport := http.DefaultTransport
+	http.DefaultTransport = feedCreateCharacterizationRoundTripper(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host != "api.onesignal.com" {
+			return previousTransport.RoundTrip(req)
+		}
+		pushAttempted <- struct{}{}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"id":"test"}`)),
+			Request:    req,
+		}, nil
+	})
+	t.Cleanup(func() { http.DefaultTransport = previousTransport })
 
 	suffix := strconv.FormatInt(time.Now().UnixNano(), 10)
 	functionName := "feed_create_fail_mentions_" + suffix
 	triggerName := "feed_create_fail_mentions_trigger_" + suffix
-	_, err := db.Exec(context.Background(), fmt.Sprintf(`CREATE FUNCTION %s() RETURNS trigger LANGUAGE plpgsql AS $$
+	pushLockKey := time.Now().UnixNano()
+	pushLockConn, err := db.Acquire(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pushLockConn.Exec(context.Background(), "SELECT pg_advisory_lock($1)", pushLockKey); err != nil {
+		pushLockConn.Release()
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := pushLockConn.Exec(context.Background(), "SELECT pg_advisory_unlock($1)", pushLockKey); err != nil {
+			t.Errorf("release push-order advisory lock: %v", err)
+		}
+		pushLockConn.Release()
+	}()
+	_, err = db.Exec(context.Background(), fmt.Sprintf(`CREATE FUNCTION %s() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF EXISTS (SELECT 1 FROM posts WHERE id=NEW.post_id AND user_id=%d) THEN
+    PERFORM pg_advisory_xact_lock(%d);
     RAISE EXCEPTION 'forced feed create test failure';
   END IF;
   RETURN NEW;
 END;
-$$`, functionName, authorID))
+$$`, functionName, authorID, pushLockKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,15 +446,57 @@ $$`, functionName, authorID))
 	}
 
 	store, _ := newFeedCreateCharacterizationStore(t, http.StatusOK, "image/png", 321)
-	handler := feedCreateCharacterizationHandler(&server{db: db, storage: store})
+	handler := feedCreateCharacterizationHandler(&server{db: db, storage: store, push: onesignalx.New("test-app", "test-key")})
 	rollbackRef := feedCreateCharacterizationRef(authorID, "rollback.png")
 	body := feedCreateCharacterizationBody(t, fmt.Sprintf("👥 Cùng với @%s\nrollback body", recipient), []mediax.AttachmentInput{{
 		StorageRef: rollbackRef,
 		Name:       "rollback.png",
 	}})
-	got := feedCreateCharacterizationRequest(t, handler, authorID, body)
+	token, err := authx.Sign(feedCreateCharacterizationSecret, authorID, authorName, "Feed User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handlerDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() { handlerDone <- feedCreateCharacterizationRequestWithToken(handler, token, body) }()
+	lockDeadline := time.Now().Add(5 * time.Second)
+	for {
+		var waiting bool
+		if err := db.QueryRow(context.Background(), `SELECT EXISTS (
+			SELECT 1 FROM pg_locks
+			WHERE locktype='advisory' AND classid=$1::oid AND objid=$2::oid AND objsubid=1 AND NOT granted
+		)`, int64(uint64(pushLockKey)>>32), int64(uint32(pushLockKey))).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting {
+			break
+		}
+		if time.Now().After(lockDeadline) {
+			t.Fatal("timed out waiting for rollback trigger advisory lock")
+		}
+		select {
+		case got := <-handlerDone:
+			t.Fatalf("handler returned before rollback trigger blocked: status=%d", got.Code)
+		case <-pushAttempted:
+			t.Fatal("push sent before post transaction completed")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	select {
+	case <-pushAttempted:
+		t.Fatal("push sent while post transaction waited before rollback")
+	case <-time.After(250 * time.Millisecond):
+	}
+	if _, err := pushLockConn.Exec(context.Background(), "SELECT pg_advisory_unlock($1)", pushLockKey); err != nil {
+		t.Fatal(err)
+	}
+	got := <-handlerDone
 	if got.Code != http.StatusInternalServerError {
 		t.Fatalf("status=%d, want %d; body=%s", got.Code, http.StatusInternalServerError, got.Body.String())
+	}
+	select {
+	case <-pushAttempted:
+		t.Fatal("push sent after post transaction rolled back")
+	case <-time.After(time.Second):
 	}
 
 	var postCount int
