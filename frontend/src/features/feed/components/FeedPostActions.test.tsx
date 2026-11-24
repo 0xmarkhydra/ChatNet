@@ -73,4 +73,15 @@ describe('feed post sharing', () => {
     await click('Chia sẻ bài viết', true)
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/feed/posts/42?ref=share`)
   })
+
+  it('shares a quick repost using its original post permalink', async () => {
+    const quickRepost = { ...post, id: 60, repostKind: 'quick' as const, originalPost: { id: 12 } }
+    act(() => root.render(<FeedPostActions post={quickRepost} mine={false} request={vi.fn()}
+      onUpdated={vi.fn()} onDeleted={vi.fn()} onFeedback={onFeedback} />))
+    await act(async () => { document.querySelector<HTMLButtonElement>('.post-more')?.click() })
+    await act(async () => { document.querySelectorAll<HTMLButtonElement>('.feed-actions-list button')[1]?.click() })
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({
+      url: `${window.location.origin}/feed/posts/12?ref=share`,
+    }))
+  })
 })

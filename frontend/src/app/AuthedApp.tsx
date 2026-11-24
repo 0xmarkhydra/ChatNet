@@ -1109,6 +1109,9 @@ export default function AuthedApp({
   const { like } = usePostReactions({ actionLocks, feedRevisionRef: feedRevision, followingFeed, postSearch, refreshPosts, setLikePreviews, setPosts, setProfilePosts, setSavedPosts });
   const { addComment, manageFeedComment, reportFeedComment, setCommentLike } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
   const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ setActivePostId });
+  function openFeedPostRoute(id: number) {
+    if (Number.isSafeInteger(id) && id > 0) navigate(feedPostPath(id), { state: { postId: id } });
+  }
 
   const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
   const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setReplyingTo });
@@ -2305,6 +2308,7 @@ export default function AuthedApp({
         translationPreferencesLoaded={translationPreferencesLoaded}
         targetLanguage={targetLanguage}
         setActivePostId={onOpen}
+        onOpenOriginal={openFeedPostRoute}
         onToggleComments={() => setInlineCommentsId((current) => current === post.id ? null : post.id)}
         discussion={inlineCommentsId === post.id ? renderPostDiscussion(post, openVisitor) : null}
         showSave={showSave}
@@ -2495,7 +2499,7 @@ export default function AuthedApp({
           }}
           onClose={closeVisitor}
           onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
-          onOpenOriginal={openFeedPostDetails}
+          onOpenOriginal={openFeedPostRoute}
           onRepostChanged={refreshAfterRepost}
           onShareToChat={setPostLinkToSend}
           onPostOpen={(post) => {
@@ -3085,7 +3089,7 @@ export default function AuthedApp({
           activePost={activePost}
           onRepostChanged={refreshAfterRepost}
           onShareToChat={setPostLinkToSend}
-          onOpenOriginal={openFeedPostDetails}
+          onOpenOriginal={openFeedPostRoute}
           apiFetch={apiFetch}
           closeFeedPostDetails={closeFeedPostDetails}
           commentSortOrder={commentSortOrder}

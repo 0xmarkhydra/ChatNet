@@ -100,12 +100,13 @@ export function PostCardToolbar({
   openPost: () => void
 }) {
   const commentsId = useId()
+  const quickRepost = post.repostKind === 'quick'
   return (
     <>
-      <div className="feed-post-toolbar grid grid-cols-3 items-center gap-1 mt-0 mx-4 pt-1 border-t border-border-subtle">
-        <FeedLikeButton post={post} busy={busy} onLike={(emoji) => void like(post, emoji)} />
+      <div className={`feed-post-toolbar grid ${quickRepost ? 'grid-cols-2' : 'grid-cols-3'} items-center gap-1 mt-0 mx-4 pt-1 border-t border-border-subtle`}>
+        {!quickRepost && <FeedLikeButton post={post} busy={busy} onLike={(emoji) => void like(post, emoji)} />}
         <button type="button" className={`post-detail-trigger ${postActionClassName}`}
-          aria-expanded={onToggleComments ? Boolean(discussion) : undefined}
+          aria-expanded={!quickRepost && onToggleComments ? Boolean(discussion) : undefined}
           aria-controls={discussion ? commentsId : undefined}
           onClick={onToggleComments ?? openPost}>
           <UiIcon name="comment" size={18} /><span>Bình luận</span>

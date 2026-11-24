@@ -17,6 +17,7 @@ import type { ToastKind } from '../../../shared/utils/toast'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
 
 const postActions = 'post-comments-post-actions mt-1.25 grid grid-cols-3 items-center gap-ui-1 min-h-12 pt-ui-1 border-t border-border text-ui-label whitespace-nowrap'
+const quickPostActions = 'post-comments-post-actions mt-1.25 grid grid-cols-2 items-center gap-ui-1 min-h-12 pt-ui-1 border-t border-border text-ui-label whitespace-nowrap'
 const commentAction = 'inline-flex w-full min-w-0 min-h-control-touch flex-none items-center justify-center gap-2 rounded-ui-md border-0 bg-transparent m-0 px-2 py-1 text-foreground cursor-pointer [&_span]:text-xs [&_span]:leading-tight hover:bg-muted active:bg-secondary max-sm:gap-1'
 
 type SortOrder = 'newest' | 'oldest'
@@ -79,6 +80,7 @@ export default function PostCommentsPage({
   const authorName = userLabel(post.author === username ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
   const commentCount = post.comments?.length || 0
   const shares = post.repostCount
+  const originalPostId = post.originalPost?.id
   const sharesLabel = typeof shares === 'number' && Number.isFinite(shares) ? `${shares.toLocaleString('vi-VN')} lượt đăng lại` : 'Chia sẻ'
   const visibility = post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'
   const extras = parsePostExtras(post.content)
@@ -122,7 +124,11 @@ export default function PostCommentsPage({
             {onOpenOriginal && <FeedRepostPreview post={post} onOpen={onOpenOriginal} />}
           </article>
 
-          {post.repostKind === 'quick' && <div className={postActions}>
+          {post.repostKind === 'quick' && <div className={quickPostActions}>
+            {originalPostId !== undefined && onOpenOriginal && <button type="button" aria-label="Bình luận" title="Bình luận" className={commentAction}
+              onClick={() => onOpenOriginal(originalPostId)}>
+              <MessageCircle size={21} aria-hidden="true" /><span>Bình luận</span>
+            </button>}
             <FeedRepostAction post={post} request={request} onUpdated={onUpdated}
               onShareToChat={onShareToChat} onFeedback={onFeedback} />
           </div>}
