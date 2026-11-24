@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ShoppingBag, ShoppingCart, ClipboardList } from 'lucide-react'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
 import { useLatest } from '../../../shared/hooks/useLatest'
@@ -22,7 +22,11 @@ type Props = {
 }
 const showMoney = (n: number, unit: string) => n.toLocaleString('vi-VN') + ' ' + unit
 
-export default function Marketplace({ userId, searchQuery = '', request, onBack }: Props) {
+export default function Marketplace(props: Props) {
+  return <MarketplaceSession key={props.userId} {...props} />
+}
+
+function MarketplaceSession({ userId, searchQuery = '', request, onBack }: Props) {
   const apiRef = useLatest(request)
   const revision = useRef(0)
   const readRevision = useRef(0)
@@ -46,7 +50,7 @@ export default function Marketplace({ userId, searchQuery = '', request, onBack 
   const [unit, setUnit] = useState('')
   const [stock, setStock] = useState('1')
 
-  async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const api = useCallback(async <T,>(path: string, init: RequestInit = {}): Promise<T> => {
     const response = await apiRef.current(path, init)
     if (!response.ok) {
       const body = await response.json().catch(() => null)
@@ -54,8 +58,8 @@ export default function Marketplace({ userId, searchQuery = '', request, onBack 
     }
     if (response.status === 204) return undefined as T
     return response.json() as Promise<T>
-  }
-  async function refresh(version = revision.current) {
+  }, [apiRef])
+  const refresh = useCallback(async (version = revision.current) => {
     const read = ++readRevision.current
     const isCurrent = () => version === revision.current && read === readRevision.current
     try {
@@ -77,19 +81,13 @@ export default function Marketplace({ userId, searchQuery = '', request, onBack 
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }
+  }, [api])
   useEffect(() => {
     const requestRevision = revision
     const version = ++requestRevision.current
-    setProducts([]); setCart([]); setOrders([]); setMine([])
-    mutationFlight.current = null
-    retryFlight.current = null
-    setView('products')
-    setTitle(''); setDescription(''); setPrice(''); setUnit(''); setStock('1')
-    setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false); setRefreshing(false)
     void refresh(version)
     return () => { ++requestRevision.current }
-  }, [userId])
+  }, [refresh])
 
   function retryRead() {
     if (retryFlight.current) return
@@ -197,7 +195,7 @@ export default function Marketplace({ userId, searchQuery = '', request, onBack 
         <button ref={view === 'sell' ? tabsPillSetActive : undefined} type="button" aria-pressed={view === 'sell'} className={view === 'sell' ? 'active' : ''} onClick={() => setView('sell')}>+ Bán hàng</button>
       </nav>
       <div className="marketplace-body">
-        <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>
+        {(view === 'cart' || view === 'orders') && <p className="marketplace-warning" role="note">Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>}
 
         {loading && <p role="status" aria-busy="true">Đang tải dữ liệu chợ…</p>}
         {refreshing && <p role="status" aria-live="polite" aria-busy="true">Đang cập nhật dữ liệu chợ…</p>}
