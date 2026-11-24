@@ -283,7 +283,7 @@ describe('Marketplace read fallback', () => {
     const tab = (label: string) => Array.from(host.querySelectorAll<HTMLButtonElement>('nav button'))
       .find(button => button.textContent?.includes(label))
 
-    await act(async () => root.render(<Marketplace searchQuery="" userId={1} request={request} onBack={() => {}} />))
+    await act(async () => root.render(<Marketplace searchQuery="" userId={1} request={request} />))
     expect(host.querySelector('.marketplace-warning')).toBeNull()
 
     await act(async () => tab('Giỏ')?.click())
