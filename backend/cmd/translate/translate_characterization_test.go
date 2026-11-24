@@ -173,6 +173,9 @@ func TestTranslateMembershipCacheQuotaIntegration(t *testing.T) {
 		authScheme: "Bearer", client: upstream.Client(),
 	}
 	cacheKeys := []string{s.cacheKey(source, "vi")}
+	ipNonce := users[0]%254 + 1
+	primaryIP := fmt.Sprintf("192.0.2.%d", ipNonce)
+	quotaIP := fmt.Sprintf("203.0.113.%d", ipNonce)
 	t.Cleanup(func() {
 		cleanup, done := context.WithTimeout(context.Background(), 5*time.Second)
 		defer done()
@@ -196,7 +199,7 @@ func TestTranslateMembershipCacheQuotaIntegration(t *testing.T) {
 		return res
 	}
 	request := func(uid int64, body string) *httptest.ResponseRecorder {
-		return requestAt(uid, body, "192.0.2.246:12345")
+		return requestAt(uid, body, primaryIP+":12345")
 	}
 	check := func(res *httptest.ResponseRecorder, status int, cache string) {
 		t.Helper()
@@ -279,11 +282,12 @@ func TestTranslateMembershipCacheQuotaIntegration(t *testing.T) {
 		t.Fatal("Redis cache hit must still consume quota")
 	}
 	check(request(users[0], message), 200, "thread")
+	waitForStableRateLimitWindow(t)
 	ipDenied := false
 	ipAttempts := 0
 	for _, uid := range users[1:] {
 		for i := 0; i < 25; i++ {
-			res := requestAt(uid, plain, "198.51.100.77:12345")
+			res := requestAt(uid, plain, quotaIP+":12345")
 			ipAttempts++
 			if res.Code == http.StatusTooManyRequests {
 				if res.Header().Get("Retry-After") != "60" {
@@ -304,5 +308,15 @@ func TestTranslateMembershipCacheQuotaIntegration(t *testing.T) {
 	check(request(users[1], message), 404, "")
 	if calls.Load() != 2 {
 		t.Fatalf("provider calls=%d, want two misses only", calls.Load())
+	}
+}
+
+func waitForStableRateLimitWindow(t *testing.T) {
+	t.Helper()
+	windowSeconds := int64(translationRateLimitWindow.Seconds())
+	now := time.Now()
+	nextWindow := time.Unix(now.Unix()/windowSeconds*windowSeconds+windowSeconds, 0)
+	if time.Until(nextWindow) < 10*time.Second {
+		time.Sleep(time.Until(nextWindow) + time.Second)
 	}
 }
