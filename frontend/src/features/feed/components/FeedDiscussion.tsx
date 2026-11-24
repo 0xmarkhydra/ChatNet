@@ -1,6 +1,6 @@
 import { userLabel } from '../../../shared/utils/userLabel'
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { requestFeedTranslation } from '../api/translation'
+import { useFeedTranslation } from './useFeedTranslation'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
 import { CommentComposerTarget } from './commentComposerTarget'
 import { createPortal } from 'react-dom'
@@ -20,7 +20,6 @@ export type FeedComment = {
 
 type TranslationProps = { api: string; token: string; target: string }
 export type DiscussionDraft = { replyTo: FeedComment | null; drafts: Record<number, string>; sending?: boolean; error?: string }
-const translationCache = new Map<string, string>()
 
 function commentRelativeTime(value: string) {
   const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000))
@@ -37,61 +36,15 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
   maxLines?: number
   onExpand?: () => void
 }) {
-  const host = useRef<HTMLDivElement>(null)
-  const key = JSON.stringify([api, token, target, text])
-  const [result, setResult] = useState({ key: '', text: '' })
-  const translated = result.key === key ? result.text : ''
+  const { host, key, translated, failed, visible, resetFailed } = useFeedTranslation({ api, token, text, target })
   const [original, setOriginal] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const [failed, setFailed] = useState(false)
-  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setVisible(true)
-        observer.disconnect()
-      }
-    })
-    if (host.current) observer.observe(host.current)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    setResult({ key, text: '' })
     setOriginal(false)
     setExpanded(false)
-    setFailed(false)
-    if (!visible || !text.trim() || !target) return
-    const cached = translationCache.get(key)
-    if (cached) {
-      setResult({ key, text: cached })
-      return
-    }
-    const controller = new AbortController()
-    let retry: ReturnType<typeof setTimeout> | undefined
-    async function translate(attempt = 0) {
-      try {
-        const response = await requestFeedTranslation({ api, token, text, target, signal: controller.signal })
-        if (!response.ok) throw new Error('Translation unavailable')
-        const result = await response.json() as { translatedText?: string }
-        if (!result.translatedText?.trim()) throw new Error('Empty translation')
-        if (controller.signal.aborted) return
-        if (translationCache.size >= 200) translationCache.delete(translationCache.keys().next().value!)
-        translationCache.set(key, result.translatedText)
-        setResult({ key, text: result.translatedText })
-      } catch {
-        if (controller.signal.aborted) return
-        if (attempt < 2) retry = setTimeout(() => void translate(attempt + 1), 2000 * (attempt + 1))
-        else setFailed(true)
-      }
-    }
-    void translate()
-    return () => {
-      controller.abort()
-      clearTimeout(retry)
-    }
-  }, [api, token, target, text, visible, key])
+    resetFailed()
+  }, [key, visible, resetFailed])
 
   const visibleText = translated && !original ? translated : text
   const isLong = Boolean(maxLines && (
