@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"chatnet/internal/database"
 	"chatnet/internal/mediax"
 	"chatnet/internal/objectstore"
+	"chatnet/internal/onesignalx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -46,6 +48,12 @@ func feedCreateCharacterizationRequestWithToken(handler http.Handler, token, bod
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	return rec
+}
+
+type feedCreateCharacterizationRoundTripper func(*http.Request) (*http.Response, error)
+
+func (roundTrip feedCreateCharacterizationRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return roundTrip(req)
 }
 
 func TestCreatePostRequiresAuthAndPreservesInputErrors(t *testing.T) {
@@ -302,6 +310,73 @@ func TestCreatePostPersistsTrimmedDefaultsMentionsAndAttachments(t *testing.T) {
 
 }
 
+func TestCreatePostPushesMentionsOnlyAfterCommit(t *testing.T) {
+	db := openFeedCreateCharacterizationDB(t)
+	authorID, _ := insertFeedCreateCharacterizationUser(t, db, "push-author")
+	recipientID, recipient := insertFeedCreateCharacterizationUser(t, db, "push-recipient")
+	low, high := authorID, recipientID
+	if low > high {
+		low, high = high, low
+	}
+	if _, err := db.Exec(context.Background(), `INSERT INTO friend_connections(user_low,user_high,requested_by,status) VALUES($1,$2,$3,'accepted')`, low, high, authorID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(context.Background(), `INSERT INTO push_subscriptions(subscription_id,user_id) VALUES(gen_random_uuid(),$1)`, recipientID); err != nil {
+		t.Fatal(err)
+	}
+	content := fmt.Sprintf("👥 Cùng với @%s\npush-order fixture", recipient)
+
+	type pushObservation struct {
+		postID       int64
+		mentionCount int
+	}
+	observed := make(chan pushObservation, 1)
+	previousTransport := http.DefaultTransport
+	http.DefaultTransport = feedCreateCharacterizationRoundTripper(func(req *http.Request) (*http.Response, error) {
+		if req.Method != http.MethodPost || req.URL.Host != "api.onesignal.com" || req.URL.Path != "/notifications" {
+			return nil, fmt.Errorf("unexpected push request %s %s", req.Method, req.URL)
+		}
+		var result pushObservation
+		if err := db.QueryRow(context.Background(), `
+			SELECT p.id, count(m.user_id)
+			FROM posts p
+			LEFT JOIN post_mentions m ON m.post_id=p.id AND m.user_id=$2
+			WHERE p.user_id=$1 AND p.content=$3
+			GROUP BY p.id`, authorID, recipientID, content).Scan(&result.postID, &result.mentionCount); err != nil {
+			observed <- pushObservation{}
+			return nil, fmt.Errorf("push began before post transaction committed: %w", err)
+		}
+		observed <- result
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"id":"test"}`)),
+			Request:    req,
+		}, nil
+	})
+	t.Cleanup(func() { http.DefaultTransport = previousTransport })
+
+	s := &server{db: db, push: onesignalx.New("test-app", "test-key")}
+	handler := feedCreateCharacterizationHandler(s)
+	body := fmt.Sprintf(`{"content":%q}`, content)
+	created := feedCreateCharacterizationRequest(t, handler, authorID, body)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("post status=%d; body=%s", created.Code, created.Body.String())
+	}
+	var createdPost post
+	if err := json.Unmarshal(created.Body.Bytes(), &createdPost); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case result := <-observed:
+		if result.postID != createdPost.ID || result.mentionCount != 1 {
+			t.Fatalf("push observed post=%d mentions=%d; want committed post %d with one mention", result.postID, result.mentionCount, createdPost.ID)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for post mention push")
+	}
+}
+
 func TestCreatePostRollsBackWhenMentionPersistenceFails(t *testing.T) {
 	db := openFeedCreateCharacterizationDB(t)
 	authorID, _ := insertFeedCreateCharacterizationUser(t, db, "rollback-author")
@@ -332,12 +407,17 @@ $$`, functionName, authorID))
 		_, _ = db.Exec(context.Background(), "DROP TRIGGER IF EXISTS "+triggerName+" ON post_mentions")
 		_, _ = db.Exec(context.Background(), "DROP FUNCTION IF EXISTS "+functionName+"()")
 	}()
-	if _, err := db.Exec(context.Background(), "CREATE TRIGGER "+triggerName+" BEFORE INSERT ON post_mentions FOR EACH ROW EXECUTE FUNCTION "+functionName+"()"); err != nil {
+	if _, err := db.Exec(context.Background(), "CREATE TRIGGER "+triggerName+" AFTER INSERT ON post_mentions FOR EACH ROW EXECUTE FUNCTION "+functionName+"()"); err != nil {
 		t.Fatal(err)
 	}
 
-	handler := feedCreateCharacterizationHandler(&server{db: db})
-	body := feedCreateCharacterizationBody(t, fmt.Sprintf("👥 Cùng với @%s\nrollback body", recipient), nil)
+	store, _ := newFeedCreateCharacterizationStore(t, http.StatusOK, "image/png", 321)
+	handler := feedCreateCharacterizationHandler(&server{db: db, storage: store})
+	rollbackRef := feedCreateCharacterizationRef(authorID, "rollback.png")
+	body := feedCreateCharacterizationBody(t, fmt.Sprintf("👥 Cùng với @%s\nrollback body", recipient), []mediax.AttachmentInput{{
+		StorageRef: rollbackRef,
+		Name:       "rollback.png",
+	}})
 	got := feedCreateCharacterizationRequest(t, handler, authorID, body)
 	if got.Code != http.StatusInternalServerError {
 		t.Fatalf("status=%d, want %d; body=%s", got.Code, http.StatusInternalServerError, got.Body.String())
@@ -349,6 +429,20 @@ $$`, functionName, authorID))
 	}
 	if postCount != 0 {
 		t.Fatalf("partial post rows=%d after mention failure, want 0", postCount)
+	}
+	var attachmentCount int
+	if err := db.QueryRow(context.Background(), `SELECT count(*) FROM post_attachments WHERE storage_ref=$1`, rollbackRef).Scan(&attachmentCount); err != nil {
+		t.Fatal(err)
+	}
+	if attachmentCount != 0 {
+		t.Fatalf("partial attachment rows=%d after mention failure, want 0", attachmentCount)
+	}
+	var mentionCount int
+	if err := db.QueryRow(context.Background(), `SELECT count(*) FROM post_mentions WHERE user_id=$1`, recipientID).Scan(&mentionCount); err != nil {
+		t.Fatal(err)
+	}
+	if mentionCount != 0 {
+		t.Fatalf("partial mention rows=%d after mention failure, want 0", mentionCount)
 	}
 }
 
