@@ -1,5 +1,6 @@
 import { userLabel } from '../../../shared/utils/userLabel'
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { requestFeedTranslation } from '../api/translation'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
 import { CommentComposerTarget } from './commentComposerTarget'
 import { createPortal } from 'react-dom'
@@ -71,12 +72,7 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
     let retry: ReturnType<typeof setTimeout> | undefined
     async function translate(attempt = 0) {
       try {
-        const response = await fetch(`${api}/api/translate`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, target }),
-          signal: controller.signal,
-        })
+        const response = await requestFeedTranslation({ api, token, text, target, signal: controller.signal })
         if (!response.ok) throw new Error('Translation unavailable')
         const result = await response.json() as { translatedText?: string }
         if (!result.translatedText?.trim()) throw new Error('Empty translation')
