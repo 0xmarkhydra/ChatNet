@@ -9,32 +9,32 @@ maplibregl.setWorkerUrl(workerUrl)
 export default function PostMapPicker({ value, disabled, onConfirm }: {
   value: string; disabled: boolean; onConfirm: (pin: MapCheckIn) => void
 }) {
-  const initial = useRef(parseMapCheckIn(value))
+  const [initial] = useState(() => parseMapCheckIn(value))
   const host = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
-  const marker = useRef<maplibregl.Marker | null>(null)
-  const [point, setPoint] = useState<MapCheckIn | null>(initial.current)
-  const [name, setName] = useState(initial.current?.name ?? '')
+  const [point, setPoint] = useState<MapCheckIn | null>(initial)
+  const [name, setName] = useState(initial?.name ?? '')
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [locating, setLocating] = useState(false)
   useEffect(() => {
-    if (!host.current) return
+    const hostNode = host.current
+    if (!hostNode) return
     let active = true
     let instance: maplibregl.Map
     try {
-      const start = initial.current
-      instance = new maplibregl.Map({ container: host.current, style: 'https://tiles.openfreemap.org/styles/liberty',
+      const start = initial
+      instance = new maplibregl.Map({ container: hostNode, style: 'https://tiles.openfreemap.org/styles/liberty',
         center: start ? [start.longitude, start.latitude] : [105.85, 21.03], zoom: 13 })
     } catch {
-      setError('Không mở được bản đồ trên thiết bị này.')
-      return
+      queueMicrotask(() => { if (active) setError('Không mở được bản đồ trên thiết bị này.') })
+      return () => { active = false }
     }
     map.current = instance
     instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     const observer = new ResizeObserver(() => instance.resize())
-    observer.observe(host.current)
+    observer.observe(hostNode)
     instance.on('load', () => { if (active) { setReady(true); setError('') } })
     instance.on('error', () => { if (active && !instance.isStyleLoaded()) setError('Không tải được bản đồ. Hãy thử lại.') })
     instance.on('click', event => {
@@ -44,12 +44,13 @@ export default function PostMapPicker({ value, disabled, onConfirm }: {
       setPoint({ latitude: coordinates.lat, longitude: coordinates.lng, name: '' })
       setName(typeof featureName === 'string' ? featureName.slice(0, 120) : '')
     })
-    return () => { active = false; observer.disconnect(); marker.current?.remove(); marker.current = null; instance.remove(); map.current = null }
-  }, [attempt])
+    return () => { active = false; observer.disconnect(); instance.remove(); map.current = null }
+  }, [attempt, initial])
   useEffect(() => {
-    if (!ready || !map.current) return
-    marker.current?.remove()
-    marker.current = point ? new maplibregl.Marker({ color: '#2464ba' }).setLngLat([point.longitude, point.latitude]).addTo(map.current) : null
+    if (!ready || !map.current || !point) return
+    const marker = new maplibregl.Marker({ color: '#2464ba' })
+      .setLngLat([point.longitude, point.latitude]).addTo(map.current)
+    return () => { marker.remove() }
   }, [point, ready, attempt])
   const locate = () => {
     if (!navigator.geolocation) { setError('Thiết bị không hỗ trợ định vị. Bạn vẫn có thể chọn điểm trên bản đồ.'); return }
