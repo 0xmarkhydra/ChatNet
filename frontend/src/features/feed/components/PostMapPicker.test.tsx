@@ -39,6 +39,7 @@ beforeEach(() => {
   harness.events.clear()
   globalThis.ResizeObserver = class {
     observe() {}
+    unobserve() {}
     disconnect() {}
   }
   host = document.createElement('div')
