@@ -4685,13 +4685,16 @@ export default function App() {
                         <article
                           key={message.id}
                           className={mine ? 'message mine message-press-target' : 'message message-press-target'}
-                          onPointerDown={(event) => beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)}
+                          onPointerDown={(event) => {
+                            if ((event.target as HTMLElement).closest('.bubble, .message-reply-quote')) return
+                            beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.target)
+                          }}
                           onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
                           onPointerUp={cancelMessageLongPress}
                           onPointerCancel={cancelMessageLongPress}
                           onPointerLeave={cancelMessageLongPress}
                           onContextMenu={(event) => {
-                            if (message.deleted) return
+                            if (message.deleted || (event.target as HTMLElement).closest('.bubble, .message-reply-quote')) return
                             event.preventDefault()
                             openMessageActions(message)
                           }}
@@ -4737,6 +4740,24 @@ export default function App() {
                               )}
                               <MediaAttachmentsView items={message.attachments} />
                             </>
+                          )}
+                          {mine && !message.deleted && message.text && (
+                            <button
+                              type="button"
+                              className="message-inline-copy"
+                              onClick={(event) => {
+                                const selection = window.getSelection()
+                                const bubble = event.currentTarget.closest('article')?.querySelector('.bubble')
+                                const selectedText = selection && !selection.isCollapsed && selection.anchorNode && selection.focusNode &&
+                                  bubble?.contains(selection.anchorNode) && bubble.contains(selection.focusNode)
+                                  ? selection.toString() : ''
+                                void copyMessage({ ...message, text: selectedText || message.text })
+                              }}
+                              aria-label="Sao chép tin nhắn đã gửi"
+                              title="Sao chép tin nhắn"
+                            >
+                              Sao chép
+                            </button>
                           )}
                           <div className="message-stamp">
                             {formatTime(message.createdAt)}
