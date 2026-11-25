@@ -12,6 +12,7 @@ class _ConversationApi extends DemoApi {
   final StreamController<void> _eventController =
       StreamController<void>.broadcast();
   final List<String> conversationRequests = [];
+  final List<String> groupPrefetchRequests = [];
   final List<Completer<List<Json>>> pendingConversationResponses = [];
   final List<dynamic> pageResponses = [];
   bool failConversationReads = false;
@@ -26,6 +27,10 @@ class _ConversationApi extends DemoApi {
 
   @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (method == 'GET' &&
+        path.startsWith('/api/conversations?type=group&limit=100&offset=')) {
+      groupPrefetchRequests.add(path);
+    }
     if (method == 'GET' && path.startsWith('/api/conversations?limit=25')) {
       conversationRequests.add(path);
       if (path != '/api/conversations?limit=25') {
@@ -79,8 +84,8 @@ List<Json> _conversationPage(int firstId, int count) => [
     ),
 ];
 
-void _setViewport(WidgetTester tester) {
-  tester.view.physicalSize = const Size(390, 844);
+void _setViewport(WidgetTester tester, {Size size = const Size(390, 844)}) {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }
@@ -89,8 +94,9 @@ Future<void> _pumpApp(
   WidgetTester tester,
   _ConversationApi api, {
   Key? key,
+  Size size = const Size(390, 844),
 }) async {
-  _setViewport(tester);
+  _setViewport(tester, size: size);
   await tester.pumpWidget(SocoApp(key: key, api: api));
 }
 
@@ -363,6 +369,7 @@ void main() {
 
     expect(find.text('Fresh SSE room'), findsOneWidget);
     expect(find.text('Stale page duplicate'), findsNothing);
+    expect(find.byKey(const ValueKey('rail-room-1')), findsOneWidget);
     await tester.drag(
       find.byKey(const ValueKey('mobile-avatar-rail')),
       const Offset(0, -10000),
@@ -373,5 +380,82 @@ void main() {
       api.conversationRequests,
       contains('/api/conversations?limit=25&offset=25'),
     );
+  });
+
+  testWidgets('concurrent scrolls issue one conversation page request', (
+    tester,
+  ) async {
+    final pageResponse = Completer<List<Json>>();
+    final api = _ConversationApi();
+    api.rooms
+      ..clear()
+      ..addAll(_conversationPage(1, 25));
+    api.pageResponses.add(pageResponse.future);
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+    final rail = find.byKey(const ValueKey('mobile-avatar-rail'));
+    await tester.drag(rail, const Offset(0, -10000));
+    await tester.pump();
+    await tester.drag(rail, const Offset(0, 500));
+    await tester.pump();
+    await tester.drag(rail, const Offset(0, -10000));
+    await tester.pump();
+
+    expect(
+      api.conversationRequests.where(
+        (path) => path == '/api/conversations?limit=25&offset=25',
+      ),
+      hasLength(1),
+    );
+
+    pageResponse.complete(_conversationPage(26, 1));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('desktop conversation list scroll also loads next page', (
+    tester,
+  ) async {
+    final api = _ConversationApi();
+    api.rooms
+      ..clear()
+      ..addAll(_conversationPage(1, 25));
+    api.pageResponses.add(_conversationPage(26, 1));
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api, size: const Size(1440, 900));
+    await tester.pumpAndSettle();
+    final room = find.text('Room 1');
+    final list = find
+        .ancestor(of: room, matching: find.byType(Scrollable))
+        .first;
+    await tester.drag(list, const Offset(0, -10000));
+    await tester.pumpAndSettle();
+
+    expect(
+      api.conversationRequests,
+      contains('/api/conversations?limit=25&offset=25'),
+    );
+  });
+
+  testWidgets('SSE refresh respects older group prefetch cooldown', (
+    tester,
+  ) async {
+    final api = _ConversationApi();
+    api.rooms
+      ..clear()
+      ..addAll(_conversationPage(1, 25));
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+    final initialPrefetchCount = api.groupPrefetchRequests.length;
+    expect(initialPrefetchCount, greaterThan(0));
+
+    api.emitEvent();
+    await tester.pumpAndSettle();
+
+    expect(api.groupPrefetchRequests, hasLength(initialPrefetchCount));
   });
 }
