@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/api.dart';
@@ -957,6 +959,106 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Tắt thông báo hội thoại'), findsOneWidget);
   });
+
+  test('Api PATCH message edit sends body and parses response', () async {
+    RequestOptions? requestOptions;
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requestOptions = options;
+            handler.resolve(
+              Response<String>(
+                requestOptions: options,
+                statusCode: 200,
+                data: jsonEncode({
+                  'id': 12,
+                  'text': 'Canonical edit response',
+                  'editedAt': '2026-11-25T10:03:00Z',
+                }),
+              ),
+            );
+          },
+        ),
+      );
+    final api = Api(dio: dio);
+
+    final response = object(
+      await api.request('PATCH', '/api/messages/12', {
+        'text': 'Submitted edit text',
+      }),
+    );
+
+    expect(requestOptions?.method, 'PATCH');
+    expect(requestOptions?.uri.path, '/api/messages/12');
+    expect(jsonDecode(requestOptions?.data as String), {
+      'text': 'Submitted edit text',
+    });
+    expect(response, {
+      'id': 12,
+      'text': 'Canonical edit response',
+      'editedAt': '2026-11-25T10:03:00Z',
+    });
+    dio.close(force: true);
+  });
+
+  test('Api PATCH message edit failure returns ApiError', () async {
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            handler.resolve(
+              Response<String>(
+                requestOptions: options,
+                statusCode: 500,
+                data: jsonEncode({'error': 'Synthetic edit failure'}),
+              ),
+            );
+          },
+        ),
+      );
+    final api = Api(dio: dio);
+
+    await expectLater(
+      api.request('PATCH', '/api/messages/12', {'text': 'Rejected edit'}),
+      throwsA(
+        isA<ApiError>().having(
+          (error) => error.message,
+          'message',
+          'Synthetic edit failure',
+        ),
+      ),
+    );
+    dio.close(force: true);
+  });
+
+  testWidgets(
+    'editedAt appears in message UI and edit opens with current text',
+    (tester) async {
+      final api = _ConversationApi();
+      final message = api.messages[1]!.firstWhere((item) => item['id'] == 12);
+      message
+        ..['text'] = 'Existing edited text'
+        ..['editedAt'] = '2026-11-25T10:03:00Z';
+      addTearDown(api.closeEvents);
+
+      await _openDefaultGroupChat(tester, api);
+      expect(find.text('Existing edited text'), findsOneWidget);
+      expect(find.textContaining('· đã sửa'), findsOneWidget);
+
+      await tester.longPress(find.byKey(const ValueKey('chat-message-12')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sửa'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<EditableText>(find.byType(EditableText).last)
+            .controller
+            .text,
+        'Existing edited text',
+      );
+    },
+  );
 
   testWidgets('message reaction posts emoji and replaces message', (
     tester,
