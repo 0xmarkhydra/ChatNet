@@ -1192,13 +1192,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Future<void> _edit(Json message) async {
-    final controller = TextEditingController(text: message['text']?.toString());
+    var currentText = message['text']?.toString() ?? '';
     final text = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Sửa tin nhắn'),
-        content: TextField(
-          controller: controller,
+        content: TextFormField(
+          initialValue: currentText,
+          onChanged: (value) => currentText = value,
           autofocus: true,
           maxLength: 4000,
           minLines: 1,
@@ -1210,13 +1211,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             child: const Text('Hủy'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            onPressed: () => Navigator.pop(context, currentText.trim()),
             child: const Text('Lưu'),
           ),
         ],
       ),
     );
-    controller.dispose();
     if (text == null || text.isEmpty || text == message['text']) return;
     try {
       final updated = await ref
