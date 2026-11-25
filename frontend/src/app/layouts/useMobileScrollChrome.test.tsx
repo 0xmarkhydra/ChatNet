@@ -419,6 +419,32 @@ describe("mobile chrome scrolling", () => {
     }
   });
 
+  it("does not collapse the header when scrolling reaches the end of the list", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="feed" /></MemoryRouter>));
+      const shell = host.querySelector("main")!;
+      const scroller = host.querySelector("section")!;
+      Object.defineProperty(host.querySelector("header")!, "offsetHeight", { value: 68 });
+      Object.defineProperty(scroller, "scrollHeight", { value: 1307 });
+      Object.defineProperty(scroller, "clientHeight", { value: 888 });
+      const scroll = (top: number) => {
+        scroller.scrollTop = top;
+        act(() => scroller.dispatchEvent(scrollEvent()));
+      };
+
+scroll(0);      scroll(419); // Collapsing at the very end would clamp scrollTop and make the feed slide.      scroll(419);      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);      scroll(0);      scroll(150);      scroll(300); // 119px from the end: the header may still collapse mid-list.      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
   it("does not hide the bars at desktop widths", () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener() {}, removeEventListener() {} })));

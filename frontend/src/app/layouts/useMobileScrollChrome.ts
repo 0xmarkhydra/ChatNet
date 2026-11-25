@@ -113,7 +113,11 @@ export function useMobileScrollChrome(activeTab?: string) {
       lastDirection = direction;
 
       const hideAfter = Math.min(90, Math.max(20, range * 0.3));
-      if (direction > 0 && top > hideAfter && directionDistance >= 20) {
+      // Collapsing the header grows the scrollport; at the very end that clamps
+      // scrollTop every frame of the transition and makes the content slide.
+      const headerHeight = header?.offsetHeight ?? 0;
+      const nearEnd = activeTab !== "chat" && headerHeight > 0 && range - top <= headerHeight;
+      if (direction > 0 && top > hideAfter && directionDistance >= 20 && !nearEnd) {
         setHidden(true);
         resetMomentum();
       } else if (direction < 0 && (top <= 1 || speed >= REVEAL_SPEED)) {
