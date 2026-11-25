@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/api.dart';
 import 'package:soco/app.dart';
+import 'package:soco/data/chatnet_repositories.dart';
 import 'package:soco/demo.dart';
 import 'package:soco/presentation/conversation_avatar.dart';
 import 'package:soco/widgets.dart';
@@ -960,49 +961,50 @@ void main() {
     expect(find.text('Tắt thông báo hội thoại'), findsOneWidget);
   });
 
-  test('Api PATCH message edit sends body and parses response', () async {
-    RequestOptions? requestOptions;
-    final dio = Dio()
-      ..interceptors.add(
-        InterceptorsWrapper(
-          onRequest: (options, handler) {
-            requestOptions = options;
-            handler.resolve(
-              Response<String>(
-                requestOptions: options,
-                statusCode: 200,
-                data: jsonEncode({
-                  'id': 12,
-                  'text': 'Canonical edit response',
-                  'editedAt': '2026-11-25T10:03:00Z',
-                }),
-              ),
-            );
-          },
-        ),
-      );
-    final api = Api(dio: dio);
+  test(
+    'ChatRepository PATCH message edit sends body and parses response',
+    () async {
+      RequestOptions? requestOptions;
+      final dio = Dio()
+        ..interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              requestOptions = options;
+              handler.resolve(
+                Response<String>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: jsonEncode({
+                    'id': 12,
+                    'text': 'Canonical edit response',
+                    'editedAt': '2026-11-25T10:03:00Z',
+                  }),
+                ),
+              );
+            },
+          ),
+        );
+      final api = Api(dio: dio);
 
-    final response = object(
-      await api.request('PATCH', '/api/messages/12', {
+      final response = await ChatRepository(
+        api,
+      ).editMessage(12, text: 'Submitted edit text');
+
+      expect(requestOptions?.method, 'PATCH');
+      expect(requestOptions?.uri.path, '/api/messages/12');
+      expect(jsonDecode(requestOptions?.data as String), {
         'text': 'Submitted edit text',
-      }),
-    );
+      });
+      expect(response, {
+        'id': 12,
+        'text': 'Canonical edit response',
+        'editedAt': '2026-11-25T10:03:00Z',
+      });
+      dio.close(force: true);
+    },
+  );
 
-    expect(requestOptions?.method, 'PATCH');
-    expect(requestOptions?.uri.path, '/api/messages/12');
-    expect(jsonDecode(requestOptions?.data as String), {
-      'text': 'Submitted edit text',
-    });
-    expect(response, {
-      'id': 12,
-      'text': 'Canonical edit response',
-      'editedAt': '2026-11-25T10:03:00Z',
-    });
-    dio.close(force: true);
-  });
-
-  test('Api PATCH message edit failure returns ApiError', () async {
+  test('ChatRepository PATCH message edit failure returns ApiError', () async {
     final dio = Dio()
       ..interceptors.add(
         InterceptorsWrapper(
@@ -1020,7 +1022,7 @@ void main() {
     final api = Api(dio: dio);
 
     await expectLater(
-      api.request('PATCH', '/api/messages/12', {'text': 'Rejected edit'}),
+      ChatRepository(api).editMessage(12, text: 'Rejected edit'),
       throwsA(
         isA<ApiError>().having(
           (error) => error.message,
