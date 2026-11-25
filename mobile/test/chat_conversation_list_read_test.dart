@@ -14,6 +14,9 @@ class _ConversationApi extends DemoApi {
   final List<String> conversationRequests = [];
   final List<String> groupPrefetchRequests = [];
   final List<String> conversationPinRequests = [];
+  final List<String> messagePinRequests = [];
+  final List<Json?> messagePinBodies = [];
+  final List<String> messagePinListRequests = [];
   final List<String> reactionRequests = [];
   final List<Json> reactionBodies = [];
   final Map<int, Json> reactionMessages = {};
@@ -24,10 +27,12 @@ class _ConversationApi extends DemoApi {
   Completer<Json>? pendingNotificationSettingsWrite;
   final List<dynamic> pageResponses = [];
   Completer<void>? pendingConversationPinRequest;
+  Completer<void>? pendingMessagePinRequest;
   Completer<Json>? pendingReactionResponse;
   bool failConversationReads = false;
   bool failPageReads = false;
   bool failConversationPinRequests = false;
+  bool failMessagePinRequests = false;
   bool failReactionRequests = false;
   bool failNotificationSettingsRead = false;
   bool failNotificationSettingsWrite = false;
@@ -70,6 +75,31 @@ class _ConversationApi extends DemoApi {
       updated['reactions'] = reactions;
       reactionMessages[messageId] = updated;
       return Map<String, dynamic>.from(updated);
+    }
+    if (path.startsWith('/api/messages/') && path.endsWith('/pin')) {
+      messagePinRequests.add('$method $path');
+      messagePinBodies.add(body);
+      final pending = pendingMessagePinRequest;
+      if (pending != null) await pending.future;
+      if (failMessagePinRequests) {
+        throw const ApiError('Synthetic message pin failure');
+      }
+      final messageId = int.parse(path.split('/')[3]);
+      final message = messages.values
+          .expand((items) => items)
+          .firstWhere((item) => item['id'] == messageId);
+      if (method == 'PUT') pinnedMessageIds.add(messageId);
+      if (method == 'DELETE') pinnedMessageIds.remove(messageId);
+      return Map<String, dynamic>.from(message);
+    }
+    if (path.startsWith('/api/conversations/') && path.endsWith('/pins')) {
+      messagePinListRequests.add('$method $path');
+      final roomId = int.parse(path.split('/')[3]);
+      return [
+        for (final message in messages[roomId] ?? <Json>[])
+          if (pinnedMessageIds.contains(message['id']))
+            {'message': message, 'pinnedAt': '2026-11-25T10:02:00Z'},
+      ];
     }
     if (path.startsWith('/api/conversations/') && path.endsWith('/pin')) {
       conversationPinRequests.add('$method $path');
@@ -220,6 +250,21 @@ Future<void> _reactToMessage(
   await tester.pumpAndSettle();
   await tester.tap(find.text(emoji));
   await tester.pumpAndSettle();
+}
+
+Future<void> _toggleMessagePin(
+  WidgetTester tester, {
+  required int messageId,
+  bool settle = true,
+}) async {
+  await tester.longPress(find.byKey(ValueKey('chat-message-$messageId')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Ghim / Bỏ ghim tin nhắn'));
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 void main() {
@@ -686,6 +731,71 @@ void main() {
     await tester.longPress(find.byKey(const ValueKey('rail-room-63')));
     await tester.pumpAndSettle();
     expect(find.text('Bỏ ghim hội thoại'), findsOneWidget);
+  });
+
+  testWidgets('message pin and unpin use PUT and DELETE', (tester) async {
+    final api = _ConversationApi();
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    final initialPinReads = api.messagePinListRequests.length;
+
+    await _toggleMessagePin(tester, messageId: 10);
+
+    expect(api.messagePinRequests, ['PUT /api/messages/10/pin']);
+    expect(api.messagePinBodies, [null]);
+    expect(api.messagePinListRequests, hasLength(initialPinReads + 1));
+    expect(find.byTooltip('Bỏ ghim'), findsOneWidget);
+
+    await _toggleMessagePin(tester, messageId: 10);
+
+    expect(api.messagePinRequests, [
+      'PUT /api/messages/10/pin',
+      'DELETE /api/messages/10/pin',
+    ]);
+    expect(api.messagePinBodies, [null, null]);
+    expect(api.messagePinListRequests, hasLength(initialPinReads + 2));
+    expect(find.byTooltip('Bỏ ghim'), findsNothing);
+  });
+
+  testWidgets('failed message pin keeps current pins and skips refresh', (
+    tester,
+  ) async {
+    final api = _ConversationApi()..failMessagePinRequests = true;
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    final initialPinReads = api.messagePinListRequests.length;
+    await _toggleMessagePin(tester, messageId: 10);
+
+    expect(api.messagePinRequests, ['PUT /api/messages/10/pin']);
+    expect(api.messagePinListRequests, hasLength(initialPinReads));
+    expect(find.byTooltip('Bỏ ghim'), findsNothing);
+    expect(
+      find.textContaining('Synthetic message pin failure'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('SSE pin refresh stays visible while message pin is in flight', (
+    tester,
+  ) async {
+    final pending = Completer<void>();
+    final api = _ConversationApi()..pendingMessagePinRequest = pending;
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _toggleMessagePin(tester, messageId: 10, settle: false);
+    expect(api.messagePinRequests, ['PUT /api/messages/10/pin']);
+
+    api.pinnedMessageIds.add(10);
+    api.emitEvent();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Bỏ ghim'), findsOneWidget);
+
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Bỏ ghim'), findsOneWidget);
   });
 
   testWidgets('conversation mute reads settings before writing them', (
