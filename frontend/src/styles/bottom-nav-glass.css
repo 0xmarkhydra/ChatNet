@@ -90,10 +90,15 @@
   .modern-shell.app-layout > .chatnet-appbar,
   .modern-shell.app-layout > .bottom-navigation {
     transition:
-      transform 290ms cubic-bezier(.22, .8, .25, 1),
-      opacity 240ms ease-out,
-      margin-top 290ms cubic-bezier(.22, .8, .25, 1);
+      transform 600ms cubic-bezier(.4, 0, .2, 1),
+      opacity 600ms ease,
+      margin-top 600ms cubic-bezier(.4, 0, .2, 1);
     will-change: transform;
+  }
+  /* Hiding waits briefly so a short flick does not trigger it; showing is immediate. */
+  .modern-shell.app-layout.mobile-chrome-hidden > .chatnet-appbar,
+  .modern-shell.app-layout.mobile-chrome-hidden > .bottom-navigation {
+    transition-delay: 200ms;
   }
   .modern-shell.app-layout.mobile-chrome-hidden > .chatnet-appbar {
     margin-top: calc(-1 * var(--mobile-header-height, 0px));
