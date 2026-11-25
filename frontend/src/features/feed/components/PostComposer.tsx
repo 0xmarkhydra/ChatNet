@@ -1,4 +1,6 @@
-import { useLayoutEffect, useState } from 'react'
+import { lazy, Suspense, useLayoutEffect, useState } from 'react'
+import { checkInDisplayName, formatMapCheckIn } from '../utils/publicPostLocation'
+const PostMapPicker = lazy(() => import('./PostMapPicker'))
 import { MapPin, X } from 'lucide-react'
 import FeedComposerIconButton from './FeedComposerIconButton'
 import { userLabel } from '../../../shared/utils/userLabel'
@@ -131,19 +133,21 @@ export default function PostComposer({
           void addFeedFiles(files)
         }} />
       {activeTool === 'checkin' && checkInOpen && setCheckInLocation && (
-        <label className="social-feed-checkin-field">
+        <div className="social-feed-checkin-field">
           <span className="smart-checkin-heading">
             <strong><MapPin size={16} aria-hidden="true" /> Gắn thẻ vị trí</strong>
             <button type="button" aria-label="Bỏ check-in" disabled={isPosting}
               onClick={() => { setCheckInOpen?.(false); setCheckInLocation(''); setActiveTool(null) }}><X size={17} aria-hidden="true" /></button>
           </span>
-          <input type="text" aria-label="Địa điểm check-in" value={checkInLocation} maxLength={120}
+          {postVisibility === 'public' ? <input type="text" aria-label="Địa điểm check-in" value={checkInDisplayName(checkInLocation)} maxLength={120}
             onChange={event => setCheckInLocation(event.target.value)}
-            placeholder="Nhập tên địa điểm" disabled={isPosting} required />
+            placeholder="Nhập tên địa điểm" disabled={isPosting} required /> :
+            <Suspense fallback={<small>Đang tải bản đồ…</small>}><PostMapPicker value={checkInLocation} disabled={isPosting} onConfirm={pin => { setCheckInLocation(formatMapCheckIn(pin)); setActiveTool(null) }} /></Suspense>}
           <small>{postVisibility === "public" ? "Bài công khai luôn có vị trí GPS. Địa điểm nhập thêm là check-in tùy chọn." : "Không bắt buộc. Chỉ người có quyền xem bài viết mới thấy vị trí này."}</small>
-          {location && <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary"><MapPin size={14} aria-hidden="true" /><span className="truncate">Đang ở {location}</span></span>}
-        </label>
+          {location && <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary"><MapPin size={14} aria-hidden="true" /><span className="truncate">Đang ở {checkInDisplayName(location)}</span></span>}
+        </div>
       )}
+      {activeTool !== 'checkin' && location && <div className="flex items-center gap-2 text-sm"><MapPin size={15} aria-hidden="true" /> <span className="min-w-0 truncate">Đang ở {checkInDisplayName(location)}</span><button type="button" disabled={isPosting} aria-label="Bỏ vị trí" onClick={() => { setCheckInLocation?.(''); setCheckInOpen?.(false) }}><X size={16} /></button></div>}
       {activeTool === 'tag' && (tagPickerOpen || taggedFriends.length > 0) && (
         <PostTagPicker
           tagPickerOpen={tagPickerOpen}
@@ -212,7 +216,7 @@ export default function PostComposer({
       </div>
       {contentLength > 4500 && <p className="smart-composer-count" aria-live="polite">{contentLength} / 5.000 ký tự</p>}
       {overLimit && <p className="smart-composer-error" role="alert">Nội dung, địa điểm, cảm xúc và gắn thẻ vượt quá 5.000 ký tự.</p>}
-      {checkInOpen && !location && <p className="smart-composer-hint">Nhập địa điểm hoặc bỏ gắn thẻ để tiếp tục.</p>}
+      {checkInOpen && !location && <p className="smart-composer-hint">Chọn vị trí hoặc bỏ gắn thẻ để tiếp tục.</p>}
       {postVisibility === 'public' && (!editingPost || (editingPost.visibility && editingPost.visibility !== 'public')) && <p className="smart-composer-hint">📍 Khi đăng công khai, ChatNet sẽ lấy vị trí hiện tại tốt nhất từ GPS hoặc mạng. Nếu chưa đạt 10 m, tên khu vực có thể thiếu chính xác; sai số được lưu kèm vị trí. Tọa độ được gửi đến BigDataCloud để lấy tên khu vực; mọi người có thể xem vị trí này. Chọn Bạn bè hoặc Chỉ mình tôi nếu không muốn chia sẻ.</p>}
        {submitError && <p className="profile-post-error" role="alert">{submitError}</p>}
       {(popup || postText.trim() || postAttachments.length > 0 || checkInOpen || taggedFriends.length > 0 || feelingId) && (

@@ -100,6 +100,29 @@ export function publishLocationTag(location: PublishLocation): string {
 export function postLocationTag(post: Pick<Post, "visibility" | "publishLocation" | "content">) {
   const gps = post.visibility === "public" ? post.publishLocation : undefined;
   if (gps) return { label: publishLocationTag(gps), title: publishLocationLabel(gps.accuracy), href: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(`${gps.latitude},${gps.longitude}`), usesGps: true };
-  const name = parsePostExtras(post.content).location;
-  return name ? { label: `Đang ở ${name}`, title: "Mở bản đồ theo tên địa điểm", href: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(name), usesGps: false } : null;
+  const value = parsePostExtras(post.content).location;
+  const name = checkInDisplayName(value);
+  const pin = parseMapCheckIn(value);
+  return name ? { label: `Đang ở ${name}`, title: pin ? "Mở vị trí đã ghim trên bản đồ" : "Mở bản đồ theo tên địa điểm", href: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(checkInMapQuery(value)), usesGps: false } : null;
+}
+
+// Preserve the existing check-in content format, including on older backend deployments.
+export type MapCheckIn = { name: string; latitude: number; longitude: number };
+const pinSuffix = / \[map:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\]$/;
+export function parseMapCheckIn(value: string): MapCheckIn | null {
+  const match = value.match(pinSuffix);
+  if (!match) return null;
+  const latitude = Number(match[1]), longitude = Number(match[2]);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  return { name: value.slice(0, match.index).trim() || "Vị trí đã chọn", latitude, longitude };
+}
+export function formatMapCheckIn(pin: MapCheckIn): string {
+  if (!Number.isFinite(pin.latitude) || !Number.isFinite(pin.longitude) || Math.abs(pin.latitude) > 90 || Math.abs(pin.longitude) > 180) return "";
+  const name = pin.name.replace(/[\r\n]+/g, " ").trim().slice(0, 120) || "Vị trí đã chọn";
+  return `${name} [map:${pin.latitude.toFixed(6)},${pin.longitude.toFixed(6)}]`;
+}
+export function checkInDisplayName(value: string): string { return parseMapCheckIn(value)?.name ?? value; }
+export function checkInMapQuery(value: string): string {
+  const pin = parseMapCheckIn(value);
+  return pin ? `${pin.latitude},${pin.longitude}` : value;
 }
