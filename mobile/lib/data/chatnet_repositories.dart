@@ -35,6 +35,11 @@ class ChatRepository {
     );
   }
 
+  Future<Json> editMessage(int messageId, {required String text}) async =>
+      object(
+        await api.request('PATCH', '/api/messages/$messageId', {'text': text}),
+      );
+
   Future<List<ChatMessage>> messages(
     int conversationId, {
     int channelId = 0,

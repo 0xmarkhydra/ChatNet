@@ -1223,11 +1223,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     controller.dispose();
     if (text == null || text.isEmpty || text == message['text']) return;
     try {
-      final updated = object(
-        await widget.api.request('PATCH', '/api/messages/${message['id']}', {
-          'text': text,
-        }),
-      );
+      final updated = await ref
+          .read(chatRepositoryProvider)
+          .editMessage((message['id'] as num).toInt(), text: text);
       _replaceMessage(updated);
     } catch (value) {
       _show(value.toString());
