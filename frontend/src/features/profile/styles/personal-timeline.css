@@ -33,6 +33,14 @@
 .personal-timeline-error p { margin-top: 0; }
 @media (max-width: 760px) {
   .modern-shell .simple-view.personal-timeline-view { padding-bottom: max(90px, env(safe-area-inset-bottom)); }
+  .modern-shell .personal-timeline-content .feed.zalo-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .modern-shell .personal-timeline-content .feed.zalo-feed > .post.feed-post-card {
+    margin: 0;
+  }
 }
 @media (max-width: 480px) {
   .personal-timeline-header h1 { font-size: 18px; }
