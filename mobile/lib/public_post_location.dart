@@ -8,7 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const publicPostLocationNotice =
-    'Khi đăng công khai, vị trí tốt nhất từ GPS hoặc mạng sẽ được chia sẻ. Nếu chưa đạt 10 m, bài viết hiển thị vị trí gần đúng và sai số. Tọa độ được gửi đến BigDataCloud để lấy tên khu vực. Chọn Bạn bè hoặc Chỉ mình tôi nếu không muốn chia sẻ.';
+    'Khi đăng công khai, vị trí tốt nhất từ GPS hoặc mạng sẽ được chia sẻ. Nếu chưa đạt 10 m, tên khu vực có thể thiếu chính xác; sai số được lưu kèm vị trí. Tọa độ được gửi đến BigDataCloud để lấy tên khu vực. Chọn Bạn bè hoặc Chỉ mình tôi nếu không muốn chia sẻ.';
 
 Future<Map<String, dynamic>> capturePublicPostLocation() async {
   if (!kIsWeb) {
@@ -178,7 +178,7 @@ class PublicPostLocationLink extends StatelessWidget {
         }),
       ),
       label: Text(
-        '$label${accuracy > 10 ? ' (gần đúng)' : ''}',
+        label,
         overflow: TextOverflow.ellipsis,
         style: Theme.of(context).textTheme.bodySmall,
       ),
