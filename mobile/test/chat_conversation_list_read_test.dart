@@ -1303,6 +1303,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.messageCreateRequests, ['POST /api/conversations/1/messages']);
+    final response = api.messages[1]!.last;
+    expect(_renderedMessageText(tester, response['id'] as int), 'New message');
     final body = api.messageCreateBodies.single!;
     expect(body['text'], 'New message');
     expect(body['channelId'], 0);
