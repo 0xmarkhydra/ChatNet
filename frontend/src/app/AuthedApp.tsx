@@ -68,6 +68,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
 import { useAppRouteNavigation } from "./router/useAppRouteNavigation";
 import { useGlobalSearchShortcut } from "./navigation/useGlobalSearchShortcut";
+import { resolveDesktopSection } from "./navigation/resolveDesktopSection";
+import { createVisitorNavigation } from "./navigation/createVisitorNavigation";
 import { useMessageSoundPreference } from "./hooks/useMessageSoundPreference";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
@@ -278,6 +280,7 @@ import AppComposerOverlays from "./layouts/AppComposerOverlays";
 import { useNearbyDiscovery } from "../features/discover/hooks/useNearbyDiscovery";
 import { useAccountSessions } from "../features/auth/hooks/useAccountSessions";
 import { usePushSettings } from "../features/notifications/hooks/usePushSettings";
+import { requestPushConfig } from "../features/notifications/api/push";
 import { useMessageClipboard } from "../features/chat/hooks/useMessageClipboard";
 import { useMediaUploads } from "../features/chat/hooks/useMediaUploads";
 import { useContactActions } from "../features/contacts/hooks/useContactActions";
@@ -314,6 +317,7 @@ import { useAppLocaleState } from "../features/i18n/hooks/useAppLocaleState";
 import { useLanguagePreferencesLifecycle } from "../features/i18n/hooks/useLanguagePreferencesLifecycle";
 import { useTranslationState } from "../features/chat/hooks/useTranslationState";
 import { useProfileState } from "../features/profile/hooks/useProfileState";
+import { profileEditDraft } from "../features/profile/utils/profileEditDraft";
 import { useProfileIdentityActions } from "../features/profile/hooks/useProfileIdentityActions";
 import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
 import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
@@ -456,25 +460,21 @@ export default function AuthedApp({
   } = useChatOutboxState({ session, sessionRef, actionLocksRef: actionLocks, setNotice });
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
-  function openVisitor(username: string, returnTo?: string) {
-    if (username === sessionRef.current?.user.username) {
+  const { openVisitor, setFriendPreview } = createVisitorNavigation({
+    getOwnUsername: () => sessionRef.current?.user.username,
+    openOwnProfile: () => {
       setTab("profile");
       setProfileTimelineOpen(true);
-      return;
-    }
-    openVisitorProfile(username, returnTo);
-  }
-  function setFriendPreview(friend: FriendSearchResult | null) {
-    if (friend) openVisitor(friend.username);
-    else if (visitorUsername) closeVisitor();
-  }
+    },
+    openVisitorProfile,
+    closeVisitor,
+    visitorUsername,
+  });
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
   const [desktopSectionState, setDesktopSection] = useState<
     "groups" | "calls" | null
   >(null);
-  const desktopSection = (routeLocation.pathname === ROUTE.calls || routeLocation.pathname.startsWith(`${ROUTE.calls}/`))
-    ? "calls"
-    : desktopSectionState === "calls" ? null : desktopSectionState;
+  const desktopSection = resolveDesktopSection(routeLocation.pathname, desktopSectionState);
   const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);
   const [translationSettingsActiveConversationId, setTranslationSettingsActiveConversationId] = useState(activeConversationId);
   // Reset dialog state during render when the selected conversation changes,
@@ -1189,7 +1189,7 @@ export default function AuthedApp({
 
     void (async () => {
       try {
-        const response = await apiFetch("/api/push/config");
+        const response = await requestPushConfig(apiFetch);
         if (!response.ok) {
           if (!cancelled) setPushConfigured(false);
           return;
@@ -1687,13 +1687,12 @@ export default function AuthedApp({
   });
 
   const discardDesktopProfileEdits = () => {
-    setProfileDisplayNameDraft(
-      profileMedia?.displayName ?? session.user.displayName ?? name,
-    );
-    setProfileUsernameDraft(profileMedia?.username ?? name);
-    setProfileBioDraft(profileMedia?.bio ?? "");
-    setProfileCityDraft(profileMedia?.city ?? "");
-    setProfilePublicDetailsDraft({ workplace: profileMedia?.workplace ?? "", school: profileMedia?.school ?? "" });
+    const draft = profileEditDraft(profileMedia, name, session.user.displayName);
+    setProfileDisplayNameDraft(draft.displayName);
+    setProfileUsernameDraft(draft.username);
+    setProfileBioDraft(draft.bio);
+    setProfileCityDraft(draft.city);
+    setProfilePublicDetailsDraft(draft.publicDetails);
     setProfileEditorOpen(false);
   };
 
