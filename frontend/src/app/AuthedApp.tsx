@@ -276,8 +276,7 @@ import ProfileOverviewSection from "../features/profile/components/ProfileOvervi
 import ProfileSection from "../features/profile/components/ProfileSection";
 import ChatSection from "../features/chat/components/ChatSection";
 import StoryDraftOverlay from "../features/feed/components/StoryDraftOverlay";
-import FeedComposerOverlay from "../features/feed/components/FeedComposerOverlay";
-import ProfileComposerOverlay from "../features/profile/components/ProfileComposerOverlay";
+import AppComposerOverlays from "./layouts/AppComposerOverlays";
 import { useNearbyDiscovery } from "../features/discover/hooks/useNearbyDiscovery";
 import { useAccountSessions } from "../features/auth/hooks/useAccountSessions";
 import { usePushSettings } from "../features/notifications/hooks/usePushSettings";
@@ -2772,32 +2771,22 @@ export default function AuthedApp({
           storyDraft={storyDraft}
         />
         )}
-      {feedComposerOpen && tab === "feed" && (
-          <FeedComposerOverlay
-          editingPost={editingPost}
-          mediaUploading={mediaUploading}
-          pendingPost={pendingPost}
-          postComposer={postComposer}
-          postEditBusy={postEditBusy}
-          restoreDraftAfterEdit={restoreDraftAfterEdit}
-          setFeedCheckInOpen={setFeedCheckInOpen}
-          setFeedComposerOpen={setFeedComposerOpen}
-        />
-        )}
-      {profileComposerOpen &&
-        tab === "profile" &&
-        (profileTimelineOpen || desktopProfileOverview) && (
-          <ProfileComposerOverlay
-          editingPost={editingPost}
-          mediaUploading={mediaUploading}
-          pendingPost={pendingPost}
-          postComposer={postComposer}
-          postEditBusy={postEditBusy}
-          restoreDraftAfterEdit={restoreDraftAfterEdit}
-          setProfileComposerOpen={setProfileComposerOpen}
-          setFeedCheckInOpen={setFeedCheckInOpen}
-        />
-        )}
+      <AppComposerOverlays
+        tab={tab}
+        feedComposerOpen={feedComposerOpen}
+        profileComposerOpen={profileComposerOpen}
+        profileTimelineOpen={profileTimelineOpen}
+        desktopProfileOverview={desktopProfileOverview}
+        editingPost={editingPost}
+        mediaUploading={mediaUploading}
+        pendingPost={pendingPost}
+        postComposer={postComposer}
+        postEditBusy={postEditBusy}
+        restoreDraftAfterEdit={restoreDraftAfterEdit}
+        setFeedCheckInOpen={setFeedCheckInOpen}
+        setFeedComposerOpen={setFeedComposerOpen}
+        setProfileComposerOpen={setProfileComposerOpen}
+      />
       {postLinkToSend && (
         <SharedPostLinkPicker
           key={session.sessionId + ":" + postLinkToSend}
