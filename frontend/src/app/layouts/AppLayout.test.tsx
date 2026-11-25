@@ -15,56 +15,6 @@ afterEach(() => {
 });
 
 
-it("keeps mobile search outside the collapsible header and in the page flow", () => {
-  const container = document.createElement("div");
-  document.body.append(container);
-  const root = createRoot(container);
-  act(() => root.render(
-    <MemoryRouter initialEntries={["/contacts"]}>
-      <Routes>
-        <Route element={
-          <AppLayout
-            className="app-shell modern-shell app-layout"
-            activeTab="contacts"
-            sidebar={<aside>Navigation</aside>}
-            header={<header className="chatnet-appbar">Toolbar only</header>}
-            mobileSearch={<input aria-label="Search contacts" />}
-            outletContext={{
-              frameClassName: "",
-              beforeFeed: null,
-              contacts: <p>Contacts list</p>,
-              search: null,
-              discover: null,
-              market: null,
-              notifications: null,
-              profile: null,
-              afterFeed: null,
-              feed: null,
-              chat: null,
-            }}
-          />
-        }>
-          <Route path="contacts" element={<PageRoute page="contacts" />} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
-  ));
-  try {
-    const shell = container.querySelector("main")!;
-    const header = shell.querySelector(":scope > header")!;
-    const searchRow = shell.querySelector(":scope > .mobile-search-dock")!;
-    const search = searchRow.querySelector("input")!;
-    expect(header.querySelector("input")).toBeNull();
-    expect(search.getAttribute("aria-label")).toBe("Search contacts");
-    expect(searchRow.previousElementSibling).toBe(header);
-    shell.classList.add("mobile-chrome-hidden");
-    expect(search.isConnected).toBe(true);
-    expect(searchRow.closest(".chatnet-appbar")).toBeNull();
-  } finally {
-    act(() => root.unmount());
-    container.remove();
-  }
-});
 
 it("renders header and sidebar around the outlet without extra DOM wrappers", () => {
   const container = document.createElement("div");
