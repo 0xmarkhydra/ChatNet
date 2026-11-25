@@ -1,8 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
+// ignore: depend_on_referenced_packages
+import 'package:cross_file/cross_file.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/widgets.dart';
+import 'package:file_picker/file_picker.dart';
+// ignore: deprecated_member_use
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/api.dart';
 import 'package:soco/app.dart';
@@ -11,6 +16,53 @@ import 'package:soco/data/chatnet_repositories.dart';
 import 'package:soco/demo.dart';
 import 'package:soco/presentation/conversation_avatar.dart';
 import 'package:soco/widgets.dart';
+
+base class _PickedPlatformFile extends PlatformFile {
+  _PickedPlatformFile(this.name, this.bytes);
+
+  @override
+  final String name;
+  final Uint8List bytes;
+
+  @override
+  Uri get uri => Uri.parse('memory:///$name');
+
+  @override
+  XFile get xFile => XFile.fromData(bytes, name: name);
+
+  @override
+  int? lengthSync() => bytes.length;
+
+  @override
+  Future<int?> length() async => bytes.length;
+
+  @override
+  Future<Uint8List> readAsBytes() async => bytes;
+
+  @override
+  Stream<Uint8List> readAsByteStream() => Stream.value(bytes);
+}
+
+class _MockFilePickerPlatform extends FilePickerPlatform {
+  _MockFilePickerPlatform(this.files);
+
+  final List<PlatformFile> files;
+
+  @override
+  Future<List<PlatformFile>> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    int compressionQuality = 0,
+    AndroidOptions androidOptions = const AndroidOptions(),
+    DarwinOptions darwinOptions = const DarwinOptions(),
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) async => files;
+}
 
 class _ConversationApi extends DemoApi {
   final StreamController<void> _eventController =
@@ -27,6 +79,11 @@ class _ConversationApi extends DemoApi {
   final List<String> messageCreateRequests = [];
   final List<Json?> messageCreateBodies = [];
   bool failNextMessageCreateRequest = false;
+  Completer<void>? pendingMessageCreateRequest;
+  final List<Json> attachmentUploadRequests = [];
+  final List<Json> uploadedAttachments = [];
+  final List<Completer<Json>> pendingAttachmentUploads = [];
+  int? failAttachmentUploadAt;
   final List<String> reactionRequests = [];
   final List<Json> reactionBodies = [];
   final Map<int, Json> reactionMessages = {};
@@ -56,6 +113,30 @@ class _ConversationApi extends DemoApi {
   Future<void> closeEvents() => _eventController.close();
 
   @override
+  Future<Json> upload(
+    String scope,
+    String name,
+    String contentType,
+    Uint8List bytes,
+  ) async {
+    attachmentUploadRequests.add({
+      'scope': scope,
+      'name': name,
+      'contentType': contentType,
+      'bytes': bytes.toList(),
+    });
+    if (failAttachmentUploadAt == attachmentUploadRequests.length) {
+      throw const ApiError('Synthetic attachment upload failure');
+    }
+    final pending = pendingAttachmentUploads;
+    final attachment = pending.isNotEmpty
+        ? await pending.removeAt(0).future
+        : _uploadedAttachment(name, contentType, bytes.length);
+    uploadedAttachments.add(attachment);
+    return attachment;
+  }
+
+  @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
     if (method == 'POST' &&
         path.startsWith('/api/conversations/') &&
@@ -64,6 +145,8 @@ class _ConversationApi extends DemoApi {
       messageCreateBodies.add(
         body == null ? null : Map<String, dynamic>.from(body),
       );
+      final pending = pendingMessageCreateRequest;
+      if (pending != null) await pending.future;
       if (failNextMessageCreateRequest) {
         failNextMessageCreateRequest = false;
         throw const ApiError('Synthetic message create failure');
@@ -218,6 +301,14 @@ class _ConversationApi extends DemoApi {
   }
 }
 
+Json _uploadedAttachment(String name, String contentType, int sizeBytes) => {
+  'kind': contentType.split('/').first,
+  'name': name,
+  'contentType': contentType,
+  'sizeBytes': sizeBytes,
+  'url': 'https://files.test/$name',
+};
+
 Map<String, dynamic> _room(
   int id,
   String name, {
@@ -265,6 +356,19 @@ Future<void> _pumpApp(
   _setViewport(tester, size: size);
   await tester.pumpWidget(SocoApp(key: key, api: api));
 }
+
+void _pickFiles(List<PlatformFile> files) {
+  final previous = FilePickerPlatform.instance;
+  FilePickerPlatform.instance = _MockFilePickerPlatform(files);
+  addTearDown(() => FilePickerPlatform.instance = previous);
+}
+
+Finder _sendButton() => find.byWidgetPredicate(
+  (widget) => widget is IconButton && widget.tooltip == 'G\u1eedi',
+);
+
+IconButton _iconButton(WidgetTester tester, Finder finder) =>
+    tester.widget<IconButton>(finder);
 
 Future<void> _tapMuteAction(WidgetTester tester, int conversationId) async {
   await tester.longPress(find.byKey(ValueKey('rail-room-$conversationId')));
@@ -1419,6 +1523,179 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('attachment uploads run sequentially before send posts them', (
+    tester,
+  ) async {
+    final firstUpload = Completer<Json>();
+    final secondUpload = Completer<Json>();
+    final api = _ConversationApi()
+      ..pendingAttachmentUploads.addAll([firstUpload, secondUpload]);
+    _pickFiles([
+      _PickedPlatformFile('first.png', Uint8List.fromList([1, 2, 3])),
+      _PickedPlatformFile('second.png', Uint8List.fromList([4, 5, 6])),
+    ]);
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    final composer = find.byWidgetPredicate(
+      (widget) => widget is EditableText && widget.maxLines == 5,
+    );
+    await tester.enterText(composer, 'Image caption');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('composer-quick-media')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(api.attachmentUploadRequests, hasLength(1));
+    expect(api.messageCreateRequests, isEmpty);
+    expect(
+      _iconButton(
+        tester,
+        find.byKey(const ValueKey('composer-quick-media')),
+      ).onPressed,
+      isNull,
+    );
+    expect(
+      _iconButton(
+        tester,
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is IconButton &&
+              widget.tooltip == 'Th\u00eam \u1ea3nh, file, emoji',
+        ),
+      ).onPressed,
+      isNull,
+    );
+    expect(_iconButton(tester, _sendButton()).onPressed, isNull);
+
+    final first = _uploadedAttachment('first.png', 'image/png', 3);
+    firstUpload.complete(first);
+    await tester.pump();
+    await tester.pump();
+    expect(api.attachmentUploadRequests, hasLength(2));
+    expect(api.messageCreateRequests, isEmpty);
+
+    final second = _uploadedAttachment('second.png', 'image/png', 3);
+    secondUpload.complete(second);
+    await tester.pumpAndSettle();
+    expect(api.attachmentUploadRequests.map((request) => request['name']), [
+      'first.png',
+      'second.png',
+    ]);
+    expect(api.messageCreateRequests, isEmpty);
+    expect(
+      find.byKey(const ValueKey('composer-pending-attachments')),
+      findsOneWidget,
+    );
+
+    api.pendingMessageCreateRequest = Completer<void>();
+    final send = _sendButton();
+    await tester.tap(send);
+    await tester.pump();
+    expect(api.messageCreateRequests, ['POST /api/conversations/1/messages']);
+    expect(api.messageCreateBodies.single?['attachments'], [first, second]);
+    expect(_iconButton(tester, send).onPressed, isNull);
+    expect(
+      find.byKey(const ValueKey('composer-pending-attachments')),
+      findsOneWidget,
+    );
+
+    api.pendingMessageCreateRequest!.complete();
+    await tester.pumpAndSettle();
+    final response = api.messages[1]!.last;
+    expect(
+      _renderedMessageText(tester, response['id'] as int),
+      'Image caption',
+    );
+    expect(
+      find.byKey(const ValueKey('composer-pending-attachments')),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'mid-batch attachment upload failure skips POST and stages none',
+    (tester) async {
+      final api = _ConversationApi()..failAttachmentUploadAt = 2;
+      _pickFiles([
+        _PickedPlatformFile('uploaded.png', Uint8List.fromList([1, 2, 3])),
+        _PickedPlatformFile('failed.png', Uint8List.fromList([4, 5, 6])),
+      ]);
+      addTearDown(api.closeEvents);
+
+      await _openDefaultGroupChat(tester, api);
+      final composer = find.byWidgetPredicate(
+        (widget) => widget is EditableText && widget.maxLines == 5,
+      );
+      await tester.enterText(composer, 'Keep draft');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('composer-quick-media')));
+      await tester.pumpAndSettle();
+
+      expect(api.attachmentUploadRequests, hasLength(2));
+      expect(api.uploadedAttachments, [
+        _uploadedAttachment('uploaded.png', 'image/png', 3),
+      ]);
+      expect(api.messageCreateRequests, isEmpty);
+      expect(
+        find.byKey(const ValueKey('composer-pending-attachments')),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('Synthetic attachment upload failure'),
+        findsOneWidget,
+      );
+      expect(_iconButton(tester, _sendButton()).onPressed, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'POST failure keeps uploaded attachment staged without reupload',
+    (tester) async {
+      final api = _ConversationApi()..failNextMessageCreateRequest = true;
+      _pickFiles([
+        _PickedPlatformFile('kept.png', Uint8List.fromList([1, 2, 3])),
+      ]);
+      addTearDown(api.closeEvents);
+
+      await _openDefaultGroupChat(tester, api);
+      final composer = find.byWidgetPredicate(
+        (widget) => widget is EditableText && widget.maxLines == 5,
+      );
+      await tester.enterText(composer, 'Keep attachment');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('composer-quick-media')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('composer-pending-attachments')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byTooltip('G\u1eedi'));
+      await tester.pumpAndSettle();
+
+      expect(api.messageCreateRequests, ['POST /api/conversations/1/messages']);
+      expect(api.messageCreateBodies.single?['attachments'], [
+        _uploadedAttachment('kept.png', 'image/png', 3),
+      ]);
+      expect(api.attachmentUploadRequests, hasLength(1));
+      expect(api.uploadedAttachments, hasLength(1));
+      expect(
+        find.byKey(const ValueKey('composer-pending-attachments')),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<EditableText>(composer).controller.text,
+        'Keep attachment',
+      );
+      expect(_iconButton(tester, _sendButton()).onPressed, isNotNull);
+      expect(
+        find.textContaining('Synthetic message create failure'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('stale reaction response overwrites newer SSE update (baseline)', (
     tester,
