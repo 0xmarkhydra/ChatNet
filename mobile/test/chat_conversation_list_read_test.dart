@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/api.dart';
 import 'package:soco/app.dart';
+import 'package:soco/chat_mention_text.dart';
 import 'package:soco/data/chatnet_repositories.dart';
 import 'package:soco/demo.dart';
 import 'package:soco/presentation/conversation_avatar.dart';
@@ -20,6 +21,9 @@ class _ConversationApi extends DemoApi {
   final List<String> messagePinRequests = [];
   final List<Json?> messagePinBodies = [];
   final List<String> messagePinListRequests = [];
+  final List<String> messageRecallRequests = [];
+  final List<Json?> messageRecallBodies = [];
+  Json? lastMessageRecallResponse;
   final List<String> reactionRequests = [];
   final List<Json> reactionBodies = [];
   final Map<int, Json> reactionMessages = {};
@@ -36,6 +40,7 @@ class _ConversationApi extends DemoApi {
   bool failPageReads = false;
   bool failConversationPinRequests = false;
   bool failMessagePinRequests = false;
+  bool failMessageRecallRequests = false;
   bool failReactionRequests = false;
   bool failNotificationSettingsRead = false;
   bool failNotificationSettingsWrite = false;
@@ -49,6 +54,29 @@ class _ConversationApi extends DemoApi {
 
   @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (method == 'DELETE' &&
+        path.startsWith('/api/messages/') &&
+        path.split('/').length == 4) {
+      messageRecallRequests.add('$method $path');
+      messageRecallBodies.add(body);
+      if (failMessageRecallRequests) {
+        throw const ApiError('Synthetic message recall failure');
+      }
+      final messageId = int.parse(path.split('/')[3]);
+      final message = messages.values
+          .expand((items) => items)
+          .firstWhere((item) => item['id'] == messageId);
+      lastMessageRecallResponse = {
+        ...message,
+        'deleted': true,
+        'text': '',
+        'editedAt': null,
+        'attachments': [],
+        'reactions': [],
+      };
+      pinnedMessageIds.remove(messageId);
+      return Map<String, dynamic>.from(lastMessageRecallResponse!);
+    }
     if (method == 'POST' &&
         path.startsWith('/api/messages/') &&
         path.endsWith('/reactions')) {
@@ -254,6 +282,25 @@ Future<void> _reactToMessage(
   await tester.tap(find.text(emoji));
   await tester.pumpAndSettle();
 }
+
+Future<void> _recallMessage(
+  WidgetTester tester, {
+  required int messageId,
+}) async {
+  await tester.longPress(find.byKey(ValueKey('chat-message-$messageId')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Thu h\u1ed3i'));
+  await tester.pumpAndSettle();
+}
+
+String _renderedMessageText(WidgetTester tester, int messageId) => tester
+    .widget<ChatMentionText>(
+      find.descendant(
+        of: find.byKey(ValueKey('chat-message-$messageId')),
+        matching: find.byType(ChatMentionText),
+      ),
+    )
+    .text;
 
 Future<void> _toggleMessagePin(
   WidgetTester tester, {
@@ -1061,6 +1108,105 @@ void main() {
       );
     },
   );
+
+  testWidgets('message recall sends bodyless DELETE and replaces message', (
+    tester,
+  ) async {
+    final api = _ConversationApi();
+    final original = api.messages[1]!.firstWhere((item) => item['id'] == 12);
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _recallMessage(tester, messageId: 12);
+
+    expect(api.messageRecallRequests, ['DELETE /api/messages/12']);
+    expect(api.messageRecallBodies, [null]);
+    expect(api.lastMessageRecallResponse?['deleted'], isTrue);
+    expect(api.lastMessageRecallResponse, isNot(same(original)));
+    expect(original['deleted'], isNot(true));
+    expect(original['text'], isNotEmpty);
+    expect(
+      _renderedMessageText(tester, 12),
+      'Tin nh\u1eafn \u0111\u00e3 \u0111\u01b0\u1ee3c thu h\u1ed3i',
+    );
+  });
+
+  testWidgets('pins.updated SSE removes recalled message from pin panel', (
+    tester,
+  ) async {
+    final api = _ConversationApi()..pinnedMessageIds.add(12);
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    expect(find.byTooltip('B\u1ecf ghim'), findsOneWidget);
+    await _recallMessage(tester, messageId: 12);
+    expect(find.byTooltip('B\u1ecf ghim'), findsOneWidget);
+
+    final serverMessages = api.messages[1]!;
+    final messageIndex = serverMessages.indexWhere((item) => item['id'] == 12);
+    serverMessages[messageIndex] = Map<String, dynamic>.from(
+      api.lastMessageRecallResponse!,
+    );
+    api.emitEvent(); // Server publishes pins.updated after recall.
+    await tester.pumpAndSettle();
+
+    expect(api.messageRecallRequests, ['DELETE /api/messages/12']);
+    expect(api.messagePinListRequests.length, greaterThan(1));
+    expect(find.byTooltip('B\u1ecf ghim'), findsNothing);
+  });
+
+  testWidgets('failed message recall keeps message and pin state', (
+    tester,
+  ) async {
+    final api = _ConversationApi()
+      ..failMessageRecallRequests = true
+      ..pinnedMessageIds.add(12);
+    final originalText = api.messages[1]!.firstWhere(
+      (item) => item['id'] == 12,
+    )['text'];
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _recallMessage(tester, messageId: 12);
+
+    expect(api.messageRecallRequests, ['DELETE /api/messages/12']);
+    expect(api.messageRecallBodies, [null]);
+    expect(_renderedMessageText(tester, 12), originalText);
+    expect(find.byTooltip('B\u1ecf ghim'), findsOneWidget);
+  });
+
+  testWidgets('empty recalled preview keeps conversation timestamp', (
+    tester,
+  ) async {
+    const lastMessageAt = '2026-11-25T10:00:00Z';
+    final api = _ConversationApi();
+    api.rooms
+      ..clear()
+      ..add(
+        _room(90, 'Recalled preview', lastMessageAt: lastMessageAt)
+          ..['lastMessage'] = '',
+      );
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+
+    final room = find.byKey(const ValueKey('rail-room-90'));
+    expect(
+      find.descendant(
+        of: room,
+        matching: find.text('Nh\u00f3m h\u1ed9i tho\u1ea1i'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: room,
+        matching: find.text(displayTime(lastMessageAt)),
+      ),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('message reaction posts emoji and replaces message', (
     tester,
