@@ -58,5 +58,55 @@ void main() {
     expect(api.messageBodies, hasLength(2));
     expect(api.messageBodies[1]['text'], 'Retry this message');
     expect(api.messageBodies[1]['clientId'], api.messageBodies[0]['clientId']);
+
+    await tester.enterText(composer, 'New message after success');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Gửi'));
+    await tester.pumpAndSettle();
+
+    expect(api.messageBodies, hasLength(3));
+    expect(
+      api.messageBodies[2]['clientId'],
+      isNot(api.messageBodies[1]['clientId']),
+    );
+  });
+
+  testWidgets('editing failed draft creates new message client id', (
+    tester,
+  ) async {
+    final api = _ResendApi()..preferences['autoTranslate'] = false;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(SocoApp(api: api));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('rail-room-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thảo luận chung'));
+    await tester.pumpAndSettle();
+
+    final composer = find.byWidgetPredicate(
+      (widget) => widget is EditableText && widget.maxLines == 5,
+    );
+    await tester.enterText(composer, 'Original draft');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Gửi'));
+    await tester.pumpAndSettle();
+    expect(api.messageBodies, hasLength(1));
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await tester.enterText(composer, 'Edited draft');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Gửi'));
+    await tester.pumpAndSettle();
+
+    expect(api.messageBodies, hasLength(2));
+    expect(api.messageBodies[1]['text'], 'Edited draft');
+    expect(
+      api.messageBodies[1]['clientId'],
+      isNot(api.messageBodies[0]['clientId']),
+    );
   });
 }

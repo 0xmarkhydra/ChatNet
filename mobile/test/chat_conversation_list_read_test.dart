@@ -1480,7 +1480,7 @@ void main() {
   });
 
   testWidgets(
-    'failed text send keeps draft and manual resend gets new client id (baseline)',
+    'failed text send keeps draft and manual resend reuses client id',
     (tester) async {
       final api = _ConversationApi()..failNextMessageCreateRequest = true;
       addTearDown(api.closeEvents);
@@ -1517,7 +1517,7 @@ void main() {
       expect(api.messageCreateBodies, hasLength(2));
       expect(
         api.messageCreateBodies[0]?['clientId'],
-        isNot(api.messageCreateBodies[1]?['clientId']),
+        api.messageCreateBodies[1]?['clientId'],
       );
       expect(api.messageCreateBodies[1]?['text'], 'Retry this message');
     },

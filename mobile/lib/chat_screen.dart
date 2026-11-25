@@ -55,6 +55,8 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen>
     with SingleTickerProviderStateMixin {
   final messageController = TextEditingController();
+  String? _pendingMessageClientId;
+  String? _pendingMessageDraftKey;
   final messageFocus = FocusNode();
   List<MentionCandidate> mentionMembers = [];
   int? mentionRoomId;
@@ -1006,13 +1008,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         (text.isEmpty && outgoingAttachments.isEmpty)) {
       return;
     }
-    final body = <String, dynamic>{
+    final draft = <String, dynamic>{
       'text': text,
-      'clientId': DateTime.now().microsecondsSinceEpoch.toString(),
       if (active?['type'] == 'group') 'channelId': selectedChannelId,
       if (replyingTo != null) 'replyToMessageId': replyingTo!['id'],
       if (outgoingAttachments.isNotEmpty) 'attachments': outgoingAttachments,
     };
+    final draftKey = jsonEncode([(active!['id'] as num).toInt(), draft]);
+    final matchingClientId = _pendingMessageDraftKey == draftKey
+        ? _pendingMessageClientId
+        : null;
+    final clientId =
+        matchingClientId ?? DateTime.now().microsecondsSinceEpoch.toString();
+    _pendingMessageDraftKey = draftKey;
+    _pendingMessageClientId = clientId;
+    final body = <String, dynamic>{'clientId': clientId, ...draft};
     setState(() => sending = true);
     try {
       final result = await ref
@@ -1022,6 +1032,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       setState(() {
         messages = [...messages, result];
         messageController.clear();
+        _pendingMessageClientId = null;
+        _pendingMessageDraftKey = null;
         pendingAttachments = [];
         replyingTo = null;
       });
