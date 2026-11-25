@@ -837,31 +837,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     setState(() => notificationBusy = true);
     final nextMuted = room['muted'] != true;
     try {
-      var mentionNotifications = !nextMuted;
       final group = room['type'] == 'group';
-      if (group) {
-        final current = object(
-          await widget.api.request(
-            'GET',
-            '/api/conversations/$id/notification-settings',
-          ),
-        );
-        if (current['mentionNotifications'] is! bool) {
-          throw const ApiError('Không đọc được cấu hình @Tag của nhóm.');
-        }
-        // Muting normal messages does NOT mute explicit @mentions.
-        mentionNotifications = current['mentionNotifications'] == true;
-      }
-      final result = object(
-        await widget.api
-            .request('PUT', '/api/conversations/$id/notification-settings', {
-              'messageNotifications': !nextMuted,
-              'mentionNotifications': mentionNotifications,
-            }),
-      );
-      if (result['messageNotifications'] is! bool) {
-        throw const ApiError('Backend chưa hỗ trợ cấu hình thông báo.');
-      }
+      final result = await ref
+          .read(chatRepositoryProvider)
+          .setConversationMuted(id, muted: nextMuted, isGroup: group);
       final muted = group
           ? result['messageNotifications'] != true
           : result['messageNotifications'] != true &&

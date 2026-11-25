@@ -53,6 +53,41 @@ class ChatRepository {
     });
   }
 
+  Future<Json> setConversationMuted(
+    int conversationId, {
+    required bool muted,
+    required bool isGroup,
+  }) async {
+    var mentionNotifications = !muted;
+    if (isGroup) {
+      final current = object(
+        await api.request(
+          'GET',
+          '/api/conversations/$conversationId/notification-settings',
+        ),
+      );
+      if (current['mentionNotifications'] is! bool) {
+        throw const ApiError('Không đọc được cấu hình @Tag của nhóm.');
+      }
+      // Muting normal messages does NOT mute explicit @mentions.
+      mentionNotifications = current['mentionNotifications'] == true;
+    }
+    final settings = object(
+      await api.request(
+        'PUT',
+        '/api/conversations/$conversationId/notification-settings',
+        {
+          'messageNotifications': !muted,
+          'mentionNotifications': mentionNotifications,
+        },
+      ),
+    );
+    if (settings['messageNotifications'] is! bool) {
+      throw const ApiError('Backend chưa hỗ trợ cấu hình thông báo.');
+    }
+    return settings;
+  }
+
   Future<List<GroupMember>> members(int conversationId) async {
     final result = objects(
       await api.request('GET', '/api/conversations/$conversationId/members'),
