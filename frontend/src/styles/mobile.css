@@ -129,12 +129,6 @@ select {
     font-size: 16px;
   }
 
-  .new-chat-buttons button {
-    min-height: 44px;
-    padding: 10px 8px;
-    font-size: 12px;
-  }
-
   .new-chat-panel {
     padding: 10px 12px 12px;
   }
@@ -229,20 +223,6 @@ select {
     min-width: 0;
     justify-content: flex-end;
     gap: 6px;
-  }
-
-  .auto-translate {
-    min-height: 40px;
-    padding: 7px 9px;
-    white-space: nowrap;
-  }
-
-  .auto-translate span {
-    display: none;
-  }
-
-  .auto-translate::after {
-    content: "AI";
   }
 
   .chat-head select {
@@ -409,30 +389,6 @@ select {
     align-content: start;
   }
 
-  .auth-copy {
-    padding: 4px 2px 0;
-  }
-
-  .auth-copy h1 {
-    margin: 7px 0 8px;
-    font-size: clamp(30px, 9vw, 38px);
-  }
-
-  .auth-copy p {
-    font-size: 14px;
-    line-height: 1.5;
-  }
-
-  .auth-points {
-    gap: 6px;
-    margin-top: 13px;
-  }
-
-  .auth-points span {
-    padding: 7px 9px;
-    font-size: 11px;
-  }
-
   .auth-card {
     gap: 12px;
     padding: 16px;
@@ -452,10 +408,6 @@ select {
 
   .otp-card {
     align-content: start;
-  }
-
-  .otp-input {
-    font-size: 24px !important;
   }
 }
 

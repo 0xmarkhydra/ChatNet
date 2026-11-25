@@ -32,7 +32,7 @@
     border: 0;
     border-bottom: 1px solid var(--pwa-header-divider);
     border-radius: 0;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: none;
   }
 
@@ -125,7 +125,7 @@
   .modern-shell.app-layout .social-chat-layout > .conversation-panel > .chat-head,
   .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .conversation-panel.group-chat-panel > .chat-head {
     border-bottom-color: var(--pwa-header-divider);
-    background: #fff;
+    background: var(--soco-surface);
   }
 }
 

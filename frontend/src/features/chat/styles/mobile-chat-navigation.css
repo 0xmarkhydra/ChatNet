@@ -42,7 +42,7 @@
     max-width: 100% !important;
     border-radius: 0;
     box-shadow: none;
-    background: #fff;
+    background: var(--soco-surface);
   }
   .modern-shell.app-layout .social-chat-layout.mobile-rail-list-view > .conversation-avatar-rail .conversation-avatar-rail-scroll {
     width: 100%;
@@ -73,7 +73,7 @@
     border-right: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    background: #fff;
+    background: var(--soco-surface);
   }
   .modern-shell.app-layout .social-chat-layout.mobile-rail-picker-view > .conversation-avatar-rail .conversation-avatar-rail-scroll {
     width: 100%;

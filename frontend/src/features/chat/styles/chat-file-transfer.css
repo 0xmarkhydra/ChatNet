@@ -4,7 +4,7 @@
   position: relative;
 }
 .conversation-panel.chat-file-drag-active {
-  outline: 2px solid var(--chatnet-accent, #2859d8);
+  outline: 2px solid var(--chatnet-accent);
   outline-offset: -2px;
 }
 .chat-file-drop-overlay {
@@ -26,11 +26,11 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  border: 2px dashed var(--chatnet-accent, #2859d8);
+  border: 2px dashed var(--chatnet-accent);
   border-radius: 20px;
   padding: 22px;
   background: white;
-  color: var(--chatnet-accent-ink, #2859d8);
+  color: var(--chatnet-accent-ink);
   text-align: center;
   box-shadow: 0 12px 35px rgba(24, 56, 110, .12);
 }

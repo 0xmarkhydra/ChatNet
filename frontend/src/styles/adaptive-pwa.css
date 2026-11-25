@@ -25,7 +25,7 @@
     height: 100dvh;
     min-height: 0;
     overflow: hidden;
-    background: #fff;
+    background: var(--soco-surface);
   }
 
   /* Native one-column list/detail behavior: only the selected surface occupies
@@ -39,7 +39,7 @@
     height: 100%;
     padding: 0;
     gap: 0;
-    background: #fff;
+    background: var(--soco-surface);
   }
   .modern-shell.app-layout .social-chat-layout > .conversation-sidebar {
     display: flex;
@@ -78,7 +78,7 @@
     flex: 0 0 auto;
     flex-direction: column;
     padding: 13px 14px 10px;
-    background: #fff;
+    background: var(--soco-surface);
   }
   .modern-shell.app-layout .social-chat-list-title {
     display: flex;
@@ -112,7 +112,7 @@
     border: 0;
     border-radius: 12px;
     background: #edf3ff;
-    color: #2563eb;
+    color: var(--soco-blue);
     cursor: pointer;
   }
   /* Creating a conversation remains available from the top appbar + menu. */
@@ -228,7 +228,7 @@
     padding: 0 14px;
     border: 1px solid #ebeff8;
     border-radius: 999px;
-    background: #f7f9fd;
+    background: var(--soco-surface-page);
     color: #687b9c;
     font-size: 12px;
     font-weight: 700;
@@ -238,7 +238,7 @@
   .modern-shell.app-layout .social-chat-list-filters button.is-active {
     border-color: #dce7ff;
     background: transparent;
-    color: #2563eb;
+    color: var(--soco-blue);
   }
   .modern-shell.app-layout .social-chat-list-filters .social-chat-active-pill {
     background: #eaf1ff;
@@ -322,13 +322,13 @@
     padding: 0;
     border: 1px solid #e6ecf6;
     border-radius: 999px;
-    background: #f7f9fd;
+    background: var(--soco-surface-page);
     color: #637a9f;
   }
   .modern-shell.app-layout .social-chat-list > .conversation-categories .category-filter-trigger.is-filtered {
     border-color: #dce7ff;
     background: #eaf1ff;
-    color: #2563eb;
+    color: var(--soco-blue);
   }
   .modern-shell.app-layout .social-chat-list > .conversation-categories .category-filter-tag-icon,
   .modern-shell.app-layout .social-chat-list > .conversation-categories .category-filter-trigger > span,
@@ -383,7 +383,7 @@
     color: #67768b;
   }
   .modern-shell.app-layout .bottom-navigation > button.active {
-    color: #2563eb;
+    color: var(--soco-blue);
     background: transparent;
     box-shadow: none;
   }
@@ -429,7 +429,7 @@
   }
   .modern-shell.app-layout .bottom-navigation > button:focus-visible,
   .modern-shell.app-layout .social-chat-list-header button:focus-visible {
-    outline: 2px solid #2563eb;
+    outline: 2px solid var(--soco-blue);
     outline-offset: -2px;
   }
 
@@ -500,7 +500,7 @@
     align-items: center;
     min-width: 0;
     padding: 8px max(12px, env(safe-area-inset-right)) 9px max(12px, env(safe-area-inset-left));
-    background: #fff;
+    background: var(--soco-surface);
     border-bottom: 1px solid #e9edf5;
   }
   .modern-shell.app-layout > .mobile-search-dock > .appbar-search-anchor {

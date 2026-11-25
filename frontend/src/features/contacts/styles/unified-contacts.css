@@ -12,7 +12,7 @@
 .unified-contacts-nav {
   width: 100%; flex: 0 0 auto; min-width: 0;
   overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
-  background: #fff; padding: 12px 24px;
+  background: var(--soco-surface); padding: 12px 24px;
   scrollbar-width: none;
 }
 .unified-contacts-nav::-webkit-scrollbar { display: none; }

@@ -10,16 +10,16 @@
     padding: 0;
     overflow-x: hidden;
     overflow-y: auto;
-    background: #f7f9fd;
+    background: var(--soco-surface-page);
     scrollbar-gutter: auto;
   }
   .modern-shell.app-layout .social-feed-stories-card,
   .modern-shell.app-layout .social-feed-launcher,
   .modern-shell.app-layout .social-feed-filter-bar,
   .modern-shell.app-layout .social-feed-side-card {
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
     border-radius: 16px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 3px 16px rgba(30, 51, 96, 0.035);
   }
   /* Stories */
@@ -108,7 +108,7 @@
     height: 69px;
     padding: 4px;
     border-radius: 50%;
-    background: #2563eb;
+    background: var(--soco-blue);
     flex: 0 0 69px;
     box-sizing: border-box;
   }
@@ -123,7 +123,7 @@
     display: block;
     width: 61px;
     height: 61px;
-    border: 3px solid #fff;
+    border: 3px solid var(--soco-surface);
     border-radius: 50%;
     box-sizing: border-box;
     object-fit: cover;
@@ -138,10 +138,10 @@
     place-items: center;
     width: 24px;
     height: 24px;
-    border: 3px solid #fff;
+    border: 3px solid var(--soco-surface);
     border-radius: 50%;
-    color: #fff;
-    background: #2563eb;
+    color: var(--soco-surface);
+    background: var(--soco-blue);
   }
   .social-feed-story-label {
     display: block;
@@ -170,12 +170,6 @@
     gap: 15px;
     min-height: 49px;
   }
-  .social-feed-me-avatar {
-    flex: 0 0 46px;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-  }
   .social-feed-launcher-prompt {
     flex: 1 1 auto;
     height: 49px;
@@ -183,7 +177,7 @@
     padding: 0 23px;
     border: 1px solid transparent;
     border-radius: 11px;
-    background: #f8fafe;
+    background: var(--soco-surface-input);
     color: #8b99ae;
     font: inherit;
     font-size: 13px;
@@ -201,7 +195,7 @@
     gap: 13px;
     margin-top: 8px;
     padding-top: 3px;
-    border-top: 1px solid #e8ecf5;
+    border-top: 1px solid var(--soco-border-subtle);
   }
   .social-feed-launcher-shortcuts {
     display: flex;
@@ -225,13 +219,13 @@
     cursor: pointer;
   }
   .social-feed-launcher-shortcuts button:hover {
-    color: #2563eb;
+    color: var(--soco-blue);
   }
   .social-feed-launcher-shortcuts button:first-child svg {
     color: #3e9b77;
   }
   .social-feed-launcher-shortcuts button:nth-child(2) svg {
-    color: #8b5cf6;
+    color: var(--soco-violet);
   }
   .social-feed-launcher-shortcuts button:nth-child(3) svg {
     color: #f3a13f;
@@ -247,8 +241,8 @@
     padding: 0 11px;
     border: none;
     border-radius: 999px;
-    color: #fff;
-    background: #2563eb;
+    color: var(--soco-surface);
+    background: var(--soco-blue);
     font: inherit;
     font-size: 12px;
     font-weight: 720;
@@ -257,9 +251,6 @@
   }
   .social-feed-launcher-publish:hover {
     background: #1d52ce;
-  }
-  .social-feed-launcher-publish-plus {
-    display: none;
   }
 
   /* Social V4 filter row */
@@ -297,7 +288,7 @@
   }
   .social-feed-filter-options button[aria-pressed="true"] {
     background: #eff3ff;
-    color: #2563eb;
+    color: var(--soco-blue);
     font-weight: 750;
   }
   .social-feed-filter-options button:not([aria-pressed="true"]):hover {
@@ -333,11 +324,11 @@
   .modern-shell.app-layout .social-feed-center .feed-empty {
     border-radius: 15px;
     background: white;
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
   }
   .modern-shell.app-layout .social-feed-center .soco-feed-load-more {
     background: white;
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
     border-radius: 12px;
     padding: 14px;
     color: #7284a0;
@@ -414,7 +405,7 @@
     border: 0;
     border-radius: 10px;
     background: #eff3ff;
-    color: #2563eb;
+    color: var(--soco-blue);
     font: inherit;
     font-size: 12px;
     font-weight: 720;
@@ -459,7 +450,7 @@
   /* Header geometry is owned by the application layout. */
   .modern-shell.app-layout .social-feed-header-community {
     background: #eff3ff;
-    color: #2563eb;
+    color: var(--soco-blue);
   }
   .modern-shell.app-layout .social-feed-header-community:hover,
   .modern-shell.app-layout .social-feed-header-community[aria-pressed="true"] {
@@ -547,7 +538,7 @@
   padding: 12px 15px;
   border: 1px solid #e5ecfa;
   border-radius: 12px;
-  background: #f8fafe;
+  background: var(--soco-surface-input);
 }
 .social-feed-checkin-field strong {
   color: #435b84;
@@ -562,7 +553,7 @@
   border: 1px solid #e4eafa;
   border-radius: 9px;
   outline: none;
-  background: #fff;
+  background: var(--soco-surface);
   color: #253955;
   font: inherit;
   font-size: 13px;
@@ -633,17 +624,17 @@
   .modern-shell.app-layout .social-feed-search-field {
     display: flex; align-items: center; gap: 9px; min-width: 0;
     height: 44px; padding: 0 12px; border-radius: 22px;
-    background: #eef1fb; color: #697894;
+    background: #eef1fb; color: var(--soco-muted);
   }
   .modern-shell.app-layout .social-feed-search-field input {
     flex: 1; min-width: 0; width: 100%; border: 0; outline: 0;
-    background: transparent; color: #17233d; font: inherit; font-size: 12px;
+    background: transparent; color: var(--soco-text); font: inherit; font-size: 12px;
   }
   /* Draw the focus ring inside the field: the independently scrolling rail clips outward outlines. */
-  .modern-shell.app-layout .social-feed-search-field:focus-within { outline: 2px solid var(--soco-blue, #2563eb); outline-offset: -2px; }
+  .modern-shell.app-layout .social-feed-search-field:focus-within { outline: 2px solid var(--soco-blue); outline-offset: -2px; }
   .modern-shell.app-layout .social-feed-search-field kbd {
     flex: 0 0 auto; border: 1px solid #dce3f5; border-radius: 5px;
-    padding: 3px 5px; background: #fff; color: #697894; font-size: 10px;
+    padding: 3px 5px; background: var(--soco-surface); color: var(--soco-muted); font-size: 10px;
   }
   .modern-shell.app-layout .social-feed-community-list {
     display: grid; gap: 6px; margin-top: 13px;
@@ -651,13 +642,13 @@
   .modern-shell.app-layout .social-feed-community-item {
     display: flex; align-items: center; gap: 10px; width: 100%;
     min-height: 52px; padding: 6px 8px; border: 0; border-radius: 10px;
-    background: transparent; text-align: left; cursor: pointer; color: #17233d;
+    background: transparent; text-align: left; cursor: pointer; color: var(--soco-text);
   }
   .modern-shell.app-layout .social-feed-community-item:hover { background: #f0f3ff; }
-  .modern-shell.app-layout .social-feed-community-item:focus-visible { outline: 2px solid var(--soco-blue, #2563eb); outline-offset: 2px; }
+  .modern-shell.app-layout .social-feed-community-item:focus-visible { outline: 2px solid var(--soco-blue); outline-offset: 2px; }
   .modern-shell.app-layout .social-feed-community-icon {
     display: grid; place-items: center; flex: 0 0 38px;
-    width: 38px; height: 38px; border-radius: 11px; background: #eef1fb; color: #2563eb;
+    width: 38px; height: 38px; border-radius: 11px; background: #eef1fb; color: var(--soco-blue);
   }
   .modern-shell.app-layout .social-feed-community-item > span:last-child {
     display: flex; flex-direction: column; min-width: 0; gap: 3px;
@@ -666,5 +657,5 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;
   }
   .modern-shell.app-layout .social-feed-community-item small,
-  .modern-shell.app-layout .social-feed-community-empty { color: #697894; font-size: 11px; }
+  .modern-shell.app-layout .social-feed-community-empty { color: var(--soco-muted); font-size: 11px; }
 }

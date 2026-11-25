@@ -96,9 +96,6 @@
     max-width: none !important;
     opacity: 1 !important;
   }
-  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.desktop-rail-picker-closing > .group-channel-sidebar {
-    pointer-events: none !important;
-  }
 }
 @media (min-width: 761px) and (max-width: 1000px) {
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar {
