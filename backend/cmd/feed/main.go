@@ -672,91 +672,19 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	body.Content = strings.TrimSpace(body.Content)
-	if body.Visibility == "" {
-		body.Visibility = "public"
-	}
-	if !validVisibility(body.Visibility) || !validBackground(body.Background) {
-		httpx.Error(w, http.StatusBadRequest, "invalid post visibility or background")
-		return
-	}
-	if utf8.RuneCountInString(body.Content) > 5000 {
-		httpx.Error(w, http.StatusBadRequest, "content must be <= 5000 characters")
-		return
-	}
-
-	attachments, err := mediax.ValidateAttachments(
-		r.Context(),
-		s.storage,
-		"feed",
-		claims.UserID,
-		body.Attachments,
-		mediax.MaxFeedAttachments,
-	)
+	p, err := s.createPost(r.Context(), claims.UserID, body.Content, body.Visibility, body.Background, body.Attachments)
 	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if body.Content == "" && len(attachments) == 0 {
-		httpx.Error(w, http.StatusBadRequest, "post content or attachment is required")
-		return
-	}
-
-	tx, err := s.db.Begin(r.Context())
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot create post")
-		return
-	}
-	defer tx.Rollback(r.Context())
-
-	var p post
-	if err := tx.QueryRow(r.Context(), "SELECT username,display_name FROM users WHERE id=$1", claims.UserID).Scan(&p.Author, &p.AuthorDisplayName); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot load post author")
-		return
-	}
-	p.Visibility = body.Visibility
-	p.Background = body.Background
-	p.Attachments = attachments
-	err = tx.QueryRow(r.Context(), `
-		INSERT INTO posts(user_id,content,visibility,background)
-		VALUES($1,$2,$3,$4)
-		RETURNING id,content,likes_count,created_at,updated_at`,
-		claims.UserID, body.Content, body.Visibility, body.Background,
-	).Scan(&p.ID, &p.Content, &p.Likes, &p.CreatedAt, &p.UpdatedAt)
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot create post")
-		return
-	}
-
-	for position, attachment := range attachments {
-		if _, err := tx.Exec(r.Context(), `
-			INSERT INTO post_attachments(
-				post_id,storage_ref,original_name,content_type,size_bytes,kind,position
-			) VALUES($1,$2,$3,$4,$5,$6,$7)`,
-			p.ID,
-			attachment.StorageRef,
-			attachment.Name,
-			attachment.ContentType,
-			attachment.SizeBytes,
-			attachment.Kind,
-			position,
-		); err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot save post attachment")
-			return
+		status := http.StatusInternalServerError
+		switch err.(type) {
+		case createPostInputError:
+			status = http.StatusBadRequest
+		case createPostError:
+		default:
+			err = createPostError("cannot create post")
 		}
-	}
-	newMentions, err := s.syncPostMentions(r.Context(), tx, p.ID, claims.UserID, p.Content, p.Visibility)
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot save post mentions")
+		httpx.Error(w, status, err.Error())
 		return
 	}
-	if err := tx.Commit(r.Context()); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot save post")
-		return
-	}
-	s.pushPostMentions(p.ID, p.AuthorDisplayName, newMentions)
-
-	p.Comments = []comment{}
 	httpx.JSON(w, http.StatusCreated, p)
 }
 
