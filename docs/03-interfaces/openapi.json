@@ -5611,6 +5611,26 @@
               }
             }
           },
+          "429": {
+            "description": "Translation rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandlerError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until another request may be sent.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                },
+                "example": "60"
+              }
+            }
+          },
           "404": {
             "description": "Handler error (404).",
             "content": {
