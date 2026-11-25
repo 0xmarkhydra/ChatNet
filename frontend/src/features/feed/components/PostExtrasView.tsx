@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { MapPin, Smile, UserRound, UsersRound } from 'lucide-react'
 import { POST_FEELINGS } from '../utils/feelings'
+import { checkInDisplayName, checkInMapQuery } from '../utils/publicPostLocation'
 import type { PostExtras } from '../utils/postExtras'
 import '../styles/post-extras.css'
 
@@ -30,9 +31,9 @@ export default function PostExtrasView({ extras, onAuthorOpen, taggedNames }: Pr
       </span>}
       {extras.location && <span className="feed-post-extra-item">
         <MapPin size={15} aria-hidden="true" />
-        tại <a className="feed-post-extra-link" aria-label={`Xem địa điểm ${extras.location} trên bản đồ`}
-          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(extras.location)}`}
-          target="_blank" rel="noopener noreferrer"><strong>{extras.location}</strong></a>
+        tại <a className="feed-post-extra-link" aria-label={`Xem địa điểm ${checkInDisplayName(extras.location)} trên bản đồ`}
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(checkInMapQuery(extras.location))}`}
+          target="_blank" rel="noopener noreferrer"><strong>{checkInDisplayName(extras.location)}</strong></a>
       </span>}
       {extras.taggedUsernames.length > 0 && <span className="feed-post-extra-item">
         <UsersRound size={15} aria-hidden="true" />

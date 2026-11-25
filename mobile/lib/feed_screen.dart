@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import 'api.dart';
 import 'feed_post_detail.dart';
 import 'public_post_location.dart';
+import 'post_map_picker.dart';
 import 'feed_story_create_sheet.dart';
 import 'feed_post_links.dart';
 import 'feed_post_share_sheet.dart';
@@ -1091,8 +1092,16 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         }
         return;
       case 'edit':
+        var editCheckIn = namedPostCheckIn(post);
+        final rawContent = post['content']?.toString() ?? '';
         final editor = TextEditingController(
-          text: post['content']?.toString() ?? '',
+          text: editCheckIn.isEmpty
+              ? rawContent
+              : rawContent
+                    .replaceAll('\r\n', '\n')
+                    .split('\n')
+                    .skip(1)
+                    .join('\n'),
         );
         var visibility = post['visibility']?.toString() ?? 'public';
         var background = post['background']?.toString() ?? '';
@@ -1173,6 +1182,26 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                           ),
                       ],
                     ),
+                    if (visibility != 'public')
+                      OutlinedButton.icon(
+                        onPressed: busy
+                            ? null
+                            : () async {
+                                final result = await choosePostMapLocation(
+                                  ctx,
+                                  editCheckIn,
+                                );
+                                if (result != null && ctx.mounted) {
+                                  setSheetState(() => editCheckIn = result);
+                                }
+                              },
+                        icon: const Icon(Icons.location_on_outlined),
+                        label: Text(
+                          editCheckIn.isEmpty
+                              ? 'Chọn vị trí trên bản đồ'
+                              : 'Đang ở ${checkInDisplayName(editCheckIn)}',
+                        ),
+                      ),
                     if (visibility == 'public' &&
                         post['visibility'] != null &&
                         post['visibility'] != 'public')
@@ -1192,13 +1221,21 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                     : null;
                                 if (!ctx.mounted) return;
                                 final updated = object(
-                                  await widget.api
-                                      .request('PATCH', '/api/posts/$id', {
-                                        'content': editor.text.trim(),
-                                        'visibility': visibility,
-                                        'background': background,
-                                        'publishLocation': ?location,
-                                      }),
+                                  await widget.api.request(
+                                    'PATCH',
+                                    '/api/posts/$id',
+                                    {
+                                      'content': [
+                                        if (editCheckIn.isNotEmpty)
+                                          '📍 $editCheckIn',
+                                        if (editor.text.trim().isNotEmpty)
+                                          editor.text.trim(),
+                                      ].join('\n'),
+                                      'visibility': visibility,
+                                      'background': background,
+                                      'publishLocation': ?location,
+                                    },
+                                  ),
                                 );
                                 _applyUpdatedPost(updated);
                                 if (ctx.mounted) Navigator.pop(ctx);
@@ -1337,7 +1374,17 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   }
 
   Future<void> _chooseCheckIn(StateSetter refreshSheet) async {
-    final controller = TextEditingController(text: checkInLocation);
+    if (postVisibility != 'public') {
+      final result = await choosePostMapLocation(context, checkInLocation);
+      if (result != null && mounted) {
+        setState(() => checkInLocation = result);
+        refreshSheet(() {});
+      }
+      return;
+    }
+    final controller = TextEditingController(
+      text: checkInDisplayName(checkInLocation),
+    );
     final location = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1520,7 +1567,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                           Chip(
                             avatar: const Icon(Icons.place_outlined, size: 17),
                             label: Text(
-                              'Đang ở $checkInLocation',
+                              'Đang ở ${checkInDisplayName(checkInLocation)}',
                               overflow: TextOverflow.ellipsis,
                             ),
                             onDeleted: () {

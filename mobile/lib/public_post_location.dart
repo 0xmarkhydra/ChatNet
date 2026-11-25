@@ -146,7 +146,50 @@ Future<Map<String, dynamic>> resolvePublishPlace(
   }
 }
 
-// Match the web post extras prefix format; keep caption and other extras intact.
+class MapCheckIn {
+  const MapCheckIn(this.name, this.latitude, this.longitude);
+  final String name;
+  final double latitude, longitude;
+}
+
+final _pinSuffix = RegExp(r' \[map:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\]$');
+MapCheckIn? parseMapCheckIn(String value) {
+  final match = _pinSuffix.firstMatch(value);
+  if (match == null) return null;
+  final lat = double.tryParse(match.group(1)!),
+      lon = double.tryParse(match.group(2)!);
+  if (lat == null ||
+      lon == null ||
+      !lat.isFinite ||
+      !lon.isFinite ||
+      lat.abs() > 90 ||
+      lon.abs() > 180) {
+    return null;
+  }
+  final name = value.substring(0, match.start).trim();
+  return MapCheckIn(name.isEmpty ? 'Vị trí đã chọn' : name, lat, lon);
+}
+
+String formatMapCheckIn(MapCheckIn pin) {
+  if (!pin.latitude.isFinite ||
+      !pin.longitude.isFinite ||
+      pin.latitude.abs() > 90 ||
+      pin.longitude.abs() > 180) {
+    return '';
+  }
+  final name = String.fromCharCodes(
+    pin.name.replaceAll(RegExp(r'[\r\n]+'), ' ').trim().runes.take(120),
+  );
+  return '${name.isEmpty ? 'Vị trí đã chọn' : name} [map:${pin.latitude.toStringAsFixed(6)},${pin.longitude.toStringAsFixed(6)}]';
+}
+
+String checkInDisplayName(String value) =>
+    parseMapCheckIn(value)?.name ?? value;
+String checkInMapQuery(String value) {
+  final pin = parseMapCheckIn(value);
+  return pin == null ? value : '${pin.latitude},${pin.longitude}';
+}
+
 String namedPostCheckIn(Map<String, dynamic> post) {
   final lines = (post['content']?.toString() ?? '')
       .replaceAll('\r\n', '\n')
@@ -158,9 +201,13 @@ String namedPostCheckIn(Map<String, dynamic> post) {
 String postContentWithoutLocation(Map<String, dynamic> post) {
   final content = post['content']?.toString() ?? '';
   // Preserve an explicitly entered extra check-in on a GPS-tagged public post.
-  if (namedPostCheckIn(post).isEmpty ||
-      (post['visibility'] == 'public' && post['publishLocation'] is Map)) {
-    return content;
+  final checkIn = namedPostCheckIn(post);
+  if (checkIn.isEmpty) return content;
+  if (post['visibility'] == 'public' && post['publishLocation'] is Map) {
+    return content.replaceFirst(
+      '📍 $checkIn',
+      '📍 ${checkInDisplayName(checkIn)}',
+    );
   }
   return content.replaceAll('\r\n', '\n').split('\n').skip(1).join('\n').trim();
 }
@@ -172,15 +219,18 @@ class PublicPostLocationLink extends StatelessWidget {
   Widget build(BuildContext context) {
     final location = post['publishLocation'];
     if (post['visibility'] != 'public' || location is! Map) {
-      final name = namedPostCheckIn(post);
+      final value = namedPostCheckIn(post);
+      final name = checkInDisplayName(value);
       if (name.isEmpty) return const SizedBox.shrink();
       return ActionChip(
         avatar: const Icon(Icons.location_on_outlined, size: 16),
-        tooltip: 'Mở bản đồ theo tên địa điểm',
+        tooltip: parseMapCheckIn(value) == null
+            ? 'Mở bản đồ theo tên địa điểm'
+            : 'Mở vị trí đã ghim trên bản đồ',
         onPressed: () => launchUrl(
           Uri.https('www.google.com', '/maps/search/', {
             'api': '1',
-            'query': name,
+            'query': checkInMapQuery(value),
           }),
         ),
         label: Text(
