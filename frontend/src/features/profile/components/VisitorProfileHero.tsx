@@ -48,8 +48,8 @@ export default function VisitorProfileHero({
   }, [friendMenuOpen])
 
   const displayName = userLabel(profile.displayName, profile.username)
-  return <ProfileHero displayName={displayName} username={profile.username}
-    friendCount={profile.friendCount}
+  return <ProfileHero displayName={displayName} username={profile.username} city={profile.city}
+    workplace={profile.workplace} school={profile.school} friendCount={profile.friendCount}
     coverUrl={profile.coverSet ? profileAssetUrl(profile.username, 'cover', profile.updatedAt) : undefined}
     avatar={<>
       <UserAvatar username={profile.username} name={displayName} className="profile-page-avatar profile-hero-avatar" online={online} />

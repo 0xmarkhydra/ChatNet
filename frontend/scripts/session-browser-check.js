@@ -17,10 +17,6 @@ async (page) => {
         contentType: 'text/event-stream',
         body: mode === 'signal-revoked' ? 'event: session-revoked\ndata: {}\n\n' : '',
       })
-      if (path === '/api/events/ticket') return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ ticket: 't'.repeat(43) }),
-      })
       if (path === '/api/auth/session/status') {
         if (mode === 'offline') return route.abort('internetdisconnected')
         return route.fulfill({ status: mode === 'revoked' ? 401 : 204 })
@@ -81,7 +77,7 @@ async (page) => {
     await p.screenshot({ path: 'output/playwright/session-recovered.png' })
     await p.reload()
     await nav.waitFor()
-    assert(await p.evaluate(() => JSON.parse(localStorage.getItem('chatnet-session')).refreshToken === undefined), 'Reload persisted refresh token')
+    assert(await p.evaluate(() => JSON.parse(localStorage.getItem('chatnet-session')).refreshToken === 'r'.repeat(43)), 'Reload lost refresh token')
 
     mode = 'revoked'
     await other.evaluate((session) => localStorage.setItem('chatnet-session', JSON.stringify(session)), initial)

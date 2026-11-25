@@ -116,12 +116,6 @@ type bearerTransport struct {
 	token string
 }
 
-var (
-	errCallNoLongerActive = errors.New("call is no longer active")
-	errCallPrivacyDenied  = errors.New("call privacy check denied join")
-	errCallBlocked        = errors.New("blocked participant cannot join call")
-)
-
 func (t bearerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	clone := req.Clone(req.Context())
 	clone.Header = req.Header.Clone()
@@ -131,10 +125,6 @@ func (t bearerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func main() {
 	ctx := context.Background()
-	jwtSecret, err := config.RequiredSecret("JWT_SECRET")
-	if err != nil {
-		log.Fatal(err)
-	}
 	db, err := database.Open(ctx, config.Env("DATABASE_URL", "postgres://chatnet:chatnet@localhost:5432/chatnet?sslmode=disable"))
 	if err != nil {
 		log.Fatal(err)
@@ -153,7 +143,7 @@ func main() {
 	s := &server{
 		db:               db,
 		redis:            rdb,
-		jwtSecret:        jwtSecret,
+		jwtSecret:        config.Env("JWT_SECRET", "dev-secret-change-me"),
 		liveKitURL:       strings.TrimSpace(config.Env("LIVEKIT_URL", "")),
 		liveKitAPIKey:    strings.TrimSpace(config.Env("LIVEKIT_API_KEY", "")),
 		liveKitAPISecret: strings.TrimSpace(config.Env("LIVEKIT_API_SECRET", "")),
@@ -167,10 +157,6 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
-	mux.HandleFunc("GET /live", func(w http.ResponseWriter, _ *http.Request) {
-		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "call"})
-	})
-	mux.HandleFunc("GET /ready", s.ready)
 	mux.Handle("POST /api/calls", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createCall)))
 	mux.Handle("GET /api/calls/current", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.currentCalls)))
 	mux.Handle("GET /api/calls/history", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.callHistory)))
@@ -213,35 +199,6 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (s *server) ready(w http.ResponseWriter, r *http.Request) {
-	dependencies := map[string]string{"database": "ok", "redis": "ok", "livekit": "ok"}
-	dbCtx, dbCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
-	defer dbCancel()
-	if s.db == nil || s.db.Ping(dbCtx) != nil {
-		dependencies["database"] = "unavailable"
-	}
-	redisCtx, redisCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
-	defer redisCancel()
-	if s.redis == nil || s.redis.Ping(redisCtx).Err() != nil {
-		dependencies["redis"] = "unavailable"
-	}
-	if !s.liveKitConfigured() {
-		dependencies["livekit"] = "missing_config"
-	}
-	ready := true
-	for _, status := range dependencies {
-		if status != "ok" {
-			ready = false
-			break
-		}
-	}
-	status, code := "ok", http.StatusOK
-	if !ready {
-		status, code = "not_ready", http.StatusServiceUnavailable
-	}
-	httpx.JSON(w, code, map[string]any{"status": status, "service": "call", "dependencies": dependencies})
-}
-
 // A direct call must never be created or resumed across a blocked pair.
 func (s *server) blockedPair(ctx context.Context, a, b int64) (bool, error) {
 	var blocked bool
@@ -264,7 +221,9 @@ func (s *server) createCall(w http.ResponseWriter, r *http.Request) {
 		ConversationID int64  `json:"conversationId"`
 		MediaType      string `json:"mediaType"`
 	}
-	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -567,22 +526,66 @@ func (s *server) joinCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	call, err = s.joinCallState(r.Context(), call, claims.UserID)
-	if errors.Is(err, errCallNoLongerActive) {
-		httpx.Error(w, http.StatusConflict, "call is no longer active")
+	// Serialize simultaneous joins to prevent blocked users joining the same
+	// LiveKit room even when different service instances handle the requests.
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
 		return
 	}
-	if errors.Is(err, errCallPrivacyDenied) {
+	defer tx.Rollback(r.Context())
+	if _, err := tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", call.ID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	var stillAllowed bool
+	err = tx.QueryRow(r.Context(), `SELECT EXISTS(
+		SELECT 1 FROM call_sessions cs
+		JOIN conversations c ON c.id=cs.conversation_id
+		JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=$2
+		WHERE cs.id=$1 AND cs.status IN ('ringing','active')
+		  AND (c.type<>'direct' OR NOT EXISTS(
+		    SELECT 1 FROM conversation_members other JOIN user_blocks b ON
+		      (b.blocker_id=$2 AND b.blocked_id=other.user_id) OR
+		      (b.blocked_id=$2 AND b.blocker_id=other.user_id)
+		    WHERE other.conversation_id=c.id AND other.user_id<>$2
+		  ))
+	)`, call.ID, claims.UserID).Scan(&stillAllowed)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	if !stillAllowed {
 		httpx.Error(w, http.StatusForbidden, "not allowed to join this call")
 		return
 	}
-	if errors.Is(err, errCallBlocked) {
+	var conflict bool
+	err = tx.QueryRow(r.Context(), `SELECT EXISTS(
+      SELECT 1 FROM call_participants cp JOIN user_blocks b ON
+        (b.blocker_id=$2 AND b.blocked_id=cp.user_id) OR
+        (b.blocked_id=$2 AND b.blocker_id=cp.user_id)
+      WHERE cp.call_id=$1 AND cp.user_id<>$2 AND cp.joined_at IS NOT NULL
+        AND cp.left_at IS NULL AND cp.declined_at IS NULL)`, call.ID, claims.UserID).Scan(&conflict)
+	if err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot verify call privacy")
+		return
+	}
+	if conflict {
 		httpx.Error(w, http.StatusForbidden, "blocked participants cannot join the same call")
 		return
 	}
-	if err != nil {
+	tag, err := tx.Exec(r.Context(), `
+        UPDATE call_participants SET joined_at=COALESCE(joined_at,NOW()),left_at=NULL
+        WHERE call_id=$1 AND user_id=$2 AND declined_at IS NULL`, call.ID, claims.UserID)
+	if err != nil || tag.RowsAffected() == 0 || tx.Commit(r.Context()) != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot join call")
 		return
+	}
+	if claims.UserID != call.CreatedBy {
+		_, _ = s.db.Exec(r.Context(), `
+			UPDATE call_sessions SET status='active',started_at=COALESCE(started_at,NOW())
+			WHERE id=$1 AND status='ringing'`, call.ID)
+		call.Status = "active"
 	}
 
 	identity := participantIdentity(claims.UserID)
@@ -604,87 +607,6 @@ func (s *server) joinCall(w http.ResponseWriter, r *http.Request) {
 		"e2eeRequired":        true,
 		"expiresInSeconds":    int(liveKitTokenTTL.Seconds()),
 	})
-}
-
-func (s *server) joinCallState(ctx context.Context, call callSession, userID int64) (callSession, error) {
-	// Lock session row so call end and join serialize before either state commits.
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return call, err
-	}
-	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", call.ID); err != nil {
-		return call, err
-	}
-	if err := tx.QueryRow(ctx, `
-		SELECT status,started_at,ended_at FROM call_sessions WHERE id=$1 FOR UPDATE`, call.ID).
-		Scan(&call.Status, &call.StartedAt, &call.EndedAt); err != nil {
-		return call, err
-	}
-	if call.Status != "ringing" && call.Status != "active" {
-		return call, errCallNoLongerActive
-	}
-
-	var stillAllowed bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(
-		SELECT 1 FROM call_sessions cs
-		JOIN conversations c ON c.id=cs.conversation_id
-		JOIN conversation_members cm ON cm.conversation_id=cs.conversation_id AND cm.user_id=$2
-		WHERE cs.id=$1 AND cs.status IN ('ringing','active')
-		  AND (c.type<>'direct' OR NOT EXISTS(
-		    SELECT 1 FROM conversation_members other JOIN user_blocks b ON
-		      (b.blocker_id=$2 AND b.blocked_id=other.user_id) OR
-		      (b.blocked_id=$2 AND b.blocker_id=other.user_id)
-		    WHERE other.conversation_id=c.id AND other.user_id<>$2
-		  ))
-	)`, call.ID, userID).Scan(&stillAllowed); err != nil {
-		return call, err
-	}
-	if !stillAllowed {
-		return call, errCallPrivacyDenied
-	}
-
-	var conflict bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(
-      SELECT 1 FROM call_participants cp JOIN user_blocks b ON
-        (b.blocker_id=$2 AND b.blocked_id=cp.user_id) OR
-        (b.blocked_id=$2 AND b.blocker_id=cp.user_id)
-      WHERE cp.call_id=$1 AND cp.user_id<>$2 AND cp.joined_at IS NOT NULL
-        AND cp.left_at IS NULL AND cp.declined_at IS NULL)`, call.ID, userID).Scan(&conflict); err != nil {
-		return call, err
-	}
-	if conflict {
-		return call, errCallBlocked
-	}
-
-	tag, err := tx.Exec(ctx, `
-        UPDATE call_participants SET joined_at=COALESCE(joined_at,NOW()),left_at=NULL
-        WHERE call_id=$1 AND user_id=$2 AND declined_at IS NULL`, call.ID, userID)
-	if err != nil {
-		return call, err
-	}
-	if tag.RowsAffected() == 0 {
-		return call, errors.New("call participant not found")
-	}
-	if userID != call.CreatedBy && call.Status == "ringing" {
-		tag, err = tx.Exec(ctx, `
-			UPDATE call_sessions SET status='active',started_at=COALESCE(started_at,NOW())
-			WHERE id=$1 AND status='ringing'`, call.ID)
-		if err != nil {
-			return call, err
-		}
-		if tag.RowsAffected() != 1 {
-			return call, errCallNoLongerActive
-		}
-		call.Status = "active"
-		if err := tx.QueryRow(ctx, `SELECT started_at FROM call_sessions WHERE id=$1`, call.ID).Scan(&call.StartedAt); err != nil {
-			return call, err
-		}
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return call, err
-	}
-	return call, nil
 }
 
 func (s *server) declineCall(w http.ResponseWriter, r *http.Request) {
@@ -891,7 +813,9 @@ func (s *server) putPublicKey(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		PublicKey publicJWK `json:"publicKey"`
 	}
-	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil || !validP256PublicJWK(body.PublicKey) {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || !validP256PublicJWK(body.PublicKey) {
 		httpx.Error(w, http.StatusBadRequest, "invalid P-256 public key")
 		return
 	}
@@ -960,7 +884,9 @@ func (s *server) putEnvelope(w http.ResponseWriter, r *http.Request) {
 		IV              string `json:"iv"`
 		Ciphertext      string `json:"ciphertext"`
 	}
-	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil || body.RecipientUserID <= 0 || !validGeneration(body.Generation) || !validEnvelope(body.IV, body.Ciphertext) {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || body.RecipientUserID <= 0 || !validGeneration(body.Generation) || !validEnvelope(body.IV, body.Ciphertext) {
 		httpx.Error(w, http.StatusBadRequest, "invalid encrypted key envelope")
 		return
 	}

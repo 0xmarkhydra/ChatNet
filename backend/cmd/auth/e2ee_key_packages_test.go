@@ -126,19 +126,6 @@ func TestE2EEClaimValidationAndFeatureFlag(t *testing.T) {
 	}
 }
 
-func TestE2EEKeyPackageEndpointsDisabledWhenAutoDefaultEnabled(t *testing.T) {
-	t.Setenv("CHATNET_E2EE_EXPERIMENTAL", "1")
-	t.Setenv("CHATNET_E2EE_AUTO_DEFAULT", "1")
-	s := &server{}
-	for _, handler := range []http.HandlerFunc{s.publishE2EEKeyPackage, s.claimE2EEKeyPackage} {
-		w := httptest.NewRecorder()
-		handler(w, httptest.NewRequest(http.MethodPost, "/", strings.NewReader("{}")))
-		if w.Code != http.StatusNotFound {
-			t.Fatalf("KeyPackage endpoint available in auto mode: %d", w.Code)
-		}
-	}
-}
-
 func TestE2EEKeyPackageExchangeIntegration(t *testing.T) {
 	dbURL, redisAddr := os.Getenv("CHATNET_TEST_DATABASE_URL"), os.Getenv("CHATNET_TEST_REDIS_ADDR")
 	if dbURL == "" || redisAddr == "" {

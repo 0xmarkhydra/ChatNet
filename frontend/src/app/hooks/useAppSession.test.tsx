@@ -15,18 +15,6 @@ vi.mock('../../features/auth/hooks/useAuthFlow', () => ({
 }))
 vi.mock('../../features/auth/lib/session', () => ({
   loadSession: () => storageSession.value,
-  persistSession: (next: Session) => {
-    try {
-      const stored = { ...next }
-      delete stored.refreshToken
-      localStorage.setItem('chatnet-session', JSON.stringify(stored))
-    } catch {
-      try { localStorage.removeItem('chatnet-session') } catch { /* storage unavailable */ }
-    }
-  },
-  clearPersistedSession: () => {
-    try { localStorage.removeItem('chatnet-session') } catch { /* storage unavailable */ }
-  },
   createSessionClient: () => ({ request: vi.fn(), refresh: vi.fn() }),
 }))
 vi.mock('../../features/chat/lib/chatPersistence', () => ({ clearChatPersistence: vi.fn() }))
@@ -138,66 +126,17 @@ describe('async logout notifications belong to the logout visit', () => {
     }
   })
 
-  it('does not copy refresh credentials into app memory after storage synchronization', () => {
+  it('retains account-scoped data for a token refresh in another tab', () => {
     vi.stubGlobal('localStorage', { setItem: vi.fn(), removeItem: vi.fn(), getItem: vi.fn() })
     const hook = mountSession()
     const accountA = session('A')
     try {
       act(() => hook.current.saveSession(accountA))
-      storageSession.value = { ...accountA, token: 'new-access-token', refreshToken: undefined }
+      storageSession.value = { ...accountA, token: 'new-access-token' }
       act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'chatnet-session' })))
       expect(clearChatPersistence).not.toHaveBeenCalled()
       expect(clearChatOutbox).not.toHaveBeenCalled()
       expect(hook.current.session?.token).toBe('new-access-token')
-      expect(hook.current.session?.refreshToken).toBeUndefined()
-    } finally {
-      hook.close()
-    }
-  })
-
-  it('does not retain refresh credentials in memory when browser storage fails', () => {
-    vi.stubGlobal('localStorage', {
-      setItem: vi.fn(() => { throw new Error('storage denied') }),
-      removeItem: vi.fn(),
-      getItem: vi.fn(),
-    })
-    const hook = mountSession()
-    try {
-      act(() => hook.current.saveSession(session('A')))
-      expect(hook.current.session).toEqual({ ...session('A'), refreshToken: undefined })
-      expect(hook.current.session?.refreshToken).toBeUndefined()
-    } finally {
-      hook.close()
-    }
-  })
-
-  it('persists access session without refresh credentials', () => {
-    const setItem = vi.fn()
-    vi.stubGlobal('localStorage', { setItem, removeItem: vi.fn(), getItem: vi.fn() })
-    const hook = mountSession()
-    try {
-      act(() => hook.current.saveSession(session('A')))
-      expect(JSON.parse(setItem.mock.calls[0][1])).toEqual({
-        token: 'token-A',
-        sessionId: 'session-A',
-        user: session('A').user,
-      })
-    } finally {
-      hook.close()
-    }
-  })
-
-  it('logs out when browser storage removal fails', () => {
-    vi.stubGlobal('localStorage', {
-      setItem: vi.fn(),
-      removeItem: vi.fn(() => { throw new Error('storage denied') }),
-      getItem: vi.fn(),
-    })
-    const hook = mountSession()
-    try {
-      act(() => hook.current.saveSession(session('A')))
-      act(() => hook.current.endSession(false))
-      expect(hook.current.session).toBeNull()
     } finally {
       hook.close()
     }

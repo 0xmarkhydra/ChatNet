@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
-import 'discover_location.dart';
 import 'nearby_places.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -60,6 +60,40 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   double? longitude;
   String error = '';
 
+  Future<({double latitude, double longitude})> _position() async {
+    if (widget.api.isDemo) {
+      return (latitude: 10.7769, longitude: 106.7009);
+    }
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw const ApiError(
+        'Dịch vụ vị trí đang tắt. Bật GPS để khám phá quanh đây.',
+      );
+    }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw const ApiError('Cần quyền vị trí để khám phá quanh đây.');
+    }
+    final value = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 15),
+      ),
+    );
+    if (!value.latitude.isFinite ||
+        !value.longitude.isFinite ||
+        value.latitude.abs() > 85.05112878 ||
+        value.longitude.abs() > 180) {
+      throw const ApiError(
+        'Tọa độ thiết bị không hợp lệ. Kiểm tra vị trí giả lập.',
+      );
+    }
+    return (latitude: value.latitude, longitude: value.longitude);
+  }
+
   Future<void> _loadRelationships() async {
     try {
       final responses = await Future.wait([
@@ -103,7 +137,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       error = '';
     });
     try {
-      final position = await resolveDiscoverPosition(isDemo: widget.api.isDemo);
+      final position = await _position();
       if (!mounted || revision != _peopleRevision) return;
       final result = object(
         await widget.api.request('POST', '/api/users/nearby', {
@@ -173,9 +207,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
     try {
       if (locate || latitude == null || longitude == null) {
-        final position = await resolveDiscoverPosition(
-          isDemo: widget.api.isDemo,
-        );
+        final position = await _position();
         if (!mounted || revision != _placesRevision) return;
         latitude = position.latitude;
         longitude = position.longitude;

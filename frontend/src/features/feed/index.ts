@@ -1,7 +1,6 @@
 export type { Post, Story } from './types'
 export type { PostMentionNotification } from './utils/postMentionNotifications'
-export { POST_FEELINGS } from './utils/feelings'
-export { getSharedPostPreview, SharedPostPreviewError, type SharedPostPreview } from './api/posts'
+export { getSharedPostPreview, type SharedPostPreview } from './api/posts'
 export { default as FeedPostCard } from './components/FeedPostCard'
 export { usePostSearch } from './hooks/usePostSearch'
 export { default as StoryHighlights } from './components/StoryHighlights'

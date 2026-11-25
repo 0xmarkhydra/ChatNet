@@ -1,16 +1,6 @@
 /** The same permalink is used by the router and by links shared outside the app. */
-export type FeedPostLinkParams = {
-  ref?: 'share';
-  source?: 'chat';
-};
-
-export function feedPostPath(id: number, params?: FeedPostLinkParams): string {
-  const path = `/feed/posts/${id}`;
-  const query = new URLSearchParams();
-  if (params?.ref === 'share') query.set('ref', 'share');
-  if (params?.source === 'chat') query.set('source', 'chat');
-  const search = query.toString();
-  return search ? `${path}?${search}` : path;
+export function feedPostPath(id: number): string {
+  return `/feed/posts/${id}`;
 }
 
 export function feedPostIdFromPath(pathname: string): number | null {

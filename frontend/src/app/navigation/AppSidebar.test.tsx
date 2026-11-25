@@ -38,10 +38,7 @@ function renderSidebar(tab: Tab, settingsActive = false, feedSaved = false, scre
     />,
   ));
   const button = (label: string) => {
-    const found = Array.from(element.querySelectorAll("button")).find((node) => {
-      const ariaLabel = node.getAttribute("aria-label");
-      return ariaLabel === label || ariaLabel?.startsWith(`${label}, `);
-    });
+    const found = Array.from(element.querySelectorAll("button")).find((node) => node.getAttribute("aria-label") === label);
     if (!found) throw new Error(`Missing sidebar button: ${label}`);
     return found;
   };

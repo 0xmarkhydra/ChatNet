@@ -50,17 +50,6 @@ type mlsRelayEvent struct {
 }
 
 func mlsRelayEnabled(w http.ResponseWriter) bool {
-	if !mlsRelayFeatureEnabled(w) {
-		return false
-	}
-	if mlsAutoDefaultEnabled() {
-		httpx.Error(w, http.StatusNotFound, "not found")
-		return false
-	}
-	return true
-}
-
-func mlsRelayFeatureEnabled(w http.ResponseWriter) bool {
 	w.Header().Set("Cache-Control", "no-store")
 	if config.Env("CHATNET_E2EE_EXPERIMENTAL", "") != "1" {
 		httpx.Error(w, http.StatusNotFound, "not found")
@@ -209,7 +198,7 @@ func (s *server) getMLSConversationStatus(w http.ResponseWriter, r *http.Request
 }
 
 func (s *server) publishMLSEvent(w http.ResponseWriter, r *http.Request) {
-	if !mlsRelayFeatureEnabled(w) {
+	if !mlsRelayEnabled(w) {
 		return
 	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
@@ -278,35 +267,20 @@ func (s *server) publishMLSEvent(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusForbidden, "invalid device signature")
 		return
 	}
+	// Serialize event epochs and all retries against this single group row.
+	if _, err = tx.Exec(r.Context(), `
+		INSERT INTO e2ee_mls_groups(conversation_id) VALUES($1)
+		ON CONFLICT DO NOTHING
+	`, conversationID); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "cannot initialize MLS relay")
+		return
+	}
 	var currentEpoch int64
-	if mlsAutoDefaultEnabled() {
-		// Auto-default may continue established manual MLS rooms, never initialize one.
-		err = tx.QueryRow(r.Context(), `
-			SELECT epoch FROM e2ee_mls_groups WHERE conversation_id=$1 FOR UPDATE
-		`, conversationID).Scan(&currentEpoch)
-		if errors.Is(err, pgx.ErrNoRows) || (err == nil && currentEpoch < 1) {
-			httpx.Error(w, http.StatusNotFound, "not found")
-			return
-		}
-		if err != nil {
-			httpx.Error(w, http.StatusServiceUnavailable, "MLS relay unavailable")
-			return
-		}
-	} else {
-		// Serialize event epochs and all retries against this single group row.
-		if _, err = tx.Exec(r.Context(), `
-			INSERT INTO e2ee_mls_groups(conversation_id) VALUES($1)
-			ON CONFLICT DO NOTHING
-		`, conversationID); err != nil {
-			httpx.Error(w, http.StatusServiceUnavailable, "cannot initialize MLS relay")
-			return
-		}
-		if err = tx.QueryRow(r.Context(), `
-			SELECT epoch FROM e2ee_mls_groups WHERE conversation_id=$1 FOR UPDATE
-		`, conversationID).Scan(&currentEpoch); err != nil {
-			httpx.Error(w, http.StatusServiceUnavailable, "MLS relay unavailable")
-			return
-		}
+	if err = tx.QueryRow(r.Context(), `
+		SELECT epoch FROM e2ee_mls_groups WHERE conversation_id=$1 FOR UPDATE
+	`, conversationID).Scan(&currentEpoch); err != nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "MLS relay unavailable")
+		return
 	}
 
 	// Idempotency comes before epoch checks because a successful Commit changes
@@ -398,7 +372,7 @@ func (s *server) publishMLSEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) listMLSEvents(w http.ResponseWriter, r *http.Request) {
-	if !mlsRelayFeatureEnabled(w) {
+	if !mlsRelayEnabled(w) {
 		return
 	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
@@ -459,10 +433,6 @@ func (s *server) listMLSEvents(w http.ResponseWriter, r *http.Request) {
 		currentEpoch = 0
 	} else if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, "cannot load MLS epoch")
-		return
-	}
-	if mlsAutoDefaultEnabled() && currentEpoch == 0 {
-		httpx.Error(w, http.StatusNotFound, "not found")
 		return
 	}
 	rows, err := s.db.Query(r.Context(), `

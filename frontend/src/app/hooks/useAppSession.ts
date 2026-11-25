@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuthFlow } from "../../features/auth/hooks/useAuthFlow";
-import {
-  clearPersistedSession,
-  createSessionClient,
-  loadSession,
-  persistSession,
-  type Session,
-} from "../../features/auth/lib/session";
+import { createSessionClient, loadSession, type Session } from "../../features/auth/lib/session";
 import { clearChatPersistence } from "../../features/chat/lib/chatPersistence";
 import { clearChatOutbox } from "../../features/chat/lib/chatOutbox";
 import { desktopBridge, isDesktopBuild } from "../../platform/desktop";
@@ -39,10 +33,9 @@ export function useAppSession(initialSession?: Session | null) {
     if (isDesktopBuild) {
       if (next.refreshToken !== undefined)
         throw new Error("Desktop credential boundary violation");
-      clearPersistedSession();
+      localStorage.removeItem("chatnet-session");
     } else {
-      next = { ...next, refreshToken: undefined };
-      persistSession(next);
+      localStorage.setItem("chatnet-session", JSON.stringify(next));
     }
     sessionEpoch.current += 1;
     sessionRef.current = next;
@@ -78,12 +71,11 @@ export function useAppSession(initialSession?: Session | null) {
             "error",
           ),
         );
-    } else if (revoke && current) {
+    } else if (revoke && current?.refreshToken) {
       void fetch(`${API}/api/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-        credentials: "include",
+        body: JSON.stringify({ refreshToken: current.refreshToken }),
         keepalive: true,
       })
         .then((response) => {
@@ -100,7 +92,7 @@ export function useAppSession(initialSession?: Session | null) {
       clearChatPersistence(current.user.id);
       clearChatOutbox(current.user.id);
     }
-    if (clearStorage) clearPersistedSession();
+    if (clearStorage) localStorage.removeItem("chatnet-session");
     sessionRef.current = null;
     auth.resetRegistration();
     auth.setAuthMode("login");
@@ -120,9 +112,8 @@ export function useAppSession(initialSession?: Session | null) {
     }
     const sync = (event: StorageEvent) => {
       if (event.key !== "chatnet-session" && event.key !== null) return;
+      const next = loadSession();
       const previous = sessionRef.current;
-      const stored = loadSession();
-      const next = stored;
       // A session identifier alone is not an account boundary: storage can
       // change to a different user while retaining the same session ID.
       if (previous?.sessionId !== next?.sessionId || previous?.user.id !== next?.user.id)

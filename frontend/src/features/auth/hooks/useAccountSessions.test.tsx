@@ -11,16 +11,13 @@ describe('account session request ordering', () => {
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     const originalConfirm = window.confirm
     window.confirm = vi.fn(() => true)
-    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>(resolve => {
+    const fetchMock = vi.fn(() => new Promise<Response>(resolve => {
       resolveFetch = resolve
     }))
     const originalFetch = globalThis.fetch
     globalThis.fetch = fetchMock as typeof fetch
     let resolveFetch: ((response: Response) => void) | undefined
-    const sessionRef = { current: {
-      sessionId: 'A', token: 'access',
-      user: { id: 1, email: 'a@test.invalid', username: 'a', displayName: 'A' },
-    } as Session }
+    const sessionRef = { current: { sessionId: 'A', refreshToken: 'test' } as Session }
     const host = document.createElement('div')
     document.body.append(host)
     const root = createRoot(host)
@@ -45,7 +42,6 @@ describe('account session request ordering', () => {
         await revoke?.()
       })
       expect(fetchMock).toHaveBeenCalledTimes(1)
-      expect(fetchMock.mock.calls[0][1]).toMatchObject({ credentials: 'include', body: '{}' })
       await act(async () => { resolveFetch?.(new Response('{}')); await first })
       await act(async () => { void revoke?.() })
       expect(fetchMock).toHaveBeenCalledTimes(2)

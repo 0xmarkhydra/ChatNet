@@ -45,7 +45,6 @@ describe('VisitorProfile session isolation', () => {
     } as const
     try {
       await act(async () => root.render(<VisitorProfile {...props} username="alice" />))
-      expect(element.querySelector('[role="status"]')?.textContent).toBe('Đang tải hồ sơ…')
       await act(async () => profilePending.get('alice')?.(new Response(JSON.stringify({ id: 1, username: 'alice' }))))
       expect(element.textContent).toContain('Hồ sơ @alice')
       await act(async () => root.render(<VisitorProfile {...props} username="bob" />))
@@ -57,33 +56,6 @@ describe('VisitorProfile session isolation', () => {
       await act(async () => root.unmount())
       element.remove()
       globalAct.IS_REACT_ACT_ENVIRONMENT = previousAct
-      vi.clearAllMocks()
-    }
-  })
-})
-describe('VisitorProfile unavailable state', () => {
-  it('shows an unavailable message and retry after a 404', async () => {
-    const environment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-    const previous = environment.IS_REACT_ACT_ENVIRONMENT
-    environment.IS_REACT_ACT_ENVIRONMENT = true
-    const element = document.createElement('div')
-    document.body.append(element)
-    const root = createRoot(element)
-    vi.mocked(loadVisitorProfile).mockResolvedValue(new Response('', { status: 404 }))
-    try {
-      await act(async () => root.render(<VisitorProfile
-        username="alice" request={async () => new Response('[]')} currentUser="me" token="session"
-        targetLanguage="vi" relationship={() => 'none'} friendBusy={null} onFriend={async () => {}}
-        onRemoveFriend={async () => {}} onMessage={async () => {}} onClose={() => {}}
-        onPostOpen={() => {}} onReactionUsers={() => {}} onUpdated={() => {}} updates={[]}
-        onDeleted={() => {}} feedback={() => {}}
-      />))
-      expect(element.querySelector('[role="alert"]')?.textContent).toContain('Không tìm thấy hồ sơ hoặc bạn không thể xem tài khoản này.')
-      expect([...element.querySelectorAll('button')].some(button => button.textContent === 'Thử lại')).toBe(true)
-    } finally {
-      await act(async () => root.unmount())
-      element.remove()
-      environment.IS_REACT_ACT_ENVIRONMENT = previous
       vi.clearAllMocks()
     }
   })
@@ -123,7 +95,7 @@ describe('VisitorProfile data-driven sections', () => {
       expect(element.querySelector('[aria-label="Tùy chọn trang cá nhân"]')).toBeNull()
 
       vi.mocked(loadVisitorProfile).mockResolvedValue(new Response(JSON.stringify({
-        id: 1, username: 'alice', displayName: 'Alice', bio: 'Bio only for owner', city: 'City only for owner', allowFriendRequests: true,
+        id: 1, username: 'alice', displayName: 'Alice', city: 'Hà Nội', allowFriendRequests: true,
         avatarSet: false, coverSet: false, updatedAt: '2026-01-01',
       })))
       vi.mocked(loadVisitorPosts).mockResolvedValue(new Response(JSON.stringify([{
@@ -135,9 +107,7 @@ describe('VisitorProfile data-driven sections', () => {
       }])))
       await act(async () => root.render(<VisitorProfile {...props} token="new-session" />))
       expect(element.textContent).toContain('Ảnh & video')
-      expect(element.textContent).not.toContain('Bio only for owner')
-      expect(element.textContent).not.toContain('City only for owner')
-      expect(element.textContent).not.toContain('Giới thiệu')
+      expect(element.textContent).toContain('Giới thiệu')
       const tab = [...element.querySelectorAll('button')].find(button => button.textContent === 'Ảnh & video')
       await act(async () => tab?.click())
       expect(element.querySelector('.visitor-media-grid img')?.getAttribute('src')).toBe('/media/real.jpg')

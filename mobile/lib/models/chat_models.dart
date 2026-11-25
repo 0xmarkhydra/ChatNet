@@ -22,9 +22,6 @@ class Conversation {
     this.otherUserId,
     this.otherUsername,
     this.lastMessageAt,
-    this.avatarUrl,
-    this.avatarMembers = const [],
-    this.muted,
   });
 
   final int id;
@@ -44,9 +41,6 @@ class Conversation {
   final int? otherUserId;
   final String? otherUsername;
   final String? lastMessageAt;
-  final String? avatarUrl;
-  final List<String> avatarMembers;
-  final bool? muted;
 
   factory Conversation.fromJson(JsonMap json) => Conversation(
     id: requiredField<int>(json, 'id'),
@@ -69,13 +63,6 @@ class Conversation {
     otherUserId: optionalField<int>(json, 'otherUserId'),
     otherUsername: optionalField<String>(json, 'otherUsername'),
     lastMessageAt: optionalField<String>(json, 'lastMessageAt'),
-    avatarUrl: optionalField<String>(json, 'avatarUrl'),
-    avatarMembers: List<String>.unmodifiable(
-      (optionalField<List<dynamic>>(json, 'avatarMembers') ?? const []).map(
-        (value) => value as String,
-      ),
-    ),
-    muted: optionalField<bool>(json, 'muted'),
   );
 
   Conversation copyWith({
@@ -94,9 +81,6 @@ class Conversation {
     Object? otherUserId = absent,
     Object? otherUsername = absent,
     Object? lastMessageAt = absent,
-    Object? avatarUrl = absent,
-    List<String>? avatarMembers,
-    Object? muted = absent,
   }) => Conversation(
     id: id ?? this.id,
     type: type ?? this.type,
@@ -125,11 +109,6 @@ class Conversation {
     lastMessageAt: identical(lastMessageAt, absent)
         ? this.lastMessageAt
         : lastMessageAt as String?,
-    avatarUrl: identical(avatarUrl, absent)
-        ? this.avatarUrl
-        : avatarUrl as String?,
-    avatarMembers: avatarMembers ?? this.avatarMembers,
-    muted: identical(muted, absent) ? this.muted : muted as bool?,
   );
 
   JsonMap toJson() => {
@@ -148,9 +127,6 @@ class Conversation {
     if (otherUserId != null) 'otherUserId': otherUserId,
     if (otherUsername != null) 'otherUsername': otherUsername,
     if (lastMessageAt != null) 'lastMessageAt': lastMessageAt,
-    if (avatarUrl != null) 'avatarUrl': avatarUrl,
-    if (avatarMembers.isNotEmpty) 'avatarMembers': avatarMembers,
-    if (muted != null) 'muted': muted,
   };
 }
 

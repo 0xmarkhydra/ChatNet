@@ -45,7 +45,7 @@ import type { GroupActivity } from "./GroupActivities";
 import type { GroupActivityEvent } from "./GroupActivities";
 import type { LanguageOption } from "../../i18n";
 import type { Dispatch, RefObject, ReactNode } from "react";
-import { getChannelAvatarCapability, getGroupAvatarCapability, saveChannelAvatar, saveGroupAvatar } from "../api/avatar";
+import { getGroupAvatarCapability, saveGroupAvatar } from "../api/avatar";
 import "../styles/chat-frame-unified.css";
 import "../styles/mobile-chat-navigation.css";
 import ConversationList from "./ConversationList";
@@ -533,7 +533,7 @@ export default function ChatSection({
     setGroupPhotoBusy(true);
     try {
       const capabilityResponse = channelId
-        ? await getChannelAvatarCapability(apiFetch, groupId, channelId)
+        ? await apiFetch(`/api/conversations/${groupId}/channels/${channelId}/avatar`, { cache: 'no-store' })
         : await getGroupAvatarCapability(apiFetch, groupId);
       const capability = await capabilityResponse.json().catch(() => null) as
         { canUpdateAvatar?: boolean; error?: string } | null;
@@ -547,7 +547,10 @@ export default function ChatSection({
       const [attachment] = file ? await uploadMediaFiles([file], 'profile') : [null];
       if (file && !attachment) throw new Error('Không tải được ảnh.');
       const response = channelId
-        ? await saveChannelAvatar(apiFetch, groupId, channelId, attachment ? attachmentRequestBody(attachment) : null)
+        ? await apiFetch(`/api/conversations/${groupId}/channels/${channelId}/avatar`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attachment: attachment ? attachmentRequestBody(attachment) : null }),
+          })
         : await saveGroupAvatar(apiFetch, groupId, attachment ? attachmentRequestBody(attachment) : null);
       const data = await response.json().catch(() => null) as
         { conversationId?: number; avatarUrl?: string; avatarSet?: boolean; error?: string } | null;

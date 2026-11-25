@@ -36,11 +36,7 @@ const stepCls = 'size-9 cursor-pointer rounded-full border-0 bg-white text-ui-se
 const primaryCls = 'min-h-control-touch w-full cursor-pointer rounded-ui-md border-0 bg-primary px-4.5 font-semibold text-white hover:bg-primary/90'
 const chipCls = (active: boolean) => cn('min-h-control-sm flex-none cursor-pointer rounded-full border px-3.5 text-ui-label font-semibold', active ? 'border-primary bg-secondary text-primary' : 'border-border bg-card text-foreground')
 
-export default function Marketplace(props: Props) {
-  return <MarketplaceSession key={props.userId} {...props} />
-}
-
-function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
+export default function Marketplace({ userId, searchQuery = '', request, }: Props) {
   const apiRef = useLatest(request)
   const revision = useRef(0)
   const readRevision = useRef(0)
@@ -258,7 +254,7 @@ function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
         </div>}
       </aside>
       <div className="min-w-0 flex-[999_1_560px] pb-7 sm:pb-10">
-        {(view === 'cart' || view === 'orders') && <p role="note" className="marketplace-warning mb-3.5 flex items-start gap-2 rounded-ui-lg border border-warning/25 bg-warning/10 px-3.5 py-3 text-ui-label text-warning"><Info size={15} aria-hidden="true" className="mt-0.5 flex-none"/>Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>}
+        <p role="note" className="mb-3.5 flex items-start gap-2 rounded-ui-lg border border-orange-200 bg-orange-50 px-3.5 py-3 text-ui-label text-orange-800"><Info size={15} aria-hidden="true" className="mt-0.5 flex-none"/>Chưa cấu hình phương thức thanh toán. Không thu tiền hoặc đặt đơn thật; chức năng đơn hiện dùng để kiểm thử.</p>
 
         {loading && <p role="status" aria-busy="true" className={noticeCls + ' bg-secondary text-primary'}>Đang tải dữ liệu chợ…</p>}
         {refreshing && <p role="status" aria-live="polite" aria-busy="true" className={noticeCls + ' bg-secondary text-primary'}>Đang cập nhật dữ liệu chợ…</p>}

@@ -4,8 +4,7 @@ services:
     environment:
       POSTGRES_DB: chatnet
       POSTGRES_USER: chatnet
-      # Use URL-safe hex; the same value is embedded in DATABASE_URL.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_PASSWORD: chatnet
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,13 +30,10 @@ services:
       dockerfile: Dockerfile.backend
     environment:
       PORT: "8080"
-      CHATNET_ENV: ${CHATNET_ENV:-production}
-      DATABASE_URL: postgres://chatnet:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/chatnet?sslmode=disable
+      DATABASE_URL: postgres://chatnet:chatnet@postgres:5432/chatnet?sslmode=disable
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
-      OTP_PEPPER: ${OTP_PEPPER:?OTP_PEPPER must be set}
-      # Keep these entries when adding CIDRs for an upstream ingress proxy.
-      CHATNET_TRUSTED_PROXY_CIDRS: "${CHATNET_TRUSTED_PROXY_CIDRS:-127.0.0.1/32,172.29.0.10/32}"
+      JWT_SECRET: ${JWT_SECRET:-chatnet-demo-secret}
+      OTP_PEPPER: ${OTP_PEPPER:-chatnet-demo-otp-pepper}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_API_BASE_URL: ${RESEND_API_BASE_URL:-https://api.resend.com}
       CHATNET_EMAIL_FROM: ${CHATNET_EMAIL_FROM:-}
@@ -57,7 +53,7 @@ services:
       ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID:-}
       ONESIGNAL_REST_API_KEY: ${ONESIGNAL_REST_API_KEY:-}
       CHATNET_WEB_URL: ${CHATNET_WEB_URL:-https://chat.codelocal.cloud}
-      MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:?MEDIA_PUBLIC_ORIGIN must be set}
+      MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:-http://localhost:8080}
       LIVEKIT_URL: ${LIVEKIT_URL:-}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
@@ -66,11 +62,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/api/ready >/dev/null"]
-      interval: 3s
-      timeout: 3s
-      retries: 20
 
   frontend:
     build:
@@ -88,16 +79,7 @@ services:
       - "8080:8080"
     depends_on:
       - backend
-    networks:
-      default:
-        ipv4_address: 172.29.0.10
 
 volumes:
   postgres_data:
   redis_data:
-
-networks:
-  default:
-    ipam:
-      config:
-        - subnet: 172.29.0.0/24

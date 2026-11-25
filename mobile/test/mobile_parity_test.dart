@@ -237,11 +237,7 @@ void main() {
     for (var index = 0; index < 35; index++) {
       api.rooms.add({
         'id': 1000 + index,
-        'createdAt': '2025-01-01T10:00:00+07:00',
         'type': 'direct',
-        'memberCount': 2,
-        'lastMessage': '',
-        'online': false,
         'name': 'Người dùng $index',
         'unreadCount': 0,
         'lastMessageAt': '2026-01-15T08:00:00+07:00',
@@ -249,13 +245,10 @@ void main() {
     }
     api.rooms.add({
       'id': 999,
-      'createdAt': '2024-12-01T10:00:00+07:00',
       'type': 'group',
       'name': 'Nhóm thảo luận cũ',
       'memberCount': 4,
       'unreadCount': 0,
-      'lastMessage': '',
-      'online': false,
       'lastMessageAt': '2025-01-01T10:00:00+07:00',
     });
     api.messages[999] = [];

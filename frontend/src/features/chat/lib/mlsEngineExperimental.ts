@@ -3,10 +3,10 @@
 // Never wire to the live composer until device-key attestation, MLS state
 // persistence, membership commits, migration and recovery have passed review.
 import {
-  createApplicationMessage, createCommit, createGroup, decodeMlsMessage,
+  acceptAll, createApplicationMessage, createCommit, createGroup, decodeMlsMessage,
   defaultCapabilities, defaultLifetime, emptyPskIndex, encodeMlsMessage,
   generateKeyPackage, getCiphersuiteFromName, getCiphersuiteImpl, joinGroup,
-  processPrivateMessage, zeroOutUint8Array,
+  processMessage, processPrivateMessage, zeroOutUint8Array,
   type ClientState, type CiphersuiteImpl, type PrivateKeyPackage, type KeyPackage,
 } from 'ts-mls'
 import { defaultClientConfig } from 'ts-mls/clientConfig.js'
@@ -311,4 +311,20 @@ export async function receiveExperimentalMLSMessage(
     next: { ...session, state: result.newState },
     plaintext: result.message,
   }
+}
+
+export async function applyExperimentalMLSCommit(
+  session: ExperimentalMLSSession,
+  commit: Uint8Array,
+): Promise<ExperimentalMLSSession> {
+  const wire = decodeFull(commit)
+  if (wire.wireformat !== 'mls_private_message' && wire.wireformat !== 'mls_public_message') {
+    throw new Error('Expected MLS Commit')
+  }
+  // acceptAll accepts proposals for the POC only. Group-policy authorization
+  // and app-level membership validation MUST replace it before production.
+  const result = await processMessage(wire, session.state, emptyPskIndex, acceptAll, session.suite)
+  if (result.kind !== 'newState') throw new Error('Expected MLS handshake')
+  result.consumed.forEach(zeroOutUint8Array)
+  return { ...session, state: result.newState }
 }

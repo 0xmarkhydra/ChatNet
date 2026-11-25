@@ -42,5 +42,5 @@ describe('architecture baseline integrity', () => {
       /^(api-ownership|chat-root|dependency-cycle|feature-entrypoint|reverse-import): /.test(line),
     ))
     expect(baseline.violations.filter(value => !current.has(value))).toEqual([])
-  }, 30_000)
+  })
 })

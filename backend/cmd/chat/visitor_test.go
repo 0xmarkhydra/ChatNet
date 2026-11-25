@@ -53,7 +53,7 @@ func TestVisitorProfileIntegration(t *testing.T) {
 			t.Fatalf("profile update: %d: %s", rec.Code, rec.Body.String())
 		}
 	}
-	update(`,"bio":"  Yêu công nghệ 🌿  ","city":"  Hòa Bình  ","workplace":"  Đội sản phẩm ","school":" Trường Công nghệ "`, 200)
+	update(`,"city":"  Hòa Bình  ","workplace":"  Đội sản phẩm ","school":" Trường Công nghệ "`, 200)
 	update("", 200) // Older clients cannot erase fields they do not send.
 	update(`,"school":"không\nhợp lệ"`, 400)
 	if _, err := db.Exec(ctx, `INSERT INTO friend_connections(user_low,user_high,requested_by,status)
@@ -79,22 +79,13 @@ func TestVisitorProfileIntegration(t *testing.T) {
 	if result["username"] != names[0] || result["displayName"] != "Tên có dấu" {
 		t.Fatalf("wrong identity: %+v", result)
 	}
-	if result["friendCount"] != float64(1) {
+	if result["city"] != "Hòa Bình" || result["workplace"] != "Đội sản phẩm" || result["school"] != "Trường Công nghệ" || result["friendCount"] != float64(1) {
 		t.Fatalf("wrong public details: %+v", result)
-	}
-	for _, key := range []string{"bio", "city", "workplace", "school"} {
-		if _, ok := result[key]; ok {
-			t.Fatalf("profile field without public visibility leaked: %s", key)
-		}
 	}
 	update(`,"workplace":"  "`, 200)
 	result = call(token, 200)
-	var workplace, school string
-	if err := db.QueryRow(ctx, "SELECT workplace,school FROM users WHERE id=$1", ids[0]).Scan(&workplace, &school); err != nil {
-		t.Fatal(err)
-	}
-	if workplace != "" || school != "Trường Công nghệ" {
-		t.Fatalf("clearing one field changed other stored details: workplace=%q school=%q", workplace, school)
+	if result["workplace"] != "" || result["school"] != "Trường Công nghệ" {
+		t.Fatalf("clearing one field changed other details: %+v", result)
 	}
 	for _, key := range []string{"email", "phone", "phone_e164", "password_hash", "token", "searchableByEmail"} {
 		if _, ok := result[key]; ok {
