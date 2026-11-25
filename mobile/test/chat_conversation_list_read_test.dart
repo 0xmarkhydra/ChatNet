@@ -1999,7 +1999,7 @@ void main() {
     expect(find.text('👍 1'), findsOneWidget);
   });
 
-  testWidgets('stale reaction response overwrites newer SSE update (baseline)', (
+  testWidgets('stale reaction response preserves newer SSE update', (
     tester,
   ) async {
     final pending = Completer<Json>();
@@ -2020,16 +2020,16 @@ void main() {
       ],
     };
     message['text'] = 'Updated from SSE';
+    message['reactions'] = staleResponse['reactions'];
     api.emitEvent();
     await tester.pumpAndSettle();
     expect(api.conversationRequests.length, greaterThan(1));
     expect(find.text('Updated from SSE'), findsOneWidget);
 
-    // Baseline: _replaceMessage applies stale POST response over newer SSE data.
     pending.complete(staleResponse);
     await tester.pumpAndSettle();
-    expect(find.text('Updated from SSE'), findsNothing);
-    expect(find.text(staleResponse['text'] as String), findsOneWidget);
+    expect(find.text('Updated from SSE'), findsOneWidget);
+    expect(find.text(staleResponse['text'] as String), findsNothing);
     expect(find.text('👍 1'), findsOneWidget);
   });
 }
