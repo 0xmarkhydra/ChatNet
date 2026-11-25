@@ -96,6 +96,14 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('nav-discover')));
     await tester.pumpAndSettle();
+    // PWA parity: Discover opens on 'Tất cả'; Nearby is its fifth tab.
+    await tester.drag(
+      find.byKey(const ValueKey('explore-horizontal-tabs')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('explore-tab-recent')));
+    await tester.pumpAndSettle();
     expect(find.text('Tên hoặc @username'), findsOneWidget);
     expect(find.text('5 km'), findsOneWidget);
     expect(find.text('Bật và tìm người'), findsOneWidget);
@@ -236,6 +244,14 @@ void main() {
     await tester.pumpWidget(SocoApp(api: DemoApi()));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('nav-discover')));
+    await tester.pumpAndSettle();
+    // PWA parity: Discover opens on 'Tất cả'; Nearby is its fifth tab.
+    await tester.drag(
+      find.byKey(const ValueKey('explore-horizontal-tabs')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('explore-tab-recent')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Địa điểm'));
     await tester.pumpAndSettle();
