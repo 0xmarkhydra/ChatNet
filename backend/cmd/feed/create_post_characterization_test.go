@@ -222,7 +222,7 @@ func TestCreatePostPersistsTrimmedDefaultsMentionsAndAttachments(t *testing.T) {
 
 	s := &server{db: db}
 	handler := feedCreateCharacterizationHandler(s)
-	created := feedCreateCharacterizationRequest(t, handler, authorID, `{"content":"  hello feed  "}`)
+	created := feedCreateCharacterizationRequest(t, handler, authorID, fmt.Sprintf(`{"content":"  hello feed  ","publishLocation":%s}`, testLocationJSON(5, time.Now())))
 	if created.Code != http.StatusCreated {
 		t.Fatalf("text post status=%d; body=%s", created.Code, created.Body.String())
 	}
@@ -358,7 +358,7 @@ func TestCreatePostPushesMentionsOnlyAfterCommit(t *testing.T) {
 
 	s := &server{db: db, push: onesignalx.New("test-app", "test-key")}
 	handler := feedCreateCharacterizationHandler(s)
-	body := fmt.Sprintf(`{"content":%q}`, content)
+	body := fmt.Sprintf(`{"content":%q,"publishLocation":%s}`, content, testLocationJSON(5, time.Now()))
 	created := feedCreateCharacterizationRequest(t, handler, authorID, body)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("post status=%d; body=%s", created.Code, created.Body.String())
