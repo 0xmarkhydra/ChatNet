@@ -18,6 +18,16 @@ class ChatRepository {
     return List.unmodifiable(items.map(Conversation.fromJson));
   }
 
+  Future<void> setConversationPinned(
+    int conversationId, {
+    required bool pinned,
+  }) async {
+    await api.request(
+      pinned ? 'PUT' : 'DELETE',
+      '/api/conversations/$conversationId/pin',
+    );
+  }
+
   Future<List<ChatMessage>> messages(
     int conversationId, {
     int channelId = 0,

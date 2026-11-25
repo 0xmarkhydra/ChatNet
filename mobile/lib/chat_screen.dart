@@ -814,10 +814,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final pinned = room['pinnedAt']?.toString().isNotEmpty == true;
     setState(() => pinBusy = true);
     try {
-      await widget.api.request(
-        pinned ? 'DELETE' : 'PUT',
-        '/api/conversations/${id.toInt()}/pin',
-      );
+      await ref
+          .read(chatRepositoryProvider)
+          .setConversationPinned(id.toInt(), pinned: !pinned);
       await _refresh();
       if (mounted) {
         _show(
