@@ -268,12 +268,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     conversationLoadingMore = true;
     if (mounted) setState(() {});
     try {
-      final page = objects(
-        await widget.api.request(
-          'GET',
-          '/api/conversations?limit=25&offset=$conversationOffset',
-        ),
-      );
+      final page = await ref
+          .read(chatRepositoryProvider)
+          .conversations(offset: conversationOffset);
       if (!mounted) return;
       setState(() {
         conversationOffset += page.length;
@@ -281,8 +278,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         final ids = conversations.map((item) => item['id']).toSet();
         conversations = [
           ...conversations,
-          for (final item in page)
-            if (!ids.contains(item['id'])) item,
+          for (final conversation in page)
+            if (!ids.contains(conversation.id)) conversation.toJson(),
         ]..sort(compareConversationRows);
       });
     } catch (error) {
