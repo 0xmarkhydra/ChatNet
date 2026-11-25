@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'public_post_location.dart';
 import 'media_viewer.dart';
 import 'reaction_participants_sheet.dart';
 import 'theme.dart';
@@ -384,6 +385,7 @@ class _FeedPostDetailState extends State<FeedPostDetail> {
                       '${displayDateTime(post['createdAt'])} · $visibility',
                       style: const TextStyle(color: socoMuted, fontSize: 12),
                     ),
+                    PublicPostLocationLink(post: post),
                   ],
                 ),
               ),

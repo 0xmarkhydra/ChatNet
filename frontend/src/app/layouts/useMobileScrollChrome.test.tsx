@@ -7,8 +7,8 @@ import { useMobileScrollChrome } from "./useMobileScrollChrome";
 
 afterEach(() => vi.unstubAllGlobals());
 
-function ScrollShell() {
-  const ref = useMobileScrollChrome();
+function ScrollShell({ activeTab = "feed" }: { activeTab?: string }) {
+  const ref = useMobileScrollChrome(activeTab);
   return (
     <main ref={ref} className="modern-shell app-layout">
       <header className="chatnet-appbar">Header</header>
@@ -47,6 +47,8 @@ describe("mobile chrome scrolling", () => {
       scroll(92);
       expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
       scroll(79);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(72);
       expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
 
       scroll(140);
@@ -59,6 +61,257 @@ describe("mobile chrome scrolling", () => {
       scroll(195);
       expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
       scroll(0);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("hides bars for short Chat/Friends lists and resets between tabs", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+
+    try {
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="chat" /></MemoryRouter>));
+      const shell = host.querySelector("main")!;
+      const scroller = host.querySelector("section")!;
+      Object.defineProperty(scroller, "scrollHeight", { value: 480 });
+      Object.defineProperty(scroller, "clientHeight", { value: 400 });
+      const scroll = (top: number) => {
+        scroller.scrollTop = top;
+        act(() => scroller.dispatchEvent(new Event("scroll")));
+      };
+
+      // A short list may have only 80px of available scroll range.
+      scroll(0);
+      scroll(24);
+      scroll(47);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+
+      // Switching tabs must not inherit the previous screen's hidden bar.
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="contacts" /></MemoryRouter>));
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+      scroll(0);
+      scroll(25);
+      scroll(50);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(36);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(27);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("keeps header and footer hidden at the bottom until the user scrolls upward", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+
+    try {
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="contacts" /></MemoryRouter>));
+      const shell = host.querySelector("main")!;
+      const scroller = host.querySelector("section")!;
+      const header = host.querySelector("header")!;
+      const footer = host.querySelector("nav")!;
+      let contentHeight = 1200;
+      Object.defineProperty(scroller, "scrollHeight", { get: () => contentHeight });
+      Object.defineProperty(scroller, "clientHeight", { value: 400 });
+      const scroll = (top: number) => {
+        scroller.scrollTop = top;
+        act(() => scroller.dispatchEvent(new Event("scroll")));
+      };
+
+      scroll(0);
+      scroll(250); // A single event >150px from a fast flick.
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(800); // Reaching the bottom alone must not reveal the chrome.
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      expect(header.isConnected && footer.isConnected).toBe(true);
+      // Momentum and minor oscillation near the bottom must not blink.
+      scroll(785);
+      scroll(798);
+      scroll(790);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(760); // A deliberate upward swipe shows both bars.
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+
+      scroll(200);
+      scroll(260);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      contentHeight = 400; // Filtering leaves a non-scrollable screen.
+      scroll(0);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+      scroll(0);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("ignores a scroll-range correction caused by collapsing bars", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="chat" /></MemoryRouter>));
+      const shell = host.querySelector("main")!;
+      const scroller = host.querySelector("section")!;
+      let height = 1200;
+      Object.defineProperty(scroller, "scrollHeight", { get: () => height });
+      Object.defineProperty(scroller, "clientHeight", { value: 400 });
+      const scroll = (top: number) => {
+        scroller.scrollTop = top;
+        act(() => scroller.dispatchEvent(new Event("scroll")));
+      };
+      scroll(0);
+      scroll(240);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+
+      // The viewport grows by the collapsed header/footer height.
+      // The synthetic correction must not look like a user reached the bottom.
+      height = 1400;
+      scroll(995);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(980);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(960);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("restores the footer on an upward swipe even if the list is already at its boundary", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="contacts" /></MemoryRouter>));
+      const shell = host.querySelector("main")!;
+      const scroller = host.querySelector("section")!;
+      Object.defineProperty(scroller, "scrollHeight", { value: 490 });
+      Object.defineProperty(scroller, "clientHeight", { value: 400 });
+      scroller.scrollTop = 0;
+      act(() => scroller.dispatchEvent(new Event("scroll")));
+      scroller.scrollTop = 56;
+      act(() => scroller.dispatchEvent(new Event("scroll")));
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+
+      const touch = (type: string, x: number, y: number) => {
+        const e = new Event(type, { bubbles: true });
+        Object.defineProperty(e, "touches", { value: [{ clientX: x, clientY: y }] });
+        act(() => scroller.dispatchEvent(e));
+      };
+      touch("touchstart", 100, 200);
+      touch("touchmove", 100, 219);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+
+      scroller.scrollTop = 90;
+      act(() => scroller.dispatchEvent(new Event("scroll")));
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      act(() => scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -16 })));
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("does not reveal Chat chrome from bottom bounce or non-scrollable nested regions", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="chat" /></MemoryRouter>));
+      const shell = host.querySelector("main")!;
+      const scroller = host.querySelector("section")!;
+      const nested = document.createElement("div");
+      scroller.append(nested);
+      Object.defineProperty(scroller, "scrollHeight", { value: 1200 });
+      Object.defineProperty(scroller, "clientHeight", { value: 400 });
+      Object.defineProperty(nested, "scrollHeight", { value: 100 });
+      Object.defineProperty(nested, "clientHeight", { value: 100 });
+      const scroll = (node: HTMLElement, top: number) => {
+        node.scrollTop = top;
+        act(() => node.dispatchEvent(new Event("scroll")));
+      };
+
+      scroll(scroller, 0);
+      scroll(scroller, 240);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(scroller, 800);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(nested, 0);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(scroller, 794); // Elastic bounce is not a real upward gesture.
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(scroller, 788);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(scroller, 765); // A meaningful upward scroll does restore chrome.
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("does not reveal Chat bars during rubber-band recovery after a downward touch flick", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="chat" /></MemoryRouter>));
+      const shell = host.querySelector("main")!;
+      const scroller = host.querySelector("section")!;
+      Object.defineProperty(scroller, "scrollHeight", { value: 1200 });
+      Object.defineProperty(scroller, "clientHeight", { value: 400 });
+      const scroll = (top: number) => {
+        scroller.scrollTop = top;
+        act(() => scroller.dispatchEvent(new Event("scroll")));
+      };
+      const touch = (type: string, x: number, y: number) => {
+        const e = new Event(type, { bubbles: true });
+        Object.defineProperty(e, "touches", { value: [{ clientX: x, clientY: y }] });
+        act(() => scroller.dispatchEvent(e));
+      };
+
+      scroll(0);
+      touch("touchstart", 100, 230);
+      touch("touchmove", 100, 130); // Finger up: scrolling downward.
+      scroll(240);
+      scroll(800);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(755); // Safari bounces upward even without a user reversal.
+      scroll(710);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+
+      touch("touchstart", 100, 140);
+      touch("touchmove", 100, 164); // New deliberate upward-scroll gesture.
       expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
     } finally {
       act(() => root.unmount());

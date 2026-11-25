@@ -1,7 +1,7 @@
 import { attachmentRequestBody, type MediaAttachment } from "../../../shared/utils/media";
 import type { ApiRequest } from "../../../shared/types/api";
 import { userLabel } from "../../../shared/utils/userLabel";
-import { FEED_PAGE_SIZE, type Post } from "../types";
+import { FEED_PAGE_SIZE, type Post, type PublishLocation } from "../types";
 import { parsePostExtras } from "../utils/postExtras";
 
 type PostVisibility = "public" | "friends" | "private";
@@ -52,6 +52,7 @@ export function submitPost(
     attachments: MediaAttachment[];
     visibility: PostVisibility;
     background: string;
+    publishLocation?: PublishLocation;
   },
 ) {
   return request("/api/posts", {
@@ -62,6 +63,7 @@ export function submitPost(
       attachments: input.attachments.map(attachmentRequestBody),
       visibility: input.visibility,
       background: input.background,
+      publishLocation: input.publishLocation,
     }),
   });
 }
@@ -69,7 +71,7 @@ export function submitPost(
 export function patchPost(
   request: ApiRequest,
   id: number,
-  input: { content: string; visibility: PostVisibility; background: string },
+  input: { content: string; visibility: PostVisibility; background: string; publishLocation?: PublishLocation },
 ) {
   return request(`/api/posts/${id}`, {
     method: "PATCH",
@@ -78,6 +80,7 @@ export function patchPost(
       content: input.content,
       visibility: input.visibility,
       background: input.background,
+      publishLocation: input.publishLocation,
     }),
   });
 }

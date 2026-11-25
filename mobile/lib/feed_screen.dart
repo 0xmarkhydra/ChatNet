@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'api.dart';
 import 'feed_post_detail.dart';
+import 'public_post_location.dart';
 import 'feed_story_create_sheet.dart';
 import 'feed_post_links.dart';
 import 'feed_post_share_sheet.dart';
@@ -382,12 +383,16 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     });
   }
 
-  Future<Json?> _pickAndUpload(String scope, {bool multiple = false, PlatformFile? selectedFile}) async {
+  Future<Json?> _pickAndUpload(
+    String scope, {
+    bool multiple = false,
+    PlatformFile? selectedFile,
+  }) async {
     final picked = selectedFile != null
         ? <PlatformFile>[selectedFile]
         : multiple
-            ? await FilePicker.pickFiles(type: FileType.media)
-            : <PlatformFile>[];
+        ? await FilePicker.pickFiles(type: FileType.media)
+        : <PlatformFile>[];
     if (!multiple && selectedFile == null) {
       final file = await FilePicker.pickFile(type: FileType.media);
       if (file != null) picked.add(file);
@@ -432,14 +437,20 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       _show('Nội dung bài viết vượt quá 5.000 ký tự.');
       return false;
     }
+    final visibility = postVisibility;
     setState(() => posting = true);
     try {
+      final location = visibility == 'public'
+          ? await capturePublicPostLocation()
+          : null;
+      if (!mounted) return false;
       final post = object(
         await widget.api.request('POST', '/api/posts', {
           'content': content,
           'attachments': attachments,
-          'visibility': postVisibility,
+          'visibility': visibility,
           'background': postBackground,
+          'publishLocation': ?location,
         }),
       );
       if (!mounted) return false;
@@ -1162,6 +1173,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                           ),
                       ],
                     ),
+                    if (visibility == 'public' &&
+                        post['visibility'] != null &&
+                        post['visibility'] != 'public')
+                      const Text(publicPostLocationNotice),
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: busy
@@ -1169,12 +1184,20 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                           : () async {
                               setSheetState(() => busy = true);
                               try {
+                                final location =
+                                    visibility == 'public' &&
+                                        post['visibility'] != null &&
+                                        post['visibility'] != 'public'
+                                    ? await capturePublicPostLocation()
+                                    : null;
+                                if (!ctx.mounted) return;
                                 final updated = object(
                                   await widget.api
                                       .request('PATCH', '/api/posts/$id', {
                                         'content': editor.text.trim(),
                                         'visibility': visibility,
                                         'background': background,
+                                        'publishLocation': ?location,
                                       }),
                                 );
                                 _applyUpdatedPost(updated);
@@ -1438,6 +1461,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                             ),
                           ],
                         ),
+                        if (postVisibility == 'public')
+                          const Text(
+                            publicPostLocationNotice,
+                            style: TextStyle(fontSize: 12),
+                          ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: postController,
@@ -1895,6 +1923,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                   },
                                 ),
                               ),
+                              if (postVisibility == 'public')
+                                const Text(
+                                  publicPostLocationNotice,
+                                  style: TextStyle(fontSize: 12),
+                                ),
                               GridView.count(
                                 crossAxisCount: 2,
                                 shrinkWrap: true,
@@ -2191,6 +2224,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                       }}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    PublicPostLocationLink(post: post),
                   ],
                 ),
               ),

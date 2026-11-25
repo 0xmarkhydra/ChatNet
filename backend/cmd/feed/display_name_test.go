@@ -63,7 +63,7 @@ func TestDisplayNamesFeedIntegration(t *testing.T) {
 		return rec.Body.Bytes()
 	}
 	var created post
-	if err := json.Unmarshal(call("POST", "/api/posts", `{"content":"Bài viết có tên hiển thị"}`, 201), &created); err != nil {
+	if err := json.Unmarshal(call("POST", "/api/posts", fmt.Sprintf(`{"content":"Bài viết có tên hiển thị","publishLocation":%s}`, testLocationJSON(5, time.Now())), 201), &created); err != nil {
 		t.Fatal(err)
 	}
 	assertAuthor := func(p post, label string) {
