@@ -99,6 +99,7 @@ class FeedPost {
     this.reactions,
     this.attachments,
     this.visibility,
+    this.publishLocation,
     this.background,
     this.updatedAt,
     this.saved,
@@ -120,6 +121,7 @@ class FeedPost {
   final List<FeedReaction>? reactions;
   final List<MediaAttachment>? attachments;
   final PostVisibility? visibility;
+  final JsonMap? publishLocation;
   final String? background;
   final String? updatedAt;
   final bool? saved;
@@ -146,6 +148,9 @@ class FeedPost {
       PostVisibility.values,
       (value) => value.name,
     ),
+    publishLocation: json['publishLocation'] == null
+        ? null
+        : jsonMap(json['publishLocation']),
     background: optionalField<String>(json, 'background'),
     updatedAt: optionalField<String>(json, 'updatedAt'),
     saved: optionalField<bool>(json, 'saved'),
@@ -170,6 +175,7 @@ class FeedPost {
     Object? reactions = absent,
     Object? attachments = absent,
     Object? visibility = absent,
+    Object? publishLocation = absent,
     Object? background = absent,
     Object? updatedAt = absent,
     Object? saved = absent,
@@ -200,6 +206,9 @@ class FeedPost {
     visibility: identical(visibility, absent)
         ? this.visibility
         : visibility as PostVisibility?,
+    publishLocation: identical(publishLocation, absent)
+        ? this.publishLocation
+        : publishLocation as JsonMap?,
     background: identical(background, absent)
         ? this.background
         : background as String?,
@@ -236,6 +245,7 @@ class FeedPost {
     if (attachments != null)
       'attachments': attachments!.map((item) => item.toJson()).toList(),
     if (visibility != null) 'visibility': visibility!.name,
+    if (publishLocation != null) 'publishLocation': publishLocation,
     if (background != null) 'background': background,
     if (updatedAt != null) 'updatedAt': updatedAt,
     if (saved != null) 'saved': saved,

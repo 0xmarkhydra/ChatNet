@@ -70,7 +70,7 @@ export default function FeedPostCard({
           onEditPost={onEditPost} openPost={openPost} apiFetch={apiFetch} syncFeedPost={syncFeedPost}
           removeFeedPost={removeFeedPost} setNotice={setNotice} onRepostChanged={onRepostChanged} />
         <div className="feed-post-body grid w-full min-w-0 gap-1.5 [&>*]:min-w-0 [&>*:not(.feed-media-preview):not(.feed-post-toolbar)]:px-4">
-        <PostExtrasView extras={extras} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
+        <PostExtrasView extras={{...extras, location: post.visibility === "public" && post.publishLocation ? extras.location : ""}} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
         {extras.caption && (
           <div className={post.background ? 'feed-post-clickable feed-text-background bg-' + post.background : 'feed-post-clickable feed-post-text pt-1.5 [&_.feed-text>p]:m-0! [&_.feed-text>p]:mb-1! [&_.feed-text>p]:text-sm! [&_.feed-text>p]:leading-normal! [&_.feed-translation-error]:text-muted-foreground!'}
             onClick={(event) => {

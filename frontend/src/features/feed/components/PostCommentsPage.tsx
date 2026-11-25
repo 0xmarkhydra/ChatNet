@@ -1,3 +1,4 @@
+import PostLocationTag from './PostLocationTag'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, Heart, MessageCircle, X } from 'lucide-react'
 import FeedRepostAction from './FeedRepostAction'
@@ -106,11 +107,12 @@ export default function PostCommentsPage({
               <div className="post-comments-author-copy">
                 <button type="button" className="post-comments-author-name" onClick={() => onAuthorOpen(post.author)}>{authorName}</button>
                 <div className="post-comments-meta"><span>{relativeDate(post.createdAt)}</span><span>{visibility}</span></div>
+                <PostLocationTag post={post} />
               </div>
               <FeedPostActions onEdit={post.repostKind === 'quick' ? undefined : onEditPost} post={post} mine={post.author === username} request={request}
                 onUpdated={onUpdated} onDeleted={onDeleted} onFeedback={onFeedback} />
             </header>
-            <PostExtrasView extras={extras} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
+            <PostExtrasView extras={{...extras, location: post.visibility === "public" && post.publishLocation ? extras.location : ""}} onAuthorOpen={onAuthorOpen} taggedNames={taggedNames} />
             {extras.caption && (
               <div className={post.background ? `post-comments-content feed-text-background bg-${post.background}` : "post-comments-content"}>
                 <FeedText api={API} token={token} target={targetLanguage} text={extras.caption} />

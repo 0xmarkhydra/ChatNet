@@ -377,7 +377,6 @@
     font-size: 13px;
   }
   .modern-shell.app-layout .app-header-account-desktop-only { display: none; }
-  .modern-shell.app-layout > .chatnet-appbar.mobile-section-header { display: none; }
 }
 
 .app-notifications-overlay {
