@@ -84,6 +84,9 @@ class _ConversationApi extends DemoApi {
   final List<Json> uploadedAttachments = [];
   final List<Completer<Json>> pendingAttachmentUploads = [];
   int? failAttachmentUploadAt;
+  final List<Json> forwardDownloadRequests = [];
+  final List<Completer<Uint8List>> pendingForwardDownloads = [];
+  bool failNextForwardDownload = false;
   final List<String> reactionRequests = [];
   final List<Json> reactionBodies = [];
   final Map<int, Json> reactionMessages = {};
@@ -134,6 +137,19 @@ class _ConversationApi extends DemoApi {
         : _uploadedAttachment(name, contentType, bytes.length);
     uploadedAttachments.add(attachment);
     return attachment;
+  }
+
+  @override
+  Future<Uint8List> downloadForForward(Json attachment) async {
+    forwardDownloadRequests.add(Map<String, dynamic>.from(attachment));
+    if (failNextForwardDownload) {
+      failNextForwardDownload = false;
+      throw const ApiError('Synthetic forward download failure');
+    }
+    final pending = pendingForwardDownloads;
+    return pending.isNotEmpty
+        ? await pending.removeAt(0).future
+        : Uint8List.fromList([1, 2, 3]);
   }
 
   @override
@@ -390,6 +406,21 @@ Future<void> _openDefaultGroupChat(
   await tester.tap(find.text('Thảo luận chung'));
   await tester.pumpAndSettle();
 }
+
+Future<void> _openForwardSheet(
+  WidgetTester tester, {
+  required int messageId,
+}) async {
+  final message = find.byKey(ValueKey('chat-message-$messageId'));
+  await tester.ensureVisible(message);
+  await tester.pumpAndSettle();
+  await tester.longPress(message);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Chuy\u1ec3n ti\u1ebfp'));
+  await tester.pumpAndSettle();
+}
+
+Finder _forwardDestination() => find.widgetWithText(ListTile, 'Alex Chen').last;
 
 Future<void> _reactToMessage(
   WidgetTester tester, {
@@ -1696,6 +1727,223 @@ void main() {
       );
     },
   );
+
+  testWidgets('text forward posts forwarded message to selected room', (
+    tester,
+  ) async {
+    final api = _ConversationApi();
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    final source = api.messages[1]!.firstWhere(
+      (message) => message['id'] == 12,
+    );
+    await _openForwardSheet(tester, messageId: 12);
+    await tester.tap(_forwardDestination());
+    await tester.pumpAndSettle();
+
+    expect(api.messageCreateRequests, ['POST /api/conversations/3/messages']);
+    final body = api.messageCreateBodies.single!;
+    expect(body.keys.toSet(), {'clientId', 'text', 'forwarded', 'attachments'});
+    expect(body['clientId'], isA<String>());
+    expect(body['clientId'], isNotEmpty);
+    expect(body['text'], source['text']);
+    expect(body['forwarded'], isTrue);
+    expect(body['attachments'], isEmpty);
+    expect(api.messages[3]!.last['forwarded'], isTrue);
+    expect(find.text('Chuy\u1ec3n ti\u1ebfp tin nh\u1eafn'), findsNothing);
+  });
+
+  testWidgets(
+    'file forward downloads and uploads each attachment before POST',
+    (tester) async {
+      final firstDownload = Completer<Uint8List>();
+      final secondDownload = Completer<Uint8List>();
+      final firstUpload = Completer<Json>();
+      final secondUpload = Completer<Json>();
+      final api = _ConversationApi()
+        ..pendingForwardDownloads.addAll([firstDownload, secondDownload])
+        ..pendingAttachmentUploads.addAll([firstUpload, secondUpload])
+        ..pendingMessageCreateRequest = Completer<void>();
+      final source = api.messages[1]!.firstWhere(
+        (message) => message['id'] == 12,
+      );
+      final originalAttachments = [
+        {
+          'kind': 'file',
+          'name': 'first.pdf',
+          'contentType': 'application/pdf',
+          'url': 'https://files.test/first.pdf',
+        },
+        {
+          'kind': 'file',
+          'name': 'second.txt',
+          'contentType': 'text/plain',
+          'url': 'https://files.test/second.txt',
+        },
+      ];
+      source['attachments'] = originalAttachments;
+      addTearDown(api.closeEvents);
+
+      await _openDefaultGroupChat(tester, api);
+      await _openForwardSheet(tester, messageId: 12);
+      await tester.tap(_forwardDestination());
+      await tester.pump();
+
+      final destination = _forwardDestination();
+      expect(api.forwardDownloadRequests, [originalAttachments.first]);
+      expect(api.attachmentUploadRequests, isEmpty);
+      expect(api.messageCreateRequests, isEmpty);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(tester.widget<ListTile>(destination).enabled, isFalse);
+
+      firstDownload.complete(Uint8List.fromList([1, 2, 3]));
+      await tester.pump();
+      await tester.pump();
+      expect(api.attachmentUploadRequests, hasLength(1));
+      expect(api.attachmentUploadRequests.single['name'], 'first.pdf');
+      expect(api.forwardDownloadRequests, [originalAttachments.first]);
+      expect(api.messageCreateRequests, isEmpty);
+
+      firstUpload.complete(
+        _uploadedAttachment('first.pdf', 'application/pdf', 3),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(api.attachmentUploadRequests, hasLength(1));
+      expect(api.forwardDownloadRequests, originalAttachments);
+      expect(api.messageCreateRequests, isEmpty);
+
+      secondDownload.complete(Uint8List.fromList([4, 5, 6]));
+      await tester.pump();
+      await tester.pump();
+      expect(api.attachmentUploadRequests, hasLength(2));
+      expect(api.attachmentUploadRequests.last['name'], 'second.txt');
+      expect(api.messageCreateRequests, isEmpty);
+
+      secondUpload.complete(_uploadedAttachment('second.txt', 'text/plain', 3));
+      await tester.pump();
+      await tester.pump();
+      expect(api.messageCreateRequests, ['POST /api/conversations/3/messages']);
+      final body = api.messageCreateBodies.single!;
+      expect(body['forwarded'], isTrue);
+      expect(body['text'], source['text']);
+      expect(body['clientId'], isA<String>());
+      expect(body['attachments'], [
+        _uploadedAttachment('first.pdf', 'application/pdf', 3),
+        _uploadedAttachment('second.txt', 'text/plain', 3),
+      ]);
+      expect(api.attachmentUploadRequests[0]['bytes'], [1, 2, 3]);
+      expect(api.attachmentUploadRequests[1]['bytes'], [4, 5, 6]);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(tester.widget<ListTile>(destination).enabled, isFalse);
+
+      api.pendingMessageCreateRequest!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Chuy\u1ec3n ti\u1ebfp tin nh\u1eafn'), findsNothing);
+    },
+  );
+
+  testWidgets('forward download failure skips upload and POST, resets busy', (
+    tester,
+  ) async {
+    final api = _ConversationApi()..failNextForwardDownload = true;
+    api.messages[1]!.firstWhere(
+      (message) => message['id'] == 10,
+    )['attachments'] = [
+      {
+        'kind': 'file',
+        'name': 'source.pdf',
+        'contentType': 'application/pdf',
+        'url': 'https://files.test/source.pdf',
+      },
+    ];
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _openForwardSheet(tester, messageId: 10);
+    await tester.tap(_forwardDestination());
+    await tester.pumpAndSettle();
+
+    expect(api.forwardDownloadRequests, hasLength(1));
+    expect(api.attachmentUploadRequests, isEmpty);
+    expect(api.messageCreateRequests, isEmpty);
+    expect(
+      find.textContaining('Synthetic forward download failure'),
+      findsOneWidget,
+    );
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(tester.widget<ListTile>(_forwardDestination()).enabled, isTrue);
+  });
+
+  testWidgets('forward upload failure skips POST and resets busy', (
+    tester,
+  ) async {
+    final api = _ConversationApi()..failAttachmentUploadAt = 1;
+    api.messages[1]!.firstWhere(
+      (message) => message['id'] == 10,
+    )['attachments'] = [
+      {
+        'kind': 'file',
+        'name': 'source.pdf',
+        'contentType': 'application/pdf',
+        'url': 'https://files.test/source.pdf',
+      },
+    ];
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _openForwardSheet(tester, messageId: 10);
+    await tester.tap(_forwardDestination());
+    await tester.pumpAndSettle();
+
+    expect(api.forwardDownloadRequests, hasLength(1));
+    expect(api.attachmentUploadRequests, hasLength(1));
+    expect(api.messageCreateRequests, isEmpty);
+    expect(
+      find.textContaining('Synthetic attachment upload failure'),
+      findsOneWidget,
+    );
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(tester.widget<ListTile>(_forwardDestination()).enabled, isTrue);
+  });
+
+  testWidgets('forward POST failure keeps sheet and does not retry upload', (
+    tester,
+  ) async {
+    final api = _ConversationApi()..failNextMessageCreateRequest = true;
+    api.messages[1]!.firstWhere(
+      (message) => message['id'] == 10,
+    )['attachments'] = [
+      {
+        'kind': 'file',
+        'name': 'source.pdf',
+        'contentType': 'application/pdf',
+        'url': 'https://files.test/source.pdf',
+      },
+    ];
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _openForwardSheet(tester, messageId: 10);
+    await tester.tap(_forwardDestination());
+    await tester.pumpAndSettle();
+
+    expect(api.messageCreateRequests, ['POST /api/conversations/3/messages']);
+    expect(api.messageCreateBodies.single?['forwarded'], isTrue);
+    expect(api.messageCreateBodies.single?['attachments'], [
+      _uploadedAttachment('source.pdf', 'application/pdf', 3),
+    ]);
+    expect(api.forwardDownloadRequests, hasLength(1));
+    expect(api.attachmentUploadRequests, hasLength(1));
+    expect(find.text('Chuy\u1ec3n ti\u1ebfp tin nh\u1eafn'), findsOneWidget);
+    expect(
+      find.textContaining('Synthetic message create failure'),
+      findsOneWidget,
+    );
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(tester.widget<ListTile>(_forwardDestination()).enabled, isTrue);
+  });
 
   testWidgets('stale reaction response overwrites newer SSE update (baseline)', (
     tester,
