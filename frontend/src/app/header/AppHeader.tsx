@@ -5,14 +5,11 @@ type AppHeaderProps = {
   start: ReactNode;
   center?: ReactNode;
   end: ReactNode;
+  mobileSearchActions?: boolean;
 };
 
-/**
- * One shared three-zone header across Chat, Contacts, Discover, Feed and Profile.
- * The title/actions are supplied by the page; phone sizing, alignment and the
- * separate persistent search dock are owned by the shared application shell.
- */
-export default function AppHeader({ className, start, center, end }: AppHeaderProps) {
+/** One shared three-zone shell; page-specific title, search/filter, and actions are supplied by the caller. */
+export default function AppHeader({ className, start, center, end, mobileSearchActions = false }: AppHeaderProps) {
   return (
     <header className={className} aria-label="Thanh công cụ chính">
       <div className="appbar-start">{start}</div>
@@ -20,8 +17,17 @@ export default function AppHeader({ className, start, center, end }: AppHeaderPr
         <img src="/soco-mark.svg" width="32" height="32" alt="" />
         <strong>SocCO</strong>
       </div>
-      <div className="appbar-center">{center}</div>
-      <div className="appbar-end">{end}</div>
+      {mobileSearchActions ? (
+        <div className="appbar-mobile-controls">
+          <div className="appbar-center">{center}</div>
+          <div className="appbar-end">{end}</div>
+        </div>
+      ) : (
+        <>
+          <div className="appbar-center">{center}</div>
+          <div className="appbar-end">{end}</div>
+        </>
+      )}
     </header>
   );
 }

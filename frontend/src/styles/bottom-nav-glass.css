@@ -84,19 +84,17 @@
     background: none;
   }
 
-  /* One scroll controller for every tab (including Newsfeed). Collapsing the
-     header's flex height and sliding it upward use the same smooth transition,
-     while the floating glass footer simply glides out of the viewport. */
+  /* One scroll controller for every tab (including Newsfeed). The header leaves
+     layout instantly (the scroll hook compensates scrollTop, so content never
+     slides under the finger) and only its transform/opacity are animated. */
   .modern-shell.app-layout > .chatnet-appbar,
   .modern-shell.app-layout > .bottom-navigation {
     transition:
       transform 600ms cubic-bezier(.4, 0, .2, 1),
-      opacity 600ms ease,
-      margin-top 600ms cubic-bezier(.4, 0, .2, 1);
+      opacity 600ms ease;
     will-change: transform;
   }
-  /* Hiding waits briefly so a short flick does not trigger it; showing is immediate. */
-  .modern-shell.app-layout.mobile-chrome-hidden > .chatnet-appbar,
+  /* Hiding the footer waits briefly so a short flick does not trigger it; showing is immediate. */
   .modern-shell.app-layout.mobile-chrome-hidden > .bottom-navigation {
     transition-delay: 200ms;
   }

@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
+/** Upward scrolling slower than this (px/ms) keeps the bars hidden; only a quick flick reveals them. */
+const REVEAL_SPEED = 0.8;
+
 /** Keep mobile chrome stable while independently scrolling Chat, Contacts, Feed and Profile. */
 export function useMobileScrollChrome(activeTab?: string) {
   const shellRef = useRef<HTMLElement>(null);
@@ -18,7 +21,9 @@ export function useMobileScrollChrome(activeTab?: string) {
     let lastDirection = 0;
     let lastScroller: HTMLElement | null = null;
     let hidden = false;
+    let lastScrollTime = 0;
     let touchStart: { x: number; y: number } | null = null;
+    let touchLast = { y: 0, t: 0 };
     let chatTouchDirection: "down" | "up" | null = null;
 
     const setHidden = (next: boolean) => {
@@ -30,8 +35,19 @@ export function useMobileScrollChrome(activeTab?: string) {
       directionDistance = 0;
       lastDirection = 0;
     };
+    // The header leaves layout instantly, so the scroller grows by its height.
+    // Shift scrollTop by the same amount to keep the content still under the finger.
+    let shift: { scroller: HTMLElement; amount: number } | null = null;
+    const compensate = (scroller: HTMLElement, amount: number) => {
+      scroller.scrollTop = Math.max(0, scroller.scrollTop + amount);
+      const range = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      previous.set(scroller, { top: Math.max(0, Math.min(scroller.scrollTop, range)), range });
+    };
     const reveal = () => {
+      const undo = hidden ? shift : null;
+      shift = null;
       setHidden(false);
+      if (undo?.scroller.isConnected) compensate(undo.scroller, -undo.amount);
       resetMomentum();
     };
     const measure = () => {
@@ -58,14 +74,16 @@ export function useMobileScrollChrome(activeTab?: string) {
       const top = Math.max(0, Math.min(target.scrollTop, range));
       const old = previous.get(target);
       previous.set(target, { top, range });
+      const elapsed = event.timeStamp - lastScrollTime;
+      lastScrollTime = event.timeStamp;
 
       // When header/footer collapse, available scroll space changes instantly.
       // Ignore the browser's resulting scroll correction BEFORE edge detection,
       // otherwise it can reveal and re-hide both bars repeatedly.
       if (range <= 2) {
         // Chat contains nested scroll regions (including non-scrollable menus).
-        // Such events must not resurrect the bars when the list is at its end.
-        if (activeTab !== "chat" || !hidden) reveal();
+        // Such events must not resurrect the bars when the list is at its end (Chat, Feed).
+        if ((activeTab !== "chat" && activeTab !== "feed") || !hidden) reveal();
         return;
       }
       if (old && Math.abs(old.range - range) > 2) {
@@ -99,17 +117,26 @@ export function useMobileScrollChrome(activeTab?: string) {
         resetMomentum();
         return;
       }
+      const speed = Math.abs(delta) / Math.max(elapsed, 8);
       directionDistance = lastDirection === direction
         ? directionDistance + Math.min(Math.abs(delta), 60)
         : Math.min(Math.abs(delta), 60);
       lastDirection = direction;
 
       const hideAfter = Math.min(90, Math.max(20, range * 0.3));
-      if (direction > 0 && top > hideAfter && directionDistance >= 20) {
+      // Collapsing the header grows the scrollport; at the very end that clamps
+      // scrollTop every frame of the transition and makes the content slide.
+      const headerHeight = header?.offsetHeight ?? 0;
+      const nearEnd = activeTab !== "chat" && headerHeight > 0 && range - top <= headerHeight;
+      if (direction > 0 && top > hideAfter && directionDistance >= 20 && !nearEnd) {
+        const amount = headerHeight;
         setHidden(true);
+        if (amount) {
+          shift = { scroller: target, amount };
+          compensate(target, amount);
+        }
         resetMomentum();
-      } else if (direction < 0 && (top <= 1 || directionDistance >= Math.min(20, Math.max(6, range * 0.2)))) {
-        // A short list might not have 20px left to scroll upward.
+      } else if (direction < 0 && (top <= 1 || speed >= REVEAL_SPEED)) {
         reveal();
       }
     };
@@ -123,6 +150,7 @@ export function useMobileScrollChrome(activeTab?: string) {
       touchStart = media.matches && target instanceof HTMLElement && shell.contains(target)
         && !target.closest('[role="dialog"], [role="menu"], .app-notifications-overlay') && point
         ? { x: point.clientX, y: point.clientY } : null;
+      if (point) touchLast = { y: point.clientY, t: event.timeStamp };
     };
     const onTouchMove = (event: TouchEvent) => {
       if (!touchStart || !media.matches) return;
@@ -130,9 +158,11 @@ export function useMobileScrollChrome(activeTab?: string) {
       if (!point) return;
       const dy = point.clientY - touchStart.y;
       const dx = Math.abs(point.clientX - touchStart.x);
+      const speed = (point.clientY - touchLast.y) / Math.max(event.timeStamp - touchLast.t, 8);
+      touchLast = { y: point.clientY, t: event.timeStamp };
       if (activeTab === "chat" && dy <= -12 && -dy > dx * 1.2) {
         chatTouchDirection = "down";
-      } else if (dy >= 12 && dy > dx * 1.2) {
+      } else if (dy >= 12 && dy > dx * 1.2 && speed >= REVEAL_SPEED) {
         chatTouchDirection = "up";
         if (hidden) reveal();
         touchStart = null;
