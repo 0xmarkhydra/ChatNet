@@ -43,6 +43,15 @@ class ChatRepository {
   Future<Json> recallMessage(int messageId) async =>
       object(await api.request('DELETE', '/api/messages/$messageId'));
 
+  Future<Json> sendMessage(int conversationId, {required Json body}) async =>
+      object(
+        await api.request(
+          'POST',
+          '/api/conversations/$conversationId/messages',
+          body,
+        ),
+      );
+
   Future<List<ChatMessage>> messages(
     int conversationId, {
     int channelId = 0,

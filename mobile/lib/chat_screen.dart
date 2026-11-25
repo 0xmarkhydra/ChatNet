@@ -1005,13 +1005,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     };
     setState(() => sending = true);
     try {
-      final result = object(
-        await widget.api.request(
-          'POST',
-          '/api/conversations/${active!['id']}/messages',
-          body,
-        ),
-      );
+      final result = await ref
+          .read(chatRepositoryProvider)
+          .sendMessage((active!['id'] as num).toInt(), body: body);
       if (!mounted) return;
       setState(() {
         messages = [...messages, result];
