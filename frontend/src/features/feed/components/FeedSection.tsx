@@ -2,7 +2,9 @@ import { collapseQuickReposts } from "../utils/feedRequestState";
 import FeedModeration from "./FeedModeration";
 import SocialFeedStories from "./SocialFeedStories";
 import { userLabel } from "../../../shared/utils/userLabel";
-import MobileFeedStories from "./MobileFeedStories";
+import StoryTray from "./StoryTray";
+import StoryListSheet from "./StoryListSheet";
+import { markStorySeen, useSeenStories } from "../utils/storySeen";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import SocialFeedComposer from "./SocialFeedComposer";
 import FeedFilters from "./FeedFilters";
@@ -16,7 +18,7 @@ import { type Conversation } from "../../chat";
 import { type Post, type Story, type StoryDraft } from "../types";
 import type { ProfileMediaState } from "../../profile";
 import { type Session } from "../../../shared/types/session";
-import { type SetStateAction } from "react";
+import { useEffect, useState, type SetStateAction } from "react";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject, ReactNode } from "react";
 
@@ -141,6 +143,12 @@ export default function FeedSection({
   storyBusy,
   switchTab,
 }: FeedSectionProps) {
+  const [storyListOpen, setStoryListOpen] = useState(false);
+  const seenStories = useSeenStories(session.sessionId);
+  useEffect(() => {
+    if (activeStoryId !== null) markStorySeen(session.sessionId, activeStoryId);
+  }, [activeStoryId, session.sessionId]);
+  const storyDisplayName = userLabel(profileMedia?.displayName || session.user.displayName, name);
   return (
       <div
             className="feed-view zalo-feed-view social-feed app-mobile:px-0! app-mobile:pb-[max(24px,env(safe-area-inset-bottom))]!"
@@ -188,13 +196,35 @@ export default function FeedSection({
                     onOpen={setActiveStoryId}
                   />
                 ) : (
-                  <MobileFeedStories
-                    username={name}
-                    stories={stories}
-                    busy={storyBusy || mediaUploading === "story"}
-                    onCreate={() => setStoryDraft({ kind: "choose" })}
-                    onOpen={setActiveStoryId}
-                  />
+                  <>
+                    <StoryTray
+                      username={name}
+                      displayName={storyDisplayName}
+                      stories={stories}
+                      seen={seenStories}
+                      busy={storyBusy || mediaUploading === "story"}
+                      onCreate={() => setStoryDraft({ kind: "choose" })}
+                      onOpen={setActiveStoryId}
+                      onSeeAll={() => setStoryListOpen(true)}
+                    />
+                    <StoryListSheet
+                      open={storyListOpen}
+                      onOpenChange={setStoryListOpen}
+                      username={name}
+                      displayName={storyDisplayName}
+                      stories={stories}
+                      seen={seenStories}
+                      busy={storyBusy || mediaUploading === "story"}
+                      onCreate={() => {
+                        setStoryListOpen(false);
+                        setStoryDraft({ kind: "choose" });
+                      }}
+                      onOpen={(id) => {
+                        setStoryListOpen(false);
+                        setActiveStoryId(id);
+                      }}
+                    />
+                  </>
                 )}
 
                 <SocialFeedComposer
