@@ -24,6 +24,9 @@ class _ConversationApi extends DemoApi {
   final List<String> messageRecallRequests = [];
   final List<Json?> messageRecallBodies = [];
   Json? lastMessageRecallResponse;
+  final List<String> messageCreateRequests = [];
+  final List<Json?> messageCreateBodies = [];
+  bool failNextMessageCreateRequest = false;
   final List<String> reactionRequests = [];
   final List<Json> reactionBodies = [];
   final Map<int, Json> reactionMessages = {};
@@ -54,6 +57,18 @@ class _ConversationApi extends DemoApi {
 
   @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (method == 'POST' &&
+        path.startsWith('/api/conversations/') &&
+        path.endsWith('/messages')) {
+      messageCreateRequests.add('$method $path');
+      messageCreateBodies.add(
+        body == null ? null : Map<String, dynamic>.from(body),
+      );
+      if (failNextMessageCreateRequest) {
+        failNextMessageCreateRequest = false;
+        throw const ApiError('Synthetic message create failure');
+      }
+    }
     if (method == 'DELETE' &&
         path.startsWith('/api/messages/') &&
         path.split('/').length == 4) {
@@ -1266,6 +1281,80 @@ void main() {
     expect(find.text('👍 1'), findsNothing);
     expect(find.textContaining('Synthetic reaction failure'), findsOneWidget);
   });
+
+  testWidgets('text send posts trimmed text and group channel id', (
+    tester,
+  ) async {
+    final api = _ConversationApi();
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    final composer = find.byWidgetPredicate(
+      (widget) => widget is EditableText && widget.maxLines == 5,
+    );
+    expect(composer, findsOneWidget);
+    await tester.enterText(composer, '  New message  ');
+    expect(
+      tester.widget<EditableText>(composer).controller.text,
+      '  New message  ',
+    );
+    await tester.pump();
+    await tester.tap(find.byTooltip('Gửi'));
+    await tester.pumpAndSettle();
+
+    expect(api.messageCreateRequests, ['POST /api/conversations/1/messages']);
+    final body = api.messageCreateBodies.single!;
+    expect(body['text'], 'New message');
+    expect(body['channelId'], 0);
+    expect(body['clientId'], isA<String>());
+    expect(body['clientId'], isNotEmpty);
+    expect(body.containsKey('replyToMessageId'), isFalse);
+    expect(body.containsKey('attachments'), isFalse);
+  });
+
+  testWidgets(
+    'failed text send keeps draft and manual resend gets new client id (baseline)',
+    (tester) async {
+      final api = _ConversationApi()..failNextMessageCreateRequest = true;
+      addTearDown(api.closeEvents);
+
+      await _openDefaultGroupChat(tester, api);
+      final composer = find.byWidgetPredicate(
+        (widget) => widget is EditableText && widget.maxLines == 5,
+      );
+      expect(composer, findsOneWidget);
+      await tester.enterText(composer, 'Retry this message');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Gửi'));
+      await tester.pumpAndSettle();
+
+      expect(api.messageCreateRequests, ['POST /api/conversations/1/messages']);
+      expect(
+        find.textContaining('Synthetic message create failure'),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<EditableText>(composer).controller.text,
+        'Retry this message',
+      );
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Gửi'));
+      await tester.pumpAndSettle();
+
+      expect(api.messageCreateRequests, [
+        'POST /api/conversations/1/messages',
+        'POST /api/conversations/1/messages',
+      ]);
+      expect(api.messageCreateBodies, hasLength(2));
+      expect(
+        api.messageCreateBodies[0]?['clientId'],
+        isNot(api.messageCreateBodies[1]?['clientId']),
+      );
+      expect(api.messageCreateBodies[1]?['text'], 'Retry this message');
+    },
+  );
 
   testWidgets('stale reaction response overwrites newer SSE update (baseline)', (
     tester,
