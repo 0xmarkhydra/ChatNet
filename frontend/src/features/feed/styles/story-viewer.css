@@ -59,7 +59,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   gap: 5px;
   border: 0;
   border-radius: 12px;
-  color: #2563eb;
+  color: var(--soco-blue);
   background: #eff3ff;
   font-size: 13px !important;
   font-weight: 700 !important;
@@ -254,7 +254,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   height: 100%;
   width: 0;
   border-radius: inherit;
-  background: #fff;
+  background: var(--soco-surface);
 }
 .story-screen-progress-track > span.complete { width: 100%; }
 .story-screen-progress-track > span.playing { animation: story-screen-progress 7s linear forwards; }
@@ -270,7 +270,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   flex: 0 1 auto;
   border: 0;
   padding: 0;
-  color: #fff;
+  color: var(--soco-surface);
   background: transparent;
 }
 .story-screen-author-profile strong {
@@ -297,7 +297,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   padding: 0;
   border: 0;
   border-radius: 9px;
-  color: #fff;
+  color: var(--soco-surface);
   background: transparent;
 }
 .story-screen-icon-button:hover,
@@ -344,7 +344,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   border: 0;
   border-radius: 12px;
   background: rgba(15, 26, 47, .55);
-  color: #fff;
+  color: var(--soco-surface);
   opacity: .3;
 }
 .story-screen-navigation.previous { left: 25px; }
@@ -362,7 +362,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   align-items: center;
   border-radius: 25px;
   background: rgba(25, 41, 75, .96);
-  color: #fff;
+  color: var(--soco-surface);
   overflow: hidden;
 }
 .story-screen-reply input {
@@ -372,7 +372,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   padding: 0 20px;
   border: 0;
   outline: 0;
-  color: #fff;
+  color: var(--soco-surface);
   background: transparent;
   font: inherit;
   font-size: 14px;
@@ -395,7 +395,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   height: 100%;
   border: 0;
   background: transparent;
-  color: #fff;
+  color: var(--soco-surface);
 }
 .story-screen-reply button:hover { background: rgba(255,255,255,.12); }
 
@@ -425,7 +425,7 @@ body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
   padding: 0 17px;
   border: 0;
   border-radius: 12px;
-  color: #fff;
+  color: var(--soco-surface);
   background: #243451;
   text-align: left;
   font-size: 14px;

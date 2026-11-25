@@ -47,9 +47,12 @@ describe("SocCO shared form controls", () => {
           />,
         );
       });
-      const input = host.querySelector<HTMLInputElement>('input[type="search"]');
+      // Desktop uses SearchField; mobile retains the expanding legacy Input.
+      const input = host.querySelector<HTMLInputElement>('input[data-slot="search-field-input"]');
+      const mobileInput = host.querySelector<HTMLInputElement>('input[data-slot="input"]');
       expect(input?.value).toBe("xin chào");
       expect(input?.getAttribute("data-slot")).toBe("search-field-input");
+      expect(mobileInput?.value).toBe("xin chào");
       expect(input?.getAttribute("aria-controls")).toBe("search-results");
       expect(input?.getAttribute("maxlength")).toBe("120");
       await act(async () => {

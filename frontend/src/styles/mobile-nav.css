@@ -86,14 +86,4 @@
   .user-chip button {
     padding-inline: 10px;
   }
-
-  .install-app-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 36px;
-    padding-inline: 8px !important;
-    font-size: 11px;
-    white-space: nowrap;
-  }
 }

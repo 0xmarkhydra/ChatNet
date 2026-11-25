@@ -36,6 +36,7 @@ type comment struct {
 }
 
 type post struct {
+	PublishLocation   *postLocation       `json:"publishLocation,omitempty"`
 	Visibility        string              `json:"visibility"`
 	Background        string              `json:"background"`
 	Saved             bool                `json:"saved"`
@@ -281,7 +282,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 	querySQL := `
 		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
-		       p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0),
+		       p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0), CASE WHEN p.visibility='public' THEN p.publish_location END,
 		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2),` + rankSQL + ` AS search_rank
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND ` + feedAccessSQL + `
@@ -328,7 +329,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		var p post
 		var originalID int64
 		var searchRank int
-		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.Saved, &searchRank) != nil {
+		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.PublishLocation, &p.Saved, &searchRank) != nil {
 			continue
 		}
 		entries = append(entries, feedRow{post: p, originalID: originalID, searchRank: searchRank})
@@ -663,16 +664,28 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Content     string                   `json:"content"`
-		Visibility  string                   `json:"visibility"`
-		Background  string                   `json:"background"`
-		Attachments []mediax.AttachmentInput `json:"attachments"`
+		Content         string                   `json:"content"`
+		Visibility      string                   `json:"visibility"`
+		Background      string                   `json:"background"`
+		Attachments     []mediax.AttachmentInput `json:"attachments"`
+		PublishLocation *postLocation            `json:"publishLocation"`
 	}
 	if err := httpx.DecodeJSON(w, r, &body, 64<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	p, err := s.createPost(r.Context(), claims.UserID, body.Content, body.Visibility, body.Background, body.Attachments)
+	if body.Visibility == "" {
+		body.Visibility = "public"
+	}
+	if body.Visibility == "public" {
+		if !validPostLocation(body.PublishLocation, time.Now()) {
+			httpx.Error(w, http.StatusBadRequest, publicLocationRequired)
+			return
+		}
+	} else {
+		body.PublishLocation = nil
+	}
+	p, err := s.createPost(r.Context(), claims.UserID, body.Content, body.Visibility, body.Background, body.PublishLocation, body.Attachments)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch err.(type) {

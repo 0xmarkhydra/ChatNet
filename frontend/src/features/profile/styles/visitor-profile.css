@@ -1,6 +1,6 @@
 .visitor-name-link{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-align:left;padding:0;cursor:pointer;overflow-wrap:anywhere}
 .visitor-name-link:hover{text-decoration:underline}
-.visitor-profile{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;background:#f7f9fd;color:#243450}
+.visitor-profile{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;background:var(--soco-surface-page);color:#243450}
 .visitor-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px max(16px,calc((100% - 1060px)/2));background:var(--soco-surface);border-bottom:1px solid var(--soco-line)}
 .visitor-toolbar button{display:grid;place-items:center;min-width:44px;min-height:44px;border:0;border-radius:10px;background:var(--soco-soft-blue);color:var(--soco-text);cursor:pointer}
 .visitor-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}

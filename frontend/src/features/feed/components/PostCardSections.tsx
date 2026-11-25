@@ -1,3 +1,4 @@
+import PostLocationTag from './PostLocationTag'
 import { useId, type ReactNode } from 'react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import UiIcon from '../../../shared/ui/UiIcon'
@@ -56,6 +57,7 @@ export function PostCardHeader({
             <button type="button" className="feed-post-open-date" aria-label="Mở bài viết" onClick={openPost}>{relativeDate(post.createdAt)}</button>
             {' · '}{post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}
           </small>
+          <PostLocationTag post={post} />
         </div>
         <FeedPostActions
           onEdit={post.repostKind === 'quick' ? undefined : onEditPost}

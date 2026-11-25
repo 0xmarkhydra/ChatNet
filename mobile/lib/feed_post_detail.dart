@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'public_post_location.dart';
 import 'media_viewer.dart';
 import 'reaction_participants_sheet.dart';
 import 'theme.dart';
@@ -384,6 +385,7 @@ class _FeedPostDetailState extends State<FeedPostDetail> {
                       '${displayDateTime(post['createdAt'])} · $visibility',
                       style: const TextStyle(color: socoMuted, fontSize: 12),
                     ),
+                    PublicPostLocationLink(post: post),
                   ],
                 ),
               ),
@@ -394,10 +396,10 @@ class _FeedPostDetailState extends State<FeedPostDetail> {
               ),
             ],
           ),
-          if (post['content']?.toString().trim().isNotEmpty == true) ...[
+          if (postContentWithoutLocation(post).trim().isNotEmpty) ...[
             const SizedBox(height: 13),
             Text(
-              post['content'].toString(),
+              postContentWithoutLocation(post),
               style: const TextStyle(
                 fontSize: 15,
                 height: 1.5,

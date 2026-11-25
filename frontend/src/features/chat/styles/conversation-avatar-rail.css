@@ -50,7 +50,7 @@
     padding: 0;
     border: 1px solid #dfe8fa;
     border-radius: 15px;
-    background: #fff;
+    background: var(--soco-surface);
     color: #3f70d8;
     cursor: pointer;
   }
@@ -129,7 +129,7 @@
     min-width: 38px;
     min-height: 38px;
     overflow: visible;
-    border: 2px solid #fff;
+    border: 2px solid var(--soco-surface);
     border-radius: 50%;
     background: #e7eeff;
     box-shadow: 0 1px 5px rgba(31, 66, 127, .09);
@@ -162,7 +162,7 @@
     border: 1.5px solid #f7f9fe;
     border-radius: 10px;
     background: #3479eb;
-    color: #fff;
+    color: var(--soco-surface);
     font-size: 9px;
     font-weight: 750;
     line-height: 1;
@@ -212,7 +212,7 @@
   }
   .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail.is-expanded {
     width: min(100%, 375px);
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 4px 0 25px rgba(34,55,94,.08);
   }
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout > .conversation-sidebar.social-chat-list {
@@ -227,7 +227,7 @@
     max-width: 100%;
     height: 100%;
     margin: 0;
-    background: #fff;
+    background: var(--soco-surface);
   }
   .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible.has-active > .conversation-panel {
     width: calc(100% - 56px);

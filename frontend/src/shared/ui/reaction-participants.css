@@ -17,7 +17,7 @@
   overflow: hidden;
   border: 1px solid #e0e6fa;
   border-radius: 20px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #25304a;
   box-shadow: 0 24px 64px rgba(19, 31, 70, .22);
 }

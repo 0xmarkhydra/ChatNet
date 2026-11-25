@@ -19,11 +19,13 @@ class DiscoverScreen extends StatefulWidget {
     required this.api,
     required this.query,
     this.onOpenConversation,
+    this.onPeopleScanned,
   });
 
   final Api api;
   final String query;
   final ValueChanged<Json>? onOpenConversation;
+  final ValueChanged<List<Json>>? onPeopleScanned;
 
   @override
   State<DiscoverScreen> createState() => _DiscoverScreenState();
@@ -127,6 +129,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         activeUntil = expires;
         active = expires == null || expires.isAfter(now);
       });
+      widget.onPeopleScanned?.call(List<Json>.of(people));
       await _loadRelationships();
     } on ApiError catch (cause) {
       if (mounted && revision == _peopleRevision) {
@@ -384,30 +387,33 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        _ModeButton(
-                          selected: peopleMode,
-                          icon: Icons.people_outline_rounded,
-                          label: 'Người ở gần',
-                          onTap: () => setState(() {
-                            mode = _NearbyMode.people;
-                            searchController.clear();
-                            error = '';
-                          }),
-                        ),
-                        const SizedBox(width: 18),
-                        _ModeButton(
-                          selected: !peopleMode,
-                          icon: Icons.location_on_outlined,
-                          label: 'Địa điểm',
-                          onTap: () => setState(() {
-                            mode = _NearbyMode.places;
-                            searchController.clear();
-                            error = '';
-                          }),
-                        ),
-                      ],
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _ModeButton(
+                            selected: peopleMode,
+                            icon: Icons.people_outline_rounded,
+                            label: 'Người ở gần',
+                            onTap: () => setState(() {
+                              mode = _NearbyMode.people;
+                              searchController.clear();
+                              error = '';
+                            }),
+                          ),
+                          const SizedBox(width: 18),
+                          _ModeButton(
+                            selected: !peopleMode,
+                            icon: Icons.location_on_outlined,
+                            label: 'Địa điểm',
+                            onTap: () => setState(() {
+                              mode = _NearbyMode.places;
+                              searchController.clear();
+                              error = '';
+                            }),
+                          ),
+                        ],
+                      ),
                     ),
                     const Divider(height: 1),
                     const SizedBox(height: 15),

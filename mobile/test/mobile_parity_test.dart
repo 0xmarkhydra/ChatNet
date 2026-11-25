@@ -505,6 +505,10 @@ void main() {
     expect(find.byKey(const ValueKey('visitor-profile-content')), findsNothing);
     expect(find.text('Alex Chen'), findsWidgets);
     expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
+    // The demo message endpoint resolves on a 160ms timer. Let that request
+    // finish before disposing the Chat widget or fake_async reports a leak.
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('visitor timeline can open full native post details', (

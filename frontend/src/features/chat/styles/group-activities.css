@@ -33,7 +33,7 @@
   padding: 7px;
   border: 1px solid #e3eaf6;
   border-radius: 15px;
-  background: #fff;
+  background: var(--soco-surface);
   box-shadow: 0 18px 46px rgba(28, 47, 87, .23);
   transform: translateY(-100%);
 }
@@ -124,7 +124,7 @@
   overflow: auto;
   border: 1px solid #e5ebf6;
   border-radius: 22px;
-  background: #fff;
+  background: var(--soco-surface);
   box-shadow: 0 32px 100px #0c1f4150;
   color: #253954;
   outline: 0;
@@ -317,7 +317,7 @@
 .group-activity-submit-vote {
   border-color: transparent;
   background: linear-gradient(115deg, #86a8fc, #7e72ec);
-  color: #fff;
+  color: var(--soco-surface);
 }
 .group-activity-dialog button:disabled {
   opacity: 0.55;

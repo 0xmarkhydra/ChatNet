@@ -558,12 +558,22 @@ func insertFeedCreateCharacterizationUser(t *testing.T, db *pgxpool.Pool, label 
 func feedCreateCharacterizationBody(t *testing.T, content string, attachments []mediax.AttachmentInput, visibility ...string) string {
 	t.Helper()
 	body := struct {
-		Content     string                   `json:"content"`
-		Visibility  string                   `json:"visibility,omitempty"`
-		Attachments []mediax.AttachmentInput `json:"attachments,omitempty"`
+		Content         string                   `json:"content"`
+		Visibility      string                   `json:"visibility,omitempty"`
+		Attachments     []mediax.AttachmentInput `json:"attachments,omitempty"`
+		PublishLocation *postLocation            `json:"publishLocation,omitempty"`
 	}{Content: content, Attachments: attachments}
 	if len(visibility) > 0 {
 		body.Visibility = visibility[0]
+	}
+	if body.Visibility == "" || body.Visibility == "public" {
+		latitude, longitude, accuracy := 21.02, 105.83, 5.0
+		body.PublishLocation = &postLocation{
+			Latitude:   &latitude,
+			Longitude:  &longitude,
+			Accuracy:   &accuracy,
+			CapturedAt: time.Now(),
+		}
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {

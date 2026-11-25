@@ -16,7 +16,7 @@ type createPostError string
 
 func (err createPostError) Error() string { return string(err) }
 
-func (s *server) createPost(ctx context.Context, userID int64, content, visibility, background string, attachmentInputs []mediax.AttachmentInput) (post, error) {
+func (s *server) createPost(ctx context.Context, userID int64, content, visibility, background string, publishLocation *postLocation, attachmentInputs []mediax.AttachmentInput) (post, error) {
 	content = strings.TrimSpace(content)
 	if visibility == "" {
 		visibility = "public"
@@ -48,12 +48,13 @@ func (s *server) createPost(ctx context.Context, userID int64, content, visibili
 	}
 	created.Visibility = visibility
 	created.Background = background
+	created.PublishLocation = publishLocation
 	created.Attachments = attachments
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO posts(user_id,content,visibility,background)
-		VALUES($1,$2,$3,$4)
+		INSERT INTO posts(user_id,content,visibility,background,publish_location)
+		VALUES($1,$2,$3,$4,$5)
 		RETURNING id,content,likes_count,created_at,updated_at`,
-		userID, content, visibility, background,
+		userID, content, visibility, background, publishLocation,
 	).Scan(&created.ID, &created.Content, &created.Likes, &created.CreatedAt, &created.UpdatedAt); err != nil {
 		return post{}, createPostError("cannot create post")
 	}

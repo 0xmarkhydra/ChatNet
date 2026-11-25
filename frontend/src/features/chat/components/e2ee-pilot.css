@@ -23,8 +23,8 @@
 .mls-pilot-primary {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   align-self: flex-start; border: 0; border-radius: 11px;
-  padding: 9px 13px; background: linear-gradient(120deg,#2563eb,#7453e7);
-  color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+  padding: 9px 13px; background: linear-gradient(120deg,var(--soco-blue),#7453e7);
+  color: var(--soco-surface); font: inherit; font-weight: 600; cursor: pointer;
 }
 .mls-pilot-primary:disabled { opacity: .55; cursor: not-allowed; }
 .mls-pilot-trust { display: flex; flex-wrap: wrap; gap: 16px; }

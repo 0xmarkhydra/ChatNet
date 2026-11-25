@@ -169,7 +169,7 @@
 }
 .feed-actions-footer button:last-child {
   color: white;
-  background: linear-gradient(120deg, #2563eb, #8b5cf6);
+  background: linear-gradient(120deg, var(--soco-blue), var(--soco-violet));
 }
 .feed-actions-footer .feed-confirm-delete {
   background: #cc3955 !important;
@@ -239,7 +239,7 @@
   padding: 6px 7px;
   border: 1px solid #e3e8f6;
   border-radius: 999px;
-  background: #fff;
+  background: var(--soco-surface);
   box-shadow: 0 8px 24px #202f5a33;
   overflow: visible;
 }
@@ -301,23 +301,23 @@
 }
 .bg-violet {
   background: linear-gradient(130deg, #536be9, #ad52d5) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .bg-blue {
   background: linear-gradient(135deg, #1d70e9, #19bad1) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .bg-sunset {
   background: linear-gradient(135deg, #ec668f, #feae5e) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .bg-mint {
   background: linear-gradient(135deg, #0d9488, #5ba6e9) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .bg-night {
   background: linear-gradient(135deg, #121d3d, #49527c) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .feed-text-background {
   border-radius: 17px;
@@ -357,7 +357,7 @@
   font-weight: 700;
 }
 .feed-filter-tabs .feed-filter-active-pill {
-  background: #fff;
+  background: var(--soco-surface);
   border-radius: 9px;
   box-shadow: 0 1px 6px #2a4c8a20;
 }
@@ -454,7 +454,7 @@
     max-height: calc(85dvh - env(safe-area-inset-bottom));
     border-radius: 26px;
     padding: 10px 12px 15px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 -10px 40px rgba(16, 24, 54, 0.2);
   }
   .feed-actions-grabber {

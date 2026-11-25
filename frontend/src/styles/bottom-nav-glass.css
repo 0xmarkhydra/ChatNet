@@ -8,8 +8,9 @@
   }
 
   .modern-shell.app-layout > .bottom-navigation {
-    position: absolute;
-    z-index: 15;
+    /* Keep the floating dock above full-height Chat/Contacts panes. */
+    position: fixed;
+    z-index: 300;
     right: max(24px, env(safe-area-inset-right));
     bottom: var(--bottom-nav-offset);
     left: max(24px, env(safe-area-inset-left));
@@ -19,12 +20,13 @@
     min-height: var(--bottom-nav-height);
     gap: 4px;
     padding: 4px;
-    border: 1px solid rgba(255, 255, 255, .7);
+    border: 1px solid rgba(255, 255, 255, .45);
     border-radius: 28px;
-    background: rgba(255, 255, 255, .5);
-    box-shadow: 0 8px 28px rgba(17, 24, 39, .2), inset 0 1px 0 rgba(255, 255, 255, .7);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
+    /* Soft translucent glass: list items remain faintly visible through the dock. */
+    background: rgba(255, 255, 255, .32);
+    box-shadow: 0 6px 22px rgba(17, 24, 39, .12), inset 0 1px 0 rgba(255, 255, 255, .5);
+    -webkit-backdrop-filter: blur(12px) saturate(135%);
+    backdrop-filter: blur(12px) saturate(135%);
   }
 
   .modern-shell.app-layout > .bottom-navigation > button {
@@ -82,18 +84,29 @@
     background: none;
   }
 
-  /* Feed scroll down: header collapses upward, nav slides below the screen. */
-  .modern-shell.app-layout > .bottom-navigation,
-  .modern-shell.app-layout > header {
-    transition: transform .45s cubic-bezier(.4, 0, .2, 1), opacity .45s ease, margin-top .45s cubic-bezier(.4, 0, .2, 1);
+  /* One scroll controller for every tab (including Newsfeed). The header leaves
+     layout instantly (the scroll hook compensates scrollTop, so content never
+     slides under the finger) and only its transform/opacity are animated. */
+  .modern-shell.app-layout > .chatnet-appbar,
+  .modern-shell.app-layout > .bottom-navigation {
+    transition:
+      transform 600ms cubic-bezier(.4, 0, .2, 1),
+      opacity 600ms ease;
+    will-change: transform;
   }
-  .modern-shell.app-layout[data-chrome-hidden] > .bottom-navigation {
-    transform: translateY(calc(100% + var(--bottom-nav-offset) + 8px));
+  /* Hiding the footer waits briefly so a short flick does not trigger it; showing is immediate. */
+  .modern-shell.app-layout.mobile-chrome-hidden > .bottom-navigation {
+    transition-delay: 200ms;
+  }
+  .modern-shell.app-layout.mobile-chrome-hidden > .chatnet-appbar {
+    margin-top: calc(-1 * var(--mobile-header-height, 0px));
+    transform: translate3d(0, -100%, 0);
     opacity: 0;
     pointer-events: none;
   }
-  .modern-shell.app-layout[data-chrome-hidden] > header {
-    margin-top: calc(-1 * var(--chrome-header-h, 0px));
+  .modern-shell.app-layout.mobile-chrome-hidden > .bottom-navigation {
+    margin-bottom: 0;
+    transform: translate3d(0, calc(100% + var(--bottom-nav-offset) + 8px), 0);
     opacity: 0;
     pointer-events: none;
   }
@@ -103,9 +116,24 @@
     box-sizing: border-box;
     padding-bottom: var(--bottom-nav-space);
   }
-  /* The feed scrolls behind the glass; only its end reserves the space. */
-  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="feed"] {
+  /* Full-height routed screens scroll behind the floating nav, rather than
+     reserving a white footer band outside the scroll surface. */
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="chat"],
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="contacts"],
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="feed"],
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="profile"],
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="discover"] {
     padding-bottom: 0;
+  }
+
+  /* Profile has additional legacy 88-90px bottom padding inside its own
+     scroll container. Remove that blank strip as well, without changing
+     the floating footer or desktop layouts. */
+  .modern-shell.app-layout > .modern-frame[data-route-page="profile"] .profile-page,
+  .modern-shell.app-layout > .modern-frame[data-route-page="profile"] .simple-view.profile-view,
+  .modern-shell.app-layout > .modern-frame[data-route-page="profile"] .simple-view.personal-timeline-view {
+    padding-bottom: 0;
+    scroll-padding-bottom: var(--bottom-nav-space);
   }
   .modern-shell.app-layout .feed-view.zalo-feed-view.social-feed {
     scroll-padding-bottom: var(--bottom-nav-space);

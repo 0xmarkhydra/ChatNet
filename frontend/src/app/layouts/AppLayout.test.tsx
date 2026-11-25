@@ -14,6 +14,8 @@ afterEach(() => {
   while (dispose.length) dispose.pop()!();
 });
 
+
+
 it("renders header and sidebar around the outlet without extra DOM wrappers", () => {
   const container = document.createElement("div");
   document.body.append(container);
