@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -1241,10 +1242,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _react(Json message, String emoji) async {
     final messageId = (message['id'] as num).toInt();
-    final messageText = message['text'];
-    final editedAt = message['editedAt'];
-    final revision = ref.read(realtimeRevisionProvider);
-    final realtimeRevision = revision.hasValue ? revision.value : null;
+    final messageSnapshot = jsonEncode(message);
     try {
       final updated = await ref
           .read(chatRepositoryProvider)
@@ -1252,11 +1250,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final current = messages
           .where((item) => item['id'] == messageId)
           .firstOrNull;
-      final latestRevision = ref.read(realtimeRevisionProvider);
-      if ((latestRevision.hasValue ? latestRevision.value : null) ==
-              realtimeRevision &&
-          current?['text'] == messageText &&
-          current?['editedAt'] == editedAt) {
+      if (current != null && jsonEncode(current) == messageSnapshot) {
         _replaceMessage(updated);
       }
     } catch (value) {

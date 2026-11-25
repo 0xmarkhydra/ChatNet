@@ -1999,7 +1999,7 @@ void main() {
     expect(find.text('👍 1'), findsOneWidget);
   });
 
-  testWidgets('stale reaction response preserves newer SSE update', (
+  testWidgets('unrelated SSE does not discard reaction response', (
     tester,
   ) async {
     final pending = Completer<Json>();
@@ -2019,17 +2019,14 @@ void main() {
         {'emoji': '👍', 'count': 1, 'mine': true},
       ],
     };
-    message['text'] = 'Updated from SSE';
-    message['reactions'] = staleResponse['reactions'];
     api.emitEvent();
     await tester.pumpAndSettle();
     expect(api.conversationRequests.length, greaterThan(1));
-    expect(find.text('Updated from SSE'), findsOneWidget);
+    expect(find.text(message['text'] as String), findsOneWidget);
 
     pending.complete(staleResponse);
     await tester.pumpAndSettle();
-    expect(find.text('Updated from SSE'), findsOneWidget);
-    expect(find.text(staleResponse['text'] as String), findsNothing);
+    expect(find.text(message['text'] as String), findsOneWidget);
     expect(find.text('👍 1'), findsOneWidget);
   });
 }
