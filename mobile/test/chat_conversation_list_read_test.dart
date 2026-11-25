@@ -14,6 +14,9 @@ class _ConversationApi extends DemoApi {
   final List<String> conversationRequests = [];
   final List<String> groupPrefetchRequests = [];
   final List<String> conversationPinRequests = [];
+  final List<String> reactionRequests = [];
+  final List<Json> reactionBodies = [];
+  final Map<int, Json> reactionMessages = {};
   final List<String> notificationRequests = [];
   final List<Json> notificationBodies = [];
   final List<Completer<List<Json>>> pendingConversationResponses = [];
@@ -21,9 +24,11 @@ class _ConversationApi extends DemoApi {
   Completer<Json>? pendingNotificationSettingsWrite;
   final List<dynamic> pageResponses = [];
   Completer<void>? pendingConversationPinRequest;
+  Completer<Json>? pendingReactionResponse;
   bool failConversationReads = false;
   bool failPageReads = false;
   bool failConversationPinRequests = false;
+  bool failReactionRequests = false;
   bool failNotificationSettingsRead = false;
   bool failNotificationSettingsWrite = false;
 
@@ -36,6 +41,36 @@ class _ConversationApi extends DemoApi {
 
   @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (method == 'POST' &&
+        path.startsWith('/api/messages/') &&
+        path.endsWith('/reactions')) {
+      reactionRequests.add('$method $path');
+      if (body != null) reactionBodies.add(Map<String, dynamic>.from(body));
+      if (failReactionRequests) {
+        throw const ApiError('Synthetic reaction failure');
+      }
+      final pending = pendingReactionResponse;
+      if (pending != null) return pending.future;
+      final messageId = int.parse(path.split('/')[3]);
+      final message =
+          reactionMessages[messageId] ??
+          messages.values
+              .expand((items) => items)
+              .firstWhere((item) => item['id'] == messageId);
+      final updated = Map<String, dynamic>.from(message);
+      final reactions = objects(updated['reactions']);
+      final old = reactions
+          .where((reaction) => reaction['emoji'] == body?['emoji'])
+          .firstOrNull;
+      if (old != null) {
+        reactions.remove(old);
+      } else {
+        reactions.add({'emoji': body?['emoji'], 'count': 1, 'mine': true});
+      }
+      updated['reactions'] = reactions;
+      reactionMessages[messageId] = updated;
+      return Map<String, dynamic>.from(updated);
+    }
     if (path.startsWith('/api/conversations/') && path.endsWith('/pin')) {
       conversationPinRequests.add('$method $path');
       final pending = pendingConversationPinRequest;
@@ -160,6 +195,31 @@ Future<void> _tapMuteAction(WidgetTester tester, int conversationId) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('Tắt thông báo hội thoại'));
   await tester.pump();
+}
+
+Future<void> _openDefaultGroupChat(
+  WidgetTester tester,
+  _ConversationApi api,
+) async {
+  api.preferences['autoTranslate'] = false;
+  await _pumpApp(tester, api);
+  await tester.pump();
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('rail-room-1')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Thảo luận chung'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _reactToMessage(
+  WidgetTester tester, {
+  required int messageId,
+  required String emoji,
+}) async {
+  await tester.longPress(find.byKey(ValueKey('chat-message-$messageId')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(emoji));
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -786,5 +846,98 @@ void main() {
     await tester.longPress(find.byKey(const ValueKey('rail-room-74')));
     await tester.pumpAndSettle();
     expect(find.text('Tắt thông báo hội thoại'), findsOneWidget);
+  });
+
+  testWidgets('message reaction posts emoji and replaces message', (
+    tester,
+  ) async {
+    final api = _ConversationApi();
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    expect(find.text('👍 1'), findsNothing);
+
+    await _reactToMessage(tester, messageId: 10, emoji: '👍');
+
+    expect(api.reactionRequests, ['POST /api/messages/10/reactions']);
+    expect(api.reactionBodies, [
+      {'emoji': '👍'},
+    ]);
+    expect(find.text('👍 1'), findsOneWidget);
+  });
+
+  testWidgets('repeating message reaction removes same emoji', (tester) async {
+    final api = _ConversationApi();
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _reactToMessage(tester, messageId: 10, emoji: '👍');
+    expect(find.text('👍 1'), findsOneWidget);
+
+    await _reactToMessage(tester, messageId: 10, emoji: '👍');
+
+    expect(api.reactionRequests, [
+      'POST /api/messages/10/reactions',
+      'POST /api/messages/10/reactions',
+    ]);
+    expect(api.reactionBodies, [
+      {'emoji': '👍'},
+      {'emoji': '👍'},
+    ]);
+    expect(find.text('👍 1'), findsNothing);
+  });
+
+  testWidgets('reaction failure keeps existing message state', (tester) async {
+    final api = _ConversationApi()..failReactionRequests = true;
+    api.messages[1]!.firstWhere(
+      (message) => message['id'] == 10,
+    )['reactions'] = [
+      {'emoji': '❤️', 'count': 2, 'mine': true},
+    ];
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    expect(find.text('❤️ 2'), findsOneWidget);
+
+    await _reactToMessage(tester, messageId: 10, emoji: '👍');
+
+    expect(api.reactionRequests, ['POST /api/messages/10/reactions']);
+    expect(find.text('❤️ 2'), findsOneWidget);
+    expect(find.text('👍 1'), findsNothing);
+    expect(find.textContaining('Synthetic reaction failure'), findsOneWidget);
+  });
+
+  testWidgets('stale reaction response overwrites newer SSE update (baseline)', (
+    tester,
+  ) async {
+    final pending = Completer<Json>();
+    final api = _ConversationApi()..pendingReactionResponse = pending;
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _reactToMessage(tester, messageId: 10, emoji: '👍');
+    expect(api.reactionRequests, ['POST /api/messages/10/reactions']);
+
+    final message = api.messages[1]!.firstWhere(
+      (message) => message['id'] == 10,
+    );
+    final staleResponse = {
+      ...message,
+      'reactions': [
+        {'emoji': '👍', 'count': 1, 'mine': true},
+      ],
+    };
+    message['text'] = 'Updated from SSE';
+    api.emitEvent();
+    await tester.pumpAndSettle();
+    expect(api.conversationRequests.length, greaterThan(1));
+    expect(find.text('Updated from SSE'), findsOneWidget);
+
+    // Baseline: _replaceMessage applies stale POST response over newer SSE data.
+    pending.complete(staleResponse);
+    await tester.pumpAndSettle();
+    expect(find.text('Updated from SSE'), findsNothing);
+    expect(find.text(staleResponse['text'] as String), findsOneWidget);
+    expect(find.text('👍 1'), findsOneWidget);
   });
 }
