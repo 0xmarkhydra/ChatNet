@@ -396,10 +396,10 @@ class _FeedPostDetailState extends State<FeedPostDetail> {
               ),
             ],
           ),
-          if (post['content']?.toString().trim().isNotEmpty == true) ...[
+          if (postContentWithoutLocation(post).trim().isNotEmpty) ...[
             const SizedBox(height: 13),
             Text(
-              post['content'].toString(),
+              postContentWithoutLocation(post),
               style: const TextStyle(
                 fontSize: 15,
                 height: 1.5,

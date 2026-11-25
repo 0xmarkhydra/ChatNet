@@ -1,4 +1,5 @@
-import type { PublishLocation } from "../types";
+import { parsePostExtras } from "./postExtras";
+import type { Post, PublishLocation } from "../types";
 
 const TARGET_ACCURACY = 10;
 const IMPROVEMENT_MS = 5000;
@@ -94,4 +95,11 @@ export async function capturePublicPostLocation(): Promise<PublishLocation> {
 export function publishLocationTag(location: PublishLocation): string {
   const name = location.placeName?.trim();
   return name ? `Đang ở ${name}` : "Đang ở vị trí đã chia sẻ";
+}
+/** The post's authorized audience receives either its GPS tag or its optional named check-in. */
+export function postLocationTag(post: Pick<Post, "visibility" | "publishLocation" | "content">) {
+  const gps = post.visibility === "public" ? post.publishLocation : undefined;
+  if (gps) return { label: publishLocationTag(gps), title: publishLocationLabel(gps.accuracy), href: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(`${gps.latitude},${gps.longitude}`), usesGps: true };
+  const name = parsePostExtras(post.content).location;
+  return name ? { label: `Đang ở ${name}`, title: "Mở bản đồ theo tên địa điểm", href: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(name), usesGps: false } : null;
 }

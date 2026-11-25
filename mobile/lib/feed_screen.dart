@@ -1341,11 +1341,22 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     final location = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Check-in địa điểm'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Nhập địa điểm'),
+        title: const Text('Gắn thẻ vị trí'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 120,
+              decoration: const InputDecoration(hintText: 'Nhập tên địa điểm'),
+            ),
+            Text(
+              postVisibility == 'public'
+                  ? 'Bài công khai luôn có vị trí GPS. Địa điểm nhập thêm là check-in tùy chọn.'
+                  : 'Không bắt buộc. Chỉ người có quyền xem bài viết mới thấy vị trí này.',
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -1508,7 +1519,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                         if (checkInLocation.isNotEmpty)
                           Chip(
                             avatar: const Icon(Icons.place_outlined, size: 17),
-                            label: Text(checkInLocation),
+                            label: Text(
+                              'Đang ở $checkInLocation',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             onDeleted: () {
                               setState(() => checkInLocation = '');
                               refreshSheet(() {});
@@ -1559,7 +1573,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                 Icons.place_outlined,
                                 color: Color(0xFFDB7436),
                               ),
-                              label: const Text('Check-in'),
+                              label: const Text('Vị trí'),
                               onPressed: () => _chooseCheckIn(refreshSheet),
                             ),
                             ActionChip(
@@ -2236,7 +2250,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               ),
             ],
           ),
-          if (post['content']?.toString().isNotEmpty == true) ...[
+          if (postContentWithoutLocation(post).isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -2247,7 +2261,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 post['background']?.toString() ?? '',
               ),
               child: Text(
-                post['content'].toString(),
+                postContentWithoutLocation(post),
                 textAlign: (post['background']?.toString().isNotEmpty ?? false)
                     ? TextAlign.center
                     : TextAlign.start,
