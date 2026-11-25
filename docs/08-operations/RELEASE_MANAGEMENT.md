@@ -5,7 +5,7 @@ version: 1.0.0
 status: Draft
 owner: Platform Engineering
 baseline_commit: 40c1f1b35958ee22c1278986bf82ff57520137a1
-last_updated: 2026-11-19
+last_updated: 2026-11-21
 normative_basis: "ISO/IEC/IEEE 12207:2026, ISO/IEC/IEEE 15289:2019"
 ---
 
@@ -17,6 +17,21 @@ normative_basis: "ISO/IEC/IEEE 12207:2026, ISO/IEC/IEEE 15289:2019"
 | Backend | Container theo SHA, migration trên DB tương đương staging, health, tích hợp PostgreSQL/Redis và provider |
 | Electron | Bản chạy trên OS/kiến trúc công bố, kiểm quyền native, ký/notarize theo nền tảng, update và rollback. Bản cài nội bộ không thay thế bằng chứng |
 | Flutter | Build và thiết bị thật cho từng nền tảng công bố, signing/store, Auth và dữ liệu |
+
+## Cổng quyết định và trạng thái
+
+Release record phải có các trường dưới đây. Không suy ra `PASS` từ việc artifact được build.
+
+| Gate | Evidence bắt buộc | Trạng thái tài liệu này |
+|---|---|---|
+| P0/P1 acceptance | Báo cáo checkpoint cùng SHA, kết quả và quyết định hoãn nếu có | NOT RUN |
+| Hosted CI | Run ID/URL, SHA khớp, job bắt buộc và log lưu trữ | NOT RUN |
+| SLO/RPO/RTO | Mục tiêu đã phê duyệt và số đo của môi trường phát hành | NOT SET |
+| Backup restore | Restore drill đạt integrity check và thời gian RTO/RPO được ghi | NOT RUN |
+| Rollback | Staging drill đạt, schema tương thích, artifact trước và smoke sau rollback | NOT RUN |
+| Release decision | `GO`/`NO-GO`/`DEFERRED`, owner, thời điểm, gap và link evidence | NOT RUN |
+
+`GO` chỉ hợp lệ khi mọi gate áp dụng là `PASS`. `NOT SET`, `NOT RUN`, `BLOCKED` và `FAIL` phải giữ nguyên trạng thái hoặc chuyển `NO-GO`.
 
 ## Luồng quyết định
 

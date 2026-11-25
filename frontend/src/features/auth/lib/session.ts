@@ -2,6 +2,39 @@ import type { Session } from '../../../shared/types/session'
 
 export type { Session }
 
+const SESSION_STORAGE_KEY = 'chatnet-session'
+
+function sessionIdFromToken(token: string): string {
+  try {
+    const encoded = token.split('.')[1]
+    if (!encoded) return token
+    const payload = JSON.parse(atob(encoded.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(encoded.length / 4) * 4, '='))) as { sid?: unknown }
+    return typeof payload.sid === 'string' && payload.sid ? payload.sid : token
+  } catch {
+    return token
+  }
+}
+
+function accessSession(session: Session): Session {
+  const safe = { ...session }
+  delete safe.refreshToken
+  if (safe.sessionId === session.refreshToken) safe.sessionId = sessionIdFromToken(session.token)
+  return safe
+}
+
+export function persistSession(session: Session): void {
+  try {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(accessSession(session)))
+  } catch {
+    // Storage is optional. Remove stale credentials when a write fails.
+    try { localStorage.removeItem(SESSION_STORAGE_KEY) } catch { /* private mode */ }
+  }
+}
+
+export function clearPersistedSession(): void {
+  try { localStorage.removeItem(SESSION_STORAGE_KEY) } catch { /* private mode */ }
+}
+
 export function parseSession(value: unknown): Session | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Session
@@ -12,12 +45,20 @@ export function parseSession(value: unknown): Session | null {
     (candidate.refreshToken !== undefined && (typeof candidate.refreshToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(candidate.refreshToken))) ||
     (candidate.sessionId !== undefined && (typeof candidate.sessionId !== 'string' || !candidate.sessionId))
   ) return null
-  return { ...candidate, sessionId: candidate.sessionId || candidate.refreshToken || candidate.token }
+  return {
+    ...candidate,
+    sessionId: candidate.sessionId && candidate.sessionId !== candidate.refreshToken
+      ? candidate.sessionId
+      : sessionIdFromToken(candidate.token),
+  }
 }
 
 export function loadSession(): Session | null {
   try {
-    return parseSession(JSON.parse(localStorage.getItem('chatnet-session') || 'null'))
+    const session = parseSession(JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || 'null'))
+    if (!session) return null
+    if (session.refreshToken !== undefined) persistSession(session)
+    return accessSession(session)
   } catch {
     return null
   }
@@ -57,19 +98,13 @@ export function createSessionClient(baseURL: string, state: {
       state.save(next)
       return next
     }
-    // Legacy access-only credentials cannot safely recreate a refresh token.
-    // Otherwise logging out could be reversed while a JWT remains valid.
-    if (!previous.refreshToken) {
-      if (unchanged(previous)) state.expire()
-      return null
-    }
     const response = await fetch(`${baseURL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // The refresh credential is required; access tokens cannot renew sessions.
       },
-      body: JSON.stringify({ refreshToken: previous.refreshToken || '' }),
+      body: JSON.stringify({}),
+      credentials: 'include',
       cache: 'no-store',
       signal: AbortSignal.timeout(15_000),
     })
@@ -80,7 +115,7 @@ export function createSessionClient(baseURL: string, state: {
     }
     if (!response.ok) throw new Error('Không thể gia hạn phiên. Vui lòng thử lại.')
     const next = parseSession(await response.json())
-    if (!next?.refreshToken || next.user.id !== previous.user.id) {
+    if (!next || next.refreshToken !== undefined || next.user.id !== previous.user.id) {
       throw new Error('Phản hồi gia hạn phiên không hợp lệ.')
     }
     if (!unchanged(previous)) return state.get()
@@ -93,7 +128,7 @@ export function createSessionClient(baseURL: string, state: {
     const current = state.get()
     if (!current) return Promise.resolve(null)
     if (pending?.sessionId === current.sessionId) return pending.promise
-    if (!force && (nativeAuth || current.refreshToken) && !expiresSoon(current.token)) return Promise.resolve(current)
+    if (!force && !expiresSoon(current.token)) return Promise.resolve(current)
     const operation = { sessionId: current.sessionId, promise: renew(current) }
     pending = operation
     void operation.promise.finally(() => {
@@ -117,13 +152,10 @@ export function createSessionClient(baseURL: string, state: {
   }
 
   async function verify(previous: Session): Promise<boolean> {
-    if (!nativeAuth && !previous.refreshToken) {
-      if (state.get()?.sessionId === previous.sessionId) state.expire()
-      return false
-    }
     const response = await fetch(`${baseURL}/api/auth/session/status`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${previous.token}` },
+      credentials: 'include',
       cache: 'no-store',
       signal: AbortSignal.timeout(15_000),
     })

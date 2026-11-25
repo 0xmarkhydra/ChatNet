@@ -141,3 +141,69 @@ func TestModerationThreeAccountsIntegration(t *testing.T) {
 		t.Fatalf("expected dismissed decision, got %s", dismissed)
 	}
 }
+
+func TestModerationStoryRemovalQueuesMediaCleanupIntegration(t *testing.T) {
+	url := os.Getenv("CHATNET_TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("set CHATNET_TEST_DATABASE_URL for story moderation integration")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	db, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := database.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+
+	prefix := fmt.Sprintf("story_moderation_%d", time.Now().UnixNano())
+	var ownerID, moderatorID int64
+	for index, target := range []*int64{&ownerID, &moderatorID} {
+		name := fmt.Sprintf("%s_%d", prefix, index)
+		if err := db.QueryRow(ctx, `INSERT INTO users(email,username,password_hash,display_name)
+			VALUES($1,$2,'test',$2) RETURNING id`, name+"@example.invalid", name).Scan(target); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer db.Exec(context.Background(), `DELETE FROM users WHERE id IN ($1,$2)`, ownerID, moderatorID)
+	if _, err := db.Exec(ctx, "INSERT INTO feed_moderators(user_id) VALUES($1)", moderatorID); err != nil {
+		t.Fatal(err)
+	}
+	storageRef := "story/moderation/" + prefix + ".jpg"
+	defer db.Exec(context.Background(), `DELETE FROM story_media_cleanup WHERE storage_ref=$1`, storageRef)
+	var storyID, reportID int64
+	if err := db.QueryRow(ctx, `INSERT INTO stories(user_id,storage_ref,original_name,content_type,size_bytes,kind)
+		VALUES($1,$2,'story.jpg','image/jpeg',100,'image') RETURNING id`, ownerID, storageRef).Scan(&storyID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(ctx, `INSERT INTO feed_reports(reporter_id,target_type,target_id,reason)
+		VALUES($1,'story',$2,'test') RETURNING id`, moderatorID, storyID).Scan(&reportID); err != nil {
+		t.Fatal(err)
+	}
+	token, err := authx.Sign("moderation-test-secret", moderatorID, prefix, prefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &server{db: db}
+	mux := http.NewServeMux()
+	mux.Handle("PATCH /api/feed/moderation/reports/{id}", authx.Middleware("moderation-test-secret", http.HandlerFunc(s.reviewModerationReport)))
+	req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/api/feed/moderation/reports/%d", reportID), strings.NewReader(`{"decision":"remove"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("moderation removal got %d: %s", res.Code, res.Body.String())
+	}
+	var stories, cleanupJobs int
+	if err := db.QueryRow(ctx, "SELECT count(*) FROM stories WHERE id=$1", storyID).Scan(&stories); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(ctx, "SELECT count(*) FROM story_media_cleanup WHERE storage_ref=$1", storageRef).Scan(&cleanupJobs); err != nil {
+		t.Fatal(err)
+	}
+	if stories != 0 || cleanupJobs != 1 {
+		t.Fatalf("story rows=%d cleanup jobs=%d", stories, cleanupJobs)
+	}
+}

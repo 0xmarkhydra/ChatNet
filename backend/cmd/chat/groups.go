@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -102,7 +101,7 @@ func (s *server) updateGroup(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name string `json:"name"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -197,7 +196,7 @@ func (s *server) addGroupMembers(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Usernames []string `json:"usernames"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -328,7 +327,7 @@ func (s *server) updateGroupMemberRole(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Role string `json:"role"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}

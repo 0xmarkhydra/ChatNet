@@ -39,17 +39,17 @@ func TestSignAndParse(t *testing.T) {
 	}
 }
 
-func TestTokenFromRequestQueryOnlyForEvents(t *testing.T) {
+func TestTokenFromRequestOnlyAcceptsAuthorizationHeader(t *testing.T) {
 	for _, tc := range []struct {
 		method, path, header, expected string
 	}{
-		{http.MethodGet, "/api/events?token=event-token", "", "event-token"},
+		{http.MethodGet, "/api/events?ticket=event-ticket", "", ""},
 		{http.MethodGet, "/api/users/search?token=stolen-token", "", ""},
 		{http.MethodPost, "/api/auth/logout?token=stolen-token", "", ""},
 		{http.MethodPost, "/api/events?token=stolen-token", "", ""},
 		{http.MethodGet, "/api/events/?token=stolen-token", "", ""},
 		{http.MethodGet, "/api/users/search?token=stolen-token", "Bearer header-token", "header-token"},
-		{http.MethodGet, "/api/events?token=stolen-token", "Bearer header-token", "header-token"},
+		{http.MethodGet, "/api/events?ticket=event-ticket", "Bearer header-token", "header-token"},
 	} {
 		r := httptest.NewRequest(tc.method, tc.path, nil)
 		if tc.header != "" {

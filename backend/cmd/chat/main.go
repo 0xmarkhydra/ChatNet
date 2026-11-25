@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"chatnet/internal/authx"
@@ -91,16 +91,36 @@ type realtimeEvent struct {
 	LastReadMessageID int64         `json:"lastReadMessageId,omitempty"`
 }
 
+const (
+	pushQueueCapacity = 64
+	pushWorkerCount   = 4
+)
+
+type pushJob struct {
+	userIDs      []int64
+	notification onesignalx.Notification
+}
+
 type server struct {
 	db        *pgxpool.Pool
 	redis     *redis.Client
 	jwtSecret string
 	push      *onesignalx.Client
 	storage   *objectstore.Client
+	pushQueue chan pushJob
+	pushCtx   context.Context
+	pushStop  context.CancelFunc
+	pushStart sync.Once
 }
+
+const conversationListDefaultLimit = 100
 
 func main() {
 	ctx := context.Background()
+	jwtSecret, err := config.RequiredSecret("JWT_SECRET")
+	if err != nil {
+		log.Fatal(err)
+	}
 	db, err := database.Open(ctx, config.Env("DATABASE_URL", "postgres://chatnet:chatnet@localhost:5432/chatnet?sslmode=disable"))
 	if err != nil {
 		log.Fatal(err)
@@ -122,10 +142,12 @@ func main() {
 	s := &server{
 		db:        db,
 		redis:     rdb,
-		jwtSecret: config.Env("JWT_SECRET", "dev-secret-change-me"),
+		jwtSecret: jwtSecret,
 		push:      onesignalx.New(config.Env("ONESIGNAL_APP_ID", ""), config.Env("ONESIGNAL_REST_API_KEY", "")),
 		storage:   objectstore.NewFromEnv(),
 	}
+	s.startPushWorkers(ctx)
+	defer s.stopPushWorkers()
 	go s.expireNearby(ctx)
 	go s.cleanupOrphanChatMedia(ctx)
 	mux := http.NewServeMux()
@@ -134,6 +156,10 @@ func main() {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
 	})
+	mux.HandleFunc("GET /live", func(w http.ResponseWriter, _ *http.Request) {
+		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "chat"})
+	})
+	mux.HandleFunc("GET /ready", s.ready)
 	mux.Handle("GET /api/push/config", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.pushConfig)))
 	mux.Handle("POST /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.upsertPushSubscription)))
 	mux.Handle("DELETE /api/push/subscription", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deletePushSubscription)))
@@ -241,11 +267,40 @@ func main() {
 	mux.Handle("GET /api/conversations/{id}/join-requests", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupJoinRequests)))
 	mux.Handle("POST /api/conversations/{id}/join-requests/{requestId}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.reviewGroupJoinRequest)))
 	mux.Handle("GET /api/conversations/{id}/admin-audit", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupAudit)))
+	mux.Handle("POST /api/events/ticket", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.eventTicket)))
 	mux.Handle("GET /api/events", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.events)))
 
 	port := config.Env("PORT", "8082")
+	httpServer := &http.Server{
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		// Keep WriteTimeout disabled: /api/events is long-lived SSE.
+		IdleTimeout:       60 * time.Second,
+	}
 	log.Printf("chat service listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Fatal(httpServer.ListenAndServe())
+}
+
+func (s *server) ready(w http.ResponseWriter, r *http.Request) {
+	dependencies := map[string]string{"database": "ok", "redis": "ok"}
+	dbCtx, dbCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+	defer dbCancel()
+	if s.db == nil || s.db.Ping(dbCtx) != nil {
+		dependencies["database"] = "unavailable"
+	}
+	redisCtx, redisCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+	defer redisCancel()
+	if s.redis == nil || s.redis.Ping(redisCtx).Err() != nil {
+		dependencies["redis"] = "unavailable"
+	}
+	ready := dependencies["database"] == "ok" && dependencies["redis"] == "ok"
+	status, code := "ok", http.StatusOK
+	if !ready {
+		status, code = "not_ready", http.StatusServiceUnavailable
+	}
+	httpx.JSON(w, code, map[string]any{"status": status, "service": "chat", "dependencies": dependencies})
 }
 
 func (s *server) pushConfig(w http.ResponseWriter, r *http.Request) {
@@ -259,18 +314,13 @@ func (s *server) pushConfig(w http.ResponseWriter, r *http.Request) {
 func (s *server) presignMedia(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	const maxMetadataBytes = 8 << 10
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxMetadataBytes))
-	if err != nil {
+	var body mediax.UploadRequest
+	if err := httpx.DecodeJSON(w, r, &body, maxMetadataBytes); err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
 			httpx.Error(w, http.StatusRequestEntityTooLarge, "request body too large")
 			return
 		}
-		httpx.Error(w, http.StatusBadRequest, "invalid body")
-		return
-	}
-	var body mediax.UploadRequest
-	if err := json.Unmarshal(data, &body); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -292,7 +342,7 @@ func (s *server) upsertPushSubscription(w http.ResponseWriter, r *http.Request) 
 	var body struct {
 		SubscriptionID string `json:"subscriptionId"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -319,7 +369,7 @@ func (s *server) deletePushSubscription(w http.ResponseWriter, r *http.Request) 
 	var body struct {
 		SubscriptionID string `json:"subscriptionId"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -459,6 +509,15 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
+	page, paged, pageErr := searchx.ParsePageRequest(r.URL.Query())
+	if pageErr != nil {
+		httpx.Error(w, http.StatusBadRequest, pageErr.Error())
+		return
+	}
+	if paged {
+		s.searchUsersPage(w, r, page)
+		return
+	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 	q = strings.TrimPrefix(q, "@")
@@ -517,6 +576,145 @@ func (s *server) searchUsers(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, items)
 }
 
+type userSearchCursor struct {
+	Rank      int       `json:"r"`
+	Username  string    `json:"u,omitempty"`
+	ID        int64     `json:"i"`
+	CreatedAt time.Time `json:"t,omitempty"`
+}
+
+type userSearchItem struct {
+	ID          int64  `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName"`
+	Online      bool   `json:"online"`
+}
+
+func (s *server) searchUsersPage(w http.ResponseWriter, r *http.Request, page searchx.PageRequest) {
+	claims, _ := authx.ClaimsFromContext(r.Context())
+	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
+	q = strings.TrimPrefix(q, "@")
+	if len(q) > 254 {
+		httpx.Error(w, http.StatusBadRequest, "search query must be <= 254 bytes")
+		return
+	}
+	items := make([]userSearchItem, 0)
+	if q == "" {
+		httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nil})
+		return
+	}
+
+	var cursor userSearchCursor
+	if page.Cursor != "" {
+		var err error
+		cursor, err = searchx.DecodeCursor[userSearchCursor](page.Cursor)
+		if err != nil || cursor.ID <= 0 ||
+			(page.Sort == "newest" && cursor.CreatedAt.IsZero()) ||
+			(page.Sort == "relevance" && (cursor.Rank < 0 || cursor.Rank > 5 || cursor.Username == "")) {
+			httpx.Error(w, http.StatusBadRequest, "invalid cursor")
+			return
+		}
+	}
+
+	rankSQL := `CASE
+		WHEN searchable_by_username AND lower(username)=$2 THEN 0
+		WHEN searchable_by_email AND lower(email)=$2 THEN 1
+		WHEN searchable_by_username AND strpos(` + searchx.FoldSQL("username") + `, ` + searchx.FoldSQL("$2") + `)=1 THEN 2
+		WHEN searchable_by_username AND strpos(` + searchx.FoldSQL("username") + `, ` + searchx.FoldSQL("$2") + `)>0 THEN 3
+		WHEN searchable_by_name AND strpos(` + searchx.FoldSQL("display_name") + `, ` + searchx.FoldSQL("$2") + `)=1 THEN 4
+		ELSE 5 END`
+	query := `WITH candidates AS (
+		SELECT id,username,display_name,show_online_status,created_at,` + rankSQL + ` AS rank
+		FROM users
+		WHERE id<>$1
+		  AND NOT EXISTS (
+		    SELECT 1 FROM user_blocks b
+		    WHERE (b.blocker_id=$1 AND b.blocked_id=users.id)
+		       OR (b.blocker_id=users.id AND b.blocked_id=$1)
+		  )
+		  AND (
+			(searchable_by_username AND strpos(` + searchx.FoldSQL("username") + `, ` + searchx.FoldSQL("$2") + `)>0)
+			OR (searchable_by_email AND lower(email)=$2)
+			OR (searchable_by_name AND strpos(` + searchx.FoldSQL("display_name") + `, ` + searchx.FoldSQL("$2") + `)>0)
+		  )
+		  AND ($3::timestamptz IS NULL OR created_at >= $3)
+	)
+	SELECT id,username,display_name,show_online_status,rank,created_at FROM candidates`
+	args := []any{claims.UserID, q, page.Since}
+	if cursor.ID > 0 {
+		if page.Sort == "newest" {
+			query += ` WHERE (created_at,id)<($4::timestamptz,$5::bigint)`
+			args = append(args, cursor.CreatedAt, cursor.ID)
+		} else {
+			query += ` WHERE (rank,username,id)>($4::integer,$5::text,$6::bigint)`
+			args = append(args, cursor.Rank, cursor.Username, cursor.ID)
+		}
+	}
+	if page.Sort == "newest" {
+		query += ` ORDER BY created_at DESC,id DESC`
+	} else {
+		query += ` ORDER BY rank ASC,username ASC,id ASC`
+	}
+	query += ` LIMIT $` + strconv.Itoa(len(args)+1)
+	args = append(args, page.Limit+1)
+
+	rows, err := s.db.Query(r.Context(), query, args...)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot search users")
+		return
+	}
+	type result struct {
+		item      userSearchItem
+		rank      int
+		createdAt time.Time
+	}
+	results := make([]result, 0, page.Limit+1)
+	for rows.Next() {
+		var item result
+		var showOnline bool
+		if rows.Scan(&item.item.ID, &item.item.Username, &item.item.DisplayName, &showOnline, &item.rank, &item.createdAt) != nil {
+			rows.Close()
+			httpx.Error(w, http.StatusInternalServerError, "cannot search users")
+			return
+		}
+		if showOnline && s.redis != nil {
+			item.item.Online = s.redis.Exists(r.Context(), presenceKey(item.item.ID)).Val() > 0
+		}
+		results = append(results, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		httpx.Error(w, http.StatusInternalServerError, "cannot search users")
+		return
+	}
+	rows.Close()
+	hasMore := len(results) > page.Limit
+	if hasMore {
+		results = results[:page.Limit]
+	}
+	for _, result := range results {
+		items = append(items, result.item)
+	}
+	var nextCursor any
+	if hasMore && len(results) > 0 {
+		last := results[len(results)-1]
+		value := userSearchCursor{ID: last.item.ID}
+		if page.Sort == "newest" {
+			value.CreatedAt = last.createdAt
+		} else {
+			value.Rank = last.rank
+			value.Username = last.item.Username
+		}
+		encoded, err := searchx.EncodeCursor(value)
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "cannot create search cursor")
+			return
+		}
+		nextCursor = encoded
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nextCursor})
+}
+
 func (s *server) getTranslationPreferences(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 
@@ -548,7 +746,7 @@ func (s *server) updateTranslationPreferences(w http.ResponseWriter, r *http.Req
 		TargetLanguage string `json:"targetLanguage"`
 		AutoTranslate  bool   `json:"autoTranslate"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -594,7 +792,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	limit := 2147483647 // Preserve the original unpaginated response for older app versions.
+	limit := conversationListDefaultLimit
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 1 || n > 100 {
@@ -787,7 +985,7 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Username string `json:"username"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -871,7 +1069,7 @@ func (s *server) createGroup(w http.ResponseWriter, r *http.Request) {
 		Rules       string   `json:"rules"`
 		Visibility  string   `json:"visibility"`
 	}
-	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -1276,7 +1474,7 @@ func (s *server) createMessage(w http.ResponseWriter, r *http.Request) {
 		ChannelID        int64                    `json:"channelId"`
 		Attachments      []mediax.AttachmentInput `json:"attachments"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 64<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -1505,7 +1703,7 @@ func (s *server) editMessage(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Text string `json:"text"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 8<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -1614,7 +1812,7 @@ func (s *server) toggleMessageReaction(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Emoji string `json:"emoji"`
 	}
-	if json.NewDecoder(r.Body).Decode(&body) != nil {
+	if err := httpx.DecodeJSON(w, r, &body, 4<<10); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -1966,40 +2164,87 @@ func (s *server) resolveGroupMembers(ctx context.Context, ownerID int64, ownerUs
 	return userIDs, missing
 }
 
+func (s *server) startPushWorkers(parent context.Context) {
+	if !s.push.Configured() {
+		return
+	}
+	s.pushStart.Do(func() {
+		s.pushCtx, s.pushStop = context.WithCancel(parent)
+		s.pushQueue = make(chan pushJob, pushQueueCapacity)
+		for i := 0; i < pushWorkerCount; i++ {
+			go s.pushWorker(s.pushCtx)
+		}
+	})
+}
+
+func (s *server) stopPushWorkers() {
+	if s.pushStop != nil {
+		s.pushStop()
+	}
+}
+
+func (s *server) pushWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case job := <-s.pushQueue:
+			s.deliverPush(ctx, job)
+		}
+	}
+}
+
 func (s *server) sendPushAsync(userIDs []int64, notification onesignalx.Notification) {
 	if !s.push.Configured() || len(userIDs) == 0 {
 		return
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-		defer cancel()
+	s.startPushWorkers(context.Background())
+	job := pushJob{
+		userIDs:      append([]int64(nil), userIDs...),
+		notification: notification,
+	}
+	select {
+	case <-s.pushCtx.Done():
+		log.Printf("push notification enqueue canceled")
+	case s.pushQueue <- job:
+	default:
+		log.Printf("push notification queue full; dropping notification")
+	}
+}
 
-		rows, err := s.db.Query(ctx, `
-			SELECT subscription_id::text
-			FROM push_subscriptions
-			WHERE user_id = ANY($1::bigint[])
-			ORDER BY updated_at DESC`, userIDs)
-		if err != nil {
-			log.Printf("load push subscriptions failed: %v", err)
-			return
-		}
-		defer rows.Close()
+func (s *server) deliverPush(parent context.Context, job pushJob) {
+	ctx, cancel := context.WithTimeout(parent, 8*time.Second)
+	defer cancel()
 
-		subscriptionIDs := []string{}
-		for rows.Next() {
-			var id string
-			if rows.Scan(&id) == nil && id != "" {
-				subscriptionIDs = append(subscriptionIDs, id)
-			}
-		}
-		if len(subscriptionIDs) == 0 {
-			return
-		}
+	rows, err := s.db.Query(ctx, `
+		SELECT subscription_id::text
+		FROM push_subscriptions
+		WHERE user_id = ANY($1::bigint[])
+		ORDER BY updated_at DESC`, job.userIDs)
+	if err != nil {
+		log.Printf("load push subscriptions failed: %v", err)
+		return
+	}
+	defer rows.Close()
 
-		if err := s.push.SendToSubscriptions(ctx, subscriptionIDs, notification); err != nil {
-			log.Printf("onesignal notification failed: %v", err)
+	subscriptionIDs := []string{}
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil && id != "" {
+			subscriptionIDs = append(subscriptionIDs, id)
 		}
-	}()
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("load push subscriptions failed: %v", err)
+		return
+	}
+	if len(subscriptionIDs) == 0 {
+		return
+	}
+
+	if err := s.push.SendToSubscriptions(ctx, subscriptionIDs, job.notification); err != nil {
+		log.Printf("onesignal notification failed: %v", err)
+	}
 }
 
 func directKey(a, b int64) string {

@@ -45,7 +45,76 @@ func TestRefreshRejectsInvalidCredentials(t *testing.T) {
 	}
 }
 
+func TestBrowserSessionUsesSecureCookieWithoutJSONRefreshToken(t *testing.T) {
+	t.Setenv("CHATNET_WEB_URL", "https://chat.example")
+	t.Setenv("CHATNET_CORS_ORIGINS", "https://chat.example")
+	r := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	r.Header.Set("Origin", "https://chat.example")
+	w := httptest.NewRecorder()
+	u := user{ID: 7, Username: "tester"}
+	writeSessionResponse(w, r, http.StatusOK, "access-token", strings.Repeat("r", 43), u)
+
+	cookie := w.Result().Cookies()[0]
+	if cookie.Name != refreshCookieName || cookie.Value != strings.Repeat("r", 43) ||
+		cookie.Path != "/api/auth" || !cookie.HttpOnly || !cookie.Secure ||
+		cookie.SameSite != http.SameSiteStrictMode || cookie.Domain != "" || cookie.MaxAge != int(sessionTTL.Seconds()) {
+		t.Fatalf("unexpected refresh cookie: %+v", cookie)
+	}
+	if strings.Contains(w.Body.String(), "refreshToken") || !strings.Contains(w.Body.String(), "access-token") {
+		t.Fatalf("browser response must omit refresh token: %s", w.Body.String())
+	}
+	if w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("session response cache policy = %q", w.Header().Get("Cache-Control"))
+	}
+}
+
+func TestClearRefreshCookieKeepsCookieScopeAndSecurity(t *testing.T) {
+	w := httptest.NewRecorder()
+	clearRefreshCookie(w)
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("clear response cookies = %d, want 1", len(cookies))
+	}
+	cookie := cookies[0]
+	if cookie.Name != refreshCookieName || cookie.Path != "/api/auth" || cookie.MaxAge >= 0 ||
+		!cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteStrictMode || cookie.Domain != "" {
+		t.Fatalf("unexpected clear cookie: %+v", cookie)
+	}
+}
+
+func TestNativeSessionResponseKeepsRefreshTokenJSON(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	writeSessionResponse(w, r, http.StatusOK, "access-token", strings.Repeat("r", 43), user{ID: 7})
+	if !strings.Contains(w.Body.String(), "refreshToken") || len(w.Result().Cookies()) != 0 {
+		t.Fatalf("native response must retain JSON credential without cookie: %s", w.Body.String())
+	}
+}
+
+func TestRefreshCookieRequiresConfiguredWebOrigin(t *testing.T) {
+	t.Setenv("CHATNET_WEB_URL", "https://chat.example")
+	t.Setenv("CHATNET_CORS_ORIGINS", "https://chat.example")
+	for _, tc := range []struct {
+		origin string
+		want   int
+		ok     bool
+	}{{origin: "https://chat.example", want: http.StatusOK, ok: true}, {origin: "https://evil.example", want: http.StatusForbidden}} {
+		t.Run(tc.origin, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", strings.NewReader(`{}`))
+			r.AddCookie(&http.Cookie{Name: refreshCookieName, Value: strings.Repeat("r", 43)})
+			r.Header.Set("Origin", tc.origin)
+			w := httptest.NewRecorder()
+			_, ok := readRefreshToken(w, r)
+			if ok != tc.ok || (!tc.ok && w.Code != tc.want) {
+				t.Fatalf("readRefreshToken status=%d ok=%v, want %d/%v", w.Code, ok, tc.want, tc.ok)
+			}
+		})
+	}
+}
+
 func TestSessionIntegration(t *testing.T) {
+	t.Setenv("CHATNET_WEB_URL", "https://chat.example")
+	t.Setenv("CHATNET_CORS_ORIGINS", "https://chat.example")
 	if os.Getenv("CHATNET_TEST_DATABASE_URL") == "" {
 		t.Skip("set CHATNET_TEST_DATABASE_URL for disposable database")
 	}
@@ -110,6 +179,27 @@ func TestSessionIntegration(t *testing.T) {
 	}
 	// A restart needs only PostgreSQL and the same signing secret, not Redis.
 	s = &server{db: db, jwtSecret: s.jwtSecret}
+	browserSessionResponse := httptest.NewRecorder()
+	browserSessionRequest := httptest.NewRequest("POST", "/", nil)
+	browserSessionRequest.Header.Set("Origin", "https://chat.example")
+	s.startSession(browserSessionResponse, browserSessionRequest, u, http.StatusOK)
+	browserCookies := browserSessionResponse.Result().Cookies()
+	if browserSessionResponse.Code != http.StatusOK || len(browserCookies) != 1 || browserCookies[0].Name != refreshCookieName {
+		t.Fatalf("browser session issue failed: %d cookies=%+v", browserSessionResponse.Code, browserCookies)
+	}
+	browserLogoutRequest := httptest.NewRequest("POST", "/", strings.NewReader(`{}`))
+	browserLogoutRequest.Header.Set("Origin", "https://chat.example")
+	browserLogoutRequest.AddCookie(browserCookies[0])
+	browserLogoutResponse := httptest.NewRecorder()
+	s.logout(browserLogoutResponse, browserLogoutRequest)
+	clearedCookies := browserLogoutResponse.Result().Cookies()
+	if browserLogoutResponse.Code != http.StatusNoContent || len(clearedCookies) != 1 ||
+		clearedCookies[0].Name != refreshCookieName || clearedCookies[0].Path != "/api/auth" ||
+		clearedCookies[0].MaxAge >= 0 || !clearedCookies[0].HttpOnly || !clearedCookies[0].Secure ||
+		clearedCookies[0].SameSite != http.SameSiteStrictMode {
+		t.Fatalf("browser logout did not expire secure refresh cookie: status=%d cookies=%+v",
+			browserLogoutResponse.Code, clearedCookies)
+	}
 	if _, err := db.Exec(ctx, "UPDATE users SET display_name='Updated' WHERE id=$1", u.ID); err != nil {
 		t.Fatal(err)
 	}

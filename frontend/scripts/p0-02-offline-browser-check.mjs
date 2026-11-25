@@ -31,9 +31,11 @@ const conversation = {
   createdAt: '2026-10-29T02:00:00.000Z',
 }
 const cors = {
-  'access-control-allow-origin': '*',
+  'access-control-allow-origin': origin,
+  'access-control-allow-credentials': 'true',
   'access-control-allow-headers': 'Authorization, Content-Type',
   'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  vary: 'Origin',
 }
 const records = new Map()
 const requests = []

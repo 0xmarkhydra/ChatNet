@@ -25,12 +25,16 @@ class StubApi extends Api {
   final List<String> requests = [];
   int searches = 0;
   int refreshes = 0;
+  bool failConversationReads = false;
   String? lastAuthentication;
 
   @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
     requests.add('$method $path');
-    if (path == '/api/conversations?limit=25&offset=0') {
+    if (path == '/api/conversations?limit=25') {
+      if (failConversationReads) {
+        throw ApiError('Synthetic conversation failure');
+      }
       return [
         {
           'id': userId,
@@ -41,6 +45,9 @@ class StubApi extends Api {
           'lastMessage': 'hi',
           'online': true,
           'createdAt': '2026-11-18T10:00:00+07:00',
+          'avatarUrl': 'https://example.invalid/group.svg',
+          'avatarMembers': ['member-a', 'member-b'],
+          'muted': true,
         },
       ];
     }
@@ -167,6 +174,12 @@ void main() {
 
       final conversations = await container.read(conversationsProvider.future);
       expect(conversations.single.id, 1);
+      expect(conversations.single.avatarMembers, ['member-a', 'member-b']);
+      expect(
+        conversations.single.avatarUrl,
+        'https://example.invalid/group.svg',
+      );
+      expect(conversations.single.muted, isTrue);
       final messages = await container.read(
         messagesProvider(const MessageQuery(1, channelId: 5)).future,
       );
@@ -179,6 +192,25 @@ void main() {
       expect(friends.friends.single.status, FriendStatus.accepted);
     },
   );
+
+  test('conversation refresh failure keeps last known provider data', () async {
+    final api = StubApi();
+    final container = ProviderContainer(
+      overrides: [apiProvider.overrideWithValue(api)],
+    );
+    addTearDown(() {
+      container.dispose();
+      api.dispose();
+    });
+
+    final initial = await container.read(conversationsProvider.future);
+    api.failConversationReads = true;
+    await expectLater(
+      container.read(conversationsProvider.notifier).refresh(),
+      throwsA(isA<ApiError>()),
+    );
+    expect(container.read(conversationsProvider).value, initial);
+  });
 
   test(
     'call history AsyncNotifier supports forced refresh and session isolation',

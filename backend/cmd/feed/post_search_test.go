@@ -127,6 +127,37 @@ func TestPostSearchGlobalCursorAndPrivacyIntegration(t *testing.T) {
 	if len(authorPage) != 2 || authorPage[0].ID != unrelatedID || authorPage[1].ID != literalID {
 		t.Fatalf("username search failed: %+v", authorPage)
 	}
+
+	searchPage := func(cursor string) (int, []post, *string) {
+		t.Helper()
+		path := "/api/posts?limit=2&q=" + url.QueryEscape(needle) + "&sort=relevance"
+		if cursor != "" {
+			path += "&cursor=" + url.QueryEscape(cursor)
+		}
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		var response struct {
+			Items      []post  `json:"items"`
+			NextCursor *string `json:"nextCursor"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("search page JSON: %v: %s", err, rec.Body.String())
+		}
+		if rec.Code != http.StatusOK {
+			t.Fatalf("search page status %d: %s", rec.Code, rec.Body.String())
+		}
+		return rec.Code, response.Items, response.NextCursor
+	}
+	_, newPage1, newCursor := searchPage("")
+	if len(newPage1) != 2 || newPage1[0].ID != third || newPage1[1].ID != second || newCursor == nil {
+		t.Fatalf("invalid cursor search first page: items=%+v cursor=%v", newPage1, newCursor)
+	}
+	_, newPage2, finalCursor := searchPage(*newCursor)
+	if len(newPage2) != 1 || newPage2[0].ID != first || finalCursor != nil {
+		t.Fatalf("invalid cursor search second page: items=%+v cursor=%v", newPage2, finalCursor)
+	}
 	displayPage := search("Author "+prefix+" 1", 0, "")
 	if len(displayPage) != 2 || displayPage[0].ID != unrelatedID || displayPage[1].ID != literalID {
 		t.Fatalf("display-name search failed: %+v", displayPage)

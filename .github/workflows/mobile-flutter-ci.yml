@@ -1,0 +1,115 @@
+name: Flutter client quality gates
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - toan-nguyen-dev
+      - 'feat/chatnet-*'
+  pull_request:
+    branches:
+      - main
+      - dev
+      - toan-nguyen-dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-flutter-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-test:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  android-release:
+    name: Signed Android release APK
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/toan-nguyen-dev')
+    needs: [analyze-test]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Decode Android release keystore
+        env:
+          CHATNET_ANDROID_KEYSTORE_BASE64: ${{ secrets.CHATNET_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$CHATNET_ANDROID_KEYSTORE_BASE64" || { echo "Missing GitHub secret: CHATNET_ANDROID_KEYSTORE_BASE64"; exit 1; }
+          keystore="$RUNNER_TEMP/chatnet-release.jks"
+          printf '%s' "$CHATNET_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          test -s "$keystore"
+          chmod 600 "$keystore"
+      - name: Build signed release APK
+        env:
+          CHATNET_ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/chatnet-release.jks
+          CHATNET_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.CHATNET_ANDROID_KEYSTORE_PASSWORD }}
+          CHATNET_ANDROID_KEY_ALIAS: ${{ secrets.CHATNET_ANDROID_KEY_ALIAS }}
+          CHATNET_ANDROID_KEY_PASSWORD: ${{ secrets.CHATNET_ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in CHATNET_ANDROID_KEYSTORE_PASSWORD CHATNET_ANDROID_KEY_ALIAS CHATNET_ANDROID_KEY_PASSWORD; do
+            test -n "${!name:-}" || { echo "Missing GitHub secret: $name"; exit 1; }
+          done
+          flutter build apk --release
+      - name: Verify release APK signature
+        run: |
+          apk="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$apk"
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -x "$apksigner" || { echo "Android SDK apksigner not found"; exit 1; }
+          "$apksigner" verify --verbose "$apk"
+      - name: Upload verified release APK for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatnet-android-release-${{ github.sha }}
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: android, os: ubuntu-latest, command: 'apk --debug' }
+          - { target: ios, os: macos-latest, command: 'ios --debug --no-codesign' }
+          - { target: linux, os: ubuntu-latest, command: 'linux --debug' }
+          - { target: macos, os: macos-latest, command: 'macos --debug' }
+          - { target: web, os: ubuntu-latest, command: 'web --release' }
+          - { target: windows, os: windows-latest, command: 'windows --debug' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ${{ matrix.command }}

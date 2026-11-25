@@ -1,21 +1,32 @@
 import assert from 'node:assert/strict'
-import { createSessionClient, parseSession } from '../src/features/auth/lib/session.ts'
+import { clearPersistedSession, createSessionClient, loadSession, parseSession, persistSession } from '../src/features/auth/lib/session.ts'
 
 const jwt = (seconds) => `header.${Buffer.from(JSON.stringify({ exp: Date.now() / 1000 + seconds })).toString('base64url')}.signature`
 const original = () => ({
-  token: jwt(-60), refreshToken: 'r'.repeat(43), sessionId: 'login-1',
+  token: jwt(-60), sessionId: 'login-1',
   user: { id: 1, email: 'test@example.com', username: 'tester', displayName: 'Test' },
 })
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
+const stored = new Map()
+const storageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: {
+    getItem: (key) => stored.get(key) ?? null,
+    setItem: (key, value) => stored.set(key, String(value)),
+    removeItem: (key) => stored.delete(key),
+  },
+})
 let current, expired, refreshes, requests, checks
 const client = createSessionClient('https://local.test', {
   get: () => current,
-  save: (next) => { current = next },
-  expire: () => { expired++; current = null },
+  save: (next) => { current = next; persistSession(next) },
+  expire: () => { expired++; current = null; clearPersistedSession() },
 })
 function reset() {
   current = original()
   expired = refreshes = requests = checks = 0
+  stored.clear()
 }
 const realFetch = globalThis.fetch
 try {
@@ -23,9 +34,10 @@ try {
   globalThis.fetch = async (url, init) => {
     if (url.endsWith('/refresh')) {
       refreshes++
-      assert.equal(JSON.parse(init.body).refreshToken, current.refreshToken)
+      assert.equal(init.credentials, 'include')
+      assert.deepEqual(JSON.parse(init.body), {})
       await new Promise((resolve) => setTimeout(resolve, 10))
-      return json({ ...current, token: jwt(86400) })
+      return json({ token: jwt(86400), user: current.user })
     }
     requests++
     assert.equal(init.headers.get('Authorization'), `Bearer ${current.token}`)
@@ -37,14 +49,36 @@ try {
   assert.equal(current.sessionId, 'login-1')
   assert.equal(expired, 0)
 
-  // Old access-only installs must sign in again: legacy renewal bypassed logout.
+  // Reload keeps access session and renews it through the HttpOnly cookie.
   reset()
-  delete current.refreshToken
-  current.token = jwt(3600)
-  globalThis.fetch = async () => { throw new Error('legacy renew must never fetch') }
+  current.token = jwt(-60)
+  persistSession(current)
+  assert.equal(JSON.parse(localStorage.getItem('chatnet-session')).refreshToken, undefined)
+  current = loadSession()
+  assert.ok(current)
+  globalThis.fetch = async (url, init) => {
+    assert.ok(url.endsWith('/api/auth/refresh'))
+    assert.equal(init.credentials, 'include')
+    assert.deepEqual(JSON.parse(init.body), {})
+    return json({ token: jwt(86400), user: current.user })
+  }
+  const reloaded = await client.refresh()
+  assert.equal(reloaded?.sessionId, 'login-1')
+  assert.equal(reloaded?.refreshToken, undefined)
+  assert.equal(loadSession()?.token, reloaded?.token)
+  assert.equal(loadSession()?.refreshToken, undefined)
+
+  // Missing server cookie returns 401 and clears local session.
+  reset()
+  globalThis.fetch = async (url, init) => {
+    assert.ok(url.endsWith('/api/auth/refresh'))
+    assert.equal(init.credentials, 'include')
+    return json({}, 401)
+  }
   assert.equal(await client.refresh(), null)
   assert.equal(expired, 1)
   assert.equal(current, null)
+  assert.equal(loadSession(), null)
 
   // Offline, upstream errors and malformed responses must preserve the saved session.
   for (const failure of [new Error('offline'), json({}, 503), json({}, 429), json({})]) {
@@ -168,4 +202,6 @@ try {
   console.log('Session checks passed: refresh, concurrency, cached Auth session checks for chat/feed writes, revocation, offline, expiry, stale responses, bounded retry.')
 } finally {
   globalThis.fetch = realFetch
+  if (storageDescriptor) Object.defineProperty(globalThis, 'localStorage', storageDescriptor)
+  else delete globalThis.localStorage
 }

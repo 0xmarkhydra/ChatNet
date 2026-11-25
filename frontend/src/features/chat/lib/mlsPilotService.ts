@@ -49,11 +49,23 @@ export async function fetchMLSPilotStatus(request: ApiRequest, conversationId: n
   return data
 }
 
-export async function identitySafetyCode(publicKey: string): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(publicKey)))
+export async function identitySafetyCode(
+  firstPublicKey: string,
+  secondPublicKey: string,
+): Promise<string> {
+  if (!firstPublicKey || !secondPublicKey) throw new Error('Invalid E2EE identity key')
+  const keys = [firstPublicKey, secondPublicKey].sort()
+  const input = new TextEncoder().encode(
+    `chatnet:e2ee:pair-verification:v1:${keys[0]}:${keys[1]}`,
+  )
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input))
   const code = [...digest.slice(0, 12)].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase()
-  return code.match(/.{1,4}/g)?.join('-') ?? code
+  return code.match(/.{4}/g)?.join('-') ?? code
 }
+
+const AUTO_MODE_UNSUPPORTED = 'Chế độ tự động chưa được hỗ trợ'
+const LOST_LOCAL_KEY =
+  'Khóa mã hóa trên trình duyệt này đã mất. Hiện chưa hỗ trợ khôi phục, nên không đọc lịch sử mã hóa hay gửi tin mới từ thiết bị này.'
 
 export class MLSPilotService {
   private local: { deviceId: string; identity: E2EEDeviceIdentity } | null = null
@@ -77,13 +89,19 @@ export class MLSPilotService {
     return fetchMLSPilotStatus(this.request, this.conversationId)
   }
 
+  private async manualStatus(): Promise<PilotStatus> {
+    const current = await this.status()
+    if (current.autoEnabled) throw new Error(AUTO_MODE_UNSUPPORTED)
+    return current
+  }
+
   async ownDevice(): Promise<{ deviceId: string; identity: E2EEDeviceIdentity } | null> {
     if (this.local) return this.local
     const ids = await listLocalE2EEDeviceIDs(this.userId)
     if (ids.length > 1) throw new Error('Nhiều khóa thiết bị cục bộ: cần chọn đúng thiết bị trước')
     if (!ids[0]) return null
     const identity = await loadLocalE2EEIdentity(this.userId, ids[0])
-    if (!identity) throw new Error('Khóa thiết bị đã mất; không tự tạo lại để tránh tráo khóa')
+    if (!identity) throw new Error(LOST_LOCAL_KEY)
     this.local = { deviceId: ids[0], identity }
     return this.local
   }
@@ -96,30 +114,44 @@ export class MLSPilotService {
     return devices[0] ?? null
   }
 
-  async pinnedPeer(): Promise<{ identityKey: string; mlsSigningKey?: string } | null> {
+  async pinnedPeer(): Promise<{
+    identityKey: string
+    mlsSigningKey?: string
+    verified: boolean
+    identityChanged: boolean
+    rekeyRequired: boolean
+  } | null> {
     const own = await this.ownDevice()
     const peer = await this.peerDevice()
     if (!own || !peer) return null
     const pinned = await getPinnedMLSPeer(this.userId, own.deviceId,
       this.otherUserId, peer.deviceId)
-    if (pinned && pinned.identityKey !== peer.identityKey) {
-      throw new Error('Khóa thiết bị của người nhận đã thay đổi! Cần xác minh lại ngoài ứng dụng.')
+    if (!pinned) return null
+    const identityChanged = pinned.identityKey !== peer.identityKey
+    return {
+      ...pinned,
+      identityChanged,
+      verified: pinned.verified && !identityChanged,
     }
-    return pinned
   }
 
-  async confirmPeerIdentity(): Promise<void> {
+  async confirmPeerIdentity(displayedSafetyCode: string): Promise<void> {
+    const current = await this.manualStatus()
     const own = await this.ownDevice()
     const peer = await this.peerDevice()
     if (!own || !peer) throw new Error('Cả hai phải đăng ký thiết bị E2EE trước')
-    // UI explicitly asks users to compare this fingerprint independently.
+    const currentCode = await identitySafetyCode(own.identity.publicKey, peer.identityKey)
+    if (displayedSafetyCode !== currentCode) {
+      throw new Error('Mã an toàn đã thay đổi. Hãy đối chiếu lại trước khi xác minh.')
+    }
     await pinMLSPeer(this.userId, own.deviceId,
-      this.otherUserId, peer.deviceId, peer.identityKey)
+      this.otherUserId, peer.deviceId, peer.identityKey, undefined, true,
+      current.mode === 'e2ee')
   }
 
   async prepareDevice(): Promise<string> {
+    const status = await this.manualStatus()
     if (this.enrolled && this.local) return this.local.deviceId
-    const status = await this.status()
     if (!status.pilotEnabled) throw new Error('Máy chủ chưa bật E2EE pilot')
     let own = await this.ownDevice()
     // The pilot cannot recover or synchronize MLS secrets on a second
@@ -182,7 +214,9 @@ export class MLSPilotService {
     const own = await this.ownMLSPackage()
     const peer = await this.peerDevice()
     const pinned = await this.pinnedPeer()
-    if (!peer || !pinned) throw new Error('Chưa xác minh mã an toàn của người nhận')
+    if (!peer || !pinned?.verified || pinned.identityChanged || pinned.rekeyRequired) {
+      throw new Error('Chưa xác minh mã an toàn hiện tại của người nhận')
+    }
     const trust = new ExperimentalMLSTrust()
     trust.authorize(this.userId, own.deviceId,
       own.publicPackage.leafNode.signaturePublicKey)
@@ -200,7 +234,9 @@ export class MLSPilotService {
     const own = await this.ownDevice()
     const peer = await this.peerDevice()
     const pinned = await this.pinnedPeer()
-    if (!own || !peer || !pinned) throw new Error('Chưa xác minh thiết bị người nhận')
+    if (!own || !peer || !pinned?.verified || pinned.identityChanged || pinned.rekeyRequired) {
+      throw new Error('Chưa xác minh thiết bị người nhận')
+    }
     const claim = await claimE2EEKeyPackage(this.request,
       { userId: this.otherUserId, deviceId: peer.deviceId })
     const suite = await createExperimentalMLSCiphersuite()
@@ -228,42 +264,8 @@ export class MLSPilotService {
     return btoa(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   }
 
-  /**
-   * Experimental automatic E2EE for direct chats, including those with legacy
-   * history. Old plaintext rows are not converted and remain explicitly
-   * labeled as unencrypted; only new MLS messages get E2EE. The first key
-   * seen is pinned (TOFU), NOT independently verified: a compromised directory
-   * could impersonate a peer at first contact. Safety-code verification and
-   * multi-device/rekey support are required before any production default.
-   *
-   * Only the lower user ID initiates to prevent competing one-time Welcome
-   * packages. If that participant is offline the room must remain pending,
-   * never silently fall back to plaintext.
-   */
-  async advanceAuto(): Promise<'disabled' | 'waiting-peer' | 'waiting-initiator' | 'ready'> {
-    const current = await this.status()
-    if (!current.pilotEnabled || !current.autoEnabled || current.mode !== 'legacy') {
-      return current.mode === 'e2ee' ? 'ready' : 'disabled'
-    }
-    await this.prepareDevice()
-    const peer = await this.peerDevice()
-    if (!peer) return 'waiting-peer'
-    const pinned = await this.pinnedPeer()
-    if (!pinned) {
-      // Trust on first use. Never overwrite or automatically accept a changed
-      // identity; pinMLSPeer rejects a mismatch in IndexedDB.
-      await this.confirmPeerIdentity()
-    }
-    const approvals = await this.pilotApprovals()
-    if (!approvals.ownApproved) await this.approvePilot()
-    const updated = await this.pilotApprovals()
-    if (!updated.peerApproved || !updated.ownApproved) return 'waiting-peer'
-    if (this.userId > this.otherUserId) return 'waiting-initiator'
-    await this.startConversation()
-    return 'ready'
-  }
-
   async pilotApprovals(): Promise<{ ownApproved: boolean; peerApproved: boolean }> {
+    await this.manualStatus()
     const response = await this.request(
       `/api/conversations/${this.conversationId}/e2ee/consents`, { cache: 'no-store' },
     )
@@ -278,8 +280,10 @@ export class MLSPilotService {
   }
 
   async approvePilot(): Promise<void> {
+    await this.manualStatus()
     const own = await this.ownDevice()
-    if (!own || !await this.pinnedPeer()) {
+    const pinned = await this.pinnedPeer()
+    if (!own || !pinned?.verified || pinned.identityChanged || pinned.rekeyRequired) {
       throw new Error('Cần chuẩn bị và xác minh khóa người nhận trước khi đồng ý')
     }
     const response = await this.request(
@@ -292,7 +296,7 @@ export class MLSPilotService {
   }
 
   async startConversation(): Promise<void> {
-    const current = await this.status()
+    const current = await this.manualStatus()
     if (!current.pilotEnabled || current.mode !== 'legacy' || current.epoch !== 0) {
       throw new Error('Cuộc trò chuyện đã chuyển sang chế độ khác')
     }
@@ -339,6 +343,7 @@ export class MLSPilotService {
     commitId: number
     welcomeId: number
   }> {
+    await this.manualStatus()
     const response = await this.request(
       `/api/conversations/${this.conversationId}/e2ee/bootstrap`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -353,6 +358,7 @@ export class MLSPilotService {
   }
 
   async flushPending(): Promise<void> {
+    await this.manualStatus()
     const own = await this.ownDevice()
     if (!own) return
     const pending = await loadMLSPending(this.userId, own.deviceId, this.conversationId)
@@ -379,11 +385,11 @@ export class MLSPilotService {
   }
 
   async send(text: string): Promise<void> {
+    const current = await this.manualStatus()
     const clean = text.trim()
     if (!clean || [...clean].length > 4000) throw new Error('Tin nhắn tối đa 4000 ký tự')
     await this.flushPending()
     await this.sync(false)
-    const current = await this.status()
     if (!current.pilotEnabled || current.mode !== 'e2ee') {
       throw new Error('Hội thoại chưa sẵn sàng gửi E2EE')
     }
@@ -416,6 +422,7 @@ export class MLSPilotService {
   }
 
   async sync(retryPending = true): Promise<MLSLocalMessage[]> {
+    await this.manualStatus()
     const own = await this.ownDevice()
     if (!own) return []
     if (retryPending) await this.flushPending()
@@ -516,8 +523,11 @@ export class MLSPilotService {
   }
 
   async isReady(): Promise<boolean> {
+    if ((await this.status()).autoEnabled) return false
     const own = await this.ownDevice()
     if (!own) return false
+    const pinned = await this.pinnedPeer()
+    if (!pinned?.verified || pinned.identityChanged || pinned.rekeyRequired) return false
     const trust = await this.buildTrust()
     return !!await loadMLSState(this.userId, own.deviceId, this.conversationId, trust.config)
   }

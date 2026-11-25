@@ -5,7 +5,7 @@ version: 1.0.0
 status: Draft
 owner: Build and Quality Engineering
 baseline_commit: 40c1f1b35958ee22c1278986bf82ff57520137a1
-last_updated: 2026-11-19
+last_updated: 2026-11-21
 normative_basis: "ISO/IEC/IEEE 29119-3:2021"
 ---
 
@@ -61,7 +61,7 @@ A local test PASS is not GitHub Actions PASS. A workflow file existing is not a 
 - test environment and service versions;
 - skipped/blocked steps.
 
-Runner CI cá nhân được quản lý ngoài repo ở `D:\06-work\ChatNet-local-ci`. Lần chạy runner này, lần chạy GitHub Actions và lần smoke trên thiết bị thật phải ghi riêng. Đợt tài liệu không xác minh cấu hình bên ngoài hoặc thay workflow.
+Runner CI cá nhân (nếu có) được quản lý ngoài repo trên máy người chạy. Lần chạy runner này, lần chạy GitHub Actions và lần smoke trên thiết bị thật phải ghi riêng. Đợt tài liệu không xác minh cấu hình bên ngoài hoặc thay workflow.
 
 ## 4. Current workflow caveats
 
@@ -72,7 +72,20 @@ Runner CI cá nhân được quản lý ngoài repo ở `D:\06-work\ChatNet-loca
 - A historic B05 report recorded GitHub billing lock preventing jobs from starting at that time. This is not asserted as the current account status.
 - This documentation task did not execute GitHub Actions or local product CI.
 
-## 5. Required release gates
+## 5. Hosted CI gate record
+
+Ghi riêng local CI, runner cá nhân và GitHub Actions. Workflow hoặc log cục bộ không chứng minh hosted CI đã đạt.
+
+| Gate | Bằng chứng bắt buộc để ghi `PASS` | Trạng thái tài liệu này |
+|---|---|---|
+| Hosted Web/PWA CI | URL/run ID, commit SHA, workflow attempt, job results, service versions và log lưu trữ | NOT RUN |
+| Hosted Desktop CI | URL/run ID, SHA, đủ ma trận OS/kiến trúc, package/signing result và job results | NOT RUN |
+| P0/P1 acceptance | Báo cáo acceptance gắn cùng SHA; P0 không có `FAIL`/`NOT RUN`/`BLOCKED`; P1 có PASS hoặc quyết định hoãn hợp lệ | NOT RUN |
+| Release decision | Người duyệt, thời điểm, `GO`/`NO-GO`/`DEFERRED`, link tới mọi gap | NOT RUN |
+
+Thiếu run ID, SHA không khớp, job bị bỏ qua hoặc run không hoàn tất giữ gate ở `NOT RUN` hoặc `BLOCKED`, không đổi thành `PASS`.
+
+## 6. Required release gates
 
 - Lint/typecheck/build.
 - Backend unit and disposable DB/Redis integration.
@@ -83,7 +96,7 @@ Runner CI cá nhân được quản lý ngoài repo ở `D:\06-work\ChatNet-loca
 - Signed/notarized distribution, updater and rollback tests where applicable.
 - Product and release-owner approval.
 
-## 6. CI maintenance
+## 7. CI maintenance
 
 When workflow files or package scripts change, update this document and TEST_CATALOG.md. Never weaken or remove a quality gate solely to obtain a green status without documenting the risk and obtaining owner approval.
 

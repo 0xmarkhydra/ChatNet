@@ -23,7 +23,9 @@ describe('VisitorProfileHero actions', () => {
       const renderHero = (online: boolean) => act(async () => root.render(<VisitorProfileHero
         online={online}
         profile={{ id: 5, username: 'alice', displayName: 'Alice', avatarSet: false,
-          coverSet: false, updatedAt: '2026-01-01', allowFriendRequests: true, online: false }}
+          coverSet: false, updatedAt: '2026-01-01', allowFriendRequests: true, online: false,
+          bio: 'Bio only for owner', city: 'City only for owner',
+          workplace: 'Company private', school: 'School private' }}
         relation="accepted" friendBusy={null} action="Bạn bè" request={async () => new Response()}
         onMessage={async () => {}} onFriendAction={() => {}} onRemoveFriendAction={onRemoveFriendAction}
       />))
@@ -33,6 +35,10 @@ describe('VisitorProfileHero actions', () => {
       expect(host.querySelector('.profile-page-cover-action')).toBeNull()
       expect(host.querySelector('[data-online="true"]')).not.toBeNull()
       expect(host.textContent).toContain('Đang hoạt động')
+      expect(host.textContent).not.toContain('Company private')
+      expect(host.textContent).not.toContain('School private')
+      expect(host.textContent).not.toContain('Bio only for owner')
+      expect(host.textContent).not.toContain('City only for owner')
       await renderHero(false)
       expect(host.querySelector('[data-online="true"]')).toBeNull()
       expect(host.textContent).not.toContain('Đang hoạt động')

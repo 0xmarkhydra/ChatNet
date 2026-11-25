@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -81,7 +82,18 @@ function cycles(edges) {
 export function collectViolations(root = defaultRoot) {
   const violations = new Set()
   const edges = new Map()
-  const files = sourceFiles(root).sort()
+  // Ignore local generated/ignored leftovers without excluding new source files.
+  // Fixture roots supplied by tests still use the complete directory scan.
+  let files = sourceFiles(root)
+  if (path.resolve(root) === defaultRoot) {
+    const repoRoot = path.resolve(here, '../..')
+    const visible = new Set(execFileSync('git', [
+      'ls-files', '--cached', '--others', '--exclude-standard', '--', 'frontend/src',
+    ], { cwd: repoRoot, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean)
+      .map(file => path.resolve(repoRoot, file)))
+    files = files.filter(file => visible.has(file))
+  }
+  files.sort()
   for (const full of files) {
     const source = slash(path.relative(root, full))
     const targets = dependencies(full, root)

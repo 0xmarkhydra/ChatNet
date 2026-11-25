@@ -33,6 +33,17 @@ describe('OpenStreetMap nearby provider recovery', () => {
     expect(places[0].name).toBe('Quán gần đây')
   })
 
+  it('sends a coarse search center to public providers', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ elements: [] }) })
+    vi.stubGlobal('fetch', fetchMock)
+    await loadNearbyPlaces({ latitude: 21.123456, longitude: 105.654321, radiusKm: 1, category: 'all' })
+    const body = fetchMock.mock.calls[0]?.[1]?.body as URLSearchParams
+    const query = body.get('data') || ''
+    expect(query).toContain('around:1000,21.123,105.654')
+    expect(query).not.toContain('21.123456')
+    expect(query).not.toContain('105.654321')
+  })
+
   it('does not fall back to a second provider after the caller cancels', async () => {
     const controller = new AbortController()
     const fetchMock = vi.fn().mockImplementation((_url: string, opts: { signal: AbortSignal }) =>

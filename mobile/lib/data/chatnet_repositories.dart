@@ -11,14 +11,46 @@ class ChatRepository {
     int limit = 25,
     int offset = 0,
   }) async {
+    final query = offset == 0 ? 'limit=$limit' : 'limit=$limit&offset=$offset';
     final items = objects(
-      await api.request(
-        'GET',
-        '/api/conversations?limit=$limit&offset=$offset',
-      ),
+      await api.request('GET', '/api/conversations?$query'),
     );
     return List.unmodifiable(items.map(Conversation.fromJson));
   }
+
+  Future<void> setConversationPinned(
+    int conversationId, {
+    required bool pinned,
+  }) async {
+    await api.request(
+      pinned ? 'PUT' : 'DELETE',
+      '/api/conversations/$conversationId/pin',
+    );
+  }
+
+  Future<void> setMessagePinned(int messageId, {required bool pinned}) async {
+    await api.request(
+      pinned ? 'PUT' : 'DELETE',
+      '/api/messages/$messageId/pin',
+    );
+  }
+
+  Future<Json> editMessage(int messageId, {required String text}) async =>
+      object(
+        await api.request('PATCH', '/api/messages/$messageId', {'text': text}),
+      );
+
+  Future<Json> recallMessage(int messageId) async =>
+      object(await api.request('DELETE', '/api/messages/$messageId'));
+
+  Future<Json> sendMessage(int conversationId, {required Json body}) async =>
+      object(
+        await api.request(
+          'POST',
+          '/api/conversations/$conversationId/messages',
+          body,
+        ),
+      );
 
   Future<List<ChatMessage>> messages(
     int conversationId, {
@@ -43,6 +75,76 @@ class ChatRepository {
     await api.request('POST', '/api/conversations/$conversationId/read', {
       'channelId': channelId,
     });
+  }
+
+  Future<bool> toggleChannelNotifications(
+    int conversationId,
+    int channelId,
+  ) async {
+    final path =
+        '/api/conversations/$conversationId/channels/$channelId/notifications';
+    final current = object(await api.request('GET', path));
+    if (current['muted'] is! bool) {
+      throw const ApiError('Không đọc được trạng thái thông báo kênh.');
+    }
+    final muted = current['muted'] != true;
+    await api.request('PUT', path, {'muted': muted});
+    return muted;
+  }
+
+  Future<Json> deleteChannel(int conversationId, int channelId) async => object(
+    await api.request(
+      'DELETE',
+      '/api/conversations/$conversationId/channels/$channelId',
+    ),
+  );
+
+  Future<Json> clearConversationHistory(int conversationId) async => object(
+    await api.request('DELETE', '/api/conversations/$conversationId/history'),
+  );
+
+  Future<Json> toggleMessageReaction(
+    int messageId, {
+    required String emoji,
+  }) async => object(
+    await api.request('POST', '/api/messages/$messageId/reactions', {
+      'emoji': emoji,
+    }),
+  );
+
+  Future<Json> setConversationMuted(
+    int conversationId, {
+    required bool muted,
+    required bool isGroup,
+  }) async {
+    var mentionNotifications = !muted;
+    if (isGroup) {
+      final current = object(
+        await api.request(
+          'GET',
+          '/api/conversations/$conversationId/notification-settings',
+        ),
+      );
+      if (current['mentionNotifications'] is! bool) {
+        throw const ApiError('Không đọc được cấu hình @Tag của nhóm.');
+      }
+      // Muting normal messages does NOT mute explicit @mentions.
+      mentionNotifications = current['mentionNotifications'] == true;
+    }
+    final settings = object(
+      await api.request(
+        'PUT',
+        '/api/conversations/$conversationId/notification-settings',
+        {
+          'messageNotifications': !muted,
+          'mentionNotifications': mentionNotifications,
+        },
+      ),
+    );
+    if (settings['messageNotifications'] is! bool) {
+      throw const ApiError('Backend chưa hỗ trợ cấu hình thông báo.');
+    }
+    return settings;
   }
 
   Future<List<GroupMember>> members(int conversationId) async {

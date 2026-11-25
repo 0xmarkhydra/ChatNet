@@ -83,6 +83,12 @@ var commentLikesSQL string
 //go:embed migrations/020_story_actions.sql
 var storyActionsSQL string
 
+//go:embed migrations/021_story_media_cleanup.sql
+var storyMediaCleanupSQL string
+
+//go:embed migrations/022_story_media_cleanup_completion.sql
+var storyMediaCleanupCompletionSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -171,6 +177,12 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, storyActionsSQL); err != nil {
 		return fmt.Errorf("apply story actions migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, storyMediaCleanupSQL); err != nil {
+		return fmt.Errorf("apply story media cleanup migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, storyMediaCleanupCompletionSQL); err != nil {
+		return fmt.Errorf("apply story media cleanup completion migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)

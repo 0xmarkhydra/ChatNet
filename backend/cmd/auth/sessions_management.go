@@ -33,8 +33,22 @@ func readSessionManagementRequest(w http.ResponseWriter, r *http.Request, requir
 	var body sessionManagementRequest
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF ||
-		len(body.RefreshToken) != 43 || !tokenRE.MatchString(body.RefreshToken) ||
+	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF {
+		httpx.Error(w, http.StatusBadRequest, "invalid session request")
+		return sessionManagementRequest{}, false
+	}
+	if body.RefreshToken != "" && (len(body.RefreshToken) != 43 || !tokenRE.MatchString(body.RefreshToken)) {
+		httpx.Error(w, http.StatusBadRequest, "invalid session request")
+		return sessionManagementRequest{}, false
+	}
+	if cookie, err := r.Cookie(refreshCookieName); err == nil {
+		if !httpx.IsWebOrigin(r.Header.Get("Origin")) {
+			httpx.Error(w, http.StatusForbidden, "invalid session origin")
+			return sessionManagementRequest{}, false
+		}
+		body.RefreshToken = cookie.Value
+	}
+	if len(body.RefreshToken) != 43 || !tokenRE.MatchString(body.RefreshToken) ||
 		(requireID && !sessionIDPattern.MatchString(body.SessionID)) ||
 		(!requireID && body.SessionID != "") {
 		httpx.Error(w, http.StatusBadRequest, "invalid session request")
@@ -102,6 +116,11 @@ func (s *server) revokeSession(w http.ResponseWriter, r *http.Request) {
 	}
 	// One statement binds the target to the owner of the active refresh token.
 	// A leaked session ID alone never grants permission to revoke another user.
+	currentUserID, currentID, ownerErr := s.sessionOwner(r, request.RefreshToken)
+	if ownerErr != nil {
+		sessionError(w, ownerErr)
+		return
+	}
 	var userID int64
 	var sessionID string
 	err := s.db.QueryRow(r.Context(), `
@@ -123,6 +142,9 @@ func (s *server) revokeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.notifySessionRevoked(r.Context(), userID, sessionID)
+	if hasRefreshCookie(r) && currentUserID == userID && currentID == sessionID {
+		clearRefreshCookie(w)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

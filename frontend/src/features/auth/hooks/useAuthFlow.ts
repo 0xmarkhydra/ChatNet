@@ -74,6 +74,7 @@ export function useAuthFlow(saveSession: (next: Session) => void) {
         const response = await fetch(`${API}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ email: authEmail.trim(), password: authPassword }),
         })
         const result = await response.json()
@@ -130,6 +131,7 @@ export function useAuthFlow(saveSession: (next: Session) => void) {
         const response = await fetch(`${API}/api/auth/email/verify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ token: verificationToken, code: otpCode }),
         })
         const result = await response.json()
@@ -139,6 +141,7 @@ export function useAuthFlow(saveSession: (next: Session) => void) {
         }
         const parsed = parseSession(result)
         if (!parsed) throw new Error('invalid session response')
+        parsed.refreshToken = undefined
         next = { ...parsed, sessionId: newClientSessionId() }
       }
 

@@ -13,6 +13,7 @@ import (
 
 	"chatnet/internal/authx"
 	"chatnet/internal/database"
+	"chatnet/internal/mediax"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -222,19 +223,29 @@ func TestStoryExpiryAndOwnershipIntegration(t *testing.T) {
 	}
 
 	var activeID, expiredID, otherStoryID int64
+	var expiredRef string
 	insert := func(userID int64, expires string, target *int64) {
 		t.Helper()
+		storageRef := fmt.Sprintf("s3://test/story/%d", time.Now().UnixNano())
 		if err := db.QueryRow(ctx, `
 			INSERT INTO stories(user_id,storage_ref,original_name,content_type,size_bytes,kind,expires_at)
 			VALUES($1,$2,'story.jpg','image/jpeg',100,'image',`+expires+`)
-			RETURNING id`, userID, fmt.Sprintf("s3://test/story/%d", time.Now().UnixNano()),
+			RETURNING id`, userID, storageRef,
 		).Scan(target); err != nil {
 			t.Fatal(err)
+		}
+		if target == &expiredID {
+			expiredRef = storageRef
 		}
 	}
 	insert(ownerID, `NOW()+INTERVAL '1 hour'`, &activeID)
 	insert(ownerID, `NOW()-INTERVAL '1 second'`, &expiredID)
 	insert(otherID, `NOW()+INTERVAL '1 hour'`, &otherStoryID)
+	defer func() {
+		if expiredRef != "" {
+			_, _ = db.Exec(context.Background(), `DELETE FROM story_media_cleanup WHERE storage_ref=$1`, expiredRef)
+		}
+	}()
 
 	token, err := authx.Sign("test", ownerID, base+"_0", base+"_0")
 	if err != nil {
@@ -275,6 +286,10 @@ func TestStoryExpiryAndOwnershipIntegration(t *testing.T) {
 	if len(items) != 2 || items[0].ID != activeID || items[0].Attachment == nil {
 		t.Fatalf("legacy media list/order incorrect: %+v", items)
 	}
+	var cleanupJobs int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM story_media_cleanup WHERE storage_ref=$1`, expiredRef).Scan(&cleanupJobs); err != nil || cleanupJobs != 1 {
+		t.Fatalf("expired story media cleanup jobs=%d err=%v", cleanupJobs, err)
+	}
 	all := call(http.MethodGet, "/api/stories?includeText=true")
 	var allItems []story
 	if all.Code != http.StatusOK || json.Unmarshal(all.Body.Bytes(), &allItems) != nil ||
@@ -306,5 +321,68 @@ func TestPostListPaginationRejectsInvalidParameters(t *testing.T) {
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("%s: got %d; expected 400", query, w.Code)
 		}
+	}
+}
+
+func TestPostListBoundsNestedData(t *testing.T) {
+	url := os.Getenv("CHATNET_TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("set CHATNET_TEST_DATABASE_URL for integration tests")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	db, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := database.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	name := fmt.Sprintf("feed_bound_%d", time.Now().UnixNano())
+	var uid, postID int64
+	if err := db.QueryRow(ctx, `
+		INSERT INTO users(email,username,password_hash,display_name)
+		VALUES($1,$2,'test',$2) RETURNING id`, name+"@example.com", name).Scan(&uid); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec(context.Background(), `DELETE FROM users WHERE id=$1`, uid)
+	if err := db.QueryRow(ctx, `INSERT INTO posts(user_id,content) VALUES($1,'bounded') RETURNING id`, uid).Scan(&postID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO comments(post_id,user_id,content)
+		SELECT $1,$2,'comment '||n FROM generate_series(1,$3) AS n`, postID, uid, maxFeedComments+10); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO post_attachments(post_id,storage_ref,original_name,content_type,size_bytes,kind,position)
+		SELECT $1,'feed/test/'||n,'image-'||n||'.png','image/png',1,'image',n
+		FROM generate_series(1,$2) AS n`, postID, mediax.MaxFeedAttachments+3); err != nil {
+		t.Fatal(err)
+	}
+	token, err := authx.Sign("test", uid, name, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &server{db: db}
+	mux := http.NewServeMux()
+	mux.Handle("GET /api/posts", authx.Middleware("test", http.HandlerFunc(s.list)))
+	req := httptest.NewRequest(http.MethodGet, "/api/posts?limit=1", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("list got %d: %s", res.Code, res.Body.String())
+	}
+	var posts []post
+	if err := json.Unmarshal(res.Body.Bytes(), &posts); err != nil {
+		t.Fatal(err)
+	}
+	if len(posts) != 1 {
+		t.Fatalf("nested data response returned %d posts", len(posts))
+	}
+	if len(posts[0].Comments) != maxFeedComments || len(posts[0].Attachments) != mediax.MaxFeedAttachments {
+		t.Fatalf("nested data not bounded: comments=%d attachments=%d", len(posts[0].Comments), len(posts[0].Attachments))
 	}
 }

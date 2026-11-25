@@ -47,6 +47,14 @@ const button = (label: string) => Array.from(host.querySelectorAll<HTMLButtonEle
   .find(item => item.textContent?.includes(label))
 
 describe('NearbyExplorer location fallback', () => {
+  it('discloses coarse location sharing before requesting a position', async () => {
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    expect(host.textContent).toContain('vị trí gần đúng (khoảng 100 m)')
+    expect(host.textContent).toContain('Overpass công cộng của OpenStreetMap')
+    expect(host.textContent).toContain('Vị trí chính xác chỉ dùng trên thiết bị')
+  })
+
   it('prevents duplicate geolocation requests before the locating state rerenders', async () => {
     let finish: ((position: GeolocationPosition) => void) | undefined
     geo.mockImplementation(() => new Promise(resolve => { finish = resolve }))

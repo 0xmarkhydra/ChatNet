@@ -32,8 +32,7 @@ export default function E2EEPilotGate(props: Props) {
           if (!active || !result || typeof result !== 'object') return
           if ('mode' in result &&
               (result.mode === 'legacy' || result.mode === 'e2ee')) {
-            onModeChange(result.mode === 'legacy' &&
-              'autoEnabled' in result && result.autoEnabled === true
+            onModeChange('autoEnabled' in result && result.autoEnabled === true
               ? 'pending' : result.mode)
             setEnabled(('pilotEnabled' in result && result.pilotEnabled === true) ||
               result.mode === 'e2ee')

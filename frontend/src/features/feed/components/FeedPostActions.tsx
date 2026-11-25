@@ -13,6 +13,7 @@ export type FeedActionPost = {
   background?: string
   saved?: boolean
   repostKind?: 'quick' | 'quote'
+  originalPost?: { id: number }
   attachments?: unknown[]
 }
 type Feedback = (message: string, kind?: 'success' | 'error') => void
@@ -43,6 +44,7 @@ async function sharePost(id: number, feedback: Feedback, copyOnly = false) {
 
 export default function FeedPostActions<P extends FeedActionPost>({ post, mine, request, onUpdated, onDeleted, onFeedback, onEdit }: Props<P>) {
   const quickRepost = post.repostKind === 'quick'
+  const shareTargetId = quickRepost ? post.originalPost?.id ?? post.id : post.id
   const deleteLabel = quickRepost ? 'Bỏ đăng lại' : 'Xóa bài viết'
   const portalContainer = useContext(ModalPortalContext)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -192,10 +194,10 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
                 <button type="button" disabled={busy} onClick={() => void savePost()}>
                   <Bookmark size={19} />{post.saved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
                 </button>
-                <button type="button" onClick={() => { close(); void sharePost(post.id, onFeedback) }}>
+                <button type="button" onClick={() => { close(); void sharePost(shareTargetId, onFeedback) }}>
                   <Share2 size={19} />Chia sẻ bài viết
                 </button>
-                <button type="button" onClick={() => { close(); void sharePost(post.id, onFeedback, true) }}>
+                <button type="button" onClick={() => { close(); void sharePost(shareTargetId, onFeedback, true) }}>
                   <Copy size={19} />Sao chép liên kết
                 </button>
                 {mine ? (

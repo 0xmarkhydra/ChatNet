@@ -59,22 +59,33 @@ final realtimeRevisionProvider = StreamProvider.autoDispose<int>((ref) async* {
 });
 
 class ConversationsNotifier extends AsyncNotifier<List<Conversation>> {
+  Future<List<Conversation>>? _initialLoad;
+  bool _initialLoadConsumed = false;
+
   @override
   Future<List<Conversation>> build() {
-    return ref.watch(chatRepositoryProvider).conversations();
+    final request = ref.watch(chatRepositoryProvider).conversations();
+    _initialLoad = request;
+    return request;
   }
 
-  Future<void> refresh() async {
-    final repo = ref.read(chatRepositoryProvider);
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(repo.conversations);
-    if (ref.mounted) state = result;
+  Future<List<Conversation>> initialLoad() {
+    if (_initialLoadConsumed) return refresh();
+    _initialLoadConsumed = true;
+    return _initialLoad ?? refresh();
+  }
+
+  Future<List<Conversation>> refresh() async {
+    final result = await ref.read(chatRepositoryProvider).conversations();
+    if (ref.mounted) state = AsyncData(result);
+    return result;
   }
 }
 
 final conversationsProvider =
     AsyncNotifierProvider<ConversationsNotifier, List<Conversation>>(
       ConversationsNotifier.new,
+      retry: (_, _) => null,
     );
 
 class MessageQuery {

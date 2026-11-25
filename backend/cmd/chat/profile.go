@@ -294,7 +294,8 @@ func (s *server) profileAsset(w http.ResponseWriter, r *http.Request, kind strin
 	http.Redirect(w, r, signed, http.StatusTemporaryRedirect)
 }
 
-// Visitor profiles expose only public identity fields, never email or privacy settings.
+// Visitor profiles expose public identity only. Bio, city, contact, workplace,
+// school, and privacy settings stay owner-only until visibility rules exist.
 func (s *server) getUserProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	claims, _ := authx.ClaimsFromContext(r.Context())
@@ -304,14 +305,18 @@ func (s *server) getUserProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var result struct {
-		profileState
-		ID                  int64 `json:"id"`
-		FriendCount         int64 `json:"friendCount"`
-		AllowFriendRequests bool  `json:"allowFriendRequests"`
+		ID                  int64     `json:"id"`
+		Username            string    `json:"username"`
+		DisplayName         string    `json:"displayName"`
+		AvatarSet           bool      `json:"avatarSet"`
+		CoverSet            bool      `json:"coverSet"`
+		UpdatedAt           time.Time `json:"updatedAt"`
+		FriendCount         int64     `json:"friendCount"`
+		AllowFriendRequests bool      `json:"allowFriendRequests"`
 	}
 	err = s.db.QueryRow(r.Context(), `
- SELECT u.id,u.username,u.display_name,COALESCE(u.bio,''),COALESCE(u.city,''),
- COALESCE(u.workplace,''),COALESCE(u.school,''),COALESCE(u.avatar_ref,'')<>'',COALESCE(u.cover_ref,'')<>'',
+	 SELECT u.id,u.username,u.display_name,
+ COALESCE(u.avatar_ref,'')<>'',COALESCE(u.cover_ref,'')<>'',
  u.profile_updated_at,u.allow_friend_requests,
  (SELECT count(*) FROM friend_connections fc
    WHERE (fc.user_low=u.id OR fc.user_high=u.id) AND fc.status='accepted'
@@ -321,7 +326,7 @@ func (s *server) getUserProfile(w http.ResponseWriter, r *http.Request) {
  FROM users u WHERE u.username=$1
  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
  (b.blocker_id=$2 AND b.blocked_id=u.id) OR (b.blocker_id=u.id AND b.blocked_id=$2))
- `, username, claims.UserID).Scan(&result.ID, &result.Username, &result.DisplayName, &result.Bio, &result.City, &result.Workplace, &result.School,
+	 `, username, claims.UserID).Scan(&result.ID, &result.Username, &result.DisplayName,
 		&result.AvatarSet, &result.CoverSet, &result.UpdatedAt, &result.AllowFriendRequests, &result.FriendCount)
 	if err != nil {
 		httpx.Error(w, 404, "profile not found")

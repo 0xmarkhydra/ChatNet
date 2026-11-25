@@ -1,5 +1,5 @@
 import { Bell, MessageCircle, PencilLine, Search, UserRoundPlus, Users } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import UiIcon from "../../shared/ui/UiIcon";
 import { Button } from "../../shared/ui/button";
 import { cn } from "../../shared/lib/utils";
@@ -52,6 +52,39 @@ function QuickCreateItem({ icon, title, hint, onClick }: { icon: ReactNode; titl
 function ChatActions(p: HeaderActionsProps) {
   const { chat, desktopSection } = p;
   const groups = desktopSection === "groups";
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (chat.quickCreateOpen) {
+      menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+    } else if (wasOpenRef.current) {
+      anchorRef.current?.querySelector<HTMLButtonElement>('.appbar-create-trigger')?.focus({ preventScroll: true });
+    }
+    wasOpenRef.current = chat.quickCreateOpen;
+  }, [chat.quickCreateOpen]);
+
+  function trapMenuFocus(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      chat.onCloseQuickCreate();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+    if (!focusable?.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   return (
     <>
       {!groups && (
@@ -59,7 +92,7 @@ function ChatActions(p: HeaderActionsProps) {
           <UiIcon name="qr" size={28} />
         </HeaderIconButton>
       )}
-      <div className="appbar-create-anchor">
+      <div className="appbar-create-anchor" ref={anchorRef}>
         <HeaderIconButton
           className={cn("appbar-create-trigger appbar-primary-action", chat.quickCreateOpen && "active")}
           type="button"
@@ -73,7 +106,7 @@ function ChatActions(p: HeaderActionsProps) {
         {chat.quickCreateOpen && !groups && (
           <>
             <button type="button" className="quick-create-dismiss" aria-label="Đóng menu tạo mới" onClick={chat.onCloseQuickCreate} />
-            <div className="quick-create-menu" role="menu" aria-label="Tạo cuộc trò chuyện mới">
+            <div ref={menuRef} className="quick-create-menu" role="menu" aria-label="Tạo cuộc trò chuyện mới" onKeyDown={trapMenuFocus}>
               <div className="quick-create-caption">TẠO MỚI</div>
               <QuickCreateItem icon={<Search size={19} aria-hidden="true" />} title="Tìm & kết nối" hint="Tìm bạn bè bằng tên hoặc @username" onClick={chat.onConnect} />
               <QuickCreateItem icon={<MessageCircle size={19} aria-hidden="true" />} title="Chat riêng" hint="Bắt đầu cuộc trò chuyện 1-1" onClick={chat.onNewDirect} />

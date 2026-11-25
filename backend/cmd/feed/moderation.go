@@ -1,8 +1,7 @@
 package main
 
 import (
-	"encoding/json"
-	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -123,9 +122,7 @@ func (s *server) reviewModerationReport(w http.ResponseWriter, r *http.Request) 
 	var body struct {
 		Decision string `json:"decision"`
 	}
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF {
+	if err := httpx.DecodeJSON(w, r, &body, 4096); err != nil {
 		httpx.Error(w, 400, "invalid body")
 		return
 	}
@@ -149,11 +146,14 @@ func (s *server) reviewModerationReport(w http.ResponseWriter, r *http.Request) 
 		httpx.Error(w, 403, "moderation permission required")
 		return
 	}
-	var targetType, status string
+	var targetType, status, storageRef string
 	var targetID int64
 	if err := tx.QueryRow(r.Context(),
-		"SELECT target_type,target_id,status FROM feed_reports WHERE id=$1 FOR UPDATE", id,
-	).Scan(&targetType, &targetID, &status); err != nil {
+		`SELECT fr.target_type,fr.target_id,fr.status,
+		        COALESCE((SELECT st.storage_ref FROM stories st
+		                  WHERE fr.target_type='story' AND st.id=fr.target_id),'')
+		 FROM feed_reports fr WHERE fr.id=$1 FOR UPDATE`, id,
+	).Scan(&targetType, &targetID, &status, &storageRef); err != nil {
 		httpx.Error(w, 404, "report not found")
 		return
 	}
@@ -178,6 +178,13 @@ func (s *server) reviewModerationReport(w http.ResponseWriter, r *http.Request) 
 		if _, err := tx.Exec(r.Context(), query, targetID); err != nil {
 			httpx.Error(w, 500, "cannot remove reported content")
 			return
+		}
+		if targetType == "story" {
+			if err := s.enqueueStoryMediaCleanup(r.Context(), tx, storageRef); err != nil {
+				log.Printf("moderation story media cleanup enqueue failed story=%d: %v", targetID, err)
+				httpx.Error(w, http.StatusServiceUnavailable, "story cleanup unavailable")
+				return
+			}
 		}
 		// Resolve duplicate reports on the same target in one transaction.
 		_, err = tx.Exec(r.Context(), `

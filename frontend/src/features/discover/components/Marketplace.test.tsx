@@ -278,6 +278,24 @@ describe('Marketplace read fallback', () => {
     expect(host.querySelector('form')).not.toBeNull()
   })
 
+  it('shows payment safety note only in cart and order views', async () => {
+    const request = vi.fn(async (path: string) => response(path))
+    const tab = (label: string) => Array.from(host.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find(button => button.textContent?.includes(label))
+
+    await act(async () => root.render(<Marketplace searchQuery="" userId={1} request={request} />))
+    expect(host.querySelector('.marketplace-warning')).toBeNull()
+
+    await act(async () => tab('Giỏ')?.click())
+    expect(host.querySelector('.marketplace-warning')?.textContent).toContain('Không thu tiền hoặc đặt đơn thật')
+
+    await act(async () => tab('Đơn hàng')?.click())
+    expect(host.querySelector('.marketplace-warning')?.textContent).toContain('Không thu tiền hoặc đặt đơn thật')
+
+    await act(async () => tab('Bán hàng')?.click())
+    expect(host.querySelector('.marketplace-warning')).toBeNull()
+  })
+
   it('preserves Marketplace search when recovering from a read failure', async () => {
     let attempts = 0
     const request = vi.fn(async (path: string) => {
