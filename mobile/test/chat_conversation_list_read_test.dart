@@ -1269,6 +1269,26 @@ void main() {
     },
   );
 
+  testWidgets(
+    'saving an edit closes dialog without controller lifecycle error',
+    (tester) async {
+      final api = _ConversationApi();
+      addTearDown(api.closeEvents);
+
+      await _openDefaultGroupChat(tester, api);
+      await tester.longPress(find.byKey(const ValueKey('chat-message-12')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('S\u1eeda'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(EditableText).last, 'Saved edit text');
+      await tester.tap(find.text('L\u01b0u'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(_renderedMessageText(tester, 12), 'Saved edit text');
+    },
+  );
+
   testWidgets('message recall sends bodyless DELETE and replaces message', (
     tester,
   ) async {
