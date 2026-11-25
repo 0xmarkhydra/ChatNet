@@ -382,12 +382,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           message.remove('translatedText');
         }
       }
+      if (!mounted ||
+          active?['id'] != conversation['id'] ||
+          selectedChannelId != channelId) {
+        return;
+      }
       await widget.api.request(
         'POST',
         '/api/conversations/${conversation['id']}/read',
         {'channelId': channelId},
       );
-      if (!mounted || active?['id'] != conversation['id']) return;
+      if (!mounted ||
+          active?['id'] != conversation['id'] ||
+          selectedChannelId != channelId) {
+        return;
+      }
       setState(() {
         messages = data;
         targetLanguage = target;
