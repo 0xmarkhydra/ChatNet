@@ -445,6 +445,41 @@ scroll(0);      scroll(419); // Collapsing at the very end would clamp scrollTop
     }
   });
 
+  it("shifts scrollTop by the header height so content stays still when the bars collapse and return", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="feed" /></MemoryRouter>));
+      const shell = host.querySelector("main")!;
+      const scroller = host.querySelector("section")!;
+      Object.defineProperty(host.querySelector("header")!, "offsetHeight", { value: 68 });
+      Object.defineProperty(scroller, "scrollHeight", { value: 3000 });
+      Object.defineProperty(scroller, "clientHeight", { value: 800 });
+      const scroll = (top: number) => {
+        scroller.scrollTop = top;
+        act(() => scroller.dispatchEvent(scrollEvent()));
+      };
+
+      scroll(0);
+      scroll(100);
+      scroll(200);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      expect(scroller.scrollTop).toBe(268);
+
+      scroll(280);
+      scroll(100); // Quick flick up reveals the bars again.
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+      expect(scroller.scrollTop).toBe(32);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
   it("does not hide the bars at desktop widths", () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener() {}, removeEventListener() {} })));

@@ -35,8 +35,19 @@ export function useMobileScrollChrome(activeTab?: string) {
       directionDistance = 0;
       lastDirection = 0;
     };
+    // The header leaves layout instantly, so the scroller grows by its height.
+    // Shift scrollTop by the same amount to keep the content still under the finger.
+    let shift: { scroller: HTMLElement; amount: number } | null = null;
+    const compensate = (scroller: HTMLElement, amount: number) => {
+      scroller.scrollTop = Math.max(0, scroller.scrollTop + amount);
+      const range = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      previous.set(scroller, { top: Math.max(0, Math.min(scroller.scrollTop, range)), range });
+    };
     const reveal = () => {
+      const undo = hidden ? shift : null;
+      shift = null;
       setHidden(false);
+      if (undo?.scroller.isConnected) compensate(undo.scroller, -undo.amount);
       resetMomentum();
     };
     const measure = () => {
@@ -118,7 +129,12 @@ export function useMobileScrollChrome(activeTab?: string) {
       const headerHeight = header?.offsetHeight ?? 0;
       const nearEnd = activeTab !== "chat" && headerHeight > 0 && range - top <= headerHeight;
       if (direction > 0 && top > hideAfter && directionDistance >= 20 && !nearEnd) {
+        const amount = headerHeight;
         setHidden(true);
+        if (amount) {
+          shift = { scroller: target, amount };
+          compensate(target, amount);
+        }
         resetMomentum();
       } else if (direction < 0 && (top <= 1 || speed >= REVEAL_SPEED)) {
         reveal();
