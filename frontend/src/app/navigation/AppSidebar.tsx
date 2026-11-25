@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import { Bell, Bookmark, BookUser, Compass, MessageCircle, Newspaper, Scan, Search, Settings, ShoppingBag } from 'lucide-react'
 import { formatUnreadMessageDescription } from '../../features/i18n/lib/i18n'
 import type { Tab } from '../../shared/types/navigation'
@@ -29,6 +29,7 @@ export default function AppSidebar({
   onNavigate, onSaved, onSettings, onScreenshot, screenshotBusy, searchActive = false, onSearch,
 }: Props) {
   const activeKey = `${tab}:${section ?? ''}:${feedSaved}:${settingsActive}:${searchActive}`
+  const unreadDescriptionId = useId()
   const navRef = useRef<HTMLElement>(null)
   const activeButtonRef = useRef<HTMLButtonElement>(null)
   const pillRef = useRef<HTMLSpanElement>(null)
@@ -113,8 +114,9 @@ export default function AppSidebar({
           <Button
             variant="ghost"
             key={label}
-            aria-label={count ? `${label}, ${formatUnreadMessageDescription(count)}` : label}
+            aria-label={label}
             aria-keyshortcuts={label === 'Tìm kiếm' ? 'Control+K Meta+K' : undefined}
+            aria-describedby={count ? unreadDescriptionId : undefined}
             className={cn('app-sidebar-link justify-start', active && 'is-active')}
             aria-current={active ? 'page' : undefined}
             ref={active ? activeButtonRef : undefined}
@@ -125,6 +127,7 @@ export default function AppSidebar({
             {count ? <b className="app-sidebar-count" aria-hidden="true">{count > 99 ? '99+' : count}</b> : null}
           </Button>
         ))}
+        {unreadTotal > 0 && <span id={unreadDescriptionId} hidden>{formatUnreadMessageDescription(unreadTotal)}</span>}
       </nav>
       <div className="app-sidebar-secondary" role="group" aria-label="Tiện ích">
       {onScreenshot && (

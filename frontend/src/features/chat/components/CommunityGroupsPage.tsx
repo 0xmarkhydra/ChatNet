@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { ArrowLeft, ArrowRight, Bell, Check, Clock3, FileText, Image as ImageIcon, MessageCircle, MoreHorizontal, PencilLine, Plus, Search, Send, Settings, ShieldCheck, Users, UserPlus, Video, X } from 'lucide-react'
 import type { Conversation, GroupMember, Message } from '../types'
 import type { QueuedChatMessage } from '../lib/chatOutbox'
@@ -74,11 +74,6 @@ export default function CommunityGroupsPage({
   const [manageTab, setManageTab] = useState<ManageTab>('members')
   const [memberQuery, setMemberQuery] = useState('')
   const [menuId, setMenuId] = useState<number | null>(null)
-  const menuTriggerRef = useRef<HTMLButtonElement>(null)
-  const closeMemberMenu = useCallback(() => {
-    setMenuId(null)
-    menuTriggerRef.current?.focus({ preventScroll: true })
-  }, [])
   const [inviteOpen, setInviteOpen] = useState(false)
   const [metadata, setMetadata] = useState<CommunityMetadata | null>(null)
   const [metadataDraft, setMetadataDraft] = useState({description:'',topic:'',rules:'',visibility:'private' as 'public'|'private'})
@@ -99,16 +94,6 @@ export default function CommunityGroupsPage({
   })
   const requestRef=useLatest(request)
   const groupId=selectedGroup?.id ?? null
-  useEffect(() => {
-    if (menuId === null) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      closeMemberMenu()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [menuId, closeMemberMenu])
   useEffect(()=>{
     setMetadata(null)
     setChannels([])
@@ -332,15 +317,15 @@ export default function CommunityGroupsPage({
           <div className="cg-members-list">{shownMembers.map(member=><article className="cg-member-row" key={member.id}>
             <button type="button" className="cg-member-info" onClick={()=>onOpenMember(member.username)}><UserAvatar username={member.username} name={nameOf(member)} className="avatar cg-avatar" online={member.online}/><span><strong>{member.id===userId?myName:nameOf(member)}</strong><small>{member.role==='owner'?'Chủ nhóm':member.role==='admin'?'Quản trị viên':'Thành viên'}</small></span></button>
             {member.role==='owner'&&<span className="cg-owner-label">Chủ nhóm</span>}
-            <div className="cg-menu-wrap"><button ref={menuId===member.id ? menuTriggerRef : undefined} type="button" aria-label={'Tùy chọn '+nameOf(member)} aria-expanded={menuId===member.id} onClick={()=>menuId===member.id ? closeMemberMenu() : setMenuId(member.id)}><MoreHorizontal size={20}/></button>
+            <div className="cg-menu-wrap"><button type="button" aria-label={'Tùy chọn '+nameOf(member)} aria-expanded={menuId===member.id} onClick={()=>setMenuId(v=>v===member.id?null:member.id)}><MoreHorizontal size={20}/></button>
               {menuId===member.id&&<div className="cg-pop-menu" role="menu">
-                <button role="menuitem" type="button" onClick={()=>{closeMemberMenu();onOpenMember(member.username)}}>Xem hồ sơ</button>
+                <button role="menuitem" type="button" onClick={()=>{setMenuId(null);onOpenMember(member.username)}}>Xem hồ sơ</button>
                 {canManage&&member.role!=='owner'&&<>
-                  <button role="menuitem" type="button" disabled={groupBusy} onClick={()=>{closeMemberMenu();void onChangeRole(member,member.role==='admin'?'member':'admin')}}>{member.role==='admin'?'Gỡ quản trị':'Cấp quyền quản trị'}</button>
-                  {activeMember?.role==='owner'&&<button role="menuitem" disabled={groupBusy} type="button" onClick={()=>{closeMemberMenu();void onChangeRole(member,'owner')}}>Chuyển quyền chủ nhóm</button>}
-                  <button role="menuitem" disabled={groupBusy} type="button" onClick={()=>{closeMemberMenu();void onRemoveMember(member)}}>Xóa khỏi nhóm</button>
+                  <button role="menuitem" type="button" disabled={groupBusy} onClick={()=>{setMenuId(null);void onChangeRole(member,member.role==='admin'?'member':'admin')}}>{member.role==='admin'?'Gỡ quản trị':'Cấp quyền quản trị'}</button>
+                  {activeMember?.role==='owner'&&<button role="menuitem" disabled={groupBusy} type="button" onClick={()=>{setMenuId(null);void onChangeRole(member,'owner')}}>Chuyển quyền chủ nhóm</button>}
+                  <button role="menuitem" disabled={groupBusy} type="button" onClick={()=>{setMenuId(null);void onRemoveMember(member)}}>Xóa khỏi nhóm</button>
                 </>}
-                {member.id===userId&&<button role="menuitem" type="button" disabled={groupBusy} onClick={()=>{closeMemberMenu();void onRemoveMember(member)}}>Rời nhóm</button>}
+                {member.id===userId&&<button role="menuitem" type="button" disabled={groupBusy} onClick={()=>{setMenuId(null);void onRemoveMember(member)}}>Rời nhóm</button>}
               </div>}</div>
           </article>)}{!members.length&&<p className="cg-muted">Chưa có thành viên để hiển thị.</p>}</div>
         </>}

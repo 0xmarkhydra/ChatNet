@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import FeedRepostAction from './FeedRepostAction'
 import FeedRepostPreview from './FeedRepostPreview'
 import { userLabel } from '../../../shared/utils/userLabel'
 import type { Post } from '../types'
@@ -23,7 +24,6 @@ type Props = {
   translationPreferencesLoaded: boolean;
   targetLanguage: string;
   setActivePostId: (id: number) => void;
-  onOpenOriginal?: (id: number) => void;
   onToggleComments?: () => void;
   discussion?: ReactNode;
   likePreviews: Record<number, boolean>;
@@ -49,7 +49,6 @@ export default function FeedPostCard({
   translationPreferencesLoaded,
   targetLanguage,
   setActivePostId,
-  onOpenOriginal,
   onToggleComments,
   discussion,
   likePreviews,
@@ -64,13 +63,6 @@ export default function FeedPostCard({
   const likeBusy = likePreviews[post.id] !== undefined
   const extras = parsePostExtras(post.content)
   const openPost = () => setActivePostId(post.id)
-  const openComments = post.repostKind === 'quick'
-    ? () => {
-      const originalId = post.originalPost?.id ?? post.id
-      if (onOpenOriginal) onOpenOriginal(originalId)
-      else setActivePostId(originalId)
-    }
-    : onToggleComments
 
   return (
     <article className="feed-post-card flex flex-col gap-y-2 min-w-0 m-0 px-0 pt-[14px] pb-[11px] overflow-hidden rounded-none border-x-0 border-y border-border-subtle bg-white shadow-none app-desktop:rounded-2xl app-desktop:border-0 app-desktop:shadow-[0_3px_16px_rgba(30,51,96,0.06)] [&>.feed-post-header]:px-4">
@@ -95,13 +87,17 @@ export default function FeedPostCard({
           </div>
         )}
         <FeedRepostPreview post={post} onOpen={setActivePostId} />
-        {post.repostKind !== 'quick' &&
+        {post.repostKind === 'quick' && <div className="feed-post-toolbar">
+          <FeedRepostAction post={post} request={apiFetch} onUpdated={syncFeedPost}
+            onShareToChat={onShareToChat} onFeedback={setNotice} />
+        </div>}
+        {post.repostKind !== 'quick' && <>
         <PostCardEngagement post={post} onReactionUsers={onReactionUsers} />
-        }
         <PostCardToolbar post={post} busy={likeBusy} like={like} apiFetch={apiFetch}
           syncFeedPost={syncFeedPost} removeFeedPost={removeFeedPost} setNotice={setNotice}
           onRepostChanged={onRepostChanged} onShareToChat={onShareToChat}
-          onToggleComments={openComments} discussion={post.repostKind === 'quick' ? null : discussion} openPost={openPost} />
+          onToggleComments={onToggleComments} discussion={discussion} openPost={openPost} />
+        </>}
       </div>
       </article>
   )

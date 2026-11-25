@@ -3,7 +3,6 @@ package main
 import (
 	"chatnet/internal/authx"
 	"chatnet/internal/httpx"
-	"chatnet/internal/searchx"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,7 +10,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type communityFields struct {
@@ -101,15 +99,6 @@ func (s *server) patchCommunityProfile(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, 200, v)
 }
 func (s *server) listPublicCommunities(w http.ResponseWriter, r *http.Request) {
-	page, paged, pageErr := searchx.ParsePageRequest(r.URL.Query())
-	if pageErr != nil {
-		httpx.Error(w, http.StatusBadRequest, pageErr.Error())
-		return
-	}
-	if paged {
-		s.listPublicCommunitiesPage(w, r, page)
-		return
-	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if len([]rune(q)) > 100 {
@@ -151,122 +140,6 @@ func (s *server) listPublicCommunities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, 200, list)
-}
-
-type communitySearchCursor struct {
-	Rank      int       `json:"r"`
-	ID        int64     `json:"i"`
-	CreatedAt time.Time `json:"t,omitempty"`
-}
-
-func (s *server) listPublicCommunitiesPage(w http.ResponseWriter, r *http.Request, page searchx.PageRequest) {
-	claims, _ := authx.ClaimsFromContext(r.Context())
-	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	if len([]rune(q)) > 120 {
-		httpx.Error(w, http.StatusBadRequest, "search too long")
-		return
-	}
-	items := make([]communityProfile, 0)
-	if q == "" {
-		httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nil})
-		return
-	}
-	var cursor communitySearchCursor
-	if page.Cursor != "" {
-		var err error
-		cursor, err = searchx.DecodeCursor[communitySearchCursor](page.Cursor)
-		if err != nil || cursor.ID <= 0 || (page.Sort == "newest" && cursor.CreatedAt.IsZero()) ||
-			(page.Sort == "relevance" && (cursor.Rank < 0 || cursor.Rank > 4)) {
-			httpx.Error(w, http.StatusBadRequest, "invalid cursor")
-			return
-		}
-	}
-	rankSQL := `CASE
-		WHEN ` + searchx.FoldSQL("COALESCE(c.name,'')") + `=` + searchx.FoldSQL("$1") + ` THEN 0
-		WHEN strpos(` + searchx.FoldSQL("COALESCE(c.name,'')") + `,` + searchx.FoldSQL("$1") + `)=1 THEN 1
-		WHEN strpos(` + searchx.FoldSQL("COALESCE(c.name,'')") + `,` + searchx.FoldSQL("$1") + `)>0 THEN 2
-		WHEN strpos(` + searchx.FoldSQL("c.group_topic") + `,` + searchx.FoldSQL("$1") + `)=1 THEN 3
-		ELSE 4 END`
-	query := `WITH candidates AS (
-		SELECT c.id,COALESCE(c.name,'') AS name,c.group_description,c.group_topic,c.group_visibility,
-		  (SELECT COUNT(*) FROM conversation_members WHERE conversation_id=c.id) AS member_count,
-		  c.created_at,` + rankSQL + ` AS rank
-		FROM conversations c
-		WHERE c.type='group' AND c.group_visibility='public'
-		  AND ($1::text='' OR strpos(` + searchx.FoldSQL("COALESCE(c.name,'')") + `,` + searchx.FoldSQL("$1") + `)>0 OR strpos(` + searchx.FoldSQL("c.group_topic") + `,` + searchx.FoldSQL("$1") + `)>0)
-		  AND ($2::timestamptz IS NULL OR c.created_at >= $2)
-		  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE c.created_by IS NOT NULL AND
-		    ((b.blocker_id=$3 AND b.blocked_id=c.created_by) OR (b.blocked_id=$3 AND b.blocker_id=c.created_by)))
-	)
-	SELECT id,name,group_description,group_topic,group_visibility,member_count,created_at,rank FROM candidates`
-	args := []any{q, page.Since, claims.UserID}
-	if cursor.ID > 0 {
-		if page.Sort == "newest" {
-			query += ` WHERE (created_at,id)<($4::timestamptz,$5::bigint)`
-			args = append(args, cursor.CreatedAt, cursor.ID)
-		} else {
-			query += ` WHERE rank>$4 OR (rank=$4 AND id<$5)`
-			args = append(args, cursor.Rank, cursor.ID)
-		}
-	}
-	if page.Sort == "newest" {
-		query += ` ORDER BY created_at DESC,id DESC`
-	} else {
-		query += ` ORDER BY rank ASC,id DESC`
-	}
-	query += ` LIMIT $` + strconv.Itoa(len(args)+1)
-	args = append(args, page.Limit+1)
-	rows, err := s.db.Query(r.Context(), query, args...)
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "cannot load communities")
-		return
-	}
-	type result struct {
-		item      communityProfile
-		createdAt time.Time
-		rank      int
-	}
-	results := make([]result, 0, page.Limit+1)
-	for rows.Next() {
-		var item result
-		if rows.Scan(&item.item.ID, &item.item.Name, &item.item.Description, &item.item.Topic,
-			&item.item.Visibility, &item.item.MemberCount, &item.createdAt, &item.rank) != nil {
-			rows.Close()
-			httpx.Error(w, http.StatusInternalServerError, "cannot load communities")
-			return
-		}
-		results = append(results, item)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		httpx.Error(w, http.StatusInternalServerError, "cannot load communities")
-		return
-	}
-	rows.Close()
-	hasMore := len(results) > page.Limit
-	if hasMore {
-		results = results[:page.Limit]
-	}
-	for _, result := range results {
-		items = append(items, result.item)
-	}
-	var nextCursor any
-	if hasMore && len(results) > 0 {
-		last := results[len(results)-1]
-		value := communitySearchCursor{ID: last.item.ID}
-		if page.Sort == "newest" {
-			value.CreatedAt = last.createdAt
-		} else {
-			value.Rank = last.rank
-		}
-		encoded, err := searchx.EncodeCursor(value)
-		if err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "cannot create search cursor")
-			return
-		}
-		nextCursor = encoded
-	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nextCursor})
 }
 func (s *server) joinPublicCommunity(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())

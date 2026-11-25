@@ -1,8 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { useLatest } from '../../../shared/hooks/useLatest'
-import { useScopedState } from '../../../shared/hooks/useScopedState'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { GroupMember } from '../types'
 import '../styles/message-readers.css'
 
@@ -18,7 +17,6 @@ export function MessageReadersInline({
   members: Reader[]
   onOpen: () => void
 }) {
-  const [showNames, setShowNames] = useState(false)
   const memberById = new Map(members.map((member) => [member.id, member]))
   const uniqueReaderIds = [...new Set(readerIds)]
   const resolvedReaders = uniqueReaderIds.flatMap((id) => {
@@ -35,17 +33,10 @@ export function MessageReadersInline({
         <button
           type="button"
           className="message-readers-preview"
-          aria-label={showNames ? undefined : 'Hiện tên người đã xem'}
-          aria-expanded={showNames}
-          title="Di chuột hoặc nhấn để xem tên"
-          onPointerEnter={(event) => { if (event.pointerType !== 'touch') setShowNames(true) }}
-          onPointerLeave={(event) => { if (event.pointerType !== 'touch') setShowNames(false) }}
-          onClick={(event) => {
-            event.stopPropagation()
-            const pointerType = 'pointerType' in event.nativeEvent ? event.nativeEvent.pointerType : ''
-            if (pointerType === 'touch' || event.detail === 0) setShowNames((current) => !current)
-            else setShowNames(true)
-          }}
+          aria-haspopup="dialog"
+          aria-label={`Mở danh sách ${resolvedReaderCount} người đã xem${preview[0] ? `: ${preview[0].displayName.trim() || preview[0].username}` : ''}`}
+          title={preview.map((reader) => reader.displayName.trim() || reader.username).join(', ')}
+          onClick={(event) => { event.stopPropagation(); onOpen() }}
         >
           <span className="message-readers-avatars" aria-hidden="true">
             {preview.map((reader) => (
@@ -55,7 +46,7 @@ export function MessageReadersInline({
             ))}
             {remaining > 0 && <span className="message-readers-more">+{remaining}</span>}
           </span>
-          <span className="message-readers-names" aria-hidden={!showNames}>
+          <span className="message-readers-names" aria-hidden="true">
             {preview.map((reader) => (
               <span className="message-readers-name" key={reader.id}>
                 {reader.displayName.trim() || reader.username}
@@ -65,16 +56,6 @@ export function MessageReadersInline({
           </span>
         </button>
       )}
-      <button
-        type="button"
-        className="message-readers-open"
-        aria-haspopup="dialog"
-        aria-label={`Mở danh sách ${resolvedReaderCount} người đã xem`}
-        title="Mở danh sách người đã xem"
-        onClick={(event) => { event.stopPropagation(); onOpen() }}
-      >
-        …
-      </button>
     </span>
   )
 }
@@ -98,14 +79,13 @@ export default function MessageReadersDialog({
   onClose: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const requestRef = useLatest(request)
+  const requestRef = useRef(request)
   const titleId = useId()
-  const readerScope = `${conversationId}:${readerIds.join(',')}`
-  const [result, setResult] = useScopedState<{ retry: number; readers: Reader[]; error: string } | null>(readerScope, null)
   const [retry, setRetry] = useState(0)
-  const loading = result?.retry !== retry
-  const readers = loading ? [] : result?.readers ?? []
-  const error = loading ? '' : result?.error ?? ''
+  const readerScope = `${conversationId}:${readerIds.join(',')}:${retry}`
+  const [readers, setReaders] = useScopedState<Reader[]>(readerScope, [])
+  const [loading, setLoading] = useScopedState(readerScope, true)
+  const [error, setError] = useScopedState(readerScope, '')
 
   const closeDialog = () => {
     const dialog = dialogRef.current
@@ -119,6 +99,8 @@ export default function MessageReadersDialog({
     return () => { if (dialog?.open) dialog.close() }
   }, [])
 
+  useEffect(() => { requestRef.current = request }, [request])
+
   useEffect(() => {
     let cancelled = false
     const controller = new AbortController()
@@ -131,13 +113,14 @@ export default function MessageReadersDialog({
         if (!Array.isArray(payload)) throw new Error('Không tải được danh sách người đã xem.')
         const allowedReaders = new Set(readerIds)
         const members = payload.filter(isReader)
-        if (!cancelled) setResult({ retry, readers: members.filter((member) => allowedReaders.has(member.id)), error: '' })
+        if (!cancelled) setReaders(members.filter((member) => allowedReaders.has(member.id)))
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setResult({ retry, readers: [], error: cause instanceof Error ? cause.message : 'Không tải được danh sách người đã xem.' })
+        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Không tải được danh sách người đã xem.')
       })
       .finally(() => {
         window.clearTimeout(timeout)
+        if (!cancelled) setLoading(false)
       })
 
     return () => {
@@ -145,7 +128,7 @@ export default function MessageReadersDialog({
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [conversationId, readerIds, requestRef, retry, setResult])
+  }, [conversationId, readerIds, retry, setReaders, setLoading, setError])
 
   return (
     <dialog

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import type { Tab } from '../../shared/types/navigation'
 import { formatUnreadMessageDescription, type UI_MESSAGES } from '../../features/i18n/lib/i18n'
 import UiIcon from '../../shared/ui/UiIcon'
@@ -19,6 +19,7 @@ export default function BottomNavigation({
   pushEnabled,
 }: Props) {
   const activeKey = tab
+  const unreadDescriptionId = useId()
   const navRef = useRef<HTMLElement>(null)
   const activeButtonRef = useRef<HTMLButtonElement>(null)
   const pillRef = useRef<HTMLSpanElement>(null)
@@ -99,7 +100,8 @@ export default function BottomNavigation({
       <span ref={pillRef} className="nav-liquid-pill" aria-hidden="true" />
       <button
         type="button"
-        aria-label={unreadTotal > 0 ? `${t('nav.chat')}, ${formatUnreadMessageDescription(unreadTotal, t('nav.chatUnread'))}` : t('nav.chat')}
+        aria-label={t('nav.chat')}
+        aria-describedby={unreadTotal > 0 ? unreadDescriptionId : undefined}
         className={tab === 'chat' ? 'active' : ''}
         aria-current={tab === 'chat' ? 'page' : undefined}
         ref={tab === 'chat' ? activeButtonRef : undefined}
@@ -156,6 +158,9 @@ export default function BottomNavigation({
         <span className="nav-icon"><UiIcon name="profile" size={25} />{!pushEnabled && <b>!</b>}</span>
         <span className="nav-label">{t('nav.profile')}</span>
       </button>
+      {unreadTotal > 0 && (
+        <span id={unreadDescriptionId} hidden>{formatUnreadMessageDescription(unreadTotal, t('nav.chatUnread'))}</span>
+      )}
     </nav>
   )
 }

@@ -14,8 +14,6 @@ normative_basis: "ISO/IEC/IEEE 12207:2026, ISO/IEC/IEEE 15289:2019"
 | Nhóm | Biến hoặc nguồn | Khi nào cần |
 |---|---|---|
 | Auth và dữ liệu | `JWT_SECRET`, `OTP_PEPPER`, `DATABASE_URL`, `REDIS_URL` | Runtime backend. Mỗi môi trường dùng cấu hình riêng, không dùng mặc định demo cho production |
-| PostgreSQL Compose | `POSTGRES_PASSWORD` | Compose bắt buộc biến này để đặt mật khẩu Postgres và tạo `DATABASE_URL` |
-| Proxy trust | `CHATNET_TRUSTED_PROXY_CIDRS` | Danh sách IP/CIDR phân tách bằng dấu phẩy. Auth và Translate chỉ tin `X-Forwarded-For` khi kết nối trực tiếp đến từ proxy trong danh sách này |
 | Email | `RESEND_API_KEY`, `RESEND_API_BASE_URL`, `CHATNET_EMAIL_FROM` | OTP thật cần nhà cung cấp và sender hợp lệ |
 | Dịch văn bản | `AI_PROVIDER`, `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_STYLE`, `AI_AUTH_HEADER`, `AI_AUTH_SCHEME` | [Translate service](../../backend/cmd/translate/main.go) |
 | Gọi và dịch thoại | `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `GEMINI_API_KEY` | Compose ở baseline truyền ba biến LiveKit nhưng không truyền `GEMINI_API_KEY`. Để kiểm dịch thoại trên môi trường QA, cần tiêm biến này riêng vào tiến trình/container backend. Chỉ đặt biến trong shell hoặc `.env` không tự làm Compose truyền vào container |
@@ -26,8 +24,6 @@ normative_basis: "ISO/IEC/IEEE 12207:2026, ISO/IEC/IEEE 15289:2019"
 | Desktop | [Main](../../desktop/src/main.cjs), [package](../../desktop/package.json) | Main chọn API origin theo mode. Chứng chỉ và khóa ký nằm ngoài repo |
 
 Đối chiếu [Compose](../../docker-compose.yml) và nơi thực sự đọc biến. Khi thay đổi, ghi owner, môi trường, nơi tiêm biến và cách xác minh. Không lưu giá trị bí mật trong docs hoặc log.
-
-Compose mặc định tin `127.0.0.1/32` cho các lời gọi Gateway đến dịch vụ trong cùng backend container và `172.29.0.10/32` cho Nginx frontend có IP tĩnh. Nếu đổi Docker network hoặc thêm ingress proxy, chỉ thêm CIDR của proxy trực tiếp đáng tin cậy; không tin toàn bộ mạng riêng hay địa chỉ do client gửi trong header.
 
 ## Lịch sử thay đổi
 

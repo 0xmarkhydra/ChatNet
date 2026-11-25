@@ -52,17 +52,6 @@ func e2eeExperimental(w http.ResponseWriter) bool {
 	return true
 }
 
-func e2eeManualEnabled(w http.ResponseWriter) bool {
-	if !e2eeExperimental(w) {
-		return false
-	}
-	if config.Env("CHATNET_E2EE_AUTO_DEFAULT", "") == "1" {
-		httpx.Error(w, http.StatusNotFound, "not found")
-		return false
-	}
-	return true
-}
-
 func e2eeChallengeKey(claims *authx.Claims, challenge string) string {
 	return fmt.Sprintf("chatnet:e2ee:challenge:%d:%s:%s", claims.UserID, claims.SessionID, challenge)
 }
@@ -99,7 +88,7 @@ func decodeE2EERegistration(w http.ResponseWriter, r *http.Request) (e2eeDeviceR
 }
 
 func (s *server) newE2EEChallenge(w http.ResponseWriter, r *http.Request) {
-	if !e2eeManualEnabled(w) {
+	if !e2eeExperimental(w) {
 		return
 	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
@@ -124,7 +113,7 @@ func (s *server) newE2EEChallenge(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) registerE2EEDevice(w http.ResponseWriter, r *http.Request) {
-	if !e2eeManualEnabled(w) {
+	if !e2eeExperimental(w) {
 		return
 	}
 	claims, _ := authx.ClaimsFromContext(r.Context())
@@ -200,7 +189,7 @@ func (s *server) registerE2EEDevice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) listE2EEDevices(w http.ResponseWriter, r *http.Request) {
-	if !e2eeManualEnabled(w) {
+	if !e2eeExperimental(w) {
 		return
 	}
 	claims, _ := authx.ClaimsFromContext(r.Context())

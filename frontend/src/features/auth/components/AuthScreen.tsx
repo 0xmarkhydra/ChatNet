@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -25,11 +25,6 @@ import AuthSetup from './AuthSetup'
 
 type Props = ReturnType<typeof useAuthFlow>
 
-function emailValidationError(value: string) {
-  if (!value.trim()) return 'Email là bắt buộc.'
-  return /^\S+@\S+\.\S+$/.test(value.trim()) ? '' : 'Nhập email hợp lệ.'
-}
-
 export default function AuthScreen({
   authMode, setAuthMode, loginMethod, setLoginMethod, registerStep,
   authEmail, setAuthEmail, authPassword, setAuthPassword, rememberEmail, setRememberEmail,
@@ -40,30 +35,12 @@ export default function AuthScreen({
   const [mobileLocale, setMobileLocale] = useState(() => {
     try { return loadAppLocalePreference() } catch { return 'auto' }
   })
-  const [validationAttempted, setValidationAttempted] = useState(false)
   const isOTP = registerStep === 'otp'
   const isSetup = registerStep === 'setup'
   const usingPassword = !isDesktopBuild && authMode === 'login' && loginMethod === 'password'
-  const emailError = validationAttempted ? emailValidationError(authEmail) : ''
-  const passwordError = validationAttempted && usingPassword && !authPassword
-    ? 'Mật khẩu là bắt buộc.'
-    : ''
   const switchMode = (next: 'login' | 'register') => {
     setAuthMode(next)
-    setAuthEmail('')
-    setAuthPassword('')
-    setValidationAttempted(false)
     resetRegistration()
-  }
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    const nextEmailError = emailValidationError(authEmail)
-    const nextPasswordError = usingPassword && !authPassword ? 'Mật khẩu là bắt buộc.' : ''
-    setValidationAttempted(true)
-    if (nextEmailError || nextPasswordError) {
-      event.preventDefault()
-      return
-    }
-    void submitAuth(event)
   }
 
   return (
@@ -241,7 +218,7 @@ export default function AuthScreen({
             <p className="auth-otp-safety"><ShieldCheck size={14} /> Không chia sẻ mã OTP với người khác.</p>
           </form>
         ) : (
-          <form className={`auth-card auth-login-card auth-login-card--${authMode}`} noValidate onSubmit={handleSubmit}>
+          <form className={`auth-card auth-login-card auth-login-card--${authMode}`} onSubmit={submitAuth}>
             <div className="auth-form-intro">
               <h2>{authMode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản SocCo'}</h2>
               <p>{authMode === 'login' ? 'Đăng nhập để khám phá cộng đồng SocCo.' : 'Bắt đầu kết nối cùng mọi người qua email.'}</p>
@@ -253,10 +230,7 @@ export default function AuthScreen({
             <label className="auth-field" htmlFor="auth-email">Email
               <input id="auth-email" type="email" value={authEmail}
                 onChange={(event) => setAuthEmail(event.target.value)} placeholder="name@example.com"
-                autoComplete="email" maxLength={254} required
-                aria-invalid={emailError ? true : undefined}
-                aria-describedby={emailError ? 'auth-email-error' : undefined} />
-              {emailError && <span id="auth-email-error" className="auth-field-error" role="alert">{emailError}</span>}
+                autoComplete="email" maxLength={254} required />
             </label>
 
             {usingPassword ? (
@@ -266,15 +240,12 @@ export default function AuthScreen({
                   <span className="auth-password-wrap">
                     <input id="auth-password" type={showPassword ? 'text' : 'password'}
                       value={authPassword} onChange={(event) => setAuthPassword(event.target.value)}
-                      autoComplete="current-password" placeholder="Nhập mật khẩu" required
-                      aria-invalid={passwordError ? true : undefined}
-                      aria-describedby={passwordError ? 'auth-password-error' : undefined} />
+                      autoComplete="current-password" placeholder="Nhập mật khẩu" required />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
                       aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
                       {showPassword ? <EyeOff size={17} /> : <Eye size={17} />} <span>{showPassword ? 'Ẩn' : 'Hiển thị'}</span>
                     </button>
                   </span>
-                  {passwordError && <span id="auth-password-error" className="auth-field-error" role="alert">{passwordError}</span>}
                 </div>
                 <div className="auth-login-options">
                   <label className="auth-remember">
@@ -291,7 +262,7 @@ export default function AuthScreen({
               </div>
             )}
 
-            {authError && <div id="auth-form-error" className="auth-alert" role="alert">{authError}</div>}
+            {authError && <div className="auth-alert" role="alert">{authError}</div>}
             <button className="auth-submit" type="submit" disabled={authLoading}>
               <span>{authLoading ? (usingPassword ? 'Đang đăng nhập...' : 'Đang gửi...') : authMode === 'register' ? 'Gửi mã xác minh' : usingPassword ? 'Đăng nhập' : 'Gửi mã OTP'}</span>
               <ArrowRight size={18} />

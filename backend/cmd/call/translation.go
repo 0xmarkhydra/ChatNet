@@ -119,7 +119,9 @@ func (s *server) setCallTranslationConsent(w http.ResponseWriter, r *http.Reques
 	var body struct {
 		Allowed *bool `json:"allowed"`
 	}
-	if err := httpx.DecodeJSON(w, r, &body, 4096); err != nil || body.Allowed == nil {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || body.Allowed == nil || decoder.Decode(&struct{}{}) != io.EOF {
 		httpx.Error(w, http.StatusBadRequest, "invalid consent decision")
 		return
 	}
@@ -221,7 +223,9 @@ func (s *server) createCallTranslationSession(w http.ResponseWriter, r *http.Req
 		TargetLanguage string `json:"targetLanguage"`
 		SpeakerID      string `json:"speakerId"`
 	}
-	if err := httpx.DecodeJSON(w, r, &body, 4096); err != nil {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil {
 		httpx.Error(w, 400, "invalid request")
 		return
 	}
@@ -484,15 +488,6 @@ func (s *server) streamCallTranslation(w http.ResponseWriter, r *http.Request) {
 		}
 		if kind != websocket.BinaryMessage || len(frame) == 0 || len(frame) > translationMaxPCM || len(frame)%2 != 0 {
 			_ = send(map[string]string{"type": "error", "message": "Định dạng âm thanh không hợp lệ."})
-			return
-		}
-		// Re-check speaker consent at every audio-frame boundary. The background
-		// watcher handles participant/session changes, but consent revocation must
-		// stop the next frame without waiting for its polling interval.
-		consented, consentErr := s.callTranslationConsentAllowed(ctx, ticket.CallID, ticket.SpeakerID)
-		if consentErr != nil || !consented {
-			_ = send(map[string]string{"type": "error", "message": "Người nói chưa đồng ý hoặc đã thu hồi quyền dịch."})
-			cancel()
 			return
 		}
 		_ = google.SetWriteDeadline(time.Now().Add(5 * time.Second))

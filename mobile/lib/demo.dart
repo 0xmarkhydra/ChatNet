@@ -51,7 +51,6 @@ class DemoApi extends Api {
   final List<Json> rooms = [
     {
       'id': 1,
-      'createdAt': '2026-10-01T09:00:00+07:00',
       'type': 'group',
       'name': 'SocCO Design Team',
       'memberCount': 4,
@@ -62,7 +61,6 @@ class DemoApi extends Api {
     },
     {
       'id': 2,
-      'createdAt': '2026-10-01T09:00:00+07:00',
       'type': 'direct',
       'name': 'Linh Nguyễn',
       'otherUserId': 2,
@@ -74,7 +72,6 @@ class DemoApi extends Api {
     },
     {
       'id': 3,
-      'createdAt': '2026-10-01T09:00:00+07:00',
       'type': 'direct',
       'name': 'Alex Chen',
       'otherUserId': 3,

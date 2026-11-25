@@ -12,7 +12,6 @@ import SecureCallRoom from './SecureCallRoom'
 import type { CallLaunchDetail } from './CallHeaderActions'
 import { notifyDesktopCall, dismissDesktopCall } from '../../notifications'
 import { friendlyCallError } from '../lib/callErrors'
-import { requestSseTicketWithRetry } from '../../../shared/lib/sseTicket'
 import '../styles/call.css'
 
 type ConversationLite = { id: number; name: string; type: 'direct' | 'group'; otherUsername?: string; blocked?: boolean }
@@ -76,11 +75,7 @@ export default function CallManager({
   useEffect(() => {
     if (!token) return
     void refresh()
-    let isSubscribed = true
-    let source: EventSource | null = null
-    let ticketRequest: AbortController | null = null
-    let reconnectAttempt = 0
-    let stableConnectionTimer = 0
+    const source = new EventSource(`${apiBase}/api/events?token=${encodeURIComponent(token)}`)
     const onCallEvent = (event: MessageEvent) => {
       try {
         const payload = JSON.parse(event.data) as CallRealtimeEvent
@@ -96,44 +91,9 @@ export default function CallManager({
       }
     }
     // Chat sends named "update" events, not default "message" events.
-    const connect = (ticket: string) => {
-      if (!isSubscribed) return
-      const currentSource = new EventSource(`${apiBase}/api/events?ticket=${encodeURIComponent(ticket)}`)
-      source = currentSource
-      currentSource.addEventListener('update', onCallEvent)
-      currentSource.onmessage = onCallEvent
-      currentSource.onopen = () => {
-        if (!isSubscribed || source !== currentSource) return
-        window.clearTimeout(stableConnectionTimer)
-        stableConnectionTimer = window.setTimeout(() => {
-          stableConnectionTimer = 0
-          reconnectAttempt = 0
-        }, 60_000)
-        void refresh()
-      }
-      currentSource.onerror = () => {
-        if (!isSubscribed || source !== currentSource) return
-        window.clearTimeout(stableConnectionTimer)
-        stableConnectionTimer = 0
-        currentSource.close()
-        source = null
-        const backoffMs = Math.min(1000 * 2 ** Math.min(reconnectAttempt, 5), 30_000)
-        reconnectAttempt += 1
-        requestConnection(backoffMs)
-      }
-    }
-    const requestConnection = (initialDelayMs = 0) => {
-      if (!isSubscribed || ticketRequest) return
-      const controller = new AbortController()
-      ticketRequest = controller
-      void requestSseTicketWithRetry(callRequest, controller.signal, initialDelayMs)
-        .then(connect)
-        .catch(() => {
-          if (isSubscribed) setError('Không thể kết nối cuộc gọi trực tiếp. Hệ thống sẽ kiểm tra cuộc gọi khi ứng dụng đang hiển thị.')
-        })
-        .finally(() => { if (ticketRequest === controller) ticketRequest = null })
-    }
-    requestConnection()
+    source.addEventListener('update', onCallEvent)
+    source.onmessage = onCallEvent
+    source.onopen = () => void refresh()
     // Recover missed ringing calls after SSE disconnects or background-tab suspension.
     const poll = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
@@ -144,12 +104,9 @@ export default function CallManager({
       refreshGeneration.current += 1
       window.clearInterval(poll)
       window.removeEventListener('focus', onFocus)
-      ticketRequest?.abort()
-      source?.close()
-      window.clearTimeout(stableConnectionTimer)
-      isSubscribed = false
+      source.close()
     }
-  }, [active?.id, apiBase, callRequest, incoming?.id, refresh, token, userId])
+  }, [active?.id, apiBase, incoming?.id, refresh, token, userId])
 
   useEffect(() => {
     const onStart = (event: Event) => {

@@ -53,9 +53,7 @@ describe('app SSE subscription lifecycle', () => {
     const expireSession = vi.fn()
     const required = {
       sessionRef,
-      apiFetch: vi.fn(async (path: string) => path === '/api/events/ticket'
-        ? Response.json({ ticket: 't'.repeat(43) })
-        : new Response(null, { status: 204 })),
+      apiFetch: vi.fn(async () => new Response(null, { status: 204 })),
       responseCache: { current: { invalidate: vi.fn() } },
       activeConversationIdRef: { current: null },
       activeChannelIdRef: { current: 0 },

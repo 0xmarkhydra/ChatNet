@@ -35,11 +35,7 @@ export default function FeedRepostAction({ post, request, onUpdated, onRemoved, 
 
   const canRepost = !post.originalPost && post.visibility !== 'private'
   const removedId = post.myRepostId
-  const link = (source?: 'chat') => postShareUrl(
-    post.repostKind === 'quick' ? post.originalPost?.id ?? post.id : post.id,
-    window.location,
-    source,
-  )
+  const link = () => postShareUrl(post.repostKind === 'quick' ? post.originalPost?.id ?? post.id : post.id)
   const count = [...draft.trim()].length
 
   async function copyLink() {
@@ -111,7 +107,7 @@ export default function FeedRepostAction({ post, request, onUpdated, onRemoved, 
             </Button>
           </>}
           {onShareToChat && post.visibility !== 'private' && <Button type="button" variant="outline" disabled={busy}
-            onClick={() => { setOpen(false); onShareToChat(link('chat')) }}>
+            onClick={() => { setOpen(false); onShareToChat(link()) }}>
             <MessageCircle aria-hidden="true" />Gửi qua chat
           </Button>}
           <Button type="button" variant="outline" disabled={busy} onClick={() => void copyLink()}>

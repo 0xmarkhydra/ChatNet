@@ -21,9 +21,11 @@ export async function getConversationEncryptionStatus(
       (body.mode !== 'legacy' && body.mode !== 'e2ee')) {
     throw new Error('Invalid encryption status response; sending blocked')
   }
-  // Never place plaintext in the local outbox while server reports auto mode.
+  // All direct chats in an E2EE-by-default environment must never place
+  // new plaintext into the legacy local outbox while MLS is pending.
   // Pre-existing plaintext history remains marked as legacy.
-  if ('autoEnabled' in body && body.autoEnabled === true) return 'pending'
+  if (body.mode === 'legacy' &&
+      'autoEnabled' in body && body.autoEnabled === true) return 'pending'
   return body.mode
 }
 

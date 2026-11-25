@@ -33,7 +33,7 @@ export function useAccountSessions({
   const pendingSession = useRef<string | null>(null);
   async function fetchAccountSessions() {
     const current = sessionRef.current;
-    if (!current || sessionsBusy || pendingSession.current === current.sessionId)
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy || pendingSession.current === current.sessionId)
       return;
     const identity = current.sessionId;
     pendingSession.current = identity;
@@ -47,9 +47,8 @@ export function useAccountSessions({
         const response = await fetch(`${API}/api/auth/sessions/list`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           cache: "no-store",
-          body: JSON.stringify({}),
+          body: JSON.stringify({ refreshToken: current.refreshToken }),
         });
         if (!response.ok) throw new Error("Không tải được phiên đăng nhập.");
         data = (await response.json()) as ManagedAccountSession[];
@@ -69,7 +68,7 @@ export function useAccountSessions({
   }
   async function revokeAccountSessions(sessionID?: string) {
     const current = sessionRef.current;
-    if (!current || sessionsBusy || pendingSession.current === current.sessionId)
+    if (!current || (!isDesktopBuild && !current.refreshToken) || sessionsBusy || pendingSession.current === current.sessionId)
       return;
     const identity = current.sessionId;
     const selected = managedSessions.find((item) => item.id === sessionID);
@@ -96,9 +95,9 @@ export function useAccountSessions({
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             cache: "no-store",
             body: JSON.stringify({
+              refreshToken: current.refreshToken,
               ...(sessionID ? { sessionId: sessionID } : {}),
             }),
           },

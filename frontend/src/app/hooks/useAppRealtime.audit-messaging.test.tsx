@@ -69,9 +69,7 @@ async function openChat({
     id: 42, type, name: 'Chat QA', memberCount: 2, unreadCount: 0, online: true,
     createdAt: at(0), lastMessage: last?.text ?? '', lastMessageAt: last?.createdAt,
   }]
-  const apiFetch = vi.fn(async (path: string, _init?: RequestInit) => path === '/api/events/ticket'
-    ? Response.json({ ticket: 't'.repeat(43) })
-    : new Response(null, { status: 204 }))
+  const apiFetch = vi.fn(async (_path: string, _init?: RequestInit) => new Response(null, { status: 204 }))
   const onMessageConfirmed = vi.fn()
   const options: Parameters<typeof useAppRealtime>[0] = {
     session, sessionRef: { current: session }, apiFetch,
@@ -89,7 +87,7 @@ async function openChat({
     pendingSend: { current: null }, messageReceipts: { current: new Map() },
     onCategoryAssignmentChanged: noop, onCategoriesChanged: noop,
     refreshCategoryConversations: noop, expireSession: noop,
-    checkSession: async () => true, setStatus: noop, setNotice: noop, purgeConversation: noop,
+    checkSession: async () => true, setStatus: noop, purgeConversation: noop,
     refreshConversations: asyncNoop, refreshPosts: asyncNoop, refreshStories: asyncNoop,
     refreshFriendConnections: asyncNoop, reconcileConversationMemberships: asyncNoop,
     refreshGroupMembers: asyncNoop, refreshPinnedMessages: asyncNoop, clearPinnedMessages: noop,
@@ -134,7 +132,7 @@ describe('message receipt across conversation, channel and visibility boundaries
       await chat.emit(message(10))
       expect(chat.messages.map(item => item.id)).toEqual([10])
       expect(chat.conversation.unreadCount).toBe(0)
-      expect(chat.apiFetch.mock.calls.filter(([path]) => path === '/api/conversations/42/read')).toHaveLength(1)
+      expect(chat.apiFetch).toHaveBeenCalledExactlyOnceWith('/api/conversations/42/read', { method: 'POST' })
     } finally { await chat.close() }
   })
 
@@ -145,7 +143,7 @@ describe('message receipt across conversation, channel and visibility boundaries
       await chat.emit(message(10))
       expect(chat.messages.map(item => item.id)).toEqual([10])
       expect(chat.conversation.unreadCount).toBe(1)
-      expect(chat.apiFetch.mock.calls.filter(([path]) => path !== '/api/events/ticket')).toHaveLength(0)
+      expect(chat.apiFetch).not.toHaveBeenCalled()
     } finally { await chat.close() }
   })
 
@@ -155,7 +153,7 @@ describe('message receipt across conversation, channel and visibility boundaries
       await chat.emit(message(10, { channelId: 4 }), message(11, { channelId: 3 }))
       expect(chat.messages.map(item => item.id)).toEqual([11])
       expect(chat.conversation.unreadCount).toBe(1)
-      expect(chat.apiFetch).toHaveBeenCalledWith('/api/conversations/42/channel-read', {
+      expect(chat.apiFetch).toHaveBeenCalledExactlyOnceWith('/api/conversations/42/channel-read', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"channelId":3}',
       })
     } finally { await chat.close() }
@@ -168,7 +166,7 @@ describe('message receipt across conversation, channel and visibility boundaries
       await chat.emit(incoming)
       expect(chat.onMessageConfirmed).toHaveBeenCalledExactlyOnceWith(incoming)
       expect(chat.conversation.unreadCount).toBe(0)
-      expect(chat.apiFetch.mock.calls.filter(([path]) => path !== '/api/events/ticket')).toHaveLength(0)
+      expect(chat.apiFetch).not.toHaveBeenCalled()
     } finally { await chat.close() }
   })
 

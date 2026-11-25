@@ -31,14 +31,6 @@ type SealedState = {
   cursor?: number
 }
 type VaultKey = { id: string; cryptoKey: CryptoKey }
-type SealedVerification = { iv: Uint8Array<ArrayBuffer>; ciphertext: ArrayBuffer }
-type StoredPeerTrust = {
-  id: string
-  identityKey: string
-  mlsSigningKey?: string
-  verification?: SealedVerification
-}
-type PeerVerification = { fingerprint: string; rekeyRequired: boolean }
 
 function keyId(userId: number, deviceId: string): string {
   if (!Number.isSafeInteger(userId) || userId < 1 || !DEVICE_RE.test(deviceId)) {
@@ -376,115 +368,42 @@ function peerTrustID(userId: number, deviceId: string, peerUserId: number, peerD
 }
 export async function getPinnedMLSPeer(
   userId: number, deviceId: string, peerUserId: number, peerDeviceId: string,
-): Promise<{
-  identityKey: string
-  mlsSigningKey?: string
-  verified: boolean
-  rekeyRequired: boolean
-} | null> {
+): Promise<{ identityKey: string; mlsSigningKey?: string } | null> {
   const id = peerTrustID(userId, deviceId, peerUserId, peerDeviceId)
-  const stored = await withVault<StoredPeerTrust | null>([TRUST], 'readonly', (tx, result) => {
+  return withVault<{ identityKey: string; mlsSigningKey?: string } | null>([TRUST], 'readonly', (tx, result) => {
     const request = tx.objectStore(TRUST).get(id)
     request.onsuccess = () => {
-      result(request.result ?? null)
+      const value = request.result
+      result(value ? { identityKey: value.identityKey, mlsSigningKey: value.mlsSigningKey } : null)
     }
   })
-  if (!stored || typeof stored.identityKey !== 'string') return null
-  let verified = false
-  let rekeyRequired = false
-  if (stored.verification) {
-    try {
-      const key = await loadOrCreateKey(keyId(userId, deviceId))
-      const fingerprint = encodeBinary(new Uint8Array(await crypto.subtle.digest(
-        'SHA-256', decodeBinary(stored.identityKey),
-      )))
-      const plain = await crypto.subtle.decrypt({
-        name: 'AES-GCM', iv: stored.verification.iv,
-        additionalData: utf8.encode(`chatnet:mls:peer-verification:v1:${id}:${fingerprint}`),
-      }, key, stored.verification.ciphertext)
-      const data = new Uint8Array(plain)
-      try {
-        const saved = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(data)) as PeerVerification
-        verified = saved.fingerprint === fingerprint && typeof saved.rekeyRequired === 'boolean'
-        rekeyRequired = verified && saved.rekeyRequired
-      } finally {
-        data.fill(0)
-      }
-    } catch {
-      // Missing, copied, edited, or undecryptable markers never establish trust.
-      verified = false
-    }
-  }
-  return {
-    identityKey: stored.identityKey,
-    ...(typeof stored.mlsSigningKey === 'string' ? { mlsSigningKey: stored.mlsSigningKey } : {}),
-    verified,
-    rekeyRequired,
-  }
 }
 export async function pinMLSPeer(
   userId: number, deviceId: string, peerUserId: number, peerDeviceId: string,
   identityKey: string,
   mlsSigningKey?: string,
-  verified = false,
-  requireRekeyAfterVerification = false,
 ): Promise<void> {
   if (decodeBinary(identityKey).length !== 32 ||
       (mlsSigningKey && decodeBinary(mlsSigningKey).length !== 32)) {
     throw new Error('Invalid verified peer public key')
   }
   const id = peerTrustID(userId, deviceId, peerUserId, peerDeviceId)
-  const previous = verified
-    ? await getPinnedMLSPeer(userId, deviceId, peerUserId, peerDeviceId) : null
-  const identityChanged = !!previous && previous.identityKey !== identityKey
-  const rekeyRequired = !!previous?.rekeyRequired ||
-    (requireRekeyAfterVerification && (!previous || identityChanged))
-  let verification: SealedVerification | undefined
-  if (verified) {
-    const key = await loadOrCreateKey(keyId(userId, deviceId))
-    const fingerprint = encodeBinary(new Uint8Array(await crypto.subtle.digest(
-      'SHA-256', decodeBinary(identityKey),
-    )))
-    const iv = crypto.getRandomValues(new Uint8Array(12))
-    const plaintext = utf8.encode(JSON.stringify({ fingerprint, rekeyRequired } satisfies PeerVerification))
-    try {
-      const ciphertext = await crypto.subtle.encrypt({
-        name: 'AES-GCM', iv,
-        additionalData: utf8.encode(`chatnet:mls:peer-verification:v1:${id}:${fingerprint}`),
-      }, key, plaintext)
-      verification = { iv, ciphertext }
-    } finally {
-      plaintext.fill(0)
-    }
-  }
   await withVault<void>([TRUST], 'readwrite', (tx, result, fail) => {
     const store = tx.objectStore(TRUST)
     const request = store.get(id)
     request.onsuccess = () => {
-      const prior = request.result as StoredPeerTrust | undefined
-      const existing = prior?.identityKey
-      if (existing && existing !== identityKey && !verified) {
+      const existing = request.result?.identityKey as string | undefined
+      if (existing && existing !== identityKey) {
         fail(new Error('Peer identity changed; verify out-of-band before continuing'))
         return
       }
-      if (existing && existing !== identityKey && requireRekeyAfterVerification && !rekeyRequired) {
-        fail(new Error('Peer identity changed during verification; repeat verification'))
-        return
-      }
-      const priorSigning = prior?.mlsSigningKey
-      if (existing === identityKey && priorSigning && mlsSigningKey && priorSigning !== mlsSigningKey) {
+      const priorSigning = request.result?.mlsSigningKey as string | undefined
+      if (priorSigning && mlsSigningKey && priorSigning !== mlsSigningKey) {
         fail(new Error('Peer MLS signing identity changed; manual verification required'))
         return
       }
-      store.put({
-        id,
-        identityKey,
-        ...(existing === identityKey ? (mlsSigningKey ?? priorSigning)
-          ? { mlsSigningKey: mlsSigningKey ?? priorSigning } : {} :
-          mlsSigningKey ? { mlsSigningKey } : {}),
-        ...(verification ? { verification } : existing === identityKey && prior?.verification
-          ? { verification: prior.verification } : {}),
-      } satisfies StoredPeerTrust)
+      if (!existing) store.add({ id, identityKey, mlsSigningKey })
+      else if (!priorSigning && mlsSigningKey) store.put({ id, identityKey, mlsSigningKey })
       result(undefined)
     }
   })

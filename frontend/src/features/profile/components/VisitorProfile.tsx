@@ -86,10 +86,7 @@ export default function VisitorProfile({ username, friendOnline, request, curren
     if(!response.ok)throw new Error(response.status===404?'Không tìm thấy hồ sơ hoặc bạn không thể xem tài khoản này.':'Không tải được hồ sơ.')
     const data=await response.json() as VisitorProfileData
     if(cancelled||id!==sequence.current)return
-    const visibleProfile = { ...data }
-    delete visibleProfile.bio
-    delete visibleProfile.city
-    setProfile(visibleProfile)
+    setProfile(data)
     const timeline=await loadVisitorPosts(latestRequest.current, data.username, undefined, Boolean(retry))
     if(!timeline.ok)throw new Error('Không tải được dòng thời gian.')
     const items=await timeline.json() as Post[]
@@ -171,7 +168,6 @@ export default function VisitorProfile({ username, friendOnline, request, curren
  }} className="visitor-profile" role="dialog" aria-modal="true" aria-label="Trang cá nhân người dùng">
   <header className="visitor-toolbar profile-page-toolbar"><button ref={back} type="button" onClick={onClose} aria-label="Quay lại"><ArrowLeft size={21}/></button><strong>Trang cá nhân</strong><button type="button" onClick={()=>setRetry(n=>n+1)} disabled={loading} aria-label="Tải lại hồ sơ"><RefreshCw size={19}/></button></header>
   <div className="visitor-scroll" ref={scroller}><div className="visitor-content">
-   {loading&&!error&&<p className="visitor-empty profile-page-loading" role="status">{profile?'Đang tải bài viết…':'Đang tải hồ sơ…'}</p>}
    {profile&&<>
     <VisitorProfileHero
       profile={profile}

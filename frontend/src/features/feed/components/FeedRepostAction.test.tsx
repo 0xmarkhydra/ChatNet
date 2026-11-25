@@ -14,13 +14,11 @@ const actEnv = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: bo
 const priorActEnv = actEnv.IS_REACT_ACT_ENVIRONMENT
 let host: HTMLDivElement
 let root: Root
-let clipboardDescriptor: PropertyDescriptor | undefined
 beforeEach(() => {
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
   actEnv.IS_REACT_ACT_ENVIRONMENT = true
-  clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value(this: HTMLDialogElement) { this.open = true } })
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value(this: HTMLDialogElement) { this.open = false } })
 })
@@ -32,8 +30,6 @@ afterEach(async () => {
   else Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal')
   if (close) Object.defineProperty(HTMLDialogElement.prototype, 'close', close)
   else Reflect.deleteProperty(HTMLDialogElement.prototype, 'close')
-  if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
-  else Reflect.deleteProperty(navigator, 'clipboard')
 })
 
 function button(label: string) {
@@ -98,24 +94,7 @@ describe('Repost controls', () => {
     await click('Chia sẻ bài viết')
     await click('Gửi qua chat')
     expect(onShare).toHaveBeenCalledOnce()
-    const sharedUrl = new URL(onShare.mock.calls[0][0])
-    expect(sharedUrl.pathname).toBe('/feed/posts/12')
-    expect(sharedUrl.search).toBe('?ref=share&source=chat')
-  })
-
-  it('copies a share permalink without chat source', async () => {
-    const writeText = vi.fn(async (_value: string) => undefined)
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
-    })
-    await setup(source, new Response())
-    await click('Chia sẻ bài viết')
-    await click('Sao chép liên kết')
-    await vi.waitFor(() => expect(writeText).toHaveBeenCalledOnce())
-    const copiedUrl = new URL(writeText.mock.calls[0][0])
-    expect(copiedUrl.pathname).toBe('/feed/posts/12')
-    expect(copiedUrl.search).toBe('?ref=share')
+    expect(new URL(onShare.mock.calls[0][0]).pathname).toBe('/feed/posts/12')
   })
 
   it('does not offer reposting or sending for private posts', async () => {

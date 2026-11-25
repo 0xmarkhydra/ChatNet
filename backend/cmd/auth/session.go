@@ -17,51 +17,6 @@ import (
 )
 
 const sessionTTL = 90 * 24 * time.Hour
-const refreshCookieName = "chatnet_refresh"
-
-func browserSessionRequest(r *http.Request) bool {
-	return httpx.IsWebOrigin(r.Header.Get("Origin"))
-}
-
-func setRefreshCookie(w http.ResponseWriter, value string) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     refreshCookieName,
-		Value:    value,
-		Path:     "/api/auth",
-		Expires:  time.Now().Add(sessionTTL),
-		MaxAge:   int(sessionTTL.Seconds()),
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
-}
-
-func clearRefreshCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     refreshCookieName,
-		Value:    "",
-		Path:     "/api/auth",
-		MaxAge:   -1,
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
-}
-
-func writeSessionResponse(w http.ResponseWriter, r *http.Request, status int, access, refresh string, u user) {
-	w.Header().Set("Cache-Control", "no-store")
-	if browserSessionRequest(r) {
-		setRefreshCookie(w, refresh)
-		httpx.JSON(w, status, map[string]any{"token": access, "user": u})
-		return
-	}
-	httpx.JSON(w, status, map[string]any{"token": access, "refreshToken": refresh, "user": u})
-}
-
-func hasRefreshCookie(r *http.Request) bool {
-	_, err := r.Cookie(refreshCookieName)
-	return err == nil
-}
 
 func sessionHash(token string) string {
 	hash := sha256.Sum256([]byte("chatnet-session-v1\x00" + token))
@@ -69,27 +24,16 @@ func sessionHash(token string) string {
 }
 
 func readRefreshToken(w http.ResponseWriter, r *http.Request) (string, bool) {
-	w.Header().Set("Cache-Control", "no-store")
 	var body struct {
 		RefreshToken string `json:"refreshToken"`
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF ||
 		(body.RefreshToken != "" && (len(body.RefreshToken) != 43 || !tokenRE.MatchString(body.RefreshToken))) {
 		httpx.Error(w, http.StatusBadRequest, "invalid refresh token")
 		return "", false
-	}
-	if cookie, err := r.Cookie(refreshCookieName); err == nil {
-		if !httpx.IsWebOrigin(r.Header.Get("Origin")) {
-			httpx.Error(w, http.StatusForbidden, "invalid session origin")
-			return "", false
-		}
-		if len(cookie.Value) != 43 || !tokenRE.MatchString(cookie.Value) {
-			httpx.Error(w, http.StatusUnauthorized, "invalid refresh cookie")
-			return "", false
-		}
-		return cookie.Value, true
 	}
 	return body.RefreshToken, true
 }
@@ -118,7 +62,7 @@ func (s *server) startSession(w http.ResponseWriter, r *http.Request, u user, st
 		httpx.Error(w, http.StatusInternalServerError, "cannot create token")
 		return
 	}
-	writeSessionResponse(w, r, status, access, refresh, u)
+	httpx.JSON(w, status, map[string]any{"token": access, "refreshToken": refresh, "user": u})
 }
 
 func (s *server) refresh(w http.ResponseWriter, r *http.Request) {
@@ -156,7 +100,7 @@ func (s *server) refresh(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create token")
 		return
 	}
-	writeSessionResponse(w, r, http.StatusOK, access, refresh, u)
+	httpx.JSON(w, http.StatusOK, map[string]any{"token": access, "refreshToken": refresh, "user": u})
 }
 
 func sessionError(w http.ResponseWriter, err error) {
@@ -183,9 +127,6 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			s.notifySessionRevoked(r.Context(), userID, sessionID)
 		}
-	}
-	if hasRefreshCookie(r) {
-		clearRefreshCookie(w)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -64,8 +63,6 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen>
     with SingleTickerProviderStateMixin {
   final messageController = TextEditingController();
-  String? _pendingMessageClientId;
-  String? _pendingMessageDraftKey;
   final messageFocus = FocusNode();
   List<MentionCandidate> mentionMembers = [];
   int? mentionRoomId;
@@ -78,7 +75,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final avatarScrollController = ScrollController();
   final conversationListScrollController = ScrollController();
   List<Json> conversations = [];
-  bool conversationListStarted = false;
   int conversationOffset = 0;
   bool hasMoreConversations = false;
   bool conversationLoadingMore = false;
@@ -180,13 +176,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _refresh() async {
     try {
-      final notifier = ref.read(conversationsProvider.notifier);
-      final isInitialRead = !conversationListStarted;
-      conversationListStarted = true;
-      final loaded = isInitialRead
-          ? await notifier.initialLoad()
-          : await notifier.refresh();
-      final data = loaded.map((conversation) => conversation.toJson()).toList();
+      final data = objects(
+        await widget.api.request('GET', '/api/conversations?limit=25'),
+      );
       if (!mounted) return;
       setState(() {
         data.sort(compareConversationRows);
@@ -280,9 +272,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     conversationLoadingMore = true;
     if (mounted) setState(() {});
     try {
-      final page = await ref
-          .read(chatRepositoryProvider)
-          .conversations(offset: conversationOffset);
+      final page = objects(
+        await widget.api.request(
+          'GET',
+          '/api/conversations?limit=25&offset=$conversationOffset',
+        ),
+      );
       if (!mounted) return;
       setState(() {
         conversationOffset += page.length;
@@ -290,8 +285,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         final ids = conversations.map((item) => item['id']).toSet();
         conversations = [
           ...conversations,
-          for (final conversation in page)
-            if (!ids.contains(conversation.id)) conversation.toJson(),
+          for (final item in page)
+            if (!ids.contains(item['id'])) item,
         ]..sort(compareConversationRows);
       });
     } catch (error) {
@@ -393,21 +388,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           message.remove('translatedText');
         }
       }
-      if (!mounted ||
-          active?['id'] != conversation['id'] ||
-          selectedChannelId != channelId) {
-        return;
-      }
       await widget.api.request(
         'POST',
         '/api/conversations/${conversation['id']}/read',
         {'channelId': channelId},
       );
-      if (!mounted ||
-          active?['id'] != conversation['id'] ||
-          selectedChannelId != channelId) {
-        return;
-      }
+      if (!mounted || active?['id'] != conversation['id']) return;
       setState(() {
         messages = data;
         targetLanguage = target;
@@ -815,9 +801,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
     setState(() => pinBusy = true);
     try {
-      await ref
-          .read(chatRepositoryProvider)
-          .setMessagePinned(id.toInt(), pinned: !pinned);
+      await widget.api.request(
+        pinned ? 'DELETE' : 'PUT',
+        '/api/messages/${id.toInt()}/pin',
+      );
       if (!mounted || active?['id'] != room['id']) return;
       await _refreshPins(room);
       _show(pinned ? 'Đã bỏ ghim tin nhắn.' : 'Đã ghim tin nhắn.');
@@ -834,9 +821,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final pinned = room['pinnedAt']?.toString().isNotEmpty == true;
     setState(() => pinBusy = true);
     try {
-      await ref
-          .read(chatRepositoryProvider)
-          .setConversationPinned(id.toInt(), pinned: !pinned);
+      await widget.api.request(
+        pinned ? 'DELETE' : 'PUT',
+        '/api/conversations/${id.toInt()}/pin',
+      );
       await _refresh();
       if (mounted) {
         _show(
@@ -857,10 +845,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     setState(() => notificationBusy = true);
     final nextMuted = room['muted'] != true;
     try {
+      var mentionNotifications = !nextMuted;
       final group = room['type'] == 'group';
-      final result = await ref
-          .read(chatRepositoryProvider)
-          .setConversationMuted(id, muted: nextMuted, isGroup: group);
+      if (group) {
+        final current = object(
+          await widget.api.request(
+            'GET',
+            '/api/conversations/$id/notification-settings',
+          ),
+        );
+        if (current['mentionNotifications'] is! bool) {
+          throw const ApiError('Không đọc được cấu hình @Tag của nhóm.');
+        }
+        // Muting normal messages does NOT mute explicit @mentions.
+        mentionNotifications = current['mentionNotifications'] == true;
+      }
+      final result = object(
+        await widget.api
+            .request('PUT', '/api/conversations/$id/notification-settings', {
+              'messageNotifications': !nextMuted,
+              'mentionNotifications': mentionNotifications,
+            }),
+      );
+      if (result['messageNotifications'] is! bool) {
+        throw const ApiError('Backend chưa hỗ trợ cấu hình thông báo.');
+      }
       final muted = group
           ? result['messageNotifications'] != true
           : result['messageNotifications'] != true &&
@@ -1017,32 +1026,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         (text.isEmpty && outgoingAttachments.isEmpty)) {
       return;
     }
-    final draft = <String, dynamic>{
+    final body = <String, dynamic>{
       'text': text,
+      'clientId': DateTime.now().microsecondsSinceEpoch.toString(),
       if (active?['type'] == 'group') 'channelId': selectedChannelId,
       if (replyingTo != null) 'replyToMessageId': replyingTo!['id'],
       if (outgoingAttachments.isNotEmpty) 'attachments': outgoingAttachments,
     };
-    final draftKey = jsonEncode([(active!['id'] as num).toInt(), draft]);
-    final matchingClientId = _pendingMessageDraftKey == draftKey
-        ? _pendingMessageClientId
-        : null;
-    final clientId =
-        matchingClientId ?? DateTime.now().microsecondsSinceEpoch.toString();
-    _pendingMessageDraftKey = draftKey;
-    _pendingMessageClientId = clientId;
-    final body = <String, dynamic>{'clientId': clientId, ...draft};
     setState(() => sending = true);
     try {
-      final result = await ref
-          .read(chatRepositoryProvider)
-          .sendMessage((active!['id'] as num).toInt(), body: body);
+      final result = object(
+        await widget.api.request(
+          'POST',
+          '/api/conversations/${active!['id']}/messages',
+          body,
+        ),
+      );
       if (!mounted) return;
       setState(() {
         messages = [...messages, result];
         messageController.clear();
-        _pendingMessageClientId = null;
-        _pendingMessageDraftKey = null;
         pendingAttachments = [];
         replyingTo = null;
       });
@@ -1223,14 +1226,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Future<void> _edit(Json message) async {
-    var currentText = message['text']?.toString() ?? '';
+    final controller = TextEditingController(text: message['text']?.toString());
     final text = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Sửa tin nhắn'),
-        content: TextFormField(
-          initialValue: currentText,
-          onChanged: (value) => currentText = value,
+        content: TextField(
+          controller: controller,
           autofocus: true,
           maxLength: 4000,
           minLines: 1,
@@ -1242,17 +1244,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             child: const Text('Hủy'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, currentText.trim()),
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
             child: const Text('Lưu'),
           ),
         ],
       ),
     );
+    controller.dispose();
     if (text == null || text.isEmpty || text == message['text']) return;
     try {
-      final updated = await ref
-          .read(chatRepositoryProvider)
-          .editMessage((message['id'] as num).toInt(), text: text);
+      final updated = object(
+        await widget.api.request('PATCH', '/api/messages/${message['id']}', {
+          'text': text,
+        }),
+      );
       _replaceMessage(updated);
     } catch (value) {
       _show(value.toString());
@@ -1261,9 +1266,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _recall(Json message) async {
     try {
-      final updated = await ref
-          .read(chatRepositoryProvider)
-          .recallMessage((message['id'] as num).toInt());
+      final updated = object(
+        await widget.api.request('DELETE', '/api/messages/${message['id']}'),
+      );
       _replaceMessage(updated);
     } catch (value) {
       _show(value.toString());
@@ -1271,18 +1276,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Future<void> _react(Json message, String emoji) async {
-    final messageId = (message['id'] as num).toInt();
-    final messageSnapshot = jsonEncode(message);
     try {
-      final updated = await ref
-          .read(chatRepositoryProvider)
-          .toggleMessageReaction(messageId, emoji: emoji);
-      final current = messages
-          .where((item) => item['id'] == messageId)
-          .firstOrNull;
-      if (current != null && jsonEncode(current) == messageSnapshot) {
-        _replaceMessage(updated);
-      }
+      final updated = object(
+        await widget.api.request(
+          'POST',
+          '/api/messages/${message['id']}/reactions',
+          {'emoji': emoji},
+        ),
+      );
+      _replaceMessage(updated);
     } catch (value) {
       _show(value.toString());
     }
@@ -1340,18 +1342,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   await widget.api.upload('chat', name, type, bytes),
                 );
               }
-              await ref
-                  .read(chatRepositoryProvider)
-                  .sendMessage(
-                    (destination['id'] as num).toInt(),
-                    body: {
-                      'clientId': DateTime.now().microsecondsSinceEpoch
-                          .toString(),
-                      'text': message['text']?.toString() ?? '',
-                      'forwarded': true,
-                      'attachments': attachments,
-                    },
-                  );
+              await widget.api.request(
+                'POST',
+                '/api/conversations/${destination['id']}/messages',
+                {
+                  'clientId': DateTime.now().microsecondsSinceEpoch.toString(),
+                  'text': message['text']?.toString() ?? '',
+                  'forwarded': true,
+                  'attachments': attachments,
+                },
+              );
               if (!sheetContext.mounted) return;
               Navigator.pop(sheetContext);
               _show('Đã chuyển tiếp đến ${destination['name']}.');
@@ -1845,9 +1845,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final channelId = (channel['id'] as num?)?.toInt();
     if (roomId == null || channelId == null) return;
     try {
-      final muted = await ref
-          .read(chatRepositoryProvider)
-          .toggleChannelNotifications(roomId, channelId);
+      final current = object(
+        await widget.api.request(
+          'GET',
+          '/api/conversations/$roomId/channels/$channelId/notifications',
+        ),
+      );
+      if (current['muted'] is! bool) {
+        throw const ApiError('Không đọc được trạng thái thông báo kênh.');
+      }
+      final muted = current['muted'] != true;
+      await widget.api.request(
+        'PUT',
+        '/api/conversations/$roomId/channels/$channelId/notifications',
+        {'muted': muted},
+      );
       await _reloadGroupChannels(roomId);
       _show(muted ? 'Đã tắt thông báo kênh.' : 'Đã bật thông báo kênh.');
     } catch (error) {
@@ -1880,7 +1892,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
     if (confirmed != true || !mounted) return;
     try {
-      await ref.read(chatRepositoryProvider).deleteChannel(roomId, channelId);
+      await widget.api.request(
+        'DELETE',
+        '/api/conversations/$roomId/channels/$channelId',
+      );
       if (!mounted) return;
       _closeConversation();
       setState(() => selectedChannelId = 0);
@@ -1987,7 +2002,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
     if (confirmed != true || !mounted) return;
     try {
-      await ref.read(chatRepositoryProvider).clearConversationHistory(roomId);
+      await widget.api.request('DELETE', '/api/conversations/$roomId/history');
       if (!mounted) return;
       if (active?['id'] == roomId) {
         setState(() {

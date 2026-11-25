@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
-import { Button } from '../../../shared/ui/button'
 import { feedPostIdFromUrl, feedPostPath } from '../../../shared/utils/feedPostPath'
-import { getSharedPostPreview, SharedPostPreviewError, type SharedPostPreview } from '../../feed'
-import ChatSharedPostCard from './ChatSharedPostCard'
+import { getSharedPostPreview, type SharedPostPreview } from '../../feed'
 import { messageLinkHref, messageTextParts } from '../lib/messageClipboard'
 import '../styles/link-preview.css'
 import { fetchLinkPreview } from '../api/linkPreview'
@@ -22,9 +20,7 @@ type LinkPreviewData = {
 type RequestPreview = (path: string, init?: RequestInit) => Promise<Response>
 type CacheEntry = { expires: number; promise: Promise<LinkPreviewData | null> }
 const previewCache = new Map<string, CacheEntry>()
-type PostPreviewState = { status: 'loading' | 'unavailable' }
-  | { status: 'error'; reason: SharedPostPreviewError['kind']; retryAt?: number }
-  | { status: 'ready'; post: SharedPostPreview }
+type PostPreviewState = { status: 'loading' | 'unavailable' } | { status: 'ready'; post: SharedPostPreview }
 const loadingPost: PostPreviewState = { status: 'loading' }
 
 function loadPreview(url: string, scope: string, request: RequestPreview): Promise<LinkPreviewData | null> {
@@ -85,14 +81,6 @@ export default function LinkPreview({
   const [preview, setPreview] = useScopedState<LinkPreviewData | null>(previewScope, null)
   const [postPreview, setPostPreview] = useScopedState<PostPreviewState>(previewScope, loadingPost)
   const [imageFailed, setImageFailed] = useScopedState(previewScope, false)
-  const [retryRevision, setRetryRevision] = useScopedState(previewScope, 0)
-  const [now, setNow] = useState(() => Date.now())
-
-  useEffect(() => {
-    if (postPreview.status !== 'error' || postPreview.retryAt === undefined || postPreview.retryAt <= now) return
-    const timeout = window.setTimeout(() => setNow(Date.now()), postPreview.retryAt - now)
-    return () => window.clearTimeout(timeout)
-  }, [now, postPreview])
 
   useEffect(() => {
     if (!url || typeof IntersectionObserver === 'undefined') return
@@ -121,18 +109,10 @@ export default function LinkPreview({
     function load() {
       const current = ++revision
       void getSharedPostPreview(requestRef.current, id)
+        .catch(() => null)
         .then(post => {
           if (current !== revision) return
           setPostPreview(post ? { status: 'ready', post } : { status: 'unavailable' })
-        })
-        .catch(error => {
-          if (current !== revision) return
-          const failure = error instanceof SharedPostPreviewError ? error : null
-          setPostPreview({
-            status: 'error',
-            reason: failure?.kind ?? 'retryable',
-            retryAt: failure?.retryAt,
-          })
         })
     }
     function refresh() {
@@ -146,42 +126,30 @@ export default function LinkPreview({
       revision++
       window.removeEventListener('chatnet:privacy-updated', refresh)
     }
-  }, [cacheScope, postId, requestRef, retryRevision, setImageFailed, setPostPreview, visible])
+  }, [cacheScope, postId, requestRef, setImageFailed, setPostPreview, visible])
 
   if (!url || !parsed) return null
   if (postId !== null) {
     const post = postPreview.status === 'ready' ? postPreview.post : null
-    const errorText = postPreview.status !== 'error' ? null
-      : postPreview.reason === 'session' ? 'Phiên đăng nhập hết hạn. Đăng nhập lại rồi thử lại.'
-        : postPreview.reason === 'rate-limited' ? 'Máy chủ giới hạn yêu cầu. Hãy chờ trước khi thử lại.'
-          : postPreview.reason === 'request' ? 'Không thể tải bài viết lúc này.'
-            : 'Không tải được bài viết. Hãy thử lại.'
-    const retryDisabled = postPreview.status === 'error' && postPreview.retryAt !== undefined && now < postPreview.retryAt
-    const postHref = feedPostPath(postId, {
-      ref: parsed.searchParams.get('ref') === 'share' ? 'share' : undefined,
-      source: parsed.searchParams.get('source') === 'chat' ? 'chat' : undefined,
-    })
+    const description = post ? post.text || post.mediaLabel : postPreview.status === 'unavailable'
+      ? 'Bài viết không còn hoặc bạn không có quyền xem.' : 'Đang tải bài viết…'
     return (
       <span ref={holder} className="message-link-preview-holder">
-        {post ? <ChatSharedPostCard post={post} postHref={postHref} /> : (
-          <Link className="message-link-preview message-link-preview-fallback" to={postHref} aria-label="Mở bài viết ChatNet">
-            <span className="message-link-preview-details">
-              <span className="message-link-preview-domain">Bài viết · ChatNet</span>
-              <strong className="message-link-preview-title">Bài viết ChatNet</strong>
-              <span className="message-link-preview-description">
-                {postPreview.status === 'unavailable' ? 'Bài viết không còn hoặc bạn không có quyền xem.'
-                  : postPreview.status === 'error' ? errorText : 'Đang tải bài viết…'}
-              </span>
+        <Link className={`message-link-preview${post ? '' : ' message-link-preview-fallback'}`}
+          to={feedPostPath(postId)}
+          aria-label={post ? `Mở bài viết của ${post.author}` : 'Mở bài viết ChatNet'}>
+          <span className="message-link-preview-details">
+            <span className="message-link-preview-domain">Bài viết · ChatNet</span>
+            <strong className="message-link-preview-title">{post?.author ?? 'Bài viết ChatNet'}</strong>
+            {description && <span className="message-link-preview-description whitespace-pre-line">{description}</span>}
+          </span>
+          {post?.image && !imageFailed && (
+            <span className="message-link-preview-image">
+              <img src={post.image} alt="" loading="lazy" referrerPolicy="no-referrer"
+                onError={() => setImageFailed(true)} />
             </span>
-          </Link>
-        )}
-        {!post && postPreview.status === 'error' && postPreview.reason !== 'request' && (
-          <Button variant="outline" size="sm" className="mt-ui-2 min-h-11"
-            disabled={retryDisabled}
-            onClick={() => { setPostPreview(loadingPost); setRetryRevision(value => value + 1) }}>
-            Thử lại
-          </Button>
-        )}
+          )}
+        </Link>
       </span>
     )
   }

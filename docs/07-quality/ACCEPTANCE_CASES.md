@@ -5,27 +5,13 @@ version: 1.0.0
 status: Draft
 owner: Quality Engineering
 baseline_commit: 40c1f1b35958ee22c1278986bf82ff57520137a1
-last_updated: 2026-11-21
+last_updated: 2026-11-19
 normative_basis: "ISO/IEC/IEEE 29119-3:2021"
 ---
 
 # Các ca nghiệm thu theo yêu cầu
 
 Tất cả ca dưới đây là **NOT RUN** trong đợt tài liệu. Đây là kịch bản đề xuất, không ghi thay lịch sử PASS. Dùng tài khoản và dữ liệu tổng hợp, không dùng qua production.
-
-## Cổng nghiệm thu P0/P1
-
-Chủ phạm vi điền một bản ghi cho từng release. Không ghi `PASS` nếu thiếu mã lần chạy, SHA/artifact, môi trường, kết quả thực tế và bằng chứng đã che dữ liệu nhạy cảm.
-
-| Trường | Quy tắc đạt | Trạng thái tài liệu này |
-|---|---|---|
-| Phạm vi và build | Ghi release, commit SHA đầy đủ và artifact digest | NOT RUN |
-| P0 acceptance | Mọi yêu cầu P0 trong phạm vi có checkpoint `PASS`; một `FAIL`, `NOT RUN` hoặc `BLOCKED` chặn phát hành | NOT RUN |
-| P1 acceptance | Mọi yêu cầu P1 trong phạm vi có checkpoint `PASS`; hoãn chỉ khi owner ghi phạm vi ảnh hưởng, giới hạn và ngày hết hạn | NOT RUN |
-| Dị thường | S1 không còn mở; S2 chỉ được hoãn bằng quyết định owner gắn release | NOT RUN |
-| Quyết định | `GO` chỉ khi các dòng trên đạt; nếu chưa, ghi `NO-GO` hoặc `DEFERRED` và owner | NOT RUN |
-
-Giá trị trạng thái checkpoint: `PASS`, `FAIL`, `NOT RUN`, `BLOCKED`, `PARTIAL`. `PASS` phải liên kết `RUN-*`; trạng thái suy từ source hoặc tài liệu chỉ là `NOT RUN`.
 
 | Mã | Trình tự | Kết quả mong đợi | Hình thức kiểm |
 |---|---|---|---|

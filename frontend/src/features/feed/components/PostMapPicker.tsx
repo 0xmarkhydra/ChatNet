@@ -9,35 +9,32 @@ maplibregl.setWorkerUrl(workerUrl)
 export default function PostMapPicker({ value, disabled, onConfirm }: {
   value: string; disabled: boolean; onConfirm: (pin: MapCheckIn) => void
 }) {
-  const [initial] = useState(() => parseMapCheckIn(value))
+  const initial = useRef(parseMapCheckIn(value))
   const host = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const marker = useRef<maplibregl.Marker | null>(null)
-  const [point, setPoint] = useState<MapCheckIn | null>(initial)
-  const [name, setName] = useState(initial?.name ?? '')
+  const [point, setPoint] = useState<MapCheckIn | null>(initial.current)
+  const [name, setName] = useState(initial.current?.name ?? '')
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [locating, setLocating] = useState(false)
   useEffect(() => {
-    const mapHost = host.current
-    if (!mapHost) return
+    if (!host.current) return
     let active = true
     let instance: maplibregl.Map
     try {
-      const start = initial
-      instance = new maplibregl.Map({ container: mapHost, style: 'https://tiles.openfreemap.org/styles/liberty',
+      const start = initial.current
+      instance = new maplibregl.Map({ container: host.current, style: 'https://tiles.openfreemap.org/styles/liberty',
         center: start ? [start.longitude, start.latitude] : [105.85, 21.03], zoom: 13 })
     } catch {
-      queueMicrotask(() => {
-        if (active) setError('Không mở được bản đồ trên thiết bị này.')
-      })
-      return () => { active = false }
+      setError('Không mở được bản đồ trên thiết bị này.')
+      return
     }
     map.current = instance
     instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     const observer = new ResizeObserver(() => instance.resize())
-    observer.observe(mapHost)
+    observer.observe(host.current)
     instance.on('load', () => { if (active) { setReady(true); setError('') } })
     instance.on('error', () => { if (active && !instance.isStyleLoaded()) setError('Không tải được bản đồ. Hãy thử lại.') })
     instance.on('click', event => {
@@ -48,7 +45,7 @@ export default function PostMapPicker({ value, disabled, onConfirm }: {
       setName(typeof featureName === 'string' ? featureName.slice(0, 120) : '')
     })
     return () => { active = false; observer.disconnect(); marker.current?.remove(); marker.current = null; instance.remove(); map.current = null }
-  }, [attempt, initial])
+  }, [attempt])
   useEffect(() => {
     if (!ready || !map.current) return
     marker.current?.remove()

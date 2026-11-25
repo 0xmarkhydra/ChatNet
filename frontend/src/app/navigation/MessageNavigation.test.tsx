@@ -44,20 +44,19 @@ describe("Message navigation unread accessibility", () => {
         ));
 
         for (const selector of [".app-sidebar", ".bottom-navigation"]) {
-          const control = Array.from(host.querySelectorAll<HTMLButtonElement>(`${selector} button`))
-            .find((button) => button.getAttribute("aria-label")?.startsWith("Tin nhắn"));
+          const control = host.querySelector<HTMLButtonElement>(`${selector} button[aria-label="Tin nhắn"]`);
           expect(control).not.toBeNull();
           const badge = control!.querySelector("b");
-          const label = control!.getAttribute("aria-label");
+          const id = control!.getAttribute("aria-describedby");
           if (unreadTotal > 0) {
-            expect(label).toBe(`Tin nhắn, ${unreadTotal} tin nhắn chưa đọc`);
-            expect(control!.getAttribute("aria-describedby")).toBeNull();
+            expect(id).toBeTruthy();
+            const description = document.getElementById(id!);
+            expect(description?.hidden).toBe(true);
+            expect(description?.textContent).toBe(`${unreadTotal} tin nhắn chưa đọc`);
             expect(badge?.getAttribute("aria-hidden")).toBe("true");
             expect(badge?.textContent).toBe(unreadTotal === 100 ? "99+" : "1");
-            expect(host.querySelector(`${selector} span[hidden]`)).toBeNull();
           } else {
-            expect(label).toBe("Tin nhắn");
-            expect(control!.getAttribute("aria-describedby")).toBeNull();
+            expect(id).toBeNull();
             expect(badge).toBeNull();
             expect(host.querySelector(`${selector} span[hidden]`)).toBeNull();
           }
