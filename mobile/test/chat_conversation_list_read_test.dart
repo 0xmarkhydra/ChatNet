@@ -13,10 +13,13 @@ class _ConversationApi extends DemoApi {
       StreamController<void>.broadcast();
   final List<String> conversationRequests = [];
   final List<String> groupPrefetchRequests = [];
+  final List<String> conversationPinRequests = [];
   final List<Completer<List<Json>>> pendingConversationResponses = [];
   final List<dynamic> pageResponses = [];
+  Completer<void>? pendingConversationPinRequest;
   bool failConversationReads = false;
   bool failPageReads = false;
+  bool failConversationPinRequests = false;
 
   @override
   Stream<void> events() => _eventController.stream;
@@ -27,6 +30,22 @@ class _ConversationApi extends DemoApi {
 
   @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (path.startsWith('/api/conversations/') && path.endsWith('/pin')) {
+      conversationPinRequests.add('$method $path');
+      final pending = pendingConversationPinRequest;
+      if (pending != null) await pending.future;
+      if (failConversationPinRequests) {
+        throw const ApiError('Synthetic pin failure');
+      }
+      final conversationId = int.parse(path.split('/')[3]);
+      final room = rooms.firstWhere((item) => item['id'] == conversationId);
+      if (method == 'PUT') {
+        room['pinnedAt'] = '2026-11-25T10:01:00Z';
+      } else if (method == 'DELETE') {
+        room.remove('pinnedAt');
+      }
+      return Map<String, dynamic>.from(room);
+    }
     if (method == 'GET' &&
         path.startsWith('/api/conversations?type=group&limit=100&offset=')) {
       groupPrefetchRequests.add(path);
@@ -464,5 +483,105 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.groupPrefetchRequests, hasLength(initialPrefetchCount));
+  });
+
+  testWidgets('conversation pin and unpin use PUT and DELETE', (tester) async {
+    final api = _ConversationApi();
+    api.rooms
+      ..clear()
+      ..add(_room(61, 'Pin room'));
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byKey(const ValueKey('rail-room-61')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ghim hội thoại'));
+    await tester.pumpAndSettle();
+
+    expect(api.conversationPinRequests, ['PUT /api/conversations/61/pin']);
+    expect(api.conversationRequests, hasLength(2));
+
+    await tester.longPress(find.byKey(const ValueKey('rail-room-61')));
+    await tester.pumpAndSettle();
+    expect(find.text('Bỏ ghim hội thoại'), findsOneWidget);
+    await tester.tap(find.text('Bỏ ghim hội thoại'));
+    await tester.pumpAndSettle();
+
+    expect(api.conversationPinRequests, [
+      'PUT /api/conversations/61/pin',
+      'DELETE /api/conversations/61/pin',
+    ]);
+    expect(api.conversationRequests, hasLength(3));
+    await tester.longPress(find.byKey(const ValueKey('rail-room-61')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ghim hội thoại'), findsOneWidget);
+  });
+
+  testWidgets('failed conversation pin keeps state and skips refresh', (
+    tester,
+  ) async {
+    final api = _ConversationApi()..failConversationPinRequests = true;
+    api.rooms
+      ..clear()
+      ..add(_room(62, 'Pin failure room'));
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byKey(const ValueKey('rail-room-62')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ghim hội thoại'));
+    await tester.pumpAndSettle();
+
+    expect(api.conversationPinRequests, ['PUT /api/conversations/62/pin']);
+    expect(api.conversationRequests, hasLength(1));
+    expect(find.textContaining('Synthetic pin failure'), findsOneWidget);
+    await tester.longPress(find.byKey(const ValueKey('rail-room-62')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ghim hội thoại'), findsOneWidget);
+  });
+
+  testWidgets('SSE update stays visible while conversation pin is in flight', (
+    tester,
+  ) async {
+    final pinResponse = Completer<void>();
+    final refreshResponse = Completer<List<Json>>();
+    final api = _ConversationApi()..pendingConversationPinRequest = pinResponse;
+    api.rooms
+      ..clear()
+      ..add(_room(63, 'Before SSE'));
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byKey(const ValueKey('rail-room-63')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ghim hội thoại'));
+    await tester.pumpAndSettle();
+    expect(api.conversationPinRequests, ['PUT /api/conversations/63/pin']);
+
+    api.rooms.single
+      ..['name'] = 'SSE update'
+      ..['pinnedAt'] = '2026-11-25T10:02:00Z';
+    api.pendingConversationResponses.add(refreshResponse);
+    api.emitEvent();
+    await tester.pump();
+    expect(api.conversationRequests, hasLength(2));
+
+    refreshResponse.complete([Map<String, dynamic>.from(api.rooms.single)]);
+    await tester.pumpAndSettle();
+    expect(find.text('SSE update'), findsOneWidget);
+
+    pinResponse.complete();
+    await tester.pumpAndSettle();
+    expect(api.conversationRequests, hasLength(3));
+    expect(find.text('SSE update'), findsOneWidget);
+    await tester.longPress(find.byKey(const ValueKey('rail-room-63')));
+    await tester.pumpAndSettle();
+    expect(find.text('Bỏ ghim hội thoại'), findsOneWidget);
   });
 }
