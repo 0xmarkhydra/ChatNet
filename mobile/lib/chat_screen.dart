@@ -794,10 +794,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
     setState(() => pinBusy = true);
     try {
-      await widget.api.request(
-        pinned ? 'DELETE' : 'PUT',
-        '/api/messages/${id.toInt()}/pin',
-      );
+      await ref
+          .read(chatRepositoryProvider)
+          .setMessagePinned(id.toInt(), pinned: !pinned);
       if (!mounted || active?['id'] != room['id']) return;
       await _refreshPins(room);
       _show(pinned ? 'Đã bỏ ghim tin nhắn.' : 'Đã ghim tin nhắn.');

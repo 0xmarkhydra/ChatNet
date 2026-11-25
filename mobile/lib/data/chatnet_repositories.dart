@@ -28,6 +28,13 @@ class ChatRepository {
     );
   }
 
+  Future<void> setMessagePinned(int messageId, {required bool pinned}) async {
+    await api.request(
+      pinned ? 'PUT' : 'DELETE',
+      '/api/messages/$messageId/pin',
+    );
+  }
+
   Future<List<ChatMessage>> messages(
     int conversationId, {
     int channelId = 0,
