@@ -77,6 +77,32 @@ class ChatRepository {
     });
   }
 
+  Future<bool> toggleChannelNotifications(
+    int conversationId,
+    int channelId,
+  ) async {
+    final path =
+        '/api/conversations/$conversationId/channels/$channelId/notifications';
+    final current = object(await api.request('GET', path));
+    if (current['muted'] is! bool) {
+      throw const ApiError('Không đọc được trạng thái thông báo kênh.');
+    }
+    final muted = current['muted'] != true;
+    await api.request('PUT', path, {'muted': muted});
+    return muted;
+  }
+
+  Future<Json> deleteChannel(int conversationId, int channelId) async => object(
+    await api.request(
+      'DELETE',
+      '/api/conversations/$conversationId/channels/$channelId',
+    ),
+  );
+
+  Future<Json> clearConversationHistory(int conversationId) async => object(
+    await api.request('DELETE', '/api/conversations/$conversationId/history'),
+  );
+
   Future<Json> toggleMessageReaction(
     int messageId, {
     required String emoji,

@@ -1807,21 +1807,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final channelId = (channel['id'] as num?)?.toInt();
     if (roomId == null || channelId == null) return;
     try {
-      final current = object(
-        await widget.api.request(
-          'GET',
-          '/api/conversations/$roomId/channels/$channelId/notifications',
-        ),
-      );
-      if (current['muted'] is! bool) {
-        throw const ApiError('Không đọc được trạng thái thông báo kênh.');
-      }
-      final muted = current['muted'] != true;
-      await widget.api.request(
-        'PUT',
-        '/api/conversations/$roomId/channels/$channelId/notifications',
-        {'muted': muted},
-      );
+      final muted = await ref
+          .read(chatRepositoryProvider)
+          .toggleChannelNotifications(roomId, channelId);
       await _reloadGroupChannels(roomId);
       _show(muted ? 'Đã tắt thông báo kênh.' : 'Đã bật thông báo kênh.');
     } catch (error) {
@@ -1854,10 +1842,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
     if (confirmed != true || !mounted) return;
     try {
-      await widget.api.request(
-        'DELETE',
-        '/api/conversations/$roomId/channels/$channelId',
-      );
+      await ref.read(chatRepositoryProvider).deleteChannel(roomId, channelId);
       if (!mounted) return;
       _closeConversation();
       setState(() => selectedChannelId = 0);
@@ -1964,7 +1949,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
     if (confirmed != true || !mounted) return;
     try {
-      await widget.api.request('DELETE', '/api/conversations/$roomId/history');
+      await ref.read(chatRepositoryProvider).clearConversationHistory(roomId);
       if (!mounted) return;
       if (active?['id'] == roomId) {
         setState(() {
