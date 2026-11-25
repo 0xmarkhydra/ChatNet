@@ -273,18 +273,17 @@ void main() {
         ..add(_conversationPage(51, 1));
       addTearDown(api.closeEvents);
 
-      await _pumpApp(tester, api);
+      await _pumpApp(tester, api, size: const Size(390, 6000));
       await tester.pumpAndSettle();
 
-      final rail = find.byKey(const ValueKey('mobile-avatar-rail'));
-      await tester.drag(rail, const Offset(0, -10000));
+      await tester.tap(find.text('Tải thêm hội thoại'));
       await tester.pumpAndSettle();
       expect(
         api.conversationRequests,
         contains('/api/conversations?limit=25&offset=25'),
       );
 
-      await tester.drag(rail, const Offset(0, -10000));
+      await tester.tap(find.text('Tải thêm hội thoại'));
       await tester.pumpAndSettle();
       expect(
         api.conversationRequests,
@@ -299,6 +298,14 @@ void main() {
         find.byKey(const ValueKey('rail-room-51')),
       );
       expect(lastExisting.dy, lessThan(lastPage.dy));
+
+      final lastFirstPageRoom = tester.getTopLeft(
+        find.byKey(const ValueKey('rail-room-25')),
+      );
+      final firstSecondPageRoom = tester.getTopLeft(
+        find.byKey(const ValueKey('rail-room-26')),
+      );
+      expect(lastFirstPageRoom.dy, lessThan(firstSecondPageRoom.dy));
     },
   );
 
