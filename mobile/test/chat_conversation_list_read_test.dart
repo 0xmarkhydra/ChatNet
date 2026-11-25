@@ -1965,6 +1965,40 @@ void main() {
     expect(tester.widget<ListTile>(_forwardDestination()).enabled, isTrue);
   });
 
+  testWidgets('stale reaction response preserves newer SSE message', (
+    tester,
+  ) async {
+    final pending = Completer<Json>();
+    final api = _ConversationApi()..pendingReactionResponse = pending;
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _reactToMessage(tester, messageId: 10, emoji: '👍');
+    expect(api.reactionRequests, ['POST /api/messages/10/reactions']);
+
+    final message = api.messages[1]!.firstWhere(
+      (message) => message['id'] == 10,
+    );
+    final staleResponse = {
+      ...message,
+      'reactions': [
+        {'emoji': '👍', 'count': 1, 'mine': true},
+      ],
+    };
+    message['text'] = 'Updated from SSE';
+    message['reactions'] = staleResponse['reactions'];
+    api.emitEvent();
+    await tester.pumpAndSettle();
+    expect(api.conversationRequests.length, greaterThan(1));
+    expect(find.text('Updated from SSE'), findsOneWidget);
+
+    pending.complete(staleResponse);
+    await tester.pumpAndSettle();
+    expect(find.text('Updated from SSE'), findsOneWidget);
+    expect(find.text(staleResponse['text'] as String), findsNothing);
+    expect(find.text('👍 1'), findsOneWidget);
+  });
+
   testWidgets('stale reaction response overwrites newer SSE update (baseline)', (
     tester,
   ) async {
