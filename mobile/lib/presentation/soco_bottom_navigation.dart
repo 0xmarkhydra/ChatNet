@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../localization.dart';
@@ -44,6 +46,7 @@ class SocoBottomNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (compact) return _buildFloatingBar(context);
     final index = selected.index;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return Container(
@@ -226,4 +229,108 @@ class SocoBottomNavigationBar extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildFloatingBar(BuildContext context) {
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final index = selected.index;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          key: const ValueKey('bottom-navigation'),
+          height: 56,
+          decoration: BoxDecoration(
+            color: const Color(0x52FFFFFF),
+            border: Border.all(color: const Color(0x73FFFFFF)),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: const [
+              BoxShadow(color: Color(0x1F111827), blurRadius: 22, offset: Offset(0, 6)),
+            ],
+          ),
+          child: Stack(
+            children: [
+              AnimatedAlign(
+                duration: reducedMotion ? Duration.zero : const Duration(milliseconds: 420),
+                curve: Curves.elasticOut,
+                alignment: Alignment(-1 + index * .5, 0),
+                child: FractionallySizedBox(
+                  widthFactor: 1 / _destinations.length,
+                  child: Center(
+                    child: TweenAnimationBuilder<double>(
+                      key: ValueKey('nav-pulse-$index'),
+                      tween: Tween(begin: 0, end: 1),
+                      duration: reducedMotion ? Duration.zero : const Duration(milliseconds: 420),
+                      builder: (context, t, child) => Transform.scale(
+                        scale: reducedMotion ? 1 : 1 + .07 * (1 - (2 * t - 1).abs()),
+                        child: child,
+                      ),
+                      child: Container(
+                        key: const ValueKey('nav-selection-indicator'),
+                        height: 46,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0x294F46E5),
+                          borderRadius: BorderRadius.circular(23),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  for (final item in _destinations)
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        selected: selected == item.tab,
+                        label: tr(context, item.label),
+                        child: InkWell(
+                          key: ValueKey('nav-${item.tab.name}'),
+                          onTap: () => onSelected(item.tab),
+                          borderRadius: BorderRadius.circular(23),
+                          child: Center(
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                IconTheme(
+                                  data: IconThemeData(
+                                    color: selected == item.tab
+                                        ? const Color(0xFF4338CA)
+                                        : const Color(0xFF4B5563),
+                                  ),
+                                  child: SocoIcon(item.icon, size: 22),
+                                ),
+                                if (item.tab == SocoTab.chat && unreadTotal > 0)
+                                  Positioned(
+                                    right: -12, top: -8,
+                                    child: Container(
+                                      constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEA4759),
+                                        border: Border.all(color: Colors.white, width: 2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(unreadTotal > 99 ? '99+' : '$unreadTotal',
+                                        style: const TextStyle(fontSize: 9, height: 1, color: Colors.white, fontWeight: FontWeight.w800)),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
 }
