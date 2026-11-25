@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/api.dart';
 import 'package:soco/app.dart';
@@ -147,7 +147,10 @@ void main() {
     await tester.tap(find.text('Đổi tên kênh').last);
     await tester.pumpAndSettle();
     expect(
-      tester.widget<TextField>(find.byType(TextField).last).controller!.text,
+      tester
+          .widget<EditableText>(find.byType(EditableText).last)
+          .controller
+          .text,
       'Thiết kế UI',
     );
   });
@@ -161,7 +164,10 @@ void main() {
     await tester.tap(find.text('Sửa chủ đề kênh').last);
     await tester.pumpAndSettle();
     expect(
-      tester.widget<TextField>(find.byType(TextField).last).controller!.text,
+      tester
+          .widget<EditableText>(find.byType(EditableText).last)
+          .controller
+          .text,
       'Cập nhật giao diện',
     );
   });
