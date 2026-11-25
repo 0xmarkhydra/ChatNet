@@ -90,7 +90,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('feed-composer-open')));
     await tester.pumpAndSettle();
     expect(find.text('Gắn thẻ'), findsOneWidget);
-    expect(find.text('Check-in'), findsOneWidget);
+    // Composer chip label changed from "Check-in" to "Vị trí" in location-tag unification.
+    expect(find.text('Vị trí'), findsOneWidget);
     await tester.tap(find.byTooltip('Đóng').last);
     await tester.pumpAndSettle();
 
