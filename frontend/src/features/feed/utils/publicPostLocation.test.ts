@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { capturePublicPostLocation, publishLocationLabel, toPublishLocation, locationPlaceName, publishLocationTag } from "./publicPostLocation";
+import { capturePublicPostLocation, publishLocationLabel, toPublishLocation, locationPlaceName, publishLocationTag , postLocationTag } from "./publicPostLocation";
 const now = Date.now();
 const position = (accuracy: number, timestamp = now) => ({ coords: { latitude: 21, longitude: 105, accuracy }, timestamp } as GeolocationPosition);
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -55,4 +55,15 @@ it("formats a map tag and uses broader names for coarse coordinates", () => {
   const location = toPublishLocation(position(10), now)!;
   expect(publishLocationTag({...location, placeName: "Hà Nội"})).toBe("Đang ở Hà Nội");
   expect(publishLocationTag(location)).toBe("Đang ở vị trí đã chia sẻ");
+});
+it("shows optional named check-ins for friends and private posts, with no duplicate GPS source", () => {
+  for (const visibility of ["friends", "private"] as const) {
+    const tag = postLocationTag({ visibility, content: "📍 Hồ Hoàn Kiếm, Hà Nội\nHello" });
+    expect(tag?.label).toBe("Đang ở Hồ Hoàn Kiếm, Hà Nội");
+    expect(tag?.href).toContain(encodeURIComponent("Hồ Hoàn Kiếm, Hà Nội"));
+    expect(postLocationTag({ visibility, content: "Hello" })).toBeNull();
+  }
+  const tag = postLocationTag({ visibility: "public", content: "📍 Check-in", publishLocation: { latitude: 21, longitude: 105, accuracy: 1200, capturedAt: new Date().toISOString(), placeName: "Hà Nội" } });
+  expect(tag?.label).toBe("Đang ở Hà Nội");
+  expect(tag?.href).toContain("21%2C105");
 });

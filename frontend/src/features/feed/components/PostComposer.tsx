@@ -133,14 +133,15 @@ export default function PostComposer({
       {activeTool === 'checkin' && checkInOpen && setCheckInLocation && (
         <label className="social-feed-checkin-field">
           <span className="smart-checkin-heading">
-            <strong><MapPin size={16} aria-hidden="true" /> Check-in tại</strong>
+            <strong><MapPin size={16} aria-hidden="true" /> Gắn thẻ vị trí</strong>
             <button type="button" aria-label="Bỏ check-in" disabled={isPosting}
               onClick={() => { setCheckInOpen?.(false); setCheckInLocation(''); setActiveTool(null) }}><X size={17} aria-hidden="true" /></button>
           </span>
           <input type="text" aria-label="Địa điểm check-in" value={checkInLocation} maxLength={120}
             onChange={event => setCheckInLocation(event.target.value)}
-            placeholder="Bạn đang ở đâu?" disabled={isPosting} required />
-          <small>Địa điểm sẽ xuất hiện trong bài viết của bạn.</small>
+            placeholder="Nhập tên địa điểm" disabled={isPosting} required />
+          <small>{postVisibility === "public" ? "Bài công khai luôn có vị trí GPS. Địa điểm nhập thêm là check-in tùy chọn." : "Không bắt buộc. Chỉ người có quyền xem bài viết mới thấy vị trí này."}</small>
+          {location && <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary"><MapPin size={14} aria-hidden="true" /><span className="truncate">Đang ở {location}</span></span>}
         </label>
       )}
       {activeTool === 'tag' && (tagPickerOpen || taggedFriends.length > 0) && (
@@ -193,7 +194,7 @@ export default function PostComposer({
           <FeedComposerIconButton icon="feeling" disabled={isPosting} data-tooltip="Bạn đang cảm thấy thế nào?" aria-label="Cảm xúc"
             aria-expanded={feelingPickerOpen} aria-pressed={Boolean(feelingId)}
             onClick={() => selectTool('feeling')} />
-          {setCheckInOpen && <FeedComposerIconButton icon="location" disabled={isPosting} data-tooltip="Thêm địa điểm check-in" aria-label="Check-in địa điểm"
+          {setCheckInOpen && <FeedComposerIconButton icon="location" disabled={isPosting} data-tooltip="Gắn thẻ vị trí" aria-label="Check-in địa điểm"
             aria-expanded={activeTool === 'checkin' && checkInOpen} aria-pressed={checkInOpen && !!checkInLocation.trim()}
             onClick={() => selectTool('checkin')} />}
         </div>
@@ -211,7 +212,7 @@ export default function PostComposer({
       </div>
       {contentLength > 4500 && <p className="smart-composer-count" aria-live="polite">{contentLength} / 5.000 ký tự</p>}
       {overLimit && <p className="smart-composer-error" role="alert">Nội dung, địa điểm, cảm xúc và gắn thẻ vượt quá 5.000 ký tự.</p>}
-      {checkInOpen && !location && <p className="smart-composer-hint">Nhập địa điểm để đăng bài check-in.</p>}
+      {checkInOpen && !location && <p className="smart-composer-hint">Nhập địa điểm hoặc bỏ gắn thẻ để tiếp tục.</p>}
       {postVisibility === 'public' && (!editingPost || (editingPost.visibility && editingPost.visibility !== 'public')) && <p className="smart-composer-hint">📍 Khi đăng công khai, ChatNet sẽ lấy vị trí hiện tại tốt nhất từ GPS hoặc mạng. Nếu chưa đạt 10 m, tên khu vực có thể thiếu chính xác; sai số được lưu kèm vị trí. Tọa độ được gửi đến BigDataCloud để lấy tên khu vực; mọi người có thể xem vị trí này. Chọn Bạn bè hoặc Chỉ mình tôi nếu không muốn chia sẻ.</p>}
        {submitError && <p className="profile-post-error" role="alert">{submitError}</p>}
       {(popup || postText.trim() || postAttachments.length > 0 || checkInOpen || taggedFriends.length > 0 || feelingId) && (

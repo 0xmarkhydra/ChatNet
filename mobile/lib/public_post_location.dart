@@ -146,6 +146,25 @@ Future<Map<String, dynamic>> resolvePublishPlace(
   }
 }
 
+// Match the web post extras prefix format; keep caption and other extras intact.
+String namedPostCheckIn(Map<String, dynamic> post) {
+  final lines = (post['content']?.toString() ?? '')
+      .replaceAll('\r\n', '\n')
+      .split('\n');
+  final first = lines.first.trim();
+  return first.startsWith('📍 ') ? first.substring('📍 '.length).trim() : '';
+}
+
+String postContentWithoutLocation(Map<String, dynamic> post) {
+  final content = post['content']?.toString() ?? '';
+  // Preserve an explicitly entered extra check-in on a GPS-tagged public post.
+  if (namedPostCheckIn(post).isEmpty ||
+      (post['visibility'] == 'public' && post['publishLocation'] is Map)) {
+    return content;
+  }
+  return content.replaceAll('\r\n', '\n').split('\n').skip(1).join('\n').trim();
+}
+
 class PublicPostLocationLink extends StatelessWidget {
   const PublicPostLocationLink({super.key, required this.post});
   final Map<String, dynamic> post;
@@ -153,7 +172,23 @@ class PublicPostLocationLink extends StatelessWidget {
   Widget build(BuildContext context) {
     final location = post['publishLocation'];
     if (post['visibility'] != 'public' || location is! Map) {
-      return const SizedBox.shrink();
+      final name = namedPostCheckIn(post);
+      if (name.isEmpty) return const SizedBox.shrink();
+      return ActionChip(
+        avatar: const Icon(Icons.location_on_outlined, size: 16),
+        tooltip: 'Mở bản đồ theo tên địa điểm',
+        onPressed: () => launchUrl(
+          Uri.https('www.google.com', '/maps/search/', {
+            'api': '1',
+            'query': name,
+          }),
+        ),
+        label: Text(
+          'Đang ở $name',
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      );
     }
     final latitude = location['latitude'];
     final longitude = location['longitude'];
