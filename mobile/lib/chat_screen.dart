@@ -1248,13 +1248,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _react(Json message, String emoji) async {
     try {
-      final updated = object(
-        await widget.api.request(
-          'POST',
-          '/api/messages/${message['id']}/reactions',
-          {'emoji': emoji},
-        ),
-      );
+      final updated = await ref
+          .read(chatRepositoryProvider)
+          .toggleMessageReaction((message['id'] as num).toInt(), emoji: emoji);
       _replaceMessage(updated);
     } catch (value) {
       _show(value.toString());

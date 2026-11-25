@@ -53,6 +53,15 @@ class ChatRepository {
     });
   }
 
+  Future<Json> toggleMessageReaction(
+    int messageId, {
+    required String emoji,
+  }) async => object(
+    await api.request('POST', '/api/messages/$messageId/reactions', {
+      'emoji': emoji,
+    }),
+  );
+
   Future<Json> setConversationMuted(
     int conversationId, {
     required bool muted,
