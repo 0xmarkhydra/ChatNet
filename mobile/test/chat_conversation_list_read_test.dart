@@ -14,12 +14,18 @@ class _ConversationApi extends DemoApi {
   final List<String> conversationRequests = [];
   final List<String> groupPrefetchRequests = [];
   final List<String> conversationPinRequests = [];
+  final List<String> notificationRequests = [];
+  final List<Json> notificationBodies = [];
   final List<Completer<List<Json>>> pendingConversationResponses = [];
+  Completer<Json>? pendingNotificationSettingsRead;
+  Completer<Json>? pendingNotificationSettingsWrite;
   final List<dynamic> pageResponses = [];
   Completer<void>? pendingConversationPinRequest;
   bool failConversationReads = false;
   bool failPageReads = false;
   bool failConversationPinRequests = false;
+  bool failNotificationSettingsRead = false;
+  bool failNotificationSettingsWrite = false;
 
   @override
   Stream<void> events() => _eventController.stream;
@@ -45,6 +51,36 @@ class _ConversationApi extends DemoApi {
         room.remove('pinnedAt');
       }
       return Map<String, dynamic>.from(room);
+    }
+    if (path.endsWith('/notification-settings')) {
+      notificationRequests.add('$method $path');
+      if (method == 'GET') {
+        if (failNotificationSettingsRead) {
+          throw const ApiError('Synthetic notification settings read failure');
+        }
+        if (pendingNotificationSettingsRead != null) {
+          return pendingNotificationSettingsRead!.future;
+        }
+        return <String, dynamic>{
+          'messageNotifications': true,
+          'mentionNotifications': true,
+        };
+      }
+      if (method == 'PUT') {
+        if (body != null) {
+          notificationBodies.add(Map<String, dynamic>.from(body));
+        }
+        if (failNotificationSettingsWrite) {
+          throw const ApiError('Synthetic notification settings write failure');
+        }
+        if (pendingNotificationSettingsWrite != null) {
+          return pendingNotificationSettingsWrite!.future;
+        }
+        return <String, dynamic>{
+          'messageNotifications': body?['messageNotifications'],
+          'mentionNotifications': body?['mentionNotifications'],
+        };
+      }
     }
     if (method == 'GET' &&
         path.startsWith('/api/conversations?type=group&limit=100&offset=')) {
@@ -117,6 +153,13 @@ Future<void> _pumpApp(
 }) async {
   _setViewport(tester, size: size);
   await tester.pumpWidget(SocoApp(key: key, api: api));
+}
+
+Future<void> _tapMuteAction(WidgetTester tester, int conversationId) async {
+  await tester.longPress(find.byKey(ValueKey('rail-room-$conversationId')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Tắt thông báo hội thoại'));
+  await tester.pump();
 }
 
 void main() {
@@ -583,5 +626,165 @@ void main() {
     await tester.longPress(find.byKey(const ValueKey('rail-room-63')));
     await tester.pumpAndSettle();
     expect(find.text('Bỏ ghim hội thoại'), findsOneWidget);
+  });
+
+  testWidgets('conversation mute reads settings before writing them', (
+    tester,
+  ) async {
+    final readResponse = Completer<Json>();
+    final api = _ConversationApi()
+      ..pendingNotificationSettingsRead = readResponse;
+    api.rooms
+      ..clear()
+      ..add(_room(70, 'Mute room')..['muted'] = false);
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+    await _tapMuteAction(tester, 70);
+
+    expect(api.notificationRequests, [
+      'GET /api/conversations/70/notification-settings',
+    ]);
+
+    readResponse.complete({
+      'messageNotifications': true,
+      'mentionNotifications': true,
+    });
+    await tester.pump();
+    expect(api.notificationRequests, [
+      'GET /api/conversations/70/notification-settings',
+      'PUT /api/conversations/70/notification-settings',
+    ]);
+
+    await tester.pumpAndSettle();
+    expect(api.notificationBodies.single, {
+      'messageNotifications': false,
+      'mentionNotifications': true,
+    });
+    await tester.longPress(find.byKey(const ValueKey('rail-room-70')));
+    await tester.pumpAndSettle();
+    expect(find.text('Bật thông báo hội thoại'), findsOneWidget);
+  });
+
+  testWidgets('notification settings read failure skips write', (tester) async {
+    final api = _ConversationApi()..failNotificationSettingsRead = true;
+    api.rooms
+      ..clear()
+      ..add(_room(71, 'Read failure room')..['muted'] = false);
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+    await _tapMuteAction(tester, 71);
+    await tester.pumpAndSettle();
+
+    expect(api.notificationRequests, [
+      'GET /api/conversations/71/notification-settings',
+    ]);
+    await tester.longPress(find.byKey(const ValueKey('rail-room-71')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tắt thông báo hội thoại'), findsOneWidget);
+  });
+
+  testWidgets('notification settings write failure keeps current mute state', (
+    tester,
+  ) async {
+    final api = _ConversationApi()..failNotificationSettingsWrite = true;
+    api.rooms
+      ..clear()
+      ..add(_room(72, 'Write failure room')..['muted'] = false);
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+    await _tapMuteAction(tester, 72);
+    await tester.pumpAndSettle();
+
+    expect(api.notificationRequests, [
+      'GET /api/conversations/72/notification-settings',
+      'PUT /api/conversations/72/notification-settings',
+    ]);
+    await tester.longPress(find.byKey(const ValueKey('rail-room-72')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tắt thông báo hội thoại'), findsOneWidget);
+  });
+
+  testWidgets('SSE conversation refresh survives mute request in flight', (
+    tester,
+  ) async {
+    final writeResponse = Completer<Json>();
+    final api = _ConversationApi()
+      ..pendingNotificationSettingsWrite = writeResponse;
+    api.rooms
+      ..clear()
+      ..add(_room(73, 'Before mute SSE')..['muted'] = false);
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+    await _tapMuteAction(tester, 73);
+    expect(api.notificationRequests, [
+      'GET /api/conversations/73/notification-settings',
+      'PUT /api/conversations/73/notification-settings',
+    ]);
+
+    api.rooms.single['name'] = 'Fresh mute SSE room';
+    api.emitEvent();
+    await tester.pumpAndSettle();
+    expect(find.text('Fresh mute SSE room'), findsOneWidget);
+
+    writeResponse.complete({
+      'messageNotifications': false,
+      'mentionNotifications': true,
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Fresh mute SSE room'), findsOneWidget);
+    await tester.longPress(find.byKey(const ValueKey('rail-room-73')));
+    await tester.pumpAndSettle();
+    expect(find.text('Bật thông báo hội thoại'), findsOneWidget);
+  });
+
+  testWidgets('direct mute and unmute write once without reading settings', (
+    tester,
+  ) async {
+    final api = _ConversationApi();
+    api.rooms
+      ..clear()
+      ..add(
+        _room(74, 'Direct room')
+          ..['type'] = 'direct'
+          ..['muted'] = false,
+      );
+    addTearDown(api.closeEvents);
+
+    await _pumpApp(tester, api);
+    await tester.pumpAndSettle();
+    await _tapMuteAction(tester, 74);
+    await tester.pumpAndSettle();
+
+    expect(api.notificationRequests, [
+      'PUT /api/conversations/74/notification-settings',
+    ]);
+    expect(api.notificationBodies, [
+      {'messageNotifications': false, 'mentionNotifications': false},
+    ]);
+
+    await tester.longPress(find.byKey(const ValueKey('rail-room-74')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bật thông báo hội thoại'));
+    await tester.pumpAndSettle();
+
+    expect(api.notificationRequests, [
+      'PUT /api/conversations/74/notification-settings',
+      'PUT /api/conversations/74/notification-settings',
+    ]);
+    expect(api.notificationBodies, [
+      {'messageNotifications': false, 'mentionNotifications': false},
+      {'messageNotifications': true, 'mentionNotifications': true},
+    ]);
+    await tester.longPress(find.byKey(const ValueKey('rail-room-74')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tắt thông báo hội thoại'), findsOneWidget);
   });
 }
