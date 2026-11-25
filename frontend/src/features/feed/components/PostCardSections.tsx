@@ -57,7 +57,7 @@ export function PostCardHeader({
             <button type="button" className="feed-post-open-date" aria-label="Mở bài viết" onClick={openPost}>{relativeDate(post.createdAt)}</button>
             {' · '}{post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}
           </small>
-          {post.visibility === 'public' && post.publishLocation && <a className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary hover:underline" title={publishLocationLabel(post.publishLocation.accuracy)} href={`https://www.google.com/maps/search/?api=1&query=${post.publishLocation.latitude},${post.publishLocation.longitude}`} target="_blank" rel="noopener noreferrer"><span aria-hidden="true">📍</span><span className="truncate">{publishLocationTag(post.publishLocation)}{post.publishLocation.accuracy > 10 ? " (gần đúng)" : ""}</span></a>}
+          {post.visibility === 'public' && post.publishLocation && <a className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary hover:underline" title={publishLocationLabel(post.publishLocation.accuracy)} href={`https://www.google.com/maps/search/?api=1&query=${post.publishLocation.latitude},${post.publishLocation.longitude}`} target="_blank" rel="noopener noreferrer"><span aria-hidden="true">📍</span><span className="truncate">{publishLocationTag(post.publishLocation)}</span></a>}
         </div>
         <FeedPostActions
           onEdit={post.repostKind === 'quick' ? undefined : onEditPost}

@@ -23,7 +23,7 @@ describe("public post location", () => {
   it("accepts fresh precise and approximate fixes", () => {
     expect(toPublishLocation(position(10), now)?.accuracy).toBe(10);
     expect(toPublishLocation(position(1200), now)?.accuracy).toBe(1200);
-    expect(publishLocationLabel(1200)).toContain("gần đúng · ±1.2 km");
+    expect(publishLocationLabel(1200)).toContain("Vị trí đăng · ±1.2 km");
   });
   it("rejects invalid and stale fixes", () => {
     expect(toPublishLocation(position(0), now)).toBeNull();

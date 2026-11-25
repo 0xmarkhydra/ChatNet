@@ -14,7 +14,7 @@ export function toPublishLocation(position: GeolocationPosition, now = Date.now(
 
 export function publishLocationLabel(accuracy: number): string {
   const distance = accuracy >= 1000 ? `${Math.ceil(accuracy / 100) / 10} km` : `${Math.ceil(accuracy)} m`;
-  return `📍 ${accuracy <= TARGET_ACCURACY ? "Vị trí đăng" : "Vị trí gần đúng"} · ±${distance}`;
+  return `📍 Vị trí đăng · ±${distance}`;
 }
 
 function captureCoordinates(): Promise<PublishLocation> {
