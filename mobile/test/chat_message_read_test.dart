@@ -89,51 +89,41 @@ List<Json> _roomMessages(_MessageReadApi api, int roomId) => [
 ];
 
 void main() {
-  testWidgets(
-    'baseline: delayed old room fetch posts stale read after switch',
-    (tester) async {
-      final api = _MessageReadApi()..preferences['autoTranslate'] = false;
-      api.pendingMessages[2] = Completer<List<Json>>();
+  testWidgets('delayed old room fetch does not post stale read after switch', (
+    tester,
+  ) async {
+    final api = _MessageReadApi()..preferences['autoTranslate'] = false;
+    api.pendingMessages[2] = Completer<List<Json>>();
 
-      await _pumpReadApp(tester, api);
-      await _openRoom(tester, 2);
-      await _pumpUntil(
-        tester,
-        () => api.messageRequests.any(
-          (path) => path.startsWith('/api/conversations/2/messages'),
-        ),
-        api.requests,
-      );
-      expect(api.readRequests, isEmpty);
+    await _pumpReadApp(tester, api);
+    await _openRoom(tester, 2);
+    await _pumpUntil(
+      tester,
+      () => api.messageRequests.any(
+        (path) => path.startsWith('/api/conversations/2/messages'),
+      ),
+      api.requests,
+    );
+    expect(api.readRequests, isEmpty);
 
-      await _switchRoom(tester, 3);
-      await _pumpUntil(
-        tester,
-        () => api.readRequests.contains('POST /api/conversations/3/read'),
-        api.requests,
-      );
-      expect(api.readRequests, ['POST /api/conversations/3/read']);
+    await _switchRoom(tester, 3);
+    await _pumpUntil(
+      tester,
+      () => api.readRequests.contains('POST /api/conversations/3/read'),
+      api.requests,
+    );
+    expect(api.readRequests, ['POST /api/conversations/3/read']);
 
-      api.pendingMessages[2]!.complete(_roomMessages(api, 2));
-      await _pumpUntil(
-        tester,
-        () => api.readRequests.length == 2,
-        api.requests,
-      );
-      await tester.pumpAndSettle();
+    api.pendingMessages[2]!.complete(_roomMessages(api, 2));
+    await tester.pumpAndSettle();
 
-      expect(api.readRequests, [
-        'POST /api/conversations/3/read',
-        'POST /api/conversations/2/read',
-      ]);
-      expect(api.readBodies, [
-        {'channelId': 0},
-        {'channelId': 0},
-      ]);
-      expect(find.byKey(const ValueKey('chat-message-30')), findsOneWidget);
-      expect(find.byKey(const ValueKey('chat-message-20')), findsNothing);
-    },
-  );
+    expect(api.readRequests, ['POST /api/conversations/3/read']);
+    expect(api.readBodies, [
+      {'channelId': 0},
+    ]);
+    expect(find.byKey(const ValueKey('chat-message-30')), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-message-20')), findsNothing);
+  });
 
   testWidgets(
     'baseline: delayed old read response keeps current room visible',
