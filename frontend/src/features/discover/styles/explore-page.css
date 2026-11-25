@@ -39,6 +39,40 @@
   overscroll-behavior-x: contain;
   padding: 2px 2px 5px;
 }
+
+/* Category tabs are an independent, non-scrolling flex row above the
+   Explore page body, not a sticky child of the vertically scrolling area.
+   This keeps tabs reachable even during PWA header-collapse animations. */
+.modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell > .explore-tabs {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  align-self: center;
+  width: min(100%, 1200px);
+  max-width: 100%;
+  margin: 0;
+  padding: 12px 40px;
+  background: var(--soco-canvas, #f6f6fb);
+  border-bottom: 1px solid var(--soco-line, #e3e3f0);
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell > .explore-tabs {
+    width: 100%;
+    padding: 8px 16px 10px;
+    background: #fff;
+    box-shadow: 0 3px 8px rgba(24, 39, 75, .04);
+  }
+}
 .explore-tabs::-webkit-scrollbar,
 .explore-topic-list::-webkit-scrollbar,
 .explore-community-grid::-webkit-scrollbar { display: none; }
@@ -382,6 +416,38 @@
   .explore-step { border-radius: 18px; }
   .explore-people-grid { gap: 14px; }
 }
+/*
+ * Explore owns its vertical scroll viewport on both desktop Web and PWA.
+ * The shared application shell keeps the top header and navigation fixed.
+ * Horizontally scrolling category tabs/cards retain their independent axis.
+ */
+.modern-shell.app-layout > .modern-frame[data-route-page="discover"] {
+  min-height: 0;
+  overflow: hidden;
+}
+.modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell > .explore-page {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 760px) {
+  .modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell > .explore-page {
+    width: 100%;
+    margin: 0;
+    /* Bottom breathing room is inside the page scroller, not a footer band. */
+    padding-bottom: max(36px, var(--bottom-nav-space, 80px));
+    scroll-padding-bottom: var(--bottom-nav-space, 80px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .explore-skeleton { animation: none; }
 }

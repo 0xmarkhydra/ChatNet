@@ -1,0 +1,141 @@
+/*
+ * PWA mobile header contract. All five primary tabs use the same AppHeader DOM
+ * (brand + action slot); page-specific actions and the separate search dock
+ * remain owned by the existing feature components. Desktop is unaffected.
+ */
+@media (max-width: 760px) {
+  .modern-shell.app-layout {
+    --pwa-header-height: 52px;
+    --pwa-header-action-size: 42px;
+    --pwa-header-gutter: max(12px, env(safe-area-inset-right));
+    --pwa-header-divider: #e9edf5;
+  }
+
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header {
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-width: 0;
+    /* Explicit common height: Chat's create/QR tools must not stretch
+       its header taller than Contacts, Discover, Feed or Profile. */
+    height: calc(var(--pwa-header-height) + env(safe-area-inset-top));
+    min-height: calc(var(--pwa-header-height) + env(safe-area-inset-top));
+    max-height: calc(var(--pwa-header-height) + env(safe-area-inset-top));
+    padding: max(4px, env(safe-area-inset-top))
+      var(--pwa-header-gutter) 4px
+      max(12px, env(safe-area-inset-left));
+    gap: 8px;
+    margin-bottom: 0;
+    border: 0;
+    border-bottom: 1px solid var(--pwa-header-divider);
+    border-radius: 0;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  /* The page title stays in the desktop zone; PWA always shows the shared
+     SocCO brand instead, so changing tabs cannot shift the toolbar. */
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header > .appbar-start,
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header > .appbar-center {
+    display: none;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header > .appbar-brand {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header > .appbar-brand img {
+    display: block;
+    flex: 0 0 27px;
+    width: 27px;
+    height: 27px;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header > .appbar-brand strong {
+    display: inline-block;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -.3px;
+    color: #2358bd;
+  }
+
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header > .appbar-end {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    margin-left: auto;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header .appbar-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    margin: 0;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header .appbar-create-anchor {
+    flex: 0 0 auto;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header :is(.appbar-icon-button, .app-header-account) {
+    box-sizing: border-box;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 var(--pwa-header-action-size);
+    width: var(--pwa-header-action-size);
+    min-width: var(--pwa-header-action-size);
+    max-width: var(--pwa-header-action-size);
+    height: var(--pwa-header-action-size);
+    min-height: var(--pwa-header-action-size);
+    padding: 0;
+    border-radius: 12px;
+    box-shadow: none;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header .app-header-account {
+    border-radius: 50%;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header .app-header-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header .appbar-icon-button svg {
+    width: 20px;
+    height: 20px;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header .appbar-action-label {
+    display: none;
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header .appbar-mobile-notification {
+    display: contents;
+  }
+  /* Chat search stays in the conversation list; Feed/Contacts/Discover search
+     stays in the persistent dock below the shared header; no search on Profile. */
+
+  /* Thread header has different content (member avatar, calls, channel name),
+     but inherits the same divider/surface, without changing its navigation. */
+  .modern-shell.app-layout .social-chat-layout > .conversation-panel > .chat-head,
+  .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .conversation-panel.group-chat-panel > .chat-head {
+    border-bottom-color: var(--pwa-header-divider);
+    background: #fff;
+  }
+}
+
+@media (max-width: 360px) {
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header {
+    gap: 4px;
+    padding-right: max(6px, env(safe-area-inset-right));
+    padding-left: max(8px, env(safe-area-inset-left));
+  }
+  .modern-shell.app-layout > .chatnet-appbar.app-unified-header .appbar-actions {
+    gap: 0;
+  }
+}
