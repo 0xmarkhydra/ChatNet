@@ -44,6 +44,8 @@ import './features/feed/styles/story-viewer.css'
 import './features/chat/styles/rail-header-compact-actions.css'
 import './features/chat/styles/rail-names-stable.css'
 import './features/chat/styles/conversation-rail-menu.css'
+import './styles/bottom-nav-glass.css'
+import './styles/mobile-shared-header.css'
 
 if (window.location.search.includes('pwa=')) {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`)

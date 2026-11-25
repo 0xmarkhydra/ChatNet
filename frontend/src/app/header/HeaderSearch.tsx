@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from "react";
 import type { KeyboardEventHandler, ReactNode, RefObject } from "react";
-import { ArrowLeft, Search } from "lucide-react";
 import { Input } from "../../shared/ui/input";
 import { SearchField } from "../../shared/ui/search-field";
 
@@ -25,28 +23,10 @@ export default function HeaderSearch({
   anchorRef, value, placeholder, ariaLabel, maxLength, expanded, controls,
   onChange, onFocus, onClick, onKeyDown, results, icon,
 }: HeaderSearchProps) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (mobileOpen) inputRef.current?.focus();
-  }, [mobileOpen]);
-
-  const closeMobileSearch = () => {
-    setMobileOpen(false);
-    inputRef.current?.blur();
-  };
-
   return (
-    <div className={`appbar-search-anchor${mobileOpen ? " mobile-search-expanded" : ""}`} ref={anchorRef}>
-      <button className="appbar-mobile-search-trigger" type="button" aria-label="Mở tìm kiếm" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>
-        <Search size={23} aria-hidden="true" />
-      </button>
-      <button className="appbar-mobile-search-back" type="button" aria-label="Đóng tìm kiếm" onClick={closeMobileSearch}>
-        <ArrowLeft size={22} aria-hidden="true" />
-      </button>
+    <div className="appbar-search-anchor" ref={anchorRef}>
       <SearchField
-        className="max-[760px]:hidden"
+        className="app-mobile:hidden"
         value={value}
         onValueChange={onChange}
         maxLength={maxLength}
@@ -58,18 +38,14 @@ export default function HeaderSearch({
         onClick={onClick}
         onKeyDown={onKeyDown}
       />
-      {/* Phones keep the legacy expanding search overlay (.appbar-search rules); desktop uses SearchField above. */}
-      <span className="contents min-[761px]:hidden"><label className="appbar-search">
+      {/* PWA uses a persistent search input, so no separate open/back buttons are required. */}
+      <span className="contents app-desktop:hidden"><label className="appbar-search">
         {icon}
         <Input
-          ref={inputRef}
           value={value}
           maxLength={maxLength}
           type="search"
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && mobileOpen) closeMobileSearch();
-            onKeyDown?.(event);
-          }}
+          onKeyDown={onKeyDown}
           aria-expanded={expanded}
           aria-controls={controls}
           onFocus={onFocus}

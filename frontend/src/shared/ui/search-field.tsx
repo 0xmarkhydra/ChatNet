@@ -32,7 +32,7 @@ function SearchField({ value, onValueChange, size, className, clearLabel = "Xóa
         type="search"
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
-        className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-[length:var(--soco-type-body)] font-medium text-foreground outline-none! placeholder:font-normal placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+        className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-[length:var(--soco-type-body)] font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
         {...props}
       />
       {value && (

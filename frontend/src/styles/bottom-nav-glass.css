@@ -1,0 +1,153 @@
+/* Mobile floating glass bottom navigation: icon-only, content scrolls behind it. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout {
+    --bottom-nav-height: 56px;
+    --bottom-nav-offset: max(16px, env(safe-area-inset-bottom));
+    --bottom-nav-space: calc(var(--bottom-nav-height) + var(--bottom-nav-offset) + 12px);
+    position: relative;
+  }
+
+  .modern-shell.app-layout > .bottom-navigation {
+    /* Keep the floating dock above full-height Chat/Contacts panes. */
+    position: fixed;
+    z-index: 300;
+    right: max(24px, env(safe-area-inset-right));
+    bottom: var(--bottom-nav-offset);
+    left: max(24px, env(safe-area-inset-left));
+    box-sizing: border-box;
+    width: auto;
+    height: var(--bottom-nav-height);
+    min-height: var(--bottom-nav-height);
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, .45);
+    border-radius: 28px;
+    /* Soft translucent glass: list items remain faintly visible through the dock. */
+    background: rgba(255, 255, 255, .32);
+    box-shadow: 0 6px 22px rgba(17, 24, 39, .12), inset 0 1px 0 rgba(255, 255, 255, .5);
+    -webkit-backdrop-filter: blur(12px) saturate(135%);
+    backdrop-filter: blur(12px) saturate(135%);
+  }
+
+  .modern-shell.app-layout > .bottom-navigation > button {
+    min-height: 46px;
+    padding-block: 0;
+    border-radius: 23px;
+    color: #4b5563;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .15s ease-out;
+  }
+  .modern-shell.app-layout > .bottom-navigation > button:active {
+    transform: scale(.9);
+  }
+  .modern-shell.app-layout > .bottom-navigation > button.active {
+    color: #4338ca;
+  }
+  .modern-shell.app-layout > .bottom-navigation > button:focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: -2px;
+  }
+
+  .modern-shell.app-layout > .bottom-navigation .nav-label {
+    display: none;
+  }
+  .modern-shell.app-layout > .bottom-navigation .nav-icon {
+    height: 28px;
+    min-height: 28px;
+    transition: transform .42s cubic-bezier(.34, 1.56, .64, 1), color .2s ease;
+  }
+  .modern-shell.app-layout > .bottom-navigation .nav-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 1.7;
+  }
+  .modern-shell.app-layout > .bottom-navigation > button.active .nav-icon svg {
+    stroke-width: 1.9;
+  }
+  .modern-shell.app-layout > .bottom-navigation > button.active .nav-icon {
+    transform: scale(1.12);
+  }
+  .modern-shell.app-layout > .bottom-navigation .nav-icon b {
+    top: -2px;
+    right: -6px;
+    border: 2px solid rgba(255, 255, 255, .9);
+    box-sizing: content-box;
+  }
+
+  .modern-shell.app-layout > .bottom-navigation .nav-liquid-pill {
+    border: 0;
+    border-radius: 23px;
+    background: rgba(79, 70, 229, .16);
+    box-shadow: none;
+  }
+  .modern-shell.app-layout > .bottom-navigation .nav-liquid-pill::after {
+    background: none;
+  }
+
+  /* One scroll controller for every tab (including Newsfeed). Collapsing the
+     header's flex height and sliding it upward use the same smooth transition,
+     while the floating glass footer simply glides out of the viewport. */
+  .modern-shell.app-layout > .chatnet-appbar,
+  .modern-shell.app-layout > .bottom-navigation {
+    transition:
+      transform 290ms cubic-bezier(.22, .8, .25, 1),
+      opacity 240ms ease-out,
+      margin-top 290ms cubic-bezier(.22, .8, .25, 1);
+    will-change: transform;
+  }
+  .modern-shell.app-layout.mobile-chrome-hidden > .chatnet-appbar {
+    margin-top: calc(-1 * var(--mobile-header-height, 0px));
+    transform: translate3d(0, -100%, 0);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .modern-shell.app-layout.mobile-chrome-hidden > .bottom-navigation {
+    margin-bottom: 0;
+    transform: translate3d(0, calc(100% + var(--bottom-nav-offset) + 8px), 0);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* The nav floats over the page, so every routed page reserves its space. */
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame {
+    box-sizing: border-box;
+    padding-bottom: var(--bottom-nav-space);
+  }
+  /* Full-height routed screens scroll behind the floating nav, rather than
+     reserving a white footer band outside the scroll surface. */
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="chat"],
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="contacts"],
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="feed"],
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="profile"],
+  .modern-shell.app-layout:not(.conversation-open) > .modern-frame[data-route-page="discover"] {
+    padding-bottom: 0;
+  }
+
+  /* Profile has additional legacy 88-90px bottom padding inside its own
+     scroll container. Remove that blank strip as well, without changing
+     the floating footer or desktop layouts. */
+  .modern-shell.app-layout > .modern-frame[data-route-page="profile"] .profile-page,
+  .modern-shell.app-layout > .modern-frame[data-route-page="profile"] .simple-view.profile-view,
+  .modern-shell.app-layout > .modern-frame[data-route-page="profile"] .simple-view.personal-timeline-view {
+    padding-bottom: 0;
+    scroll-padding-bottom: var(--bottom-nav-space);
+  }
+  .modern-shell.app-layout .feed-view.zalo-feed-view.social-feed {
+    scroll-padding-bottom: var(--bottom-nav-space);
+  }
+  .modern-shell.app-layout .feed-view.zalo-feed-view.social-feed > :last-child {
+    margin-bottom: var(--bottom-nav-space);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout > .bottom-navigation,
+  .modern-shell.app-layout > header {
+    transition: none;
+  }
+  .modern-shell.app-layout > .bottom-navigation > button,
+  .modern-shell.app-layout > .bottom-navigation .nav-icon {
+    transition: none;
+    transform: none;
+  }
+}
