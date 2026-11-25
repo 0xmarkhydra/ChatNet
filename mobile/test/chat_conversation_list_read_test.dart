@@ -298,6 +298,16 @@ Future<void> _reactToMessage(
   await tester.pumpAndSettle();
 }
 
+Future<void> _replyToMessage(
+  WidgetTester tester, {
+  required int messageId,
+}) async {
+  await tester.longPress(find.byKey(ValueKey('chat-message-$messageId')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Tr\u1ea3 l\u1eddi'));
+  await tester.pumpAndSettle();
+}
+
 Future<void> _recallMessage(
   WidgetTester tester, {
   required int messageId,
@@ -1357,6 +1367,58 @@ void main() {
       expect(api.messageCreateBodies[1]?['text'], 'Retry this message');
     },
   );
+
+  testWidgets('reply send posts reply id, renders response, and clears reply', (
+    tester,
+  ) async {
+    final api = _ConversationApi();
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _replyToMessage(tester, messageId: 10);
+    expect(find.textContaining('Tr\u1ea3 l\u1eddi @'), findsOneWidget);
+
+    final composer = find.byWidgetPredicate(
+      (widget) => widget is EditableText && widget.maxLines == 5,
+    );
+    await tester.enterText(composer, 'Reply message');
+    await tester.pump();
+    await tester.tap(find.byTooltip('G\u1eedi'));
+    await tester.pumpAndSettle();
+
+    expect(api.messageCreateRequests, ['POST /api/conversations/1/messages']);
+    expect(api.messageCreateBodies.single?['replyToMessageId'], 10);
+    final response = api.messages[1]!.last;
+    expect(response['replyToMessageId'], 10);
+    expect(
+      _renderedMessageText(tester, response['id'] as int),
+      'Reply message',
+    );
+    expect(find.textContaining('Tr\u1ea3 l\u1eddi @'), findsNothing);
+  });
+
+  testWidgets('failed reply send keeps reply state', (tester) async {
+    final api = _ConversationApi()..failNextMessageCreateRequest = true;
+    addTearDown(api.closeEvents);
+
+    await _openDefaultGroupChat(tester, api);
+    await _replyToMessage(tester, messageId: 10);
+    final composer = find.byWidgetPredicate(
+      (widget) => widget is EditableText && widget.maxLines == 5,
+    );
+    await tester.enterText(composer, 'Reply message');
+    await tester.pump();
+    await tester.tap(find.byTooltip('G\u1eedi'));
+    await tester.pumpAndSettle();
+
+    expect(api.messageCreateRequests, ['POST /api/conversations/1/messages']);
+    expect(api.messageCreateBodies.single?['replyToMessageId'], 10);
+    expect(find.textContaining('Tr\u1ea3 l\u1eddi @'), findsOneWidget);
+    expect(
+      find.textContaining('Synthetic message create failure'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('stale reaction response overwrites newer SSE update (baseline)', (
     tester,
