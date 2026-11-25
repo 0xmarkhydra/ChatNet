@@ -1234,9 +1234,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _recall(Json message) async {
     try {
-      final updated = object(
-        await widget.api.request('DELETE', '/api/messages/${message['id']}'),
-      );
+      final updated = await ref
+          .read(chatRepositoryProvider)
+          .recallMessage((message['id'] as num).toInt());
       _replaceMessage(updated);
     } catch (value) {
       _show(value.toString());

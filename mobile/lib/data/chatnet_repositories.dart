@@ -40,6 +40,9 @@ class ChatRepository {
         await api.request('PATCH', '/api/messages/$messageId', {'text': text}),
       );
 
+  Future<Json> recallMessage(int messageId) async =>
+      object(await api.request('DELETE', '/api/messages/$messageId'));
+
   Future<List<ChatMessage>> messages(
     int conversationId, {
     int channelId = 0,
