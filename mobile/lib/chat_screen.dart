@@ -1302,16 +1302,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   await widget.api.upload('chat', name, type, bytes),
                 );
               }
-              await widget.api.request(
-                'POST',
-                '/api/conversations/${destination['id']}/messages',
-                {
-                  'clientId': DateTime.now().microsecondsSinceEpoch.toString(),
-                  'text': message['text']?.toString() ?? '',
-                  'forwarded': true,
-                  'attachments': attachments,
-                },
-              );
+              await ref
+                  .read(chatRepositoryProvider)
+                  .sendMessage(
+                    (destination['id'] as num).toInt(),
+                    body: {
+                      'clientId': DateTime.now().microsecondsSinceEpoch
+                          .toString(),
+                      'text': message['text']?.toString() ?? '',
+                      'forwarded': true,
+                      'attachments': attachments,
+                    },
+                  );
               if (!sheetContext.mounted) return;
               Navigator.pop(sheetContext);
               _show('Đã chuyển tiếp đến ${destination['name']}.');
