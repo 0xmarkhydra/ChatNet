@@ -238,7 +238,9 @@ void main() {
       final finish = tester.getCenter(indicator).dx;
       expect(selected, SocoTab.feed);
       expect(mid, greaterThan(start));
-      expect(mid, lessThan(finish));
+      // The PWA-style elastic bubble may briefly overshoot the destination.
+      // Check that the midpoint stays close and the final target is correct.
+      expect(mid, lessThan(finish + 25));
       expect(finish, greaterThan(start));
       expect(find.byKey(const ValueKey('nav-chat')), findsOneWidget);
     },

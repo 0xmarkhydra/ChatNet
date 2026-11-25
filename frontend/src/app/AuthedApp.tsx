@@ -16,40 +16,36 @@ import { useSession } from "../shared/context/SessionContext";
 import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
+import { createAppLogout } from "./lifecycle/createAppLogout";
+import { createAppTabSwitch } from "./navigation/createAppTabSwitch";
+import { useFeedRouteLifecycle } from "./navigation/useFeedRouteLifecycle";
 import { applyPostLikePreviews } from "./applyPostLikePreviews";
-import { usePhoneSearchLayout } from "./hooks/usePhoneSearchLayout";
+import { useAppChatSearchState } from "./hooks/useAppChatSearchState";
 import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
 import { useAppInstallState } from "./hooks/useAppInstallState";
 import { useLatest } from "../shared/hooks/useLatest";
 import { useSessionKeepalive } from "./hooks/useSessionKeepalive";
-import { useQuickSearchDismiss } from "./hooks/useQuickSearchDismiss";
 import { useChatOutboxReconnect } from "./hooks/useChatOutboxReconnect";
 import { useUnreadDocumentTitle } from "./hooks/useUnreadDocumentTitle";
 import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
+import { revokeConversationMembership, restoreConversationFromNotification } from "../features/chat/lib/conversationMembershipLifecycle";
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
 import {
   useChatQuickSearch,
-  type ChatQuickContact,
-  type ChatQuickHit,
 } from "../features/chat/hooks/useChatQuickSearch";
-import ChatQuickSearch from "../features/chat/components/ChatQuickSearch";
 import { useContactData } from "../features/contacts/hooks/useContactData";
 import { useFeedData } from "../features/feed/hooks/useFeedData";
-import { usePostSearch } from "../features/feed/hooks/usePostSearch";
+import { useFeedPagingOrchestration } from "../features/feed/hooks/useFeedPagingOrchestration";
 import { useFollowingPosts } from "../features/feed/hooks/useFollowingPosts";
-import { useFeedInfiniteScroll } from "../features/feed/hooks/useFeedInfiniteScroll";
 
 import { useGroupManagement } from "../features/chat/hooks/useGroupManagement";
 import { API } from "../shared/lib/config";
 import type {
-  ProfileMediaState,
-  ProfileUpdateResponse,
   UserPrivacy,
 } from "../features/profile/types";
 import {
-  attachmentRequestBody,
   type MediaAttachment,
   type PresignedUpload,
 } from "../shared/utils/media";
@@ -83,15 +79,14 @@ import {
 } from "../shared/utils/toast";
 import { formatTime, attachmentLabel } from "../shared/utils/format";
 import UserAvatar, {
-  avatarRefreshVersions,
   profileAssetUrl,
 } from "../shared/ui/UserAvatar";
 import useSlidingPill from "../shared/ui/useSlidingPill";
 import MediaAttachmentsView from "../shared/ui/MediaAttachmentsView";
 import UiIcon from "../shared/ui/UiIcon";
 import NearbyRadar from "../features/discover/components/NearbyRadar";
-import PostComposer from "../features/feed/components/PostComposer";
-import FeedPostCard from "../features/feed/components/FeedPostCard";
+import CommunitySuggestions from "../features/discover/components/CommunitySuggestions";
+import { createPostComposerPresenter } from "../features/feed/components/createPostComposerPresenter";
 import ReactionParticipantsDialog from "../shared/ui/ReactionParticipantsDialog";
 import SharedPostLinkPicker from "../features/chat/components/SharedPostLinkPicker";
 import MessageForwardPicker from "../features/chat/components/MessageForwardPicker";
@@ -142,14 +137,13 @@ import "../features/chat/styles/community-groups.css";
 import CommunityGroupWizard, { type CommunityCreationExtras } from "../features/chat/components/CommunityGroupWizard";
 import GroupSettingsPanel from "../features/chat/components/GroupSettingsPanel";
 import GroupChannelPicker from "../features/chat/components/GroupChannelPicker";
-import { totalGroupChannelUnread, validGroupChannels, type GroupChannel } from "../features/chat/utils/groupChannels";
+import { validGroupChannels } from "../features/chat/utils/groupChannels";
 import GroupInviteJoinDialog from "../features/chat/components/GroupInviteJoinDialog";
 import ContactsView from "../features/contacts/components/ContactsView";
 import PrivacyControls from "../features/profile/components/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
 import {
-  FormEvent,
   Fragment,
   lazy,
   Suspense,
@@ -165,13 +159,13 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
-  FeedDiscussion,
   FeedText,
   type FeedComment,
   type DiscussionDraft,
 } from "../features/feed/components/FeedDiscussion";
+import { createFeedDiscussionPresenter } from "../features/feed/components/createFeedDiscussionPresenter";
+import { createFeedPostListPresenter } from "../features/feed/components/createFeedPostListPresenter";
 import FeedModeration from "../features/feed/components/FeedModeration";
-import ProfileOverlay from "../features/profile/components/ProfileOverlay";
 import GroupCreator from "../features/chat/components/GroupCreator";
 import {
   Ban,
@@ -209,23 +203,16 @@ import {
 } from "../features/auth/lib/session";
 import {
   clearPendingSend,
-  loadChatDrafts,
   loadPendingSend,
-  saveChatDrafts,
 } from "../features/chat/lib/chatPersistence";
-import { restoreChatOutbox } from "../features/chat/utils/outboxRecovery";
 import {
   confirmChatMessage,
   enqueueChatMessage,
-  persistChatOutboxChange,
   retryableChatMessages,
   type QueuedChatMessage,
 } from "../features/chat/lib/chatOutbox";
 import { uploadPresignedFile } from "../features/chat/lib/mediaUpload";
-import {
-  chatFilesFromClipboard,
-  transferHasFiles,
-} from "../features/chat/utils/chatFileTransfer";
+import { chatFilesFromClipboard } from "../features/chat/utils/chatFileTransfer";
 import { canMarkConversationRead } from "../features/chat/utils/conversationRead";
 import { mergeById, toggleMessageReactionCount } from "../shared/utils/optimistic";
 import { CallHeaderActions } from "../features/calls/components/CallManager";
@@ -240,10 +227,8 @@ import {
 const ProfileQr = lazy(() => import("../features/profile/components/ProfileQr"));
 import {
   defaultBundle,
-  loadAppLocalePreference,
   loadCachedBundle,
   resolveEffectiveLocale,
-  saveAppLocalePreference,
   saveCachedBundle,
   translateUI,
   UI_BUNDLE_VERSION,
@@ -258,7 +243,6 @@ import {
 import {
   disableOneSignalPush,
   enableOneSignalPush,
-  getOneSignalPushState,
   isPushDisabled,
   setupOneSignal,
   type PushState,
@@ -276,11 +260,11 @@ import AppShellCallManager from "./layouts/AppShellCallManager";
 
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { inviteRouteTarget } from "./navigation/inviteDeepLink";
-import HeaderSearch from "./header/HeaderSearch";
+import AppQuickSearch from "./header/AppQuickSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
 import HeaderTitle from "./header/HeaderTitle";
-import { searchLabels } from "./header/headerContext";
+import HeaderFeedTabs from "./header/HeaderFeedTabs";
 import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
 import FeedPostDetail from "../features/feed/components/FeedPostDetail";
@@ -292,12 +276,10 @@ import ProfileOverviewSection from "../features/profile/components/ProfileOvervi
 import ProfileSection from "../features/profile/components/ProfileSection";
 import ChatSection from "../features/chat/components/ChatSection";
 import StoryDraftOverlay from "../features/feed/components/StoryDraftOverlay";
-import FeedComposerOverlay from "../features/feed/components/FeedComposerOverlay";
-import ProfileComposerOverlay from "../features/profile/components/ProfileComposerOverlay";
+import AppComposerOverlays from "./layouts/AppComposerOverlays";
 import { useNearbyDiscovery } from "../features/discover/hooks/useNearbyDiscovery";
 import { useAccountSessions } from "../features/auth/hooks/useAccountSessions";
 import { usePushSettings } from "../features/notifications/hooks/usePushSettings";
-import { useMessageLongPress } from "../features/chat/hooks/useMessageLongPress";
 import { useMessageClipboard } from "../features/chat/hooks/useMessageClipboard";
 import { useMediaUploads } from "../features/chat/hooks/useMediaUploads";
 import { useContactActions } from "../features/contacts/hooks/useContactActions";
@@ -308,10 +290,14 @@ import { useMessageSender } from "../features/chat/hooks/useMessageSender";
 import { useOutboxDelivery } from "../features/chat/hooks/useOutboxDelivery";
 import { useConversationHistory } from "../features/chat/hooks/useConversationHistory";
 import { useGroupChannels } from "../features/chat/hooks/useGroupChannels";
+import { useGroupChannelLiveSync } from "../features/chat/hooks/useGroupChannelLiveSync";
+import { useChatMessageJumpFocus } from "../features/chat/hooks/useChatMessageJumpFocus";
+import { useGroupSettingsEscape } from "../features/chat/hooks/useGroupSettingsEscape";
 import { useDirectConversations } from "../features/chat/hooks/useDirectConversations";
 import { useGroupCreation } from "../features/chat/hooks/useGroupCreation";
 import { usePostSync } from "../features/feed/hooks/usePostSync";
 import { usePostMentions } from "../features/feed/hooks/usePostMentions";
+import { createOpenMentionPost } from "../features/feed/utils/createOpenMentionPost";
 import { usePostRouteLoad } from "../features/feed/hooks/usePostRouteLoad";
 import { useProfilePosts } from "../features/feed/hooks/useProfilePosts";
 import { usePostComposer } from "../features/feed/hooks/usePostComposer";
@@ -325,13 +311,24 @@ import { savePrivacySettings } from "../features/settings/api/privacy";
 import { useNearbyState } from "../features/discover/hooks/useNearbyState";
 import { useBlockedUsers } from "../features/contacts/hooks/useBlockedUsers";
 import { useFriendSearch } from "../features/contacts/hooks/useFriendSearch";
+import { useFriendSearchRequests } from "../features/contacts/hooks/useFriendSearchRequests";
 import { useAppLocaleState } from "../features/i18n/hooks/useAppLocaleState";
+import { useLanguagePreferencesLifecycle } from "../features/i18n/hooks/useLanguagePreferencesLifecycle";
 import { useTranslationState } from "../features/chat/hooks/useTranslationState";
 import { useProfileState } from "../features/profile/hooks/useProfileState";
+import { useProfileIdentityActions } from "../features/profile/hooks/useProfileIdentityActions";
 import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
 import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
 import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
+import { useChatDraftState } from "../features/chat/hooks/useChatDraftState";
+import { useChatScrollCoordinator } from "../features/chat/hooks/useChatScrollCoordinator";
+import { useConversationViewReset } from "../features/chat/hooks/useConversationViewReset";
+import { useIncomingMessageAutoTranslation } from "../features/chat/hooks/useIncomingMessageAutoTranslation";
+import { useChatOutboxState } from "../features/chat/hooks/useChatOutboxState";
+import { useChatOutboxReceiptReconciliation } from "../features/chat/hooks/useChatOutboxReceiptReconciliation";
+import { useChatQuickSelectionActions } from "../features/chat/hooks/useChatQuickSelectionActions";
+import { useChatComposerSurface } from "../features/chat/hooks/useChatComposerSurface";
 import { useSessionsPanel } from "../features/auth/hooks/useSessionsPanel";
 
 export type AuthedAppProps = {
@@ -361,7 +358,7 @@ export default function AuthedApp({
   const screenshot = useDesktopScreenshot(setNotice);
   const { chatCreateError, directUsername, groupCreateStep, groupWorkspaceMode, newChatMode, quickCreateOpen, setChatCreateError, setDirectUsername, setGroupCreateStep, setGroupWorkspaceMode, setNewChatMode, setQuickCreateOpen } = useGroupWorkspaceState({  });
 
-  const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({ sessionId: session?.sessionId ?? null });
+  const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profilePublicDetailsDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfilePublicDetailsDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({ sessionId: session?.sessionId ?? null });
 
   const { appLocale, languageSearch, localePickerOpen, localeSearch, setAppLocale, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setTranslationPickerOpen, setUiBundle, setUiLocaleLoading, translationPickerOpen, uiBundle, uiLocaleLoading } = useAppLocaleState({  });
 
@@ -379,6 +376,16 @@ export default function AuthedApp({
   const routeLocation = useLocation();
   const isSearchResultsRoute = routeLocation.pathname === "/search";
   const navigate = useNavigate();
+  useEffect(() => {
+    const openSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        navigate(ROUTE.search);
+      }
+    };
+    window.addEventListener("keydown", openSearch);
+    return () => window.removeEventListener("keydown", openSearch);
+  }, [navigate]);
   const {
     tab, setTab, contactsScreen, setContactsScreen,
     desktopProfileSettings, setDesktopProfileSettings,
@@ -388,35 +395,23 @@ export default function AuthedApp({
 
   const [inlineCommentsId, setInlineCommentsId] = useScopedState<number | null>(tab, null);
   const tabRef = useLatest(tab);
-  const [globalSearch, setGlobalSearch] = useState("");
-  const [chatListQuery, setChatListQuery] = useState('');
-  const [chatListFilter, setChatListFilter] = useState<'all' | 'unread' | 'groups'>('all');
-  const chatFiltersPill = useSlidingPill<HTMLDivElement>(chatListFilter);
-  const [quickSearchOpen, setQuickSearchOpen] = useState(false);
-  const phoneSearchLayout = usePhoneSearchLayout();
-  const quickSearchAnchorRef = useRef<HTMLDivElement>(null);
-  const [chatSearchJump, setChatSearchJump] = useState<{
-    conversationId: number;
-    messageId: number;
-    revision: number;
-  } | null>(null);
-  const chatSearchJumpRevision = useRef(0);
-  const nextChatSearchJumpRevision = useCallback(() => ++chatSearchJumpRevision.current, []);
-  const lastScrolledSearchJump = useRef(0);
-  useQuickSearchDismiss(quickSearchOpen, quickSearchAnchorRef, setQuickSearchOpen);
+  const {
+    globalSearch, setGlobalSearch, chatListQuery, setChatListQuery,
+    chatListFilter, setChatListFilter,
+    quickSearchOpen, setQuickSearchOpen, phoneSearchLayout, quickSearchAnchorRef,
+    chatSearchJump, setChatSearchJump, chatSearchJumpRevision,
+    nextChatSearchJumpRevision, lastScrolledSearchJump,
+  } = useAppChatSearchState();
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
   const selectRoutedConversation = useChatConversationRoute(activeConversationId, setActiveConversationId);
-  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, pinnedExpanded, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setPinnedExpanded, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId, sessionId: session?.sessionId ?? null });
+  const { channelSelection, conversationActionId, conversationDetailsOpen, conversationMenuPosition, groupActivityCreateKind, groupActivityViewedId, groupChannelBusy, groupChannelState, groupMemberViewOpen, historyActionBusy, messageActionId, messageActionMode, messageSearchOpen, replyingTo, setChannelSelection, setConversationActionId, setConversationDetailsOpen, setConversationMenuPosition, setGroupActivityCreateKind, setGroupActivityViewedId, setGroupChannelBusy, setGroupChannelState, setGroupMemberViewOpen, setHistoryActionBusy, setMessageActionId, setMessageActionMode, setMessageSearchOpen, setReplyingTo, setSharedContentOpen, sharedContentOpen } = useChatPanelState({ activeConversationId, sessionId: session?.sessionId ?? null });
 
   const activeConversationIdRef = useRef<number | null>(null);
   const selectedChannelId = channelSelection.conversationId === activeConversationId ? channelSelection.channelId : 0;
   const activeChannelIdRef = useLatest(selectedChannelId);
   const activeConversationTypeRef = useRef<'group' | 'direct' | null>(null);
-  const [groupChannelUnreadStatus, setGroupChannelUnreadStatus] = useState<{ conversationId: number; available: boolean } | null>(null);
-  const groupChannelUnreadAvailable = groupChannelUnreadStatus?.conversationId === activeConversationId
-    ? groupChannelUnreadStatus.available : true;
   const groupChannels = groupChannelState.conversationId === activeConversationId
     ? groupChannelState.channels
     : validGroupChannels([], activeConversationId ?? 0);
@@ -426,30 +421,16 @@ export default function AuthedApp({
   const ownSendScrollConversation = useRef<number | null>(null);
   const [messageCopyTarget, setMessageCopyTarget] =
     useState<MessageCopyTarget | null>(null);
-  const { beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress, cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress, openMessageActions, openMessageReactions, suppressConversationClick, suppressMessageClick } = useMessageLongPress({ setConversationActionId, setConversationMenuPosition, setMessageActionId, setMessageActionMode, setMessageCopyTarget });
 
-  // Only text is kept in this tab's session storage. Media URLs/tokens are never persisted.
-  const [messageDrafts, setMessageDrafts] = useState<
-    Record<number, MessageDraft>
-  >(() => {
-    const saved = loadChatDrafts(session?.user.id ?? 0);
-    return Object.fromEntries(
-      Object.entries(saved).map(([id, item]) => [
-        Number(id),
-        { text: item.text, attachments: [] },
-      ]),
-    );
+  const {
+    messageDrafts, setMessageDrafts, channelDrafts, setChannelDrafts,
+    channelDraftKey, draft, messageText, messageAttachments, setMessageText,
+  } = useChatDraftState({
+    userId: session?.user.id ?? 0,
+    sessionRef,
+    activeConversationId,
+    selectedChannelId,
   });
-  useEffect(() => {
-    if (session?.user.id && sessionRef.current?.user.id === session.user.id) {
-      saveChatDrafts(session.user.id, messageDrafts);
-    }
-  }, [session?.user.id, messageDrafts, sessionRef]);
-  const [channelDrafts, setChannelDrafts] = useState<Record<string, MessageDraft>>({});
-  const channelDraftKey = `${activeConversationId ?? 0}:${selectedChannelId}`;
-  const draft = selectedChannelId > 0 ? channelDrafts[channelDraftKey] ?? emptyDraft : messageDrafts[activeConversationId ?? 0] ?? emptyDraft;
-  const messageText = draft.text;
-  const messageAttachments = draft.attachments;
   const [messageSending, setMessageSending] = useState(false);
   const sendingRef = useRef(false);
   const [outgoingMessage, setOutgoingMessage] = useState<Message | null>(null);
@@ -480,53 +461,10 @@ export default function AuthedApp({
     clientId: string;
     draft: MessageDraft;
   } | null>(null);
-  const [chatOutbox, setChatOutbox] = useState<QueuedChatMessage[]>(() =>
-    restoreChatOutbox(session?.user.id ?? 0, session?.sessionId ?? ""),
-  );
-  const chatOutboxRef = useRef(chatOutbox);
-  const chatOutboxSession = useRef(session?.sessionId ?? "");
-  const sendingClientIDs = useRef(new Set<string>());
-  const retryOutboxBusy = useRef(false);
-  const [chatOnline, setChatOnline] = useState(() => navigator.onLine);
-
-  function updateChatOutbox(
-    transform: (items: QueuedChatMessage[]) => QueuedChatMessage[],
-  ) {
-    const current = sessionRef.current;
-    if (!current || current.sessionId !== chatOutboxSession.current)
-      return chatOutboxRef.current;
-    const previous = chatOutboxRef.current;
-    const next = transform(previous);
-    if (previous === next) return next;
-    if (
-      !persistChatOutboxChange(
-        current.user.id,
-        current.sessionId,
-        previous,
-        next,
-      )
-    ) {
-      setNotice(
-        "Không lưu được hàng đợi tin nhắn trên thiết bị này.",
-        "warning",
-      );
-      return previous;
-    }
-    chatOutboxRef.current = next;
-    setChatOutbox(next);
-    return next;
-  }
-  useEffect(() => {
-    const nextSessionId = session?.sessionId ?? "";
-    if (nextSessionId === chatOutboxSession.current) return;
-    chatOutboxSession.current = nextSessionId;
-    const restored = restoreChatOutbox(session?.user.id ?? 0, nextSessionId);
-    chatOutboxRef.current = restored;
-    setChatOutbox(restored);
-    sendingClientIDs.current = new Set<string>();
-    actionLocks.current = new Set<string>();
-    retryOutboxBusy.current = false;
-  }, [session?.sessionId]);
+  const {
+    chatOutbox, setChatOutbox, chatOutboxRef, chatOutboxSession, sendingClientIDs,
+    retryOutboxBusy, chatOnline, setChatOnline, updateChatOutbox,
+  } = useChatOutboxState({ session, sessionRef, actionLocksRef: actionLocks, setNotice });
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
   function openVisitor(username: string, returnTo?: string) {
@@ -593,18 +531,16 @@ export default function AuthedApp({
     apiFetch,
     onReadError: message => setNotice(message, "error"),
   });
-  useLayoutEffect(() => {
-    if (tab !== "feed") return;
-    if (feedViewRef.current) feedViewRef.current.scrollTop = 0;
-    setSearchHasScrolled(false);
-  }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN"), feedFilter]);
-  // Router location is authoritative for browser Back/Forward on post URLs.
-  useEffect(() => {
-    if (tab !== "feed") return;
-    const routeId = feedPostIdFromPath(routeLocation.pathname);
-    const id = routeId ?? Number(new URLSearchParams(routeLocation.search).get("post"));
-    setActivePostId(Number.isSafeInteger(id) && id > 0 ? id : null);
-  }, [tab, routeLocation.pathname, routeLocation.search]);
+  useFeedRouteLifecycle({
+    tab,
+    searchKey: globalSearch.trim().toLocaleLowerCase('vi-VN'),
+    feedViewRef,
+    setSearchHasScrolled,
+    pathname: routeLocation.pathname,
+    search: routeLocation.search,
+    getPostIdFromPath: feedPostIdFromPath,
+    setActivePostId,
+  });
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -671,40 +607,13 @@ export default function AuthedApp({
   const [pushPromptDismissed, setPushPromptDismissed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const postComposerRef = useRef<HTMLTextAreaElement>(null);
-  const messageInputRef = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const input = messageInputRef.current;
-    if (!input) return;
-    input.style.height = 'auto';
-    input.style.height = `${Math.min(input.scrollHeight, 154)}px`;
-  }, [messageText, activeConversationId, tab, desktopSection]);
-  const chatDragDepth = useRef(0);
-  const setChatDragDepth = useCallback((next: number) => { chatDragDepth.current = next; }, []);
-  const [chatDragActive, setChatDragActive] = useScopedState(
-    `${tab}:${activeConversationId ?? "none"}`, false,
-  );
-  useEffect(() => {
-    chatDragDepth.current = 0;
-  }, [activeConversationId, tab]);
+  const { messageInputRef } = useChatComposerSurface({ tab, activeConversationId, desktopSection, messageText });
 
   useDesktopShortcuts({
     sessionRef,
     onOpenChat: () => setTab("chat"),
     messageInputRef,
   });
-  useEffect(() => {
-    const preventFileNavigation = (event: DragEvent) => {
-      // Never navigate away from the chat when a file is dropped outside it.
-      if (transferHasFiles(event.dataTransfer)) event.preventDefault();
-    };
-    document.addEventListener("dragover", preventFileNavigation);
-    document.addEventListener("drop", preventFileNavigation);
-    return () => {
-      document.removeEventListener("dragover", preventFileNavigation);
-      document.removeEventListener("drop", preventFileNavigation);
-    };
-  }, []);
-  const chatFileInputRef = useRef<HTMLInputElement>(null);
   const feedAlbumInputRef = useRef<HTMLInputElement>(null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
@@ -805,10 +714,9 @@ export default function AuthedApp({
     savedPosts,
     setSavedPosts,
     hasMoreSavedPosts,
-    setHasMoreSavedPosts,
     savedPostsBusy,
-    setSavedPostsBusy,
-    savedPagingBusy,
+    savedPostsLoaded,
+    resetSavedPosts,
     hasMorePosts,
     setHasMorePosts,
     postsLoadingMore,
@@ -852,49 +760,25 @@ export default function AuthedApp({
     enabled: tab === "feed" && feedFilter === "following",
     request: apiFetch,
   });
-  const feedSearchActive = tab === "feed" && globalSearch.trim().length > 0;
-  const postSearch = usePostSearch({
-    query: globalSearch,
-    scope: feedFilter,
-    enabled: tab === "feed",
-    sessionId: session?.sessionId,
-    request: apiFetch,
-  });
-  const feedLoadingMore = feedSearchActive
-    ? postSearch.loadingMore
-    : feedFilter === "saved"
-      ? savedPostsBusy
-      : feedFilter === "following"
-        ? followingFeed.loadingMore
-        : postsLoadingMore;
-  const feedPagingError = feedSearchActive
-    ? Boolean(postSearch.error)
-    : feedFilter === "saved"
-      ? savedPagingError
-      : feedFilter === "following"
-        ? Boolean(followingFeed.error)
-        : postsPagingError;
-  const feedInfiniteScrollRef = useFeedInfiniteScroll({
-    enabled: tab === "feed" && (!feedSearchActive || searchHasScrolled),
-    hasMore: feedSearchActive
-      ? postSearch.hasMore
-      : feedFilter === "saved"
-        ? hasMoreSavedPosts
-        : feedFilter === "following"
-          ? followingFeed.hasMore
-          : hasMorePosts,
-    loading:
-      (feedSearchActive && postSearch.loading) ||
-      (feedFilter === "following" && followingFeed.loading) ||
-      feedLoadingMore,
-    error: feedPagingError,
-    onLoadMore: () => {
-      if (feedSearchActive) void postSearch.loadMore();
-      else if (feedFilter === "saved") void loadSavedPosts(true);
-      else if (feedFilter === "following") void followingFeed.loadMore();
-      else void loadMorePosts();
-    },
-  });
+  const { feedSearchActive, postSearch, feedInitialLoading, feedLoadingMore, feedPagingError, feedInfiniteScrollRef } =
+    useFeedPagingOrchestration({
+      tab,
+      sessionId: session?.sessionId,
+      globalSearch,
+      feedFilter,
+      request: apiFetch,
+      followingFeed,
+      savedPostsLoaded,
+      savedPagingError,
+      savedPostsBusy,
+      postsLoadingMore,
+      postsPagingError,
+      searchHasScrolled,
+      hasMoreSavedPosts,
+      hasMorePosts,
+      loadSavedPosts,
+      loadMorePosts,
+    });
 
   const {
     messages,
@@ -988,18 +872,7 @@ export default function AuthedApp({
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
   }, [groupSettingsOpen, setGroupMemberViewOpen]);
 
-  useEffect(() => {
-    if (!groupSettingsOpen) return;
-    const onEscape = (event: KeyboardEvent) => {
-      if (
-        event.key === "Escape" &&
-        !document.querySelector("dialog[open]")
-      )
-        setGroupSettingsOpen(false);
-    };
-    window.addEventListener("keydown", onEscape);
-    return () => window.removeEventListener("keydown", onEscape);
-  }, [groupSettingsOpen, setGroupSettingsOpen]);
+  useGroupSettingsEscape(groupSettingsOpen, setGroupSettingsOpen);
 
   const conversationListSearch = useConversationListSearch({
     query: chatListQuery,
@@ -1017,38 +890,12 @@ export default function AuthedApp({
     enabled: tab === "chat",
     request: apiFetch,
   });
-  useEffect(() => {
-    const jump = chatSearchJump;
-    if (
-      !jump ||
-      jump.conversationId !== activeConversationId ||
-      lastScrolledSearchJump.current === jump.revision ||
-      !messages.some((item) => item.id === jump.messageId)
-    )
-      return;
-    const frame = window.requestAnimationFrame(() => {
-      const target = document.querySelector(
-        `[data-message-id="${jump.messageId}"]`,
-      );
-      if (!target) return;
-      target.scrollIntoView({
-        block: "center",
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-      });
-      // A transient highlight makes the notification's exact message easy to locate.
-      if (target instanceof HTMLElement && typeof target.animate === "function") {
-        target.animate(
-          [
-            { outline: "2px solid var(--accent, #318a65)", outlineOffset: "3px", backgroundColor: "rgba(49,138,101,0.16)" },
-            { outline: "2px solid transparent", outlineOffset: "3px", backgroundColor: "transparent" },
-          ],
-          { duration: 2200, easing: "ease-out" },
-        );
-      }
-      lastScrolledSearchJump.current = jump.revision;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [messages, activeConversationId, chatSearchJump]);
+  useChatMessageJumpFocus({
+    jump: chatSearchJump,
+    activeConversationId,
+    messages,
+    lastScrolledRevision: lastScrolledSearchJump,
+  });
   const name = session?.user.username || "";
   const displayConversations = useMemo(
     () => withContactNicknames(conversations, contactMetadata),
@@ -1081,77 +928,15 @@ export default function AuthedApp({
     activeConversationTypeRef.current = activeConversation?.type ?? null;
   }, [activeConversation?.type]);
 
-  // Channel selection stays inside the active group and never leaks into another conversation.
-  useEffect(() => {
-    const id = activeConversation?.type === 'group' ? activeConversation.id : null;
-    setGroupChannelState({ conversationId: id, channels: validGroupChannels([], id ?? 0) });
-    if (!id || !session?.token) return;
-    let activeRequest: AbortController | null = null;
-    const reload = async () => {
-      activeRequest?.abort();
-      const controller = new AbortController();
-      activeRequest = controller;
-      try {
-        const response = await apiFetch(`/api/conversations/${id}/channels`, { signal: controller.signal });
-        if (!response.ok) throw new Error('Không tải được kênh hội thoại.');
-        const raw = await response.json();
-        const channels = validGroupChannels(raw, id);
-        if (!controller.signal.aborted) {
-          const unreadAvailable = Array.isArray(raw) && raw.every(channel =>
-            typeof channel.unreadCount === 'number' && Number.isFinite(channel.unreadCount));
-          setGroupChannelUnreadStatus({ conversationId: id, available: unreadAvailable });
-          setGroupChannelState({ conversationId: id, channels });
-          // Keep the group's list badge in sync with the same per-channel unread
-          // counts shown in the picker. Do not replace the server count if the
-          // channels endpoint has no reliable unread metadata.
-          if (unreadAvailable) {
-            const totalUnread = totalGroupChannelUnread(channels);
-            setConversations(current => current.map(conversation =>
-              conversation.id === id && conversation.type === 'group' && conversation.unreadCount !== totalUnread
-                ? { ...conversation, unreadCount: totalUnread } : conversation));
-          }
-          setChannelSelection(current =>
-            current.conversationId === id && !channels.some(channel => channel.id === current.channelId)
-              ? { conversationId: id, channelId: 0 }
-              : current,
-          );
-
-        }
-      } catch {
-        if (!controller.signal.aborted) setNotice('Không tải được kênh hội thoại.', 'warning');
-      }
-    };
-    void reload();
-    const onUpdate = (event: Event) => {
-      const value = (event as CustomEvent<{ conversationId: number }>).detail;
-      if (value?.conversationId === id) void reload();
-    };
-    const onChannelEvent = (event: Event) => {
-      const detail = (event as CustomEvent<{ message?: Message }>).detail;
-      if (detail?.message?.conversationId === id) void reload();
-    };
-    const onChannelRead = (event: Event) => {
-      const detail = (event as CustomEvent<{ conversationId: number; channelId: number }>).detail;
-      if (detail?.conversationId !== id) return;
-      setGroupChannelState(current => current.conversationId !== id ? current : {
-        ...current,
-        channels: current.channels.map(channel => channel.id === detail.channelId
-          ? { ...channel, unreadCount: 0 } : channel),
-      });
-      // Only the opened channel was marked read; recalculate the group badge
-      // from all channels rather than clearing the entire group's unread count.
-      void reload();
-    };
-    window.addEventListener('chatnet:group-community-updated', onUpdate);
-    window.addEventListener('chatnet:group-channel-event', onChannelEvent);
-    window.addEventListener('chatnet:channel-read', onChannelRead);
-    return () => {
-      activeRequest?.abort();
-      window.removeEventListener('chatnet:group-community-updated', onUpdate);
-      window.removeEventListener('chatnet:group-channel-event', onChannelEvent);
-      window.removeEventListener('chatnet:channel-read', onChannelRead);
-    };
-  }, [activeConversation?.id, activeConversation?.type, session?.token]);
+  const { groupChannelUnreadAvailable } = useGroupChannelLiveSync({
+    groupConversationId: activeConversation?.type === "group" ? activeConversation.id : null,
+    sessionToken: session?.token ?? null,
+    request: apiFetch,
+    setGroupChannelState,
+    setChannelSelection,
+    setConversations,
+    setNotice,
+  });
   const conversationBlocked = Boolean(activeConversation?.type === 'direct' &&
     (activeConversation.blockedByMe || activeConversation.blockedByOther));
   const groupActivities = useGroupActivities(activeConversation?.type === 'group' ? activeConversation.id : null, session?.sessionId, apiFetch);
@@ -1183,16 +968,27 @@ export default function AuthedApp({
     () => Object.fromEntries(friends.map(friend => [friend.username, friend.displayName || friend.username])),
     [friends],
   );
-  const visiblePosts = applyPostLikePreviews(posts, likePreviews);
-  const visibleMessages = messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
-    reactionPreviews[message.id]
-      ? {
-          ...message,
-          reactions: message.deleted ? [] : reactionPreviews[message.id],
-        }
-      : message,
+  // Message updates should not rebuild the feed previews, and unrelated shell
+  // state changes should not remap every visible message in a long conversation.
+  const visiblePosts = useMemo(
+    () => applyPostLikePreviews(posts, likePreviews),
+    [posts, likePreviews],
   );
-  const visibleProfilePosts = applyPostLikePreviews(profilePosts, likePreviews);
+  const visibleMessages = useMemo(
+    () => messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
+      reactionPreviews[message.id]
+        ? {
+            ...message,
+            reactions: message.deleted ? [] : reactionPreviews[message.id],
+          }
+        : message,
+    ),
+    [messages, selectedChannelId, reactionPreviews],
+  );
+  const visibleProfilePosts = useMemo(
+    () => applyPostLikePreviews(profilePosts, likePreviews),
+    [profilePosts, likePreviews],
+  );
   // Shared links are routed, while opening a card in the feed is local UI state.
   const feedRoutePostId = feedPostIdFromPath(routeLocation.pathname)
     ?? Number(new URLSearchParams(routeLocation.search).get("post"));
@@ -1283,183 +1079,36 @@ export default function AuthedApp({
     }
   }, [session?.token, routeLocation.pathname, routeLocation.search, routeLocation.hash, navigate]);
 
-  useEffect(() => {
-    activeConversationIdRef.current = activeConversationId;
-    messageScrollAtBottom.current = true;
-    cancelMessageLongPress();
-    // useMessageData owns room-specific clearing and its recently-visited
-    // cache. A second reset here caused an unnecessary blank render between
-    // PWA conversation selections.
-    setHasMoreMessages(false);
-    setMessagesLoadingMore(false);
-    messagesPagingBusy.current = false;
-    setGroupMembers([]);
-  }, [activeConversationId]);
-
-  useEffect(() => {
-    messageScrollAtBottom.current = true;
-  }, [selectedChannelId]);
-
-  function setMessageText(text: string) {
-    if (!activeConversationId) return;
-    if (selectedChannelId > 0) {
-      setChannelDrafts(current => ({
-        ...current,
-        [channelDraftKey]: { ...(current[channelDraftKey] ?? emptyDraft), text },
-      }));
-      return;
-    }
-    setMessageDrafts((current) => ({
-      ...current,
-      [activeConversationId]: {
-        ...(current[activeConversationId] ?? emptyDraft),
-        text,
-      },
-    }));
-  }
+  useConversationViewReset(activeConversationId, {
+    activeConversationIdRef,
+    messageScrollAtBottom,
+    messagesPagingBusy,
+    setHasMoreMessages,
+    setMessagesLoadingMore,
+    setGroupMembers,
+  });
 
 
-
-
-  async function loadProfileMedia() {
-    if (!session?.token) return;
-    const sessionId = session.sessionId;
-    const response = await apiFetch("/api/profile");
-    if (!response.ok) return;
-    const profile = (await response.json()) as ProfileMediaState;
-    if (sessionRef.current?.sessionId !== sessionId) return;
-    avatarRefreshVersions.set(profile.username, profile.updatedAt);
-    setProfileMedia(profile);
-    setProfileDisplayNameDraft(profile.displayName);
-    setProfileUsernameDraft(profile.username);
-    setProfileBioDraft(profile.bio ?? "");
-    setProfileCityDraft(profile.city ?? "");
-  }
-
-  async function saveProfileIdentity(event: FormEvent) {
-    event.preventDefault();
-    if (!session || profileSaving) return;
-
-    const displayName = profileDisplayNameDraft.trim();
-    const username = profileUsernameDraft.trim().toLowerCase();
-    const bio = profileBioDraft.trim();
-    const city = profileCityDraft.trim();
-    if (!displayName || !username) {
-      setNotice("Tên hiển thị và username không được để trống.", "error");
-      return;
-    }
-
-    setProfileSaving(true);
-    try {
-      const response = await apiFetch("/api/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName, username, bio, city }),
-      });
-      const result = (await response.json().catch(() => null)) as
-        | (ProfileUpdateResponse & { error?: string })
-        | null;
-      if (sessionRef.current?.sessionId !== session.sessionId) return;
-      if (!response.ok || !result?.token) {
-        throw new Error(
-          result?.error || "Không cập nhật được thông tin cá nhân.",
-        );
-      }
-
-      const previousUsername = session.user.username;
-      avatarRefreshVersions.delete(previousUsername);
-      avatarRefreshVersions.set(result.username, result.updatedAt);
-      setProfileMedia({
-        username: result.username,
-        displayName: result.displayName,
-        bio: result.bio ?? "",
-        city: result.city ?? "",
-        avatarSet: result.avatarSet,
-        coverSet: result.coverSet,
-        updatedAt: result.updatedAt,
-      });
-      setProfileDisplayNameDraft(result.displayName);
-      setProfileUsernameDraft(result.username);
-      setProfileBioDraft(result.bio ?? "");
-      setProfileCityDraft(result.city ?? "");
-
-      const nextSession: Session = {
-        ...sessionRef.current,
-        token: result.token,
-        user: {
-          ...session.user,
-          username: result.username,
-          displayName: result.displayName,
-        },
-      };
-      saveSession(nextSession);
-      setNotice("Đã lưu thông tin hồ sơ.", "success");
-      if (isProfileDesktop) setProfileEditorOpen(false);
-    } catch (error) {
-      if (sessionRef.current?.sessionId === session.sessionId)
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : "Không cập nhật được thông tin cá nhân.",
-          "error",
-        );
-    } finally {
-      if (sessionRef.current?.sessionId === session.sessionId)
-        setProfileSaving(false);
-    }
-  }
-
-  async function updateProfileImage(kind: "avatar" | "cover", file?: File | null) {
-    if (!session || profileBusy) return false;
-    if (file === undefined) return false;
-    if (file && !file.type.toLowerCase().startsWith("image/")) {
-      setNotice("Chỉ hỗ trợ file ảnh cho ảnh đại diện và ảnh bìa.", "error");
-      return false;
-    }
-    setProfileBusy(kind);
-    try {
-      const [attachment] = file ? await uploadMediaFiles([file], "profile") : [null];
-      if (sessionRef.current?.sessionId !== session.sessionId) return false;
-      if (file && !attachment) throw new Error("Không upload được ảnh.");
-
-      const response = await apiFetch("/api/profile/media", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind,
-          attachment: attachment ? attachmentRequestBody(attachment) : null,
-        }),
-      });
-      const result = (await response.json().catch(() => null)) as
-        | (ProfileMediaState & { error?: string })
-        | null;
-      if (sessionRef.current?.sessionId !== session.sessionId) return false;
-      if (!response.ok || !result) {
-        throw new Error(result?.error || "Không cập nhật được ảnh hồ sơ.");
-      }
-      avatarRefreshVersions.set(result.username, result.updatedAt);
-      setProfileMedia(result);
-      setNotice(
-        kind === "avatar"
-          ? "Đã cập nhật ảnh đại diện."
-          : "Đã cập nhật ảnh bìa.",
-        "success",
-      );
-      return true;
-    } catch (error) {
-      if (sessionRef.current?.sessionId === session.sessionId)
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : "Không cập nhật được ảnh hồ sơ.",
-          "error",
-        );
-      return false;
-    } finally {
-      if (sessionRef.current?.sessionId === session.sessionId)
-        setProfileBusy(null);
-    }
-  }
+  const { loadProfileMedia, saveProfileIdentity, updateProfileImage } = useProfileIdentityActions({
+    session, sessionRef, apiFetch, saveSession, setNotice, uploadMediaFiles,
+    isProfileDesktop,
+    profileSaving,
+    profileBusy,
+    profileDisplayNameDraft,
+    profileUsernameDraft,
+    profileBioDraft,
+    profileCityDraft,
+    profilePublicDetailsDraft,
+    setProfileMedia,
+    setProfileDisplayNameDraft,
+    setProfileUsernameDraft,
+    setProfileBioDraft,
+    setProfileCityDraft,
+    setProfilePublicDetailsDraft,
+    setProfileSaving,
+    setProfileBusy,
+    setProfileEditorOpen,
+  });
 
   useEffect(() => {
     if (!session?.token) {
@@ -1469,119 +1118,15 @@ export default function AuthedApp({
     void loadProfileMedia().catch(() => setStatus("Đang kết nối lại..."));
   }, [session?.sessionId]);
 
-  useEffect(() => {
-    if (!session?.token) {
-      setTranslationPreferencesLoaded(false);
-      setAutoTranslate(true);
-      setTargetLanguage("en");
-      setAppLocale(loadAppLocalePreference());
-      return;
-    }
-
-    let cancelled = false;
-    const revision = preferenceRevision.current;
-    const preferenceKey = `chatnet-preferences:${session.user.id}`;
-    try {
-      const cached = JSON.parse(
-        localStorage.getItem(preferenceKey) || "null",
-      ) as {
-        targetLanguage?: string;
-        autoTranslate?: boolean;
-        appLocale?: string;
-      } | null;
-      if (
-        cached?.targetLanguage &&
-        isSupportedLanguageCode(cached.targetLanguage)
-      ) {
-        setTargetLanguage(cached.targetLanguage);
-      }
-      if (typeof cached?.autoTranslate === "boolean")
-        setAutoTranslate(cached.autoTranslate);
-      if (
-        cached?.appLocale === "auto" ||
-        (cached?.appLocale && isSupportedLanguageCode(cached.appLocale))
-      ) {
-        setAppLocale(cached.appLocale);
-        saveAppLocalePreference(cached.appLocale);
-      }
-    } catch {
-      // Ignore malformed local fallback; server preferences remain authoritative.
-    }
-
-    apiFetch("/api/preferences")
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<{
-          targetLanguage: string;
-          autoTranslate: boolean;
-          appLocale: string;
-        }>;
-      })
-      .then(async (preferences) => {
-        if (cancelled || revision !== preferenceRevision.current || !preferences) return;
-        const nextTarget = isSupportedLanguageCode(preferences.targetLanguage)
-          ? preferences.targetLanguage
-          : "en";
-        const nextAuto = preferences.autoTranslate !== false;
-        const serverLocale =
-          preferences.appLocale === "auto" ||
-          isSupportedLanguageCode(preferences.appLocale)
-            ? preferences.appLocale
-            : "auto";
-
-        // First-use language selection takes priority over the default server value.
-        const setupLocaleKey = `chatnet-setup-locale:${session.user.id}`;
-        const pendingLocale = localStorage.getItem(setupLocaleKey);
-        const validPendingLocale = pendingLocale === "auto" ||
-          (pendingLocale !== null && isSupportedLanguageCode(pendingLocale));
-        const nextLocale = validPendingLocale && pendingLocale ? pendingLocale : serverLocale;
-
-        if (validPendingLocale && pendingLocale) {
-          if (serverLocale === pendingLocale) {
-            localStorage.removeItem(setupLocaleKey);
-          } else {
-            try {
-              const response = await apiFetch("/api/preferences", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  targetLanguage: nextTarget,
-                  autoTranslate: nextAuto,
-                  appLocale: nextLocale,
-                }),
-              });
-              if (!response.ok) throw new Error("preference sync failed");
-              localStorage.removeItem(setupLocaleKey);
-            } catch {
-              // Keep the chosen language locally and retry sync on the next login.
-            }
-          }
-        }
-        if (cancelled || revision !== preferenceRevision.current) return;
-        setTargetLanguage(nextTarget);
-        setAutoTranslate(nextAuto);
-        setAppLocale(nextLocale);
-        saveAppLocalePreference(nextLocale);
-        localStorage.setItem(
-          preferenceKey,
-          JSON.stringify({
-            targetLanguage: nextTarget,
-            autoTranslate: nextAuto,
-            appLocale: nextLocale,
-          }),
-        );
-      })
-      .catch(() => {
-        // Keep local/device preferences when the network is unavailable.
-      })
-      .finally(() => {
-        if (!cancelled) setTranslationPreferencesLoaded(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.sessionId]);
+  useLanguagePreferencesLifecycle({
+    session,
+    apiFetch,
+    preferenceRevision,
+    setTranslationPreferencesLoaded,
+    setAutoTranslate,
+    setTargetLanguage,
+    setAppLocale,
+  });
 
   useEffect(() => {
     document.documentElement.lang = effectiveAppLocale;
@@ -1806,100 +1351,39 @@ export default function AuthedApp({
     }
   }, [session?.token, tab, desktopSection, newChatMode, chatFriend?.id]);
 
-  const friendSearchSessionRef = useRef(session?.sessionId);
-  useEffect(() => {
-    const friendSurfaceOpen = newChatMode === "friends" || tab === "contacts";
-    if (friendSearchSessionRef.current !== session?.sessionId) {
-      friendSearchSessionRef.current = session?.sessionId;
-      setFriendResults([]);
-    }
-    if (!session?.token) {
-      setFriendResults([]);
-      setFriendSearching(false);
-      setFriendSearchError(false);
-      return;
-    }
-    if (!friendSurfaceOpen) return;
-
-    const controller = new AbortController();
-    const query = friendQuery.trim();
-    // Keep the last successful suggestions visible while refreshing in the background.
-    if (query) setFriendResults([]);
-    setFriendSearching(true);
-    setFriendSearchError(false);
-
-    if (!query) {
-      apiFetch("/api/users/suggestions", { signal: controller.signal })
-        .then(async (response) => {
-          if (!response.ok) throw new Error("Cannot load suggestions");
-          return response.json() as Promise<FriendSearchResult[]>;
-        })
-        .then((items) => {
-          if (!controller.signal.aborted) setFriendResults(items);
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) {
-            // Retain last-known suggestions on a transient network failure.
-            setFriendSearchError(true);
-          }
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setFriendSearching(false);
-        });
-
-      return () => controller.abort();
-    }
-
-    const timer = window.setTimeout(async () => {
-      setFriendSearching(true);
-      try {
-        const response = await apiFetch(
-          `/api/users/search?q=${encodeURIComponent(query)}`,
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error("Cannot search users");
-        const items = (await response.json()) as FriendSearchResult[];
-        if (!controller.signal.aborted) setFriendResults(items);
-      } catch {
-        if (!controller.signal.aborted) {
-          setFriendResults([]);
-          setFriendSearchError(true);
-        }
-      } finally {
-        if (!controller.signal.aborted) setFriendSearching(false);
-      }
-    }, 250);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, session?.sessionId, tab, desktopSection]);
+  useFriendSearchRequests({
+    sessionToken: session?.token,
+    sessionId: session?.sessionId,
+    tab,
+    desktopSection,
+    newChatMode,
+    friendQuery,
+    friendSearchRetry,
+    apiFetch,
+    setFriendResults,
+    setFriendSearching,
+    setFriendSearchError,
+  });
 
   function purgeConversation(id: number) {
-    responseCache.current.invalidate(["conversations", "messages"]);
-    window.dispatchEvent(new CustomEvent("chatnet:message-history-cleared", { detail: { conversationId: id } }));
-    revokedConversationIds.current.add(id);
-    membershipSnapshot.current?.delete(id);
-    membershipEventSequence.current += 1;
-    setConversations((current) => current.filter((item) => item.id !== id));
-    setMessageDrafts((current) => {
-      const next = { ...current };
-      delete next[id];
-      return next;
+    revokeConversationMembership(id, {
+      responseCache,
+      revokedConversationIds,
+      membershipSnapshot,
+      membershipEventSequence,
+      activeConversationIdRef,
+      setConversations,
+      setMessageDrafts,
+      setActiveConversationId,
+      setHasMoreMessages,
+      setGroupMembers,
+      setGroupSettingsOpen,
+      setSharedContentOpen,
+      setTranslations,
+      setReplyingTo,
+      setMessageActionId,
+      setNotice,
     });
-    if (activeConversationIdRef.current === id) {
-      activeConversationIdRef.current = null;
-      setActiveConversationId(null);
-      setHasMoreMessages(false);
-      setGroupMembers([]);
-      setGroupSettingsOpen(false);
-      setSharedContentOpen(false);
-      setTranslations({});
-      setReplyingTo(null);
-      setMessageActionId(null);
-      setNotice("Bạn không còn là thành viên của nhóm này.");
-    }
   }
 
   function closeProfileTimeline() {
@@ -1907,115 +1391,93 @@ export default function AuthedApp({
     requestAnimationFrame(() => profileIdentityRef.current?.focus());
   }
 
-  function logout(revoke = true, clearStorage = true) {
-    if (visitorUsername) navigate(TAB_PATH.chat, { replace: true });
-    const current = sessionRef.current;
-    const currentToken = current?.token;
-    ++nearbyRequest.current;
-    setNearbyUsers([]);
-    setNearbyUntil(0);
-    setNearbyBusy(false);
-    setNearbyScanning(false);
-    if (currentToken) {
-      void fetch(`${API}/api/users/nearby`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${currentToken}` },
-        keepalive: true,
-      }).catch(() => undefined);
-    }
-    void getOneSignalPushState()
-      .then(async (state) => {
-        if (!currentToken || !state.subscriptionId) return;
-        await fetch(`${API}/api/push/subscription`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${currentToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ subscriptionId: state.subscriptionId }),
-        });
-      })
-      .catch(() => undefined);
-
-    chatOutboxRef.current = [];
-    setChatOutbox([]);
-    chatOutboxSession.current = "";
-    sendingClientIDs.current = new Set<string>();
-    pendingSend.current = null;
-    endSession(revoke, clearStorage, setNotice);
-    setConversations([]);
-    revokedConversationIds.current.clear();
-    membershipSnapshot.current = null;
-    membershipSyncSequence.current += 1;
-    membershipEventSequence.current += 1;
-    setHasMoreConversations(false);
-    setConversationLoadingMore(false);
-    conversationOffset.current = 0;
-    conversationPagingBusy.current = false;
-    setActiveConversationId(null);
-    setMessages([]);
-    setHasMoreMessages(false);
-    setMessagesLoadingMore(false);
-    messagesPagingBusy.current = false;
-    setOutgoingMessage(null);
-    setPendingPost(null);
-    setPendingComments({});
-    setLikePreviews({});
-    setReactionPreviews({});
-    actionLocks.current = new Set<string>();
-    pendingRequests.current.clear();
-    mutationRequests.current.clear();
-    messageReceipts.current.clear();
-    messageSound.current?.clearSeen();
-    ++preferenceRevision.current;
-    sendingRef.current = false;
-    setMessageSending(false);
-    setGroupBusy(false);
-    setProfileBusy(null);
-    setProfileSaving(false);
-    setStoryBusy(false);
-    mediaUploadAbort.current?.abort();
-    mediaUploadAbort.current = null;
-    setMediaUploading(null);
-    setMediaUploadProgress(null);
-    friendActionRef.current.clear();
-    setFriendBusyIds(new Set());
-    setFriendActionBusy(null);
-    ++feedRevision.current;
-    setMessageDrafts({});
-    setFriends([]);
-    setFriendRequests([]);
-    setFriendMenuId(null);
-    setFriendPreview(null);
-    setPostText("");
-    setPostTaggedFriends([]);
-    setPostFeelingId("");
-    setEditingPost(null);
-    setPostEditBusy(false);
-    draftBeforeEdit.current = null;
-    setPosts([]);
-    setSavedPosts([]);
-    setHasMoreSavedPosts(false);
-    ++profileLoadSequence.current;
-    profilePagingBusy.current = false;
-    setProfileTimelineOpen(false);
-    setProfileComposerOpen(false);
-    setFeedComposerOpen(false);
-    setProfileEditorOpen(false);
-    setPostSubmitError("");
-    setProfilePosts([]);
-    setProfileHasMore(false);
-    setProfilePostsBusy(false);
-    setProfilePostsError("");
-    setHasMorePosts(false);
-    setPostsLoadingMore(false);
-    postsPagingBusy.current = false;
-    setStories([]);
-    setActiveStoryId(null);
-    setCommentEditors({});
-    setPostAttachments([]);
-    setTranslations({});
-  }
+  const logout = createAppLogout({
+    setNearbyUsers,
+    setNearbyUntil,
+    setNearbyBusy,
+    setNearbyScanning,
+    setChatOutbox,
+    setConversations,
+    setHasMoreConversations,
+    setConversationLoadingMore,
+    setActiveConversationId,
+    setMessages,
+    setHasMoreMessages,
+    setMessagesLoadingMore,
+    setOutgoingMessage,
+    setPendingPost,
+    setPendingComments,
+    setLikePreviews,
+    setReactionPreviews,
+    setMessageSending,
+    setGroupBusy,
+    setProfileBusy,
+    setProfileSaving,
+    setStoryBusy,
+    setMediaUploading,
+    setMediaUploadProgress,
+    setFriendBusyIds,
+    setFriendActionBusy,
+    setMessageDrafts,
+    setFriends,
+    setFriendRequests,
+    setFriendMenuId,
+    setFriendPreview,
+    setPostText,
+    setPostTaggedFriends,
+    setPostFeelingId,
+    setEditingPost,
+    setPostEditBusy,
+    setPosts,
+    setProfileTimelineOpen,
+    setProfileComposerOpen,
+    setFeedComposerOpen,
+    setProfileEditorOpen,
+    setPostSubmitError,
+    setProfilePosts,
+    setProfileHasMore,
+    setProfilePostsBusy,
+    setProfilePostsError,
+    setHasMorePosts,
+    setPostsLoadingMore,
+    setStories,
+    setActiveStoryId,
+    setCommentEditors,
+    setPostAttachments,
+    setTranslations,
+    nearbyRequest,
+    chatOutboxRef,
+    chatOutboxSession,
+    sendingClientIDs,
+    pendingSend,
+    conversationOffset,
+    conversationPagingBusy,
+    messagesPagingBusy,
+    actionLocks,
+    pendingRequests,
+    mutationRequests,
+    messageReceipts,
+    messageSound,
+    preferenceRevision,
+    sendingRef,
+    mediaUploadAbort,
+    friendActionRef,
+    feedRevision,
+    draftBeforeEdit,
+    profileLoadSequence,
+    profilePagingBusy,
+    postsPagingBusy,
+    visitorUsername,
+    navigate,
+    sessionRef,
+    endSession,
+    setNotice,
+    resetSavedPosts,
+    revokedConversationIds,
+    membershipSnapshot,
+    membershipSyncSequence,
+    membershipEventSequence,
+  });
   const { fetchAccountSessions, revokeAccountSessions } = useAccountSessions({ logout, managedSessions, sessionRef, sessionsBusy, setManagedSessions, setNotice, setSessionsBusy, setSessionsError, setSessionsOpen });
 
 
@@ -2032,14 +1494,13 @@ export default function AuthedApp({
     sound: messageSoundEnabled,
     onError: (message) => setNotice(message, "warning"),
     onOpen: (conversation) => {
-      revokedConversationIds.current.delete(conversation.id);
-      membershipSnapshot.current?.add(conversation.id);
-      setConversations((current) => [
-        conversation,
-        ...current.filter((item) => item.id !== conversation.id),
-      ]);
-      switchTab("chat");
-      selectRoutedConversation(conversation.id);
+      restoreConversationFromNotification(conversation, {
+        revokedConversationIds,
+        membershipSnapshot,
+        setConversations,
+        switchTab,
+        selectConversation: selectRoutedConversation,
+      });
     },
   });
 
@@ -2121,59 +1582,30 @@ export default function AuthedApp({
     refreshStories,
   });
 
-  useLayoutEffect(() => {
-    const container = messagesScrollRef.current;
-    if (ownSendScrollConversation.current !== null) {
-      const sentInCurrentConversation =
-        ownSendScrollConversation.current === activeConversationId;
-      ownSendScrollConversation.current = null;
-      if (sentInCurrentConversation && container) {
-        // Only a local send overrides the reader's position; incoming messages never do.
-        pendingMessageScrollRestore.current = null;
-        container.scrollTop = container.scrollHeight;
-        messageScrollAtBottom.current = true;
-        return;
-      }
-    }
-    const restore = pendingMessageScrollRestore.current;
-    if (restore && container) {
-      container.scrollTop =
-        restore.top + container.scrollHeight - restore.height;
-      pendingMessageScrollRestore.current = null;
-      return;
-    }
-    // Preserve scroll position when reading history; only follow new messages
-    // when the reader was already near the bottom of the conversation.
-    if (container && messageScrollAtBottom.current)
-      container.scrollTop = container.scrollHeight;
-  }, [messages, outgoingMessage, chatOutbox]);
-
-  useEffect(() => {
-    if (
-      !translationPreferencesLoaded ||
-      !effectiveAutoTranslate ||
-      !session ||
-      !activeConversationId
-    )
-      return;
-    const missing = messages.filter(
-      (message) =>
-        !message.deleted &&
-        message.senderId !== session.user.id &&
-        Boolean(message.text.trim()) &&
-        !translations[message.id] &&
-        !translationAttempted.current.has(`${session.sessionId}:${effectiveTargetLanguage}:${message.id}:${message.editedAt ?? ""}`),
-    );
-    missing.forEach((message) => void translateMessage(message, false));
-  }, [
-    effectiveAutoTranslate,
-    translationPreferencesLoaded,
-    messages,
-    effectiveTargetLanguage,
-    session?.user.id,
-    session?.sessionId,
+  useChatScrollCoordinator({
     activeConversationId,
-  ]);
+    selectedChannelId,
+    messages,
+    outgoingMessage,
+    chatOutbox,
+    messagesScrollRef,
+    messageScrollAtBottom,
+    ownSendScrollConversation,
+    pendingMessageScrollRestore,
+  });
+
+  useIncomingMessageAutoTranslation({
+    enabled: effectiveAutoTranslate,
+    preferencesLoaded: translationPreferencesLoaded,
+    messages,
+    targetLanguage: effectiveTargetLanguage,
+    userId: session?.user.id ?? null,
+    sessionId: session?.sessionId ?? null,
+    activeConversationId,
+    translations,
+    attempted: translationAttempted,
+    translateMessage,
+  });
 
   const canSend = useMemo(
     () =>
@@ -2207,30 +1639,13 @@ export default function AuthedApp({
     setChatOnline,
   });
 
-  useEffect(() => {
-    if (!session || !messages.length || !chatOutboxRef.current.length) return;
-    const delivered = new Set(
-      messages
-        .filter(
-          (message) =>
-            message.senderId === session.user.id && Boolean(message.clientId),
-        )
-        .map((message) => `${message.conversationId}:${message.clientId}`),
-    );
-    if (!delivered.size) return;
-    updateChatOutbox((items) => {
-      if (
-        !items.some((item) =>
-          delivered.has(`${item.conversationId}:${item.clientId}`),
-        )
-      )
-        return items;
-      return items.filter(
-        (item) => !delivered.has(`${item.conversationId}:${item.clientId}`),
-      );
-    });
-  }, [messages, session?.sessionId]);
-
+  useChatOutboxReceiptReconciliation({
+    messages,
+    sessionId: session?.sessionId ?? null,
+    userId: session?.user.id ?? null,
+    chatOutboxRef,
+    updateChatOutbox,
+  });
 
   const unreadTotal = nativeNotifications.unreadCount ?? 0;
   const notificationItemCount = countNotificationItems(friendRequests, conversations)
@@ -2272,82 +1687,45 @@ export default function AuthedApp({
     likePreviews,
   });
   const sortedChatListConversations = sortChatListConversations(chatListConversations);
-  const openChatQuickContact = (contact: ChatQuickContact) => {
-    setQuickSearchOpen(false);
-    setGlobalSearch("");
-    setChatSearchJump(null);
-    if (contact.conversation) {
-      const selected = contact.conversation;
-      setConversations((current) =>
-        current.some((item) => item.id === selected.id)
-          ? current
-          : [...current, selected],
-      );
-      selectRoutedConversation(selected.id);
-    } else if (contact.username) {
-      void openDirectByUsername(contact.username);
-    }
-  };
-  const openChatQuickHit = (hit: ChatQuickHit) => {
-    setQuickSearchOpen(false);
-    setGlobalSearch("");
-    setConversations((current) =>
-      current.some((item) => item.id === hit.conversation.id)
-        ? current
-        : [...current, hit.conversation],
-    );
-    setChatSearchJump({
-      conversationId: hit.conversation.id,
-      messageId: hit.id,
-      revision: ++chatSearchJumpRevision.current,
-    });
-    selectRoutedConversation(hit.conversation.id);
-    setTranslations({});
-    setTranslationOriginals({});
-  };
-  async function openMentionPost(mention: PostMentionNotification) {
-    if (!isCurrentMentionVisit()) return;
-    try {
-      const response = await apiFetch(`/api/posts/${mention.postId}`, { cache: "no-store" });
-      if (!response.ok) throw new Error(response.status === 404
-        ? "Bài viết không tồn tại hoặc bạn không còn quyền xem."
-        : "Không mở được bài viết.");
-      const post = await response.json() as Post;
-      if (!isCurrentMentionVisit()) return;
-      setPosts(current => [post, ...current.filter(item => item.id !== post.id)]);
-      setFeedCommunitiesOpen(false);
-      setTab("feed");
-      navigate(feedPostPath(post.id), { state: { postId: post.id } });
-      void readPostMention(mention.id);
-    } catch (error) {
-      if (isCurrentMentionVisit())
-        setNotice(error instanceof Error ? error.message : "Không mở được bài viết.", "error");
-    }
-  }
+  const { openChatQuickContact, openChatQuickHit } = useChatQuickSelectionActions({
+    setQuickSearchOpen,
+    setGlobalSearch,
+    setChatSearchJump,
+    setConversations,
+    selectConversation: selectRoutedConversation,
+    openDirectByUsername,
+    nextRevision: nextChatSearchJumpRevision,
+    setTranslations,
+    setTranslationOriginals,
+  });
+  const openMentionPost = createOpenMentionPost({
+    isCurrentMentionVisit,
+    apiFetch,
+    setPosts,
+    setFeedCommunitiesOpen,
+    setTab,
+    navigate,
+    readPostMention,
+    setNotice,
+    feedPostPath,
+  });
 
-  const switchTab = (nextTab: Tab) => {
-    setDesktopSection(null);
-    setFeedCommunitiesOpen(false);
-    setTranslationSettingsConversationId(null);
-
-    if (nextTab === "profile") {
-      // setTab owns the URL; a second Settings setter would push /profile twice.
-      setProfileEditorOpen(false);
-    }
-    if (activePostId !== null) {
-      setActivePostId(null);
-      if (new URLSearchParams(routeLocation.search).has("post")) {
-        navigate({ pathname: routeLocation.pathname, search: "" }, { replace: true });
-      }
-    }
-    if (nextTab === "feed") setFeedFilter("all");
-    setQuickSearchOpen(false);
-    setTab(nextTab);
-    setQuickCreateOpen(false);
-    setGlobalSearch("");
-    if (nextTab !== "chat") setActiveConversationId(null);
-    if (nextTab !== "contacts") setFriendQuery("");
-  };
+  const switchTab = createAppTabSwitch({
+    setDesktopSection,
+    setFeedCommunitiesOpen,
+    setTranslationSettingsConversationId,
+    setProfileEditorOpen,
+    activePostId,
+    setActivePostId,
+    routeLocation,
+    navigate,
+    setQuickSearchOpen,
+    setTab,
+    setQuickCreateOpen,
+    setGlobalSearch,
+    setActiveConversationId,
+    setFriendQuery,
+  });
 
   const discardDesktopProfileEdits = () => {
     setProfileDisplayNameDraft(
@@ -2356,6 +1734,7 @@ export default function AuthedApp({
     setProfileUsernameDraft(profileMedia?.username ?? name);
     setProfileBioDraft(profileMedia?.bio ?? "");
     setProfileCityDraft(profileMedia?.city ?? "");
+    setProfilePublicDetailsDraft({ workplace: profileMedia?.workplace ?? "", school: profileMedia?.school ?? "" });
     setProfileEditorOpen(false);
   };
 
@@ -2369,6 +1748,10 @@ export default function AuthedApp({
       setProfileUsernameDraft={setProfileUsernameDraft}
       profileSaving={profileSaving}
       profileMedia={profileMedia}
+      cityDraft={profileCityDraft}
+      setCityDraft={setProfileCityDraft}
+      publicDetailsDraft={profilePublicDetailsDraft}
+      setPublicDetailsDraft={setProfilePublicDetailsDraft}
     />
   );
   const profilePrivacyControls = (
@@ -2381,99 +1764,68 @@ export default function AuthedApp({
       changePrivacy={changePrivacy}
     />
   );
-  const postComposer = (
-    <PostComposer
-      name={name}
-      createPost={createPost}
-      editingPost={editingPost}
-      editBusy={postEditBusy}
-      postComposerRef={postComposerRef}
-      postBackground={postBackground}
-      pendingPost={pendingPost}
-      postText={postText}
-      setPostText={setPostText}
-      taggableFriends={friends.filter((friend) => friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther)}
-      taggedFriends={postTaggedFriends}
-      setTaggedFriends={setPostTaggedFriends}
-      feelingId={postFeelingId}
-      setFeelingId={setPostFeelingId}
-      feedAlbumInputRef={feedAlbumInputRef}
-      addFeedFiles={addFeedFiles}
-      postAttachments={postAttachments}
-      setPostAttachments={setPostAttachments}
-      mediaUploading={mediaUploading}
-      showPostBackgrounds={showPostBackgrounds}
-      setShowPostBackgrounds={setShowPostBackgrounds}
-      postVisibility={postVisibility}
-      setPostVisibility={setPostVisibility}
-      setPostBackground={setPostBackground}
-      popup={profileComposerOpen || feedComposerOpen}
-      displayName={
-        profileMedia?.displayName || session.user.displayName || name
-      }
-      submitError={postSubmitError}
-      checkInOpen={feedCheckInOpen}
-      checkInLocation={feedCheckInLocation}
-      setCheckInLocation={setFeedCheckInLocation}
-      setCheckInOpen={setFeedCheckInOpen}
-      uploadProgress={mediaUploadProgress}
-      cancelUpload={() => mediaUploadAbort.current?.abort()}
-    />
-  );
+  const postComposer = createPostComposerPresenter({
+    props: {
+      name,
+      createPost,
+      editingPost,
+      editBusy: postEditBusy,
+      postComposerRef,
+      postBackground,
+      pendingPost,
+      postText,
+      setPostText,
+      taggedFriends: postTaggedFriends,
+      setTaggedFriends: setPostTaggedFriends,
+      feelingId: postFeelingId,
+      setFeelingId: setPostFeelingId,
+      feedAlbumInputRef,
+      addFeedFiles,
+      postAttachments,
+      setPostAttachments,
+      mediaUploading,
+      showPostBackgrounds,
+      setShowPostBackgrounds,
+      postVisibility,
+      setPostVisibility,
+      setPostBackground,
+      submitError: postSubmitError,
+      checkInOpen: feedCheckInOpen,
+      checkInLocation: feedCheckInLocation,
+      setCheckInLocation: setFeedCheckInLocation,
+      setCheckInOpen: setFeedCheckInOpen,
+      uploadProgress: mediaUploadProgress,
+    },
+    friends,
+    profileDisplayName: profileMedia?.displayName,
+    sessionDisplayName: session.user.displayName,
+    profileComposerOpen,
+    feedComposerOpen,
+    cancelUpload: () => mediaUploadAbort.current?.abort(),
+  });
 
   function openPostDetailProfile(username: string) {
     const returnTo = closeFeedPostDetails();
     openVisitor(username, returnTo);
   }
 
-  const renderPostDiscussion = (discussionPost: Post, onAuthorOpen: (username: string) => void) => (
-    <FeedDiscussion
-      key={discussionPost.id}
-      variant="post-page"
-      sortOrder={commentSortOrder}
-      pending={pendingComments[discussionPost.id]}
-      comments={discussionPost.comments || []}
-      editor={
-        commentEditors[discussionPost.id] || {
-          replyTo: null,
-          drafts: {},
-        }
-      }
-      updateEditor={(editor) => {
-        if (
-          sessionRef.current?.sessionId === session.sessionId
-        ) {
-          setCommentEditors((current) => ({
-            ...current,
-            [discussionPost.id]: editor,
-          }));
-        }
-      }}
-      api={API}
-      token={session.token}
-      target={
-        translationPreferencesLoaded ? targetLanguage : ""
-      }
-      submit={(content, parentId) =>
-        addComment(discussionPost, content, parentId)
-      }
-      currentUser={name}
-      onEdit={(commentId, content) =>
-        manageFeedComment(
-          discussionPost,
-          commentId,
-          "PATCH",
-          content,
-        )
-      }
-      onDelete={(commentId) =>
-        manageFeedComment(discussionPost, commentId, "DELETE")
-      }
-      onReport={reportFeedComment}
-      onLike={(commentId, liked) => setCommentLike(discussionPost, commentId, liked)}
-      onAuthorOpen={onAuthorOpen}
-    />
-  );
+  const renderPostDiscussion = createFeedDiscussionPresenter({
+    sessionId: session.sessionId,
+    getCurrentSessionId: () => sessionRef.current?.sessionId,
+    sortOrder: commentSortOrder,
+    pendingComments,
+    commentEditors,
+    setCommentEditors,
+    api: API,
+    token: session.token,
+    targetLanguage,
+    translationPreferencesLoaded,
+    currentUser: name,
+    addComment,
+    manageFeedComment,
+    reportFeedComment,
+    setCommentLike,
+  });
 
   function refreshAfterRepost() {
     void refreshPosts();
@@ -2482,36 +1834,31 @@ export default function AuthedApp({
     if (tab === 'profile') void loadProfilePosts(false, true);
   }
 
-  const renderPosts = (items: Post[], showSave = false) =>
-    items.map((post) => (
-      <FeedPostCard
-        key={post.id}
-        post={post}
-        name={name}
-        onAuthorOpen={openVisitor}
-        ownDisplayName={
-          profileMedia?.displayName || session.user.displayName || name
-        }
-        apiFetch={apiFetch}
-        syncFeedPost={syncFeedPost}
-        removeFeedPost={removeFeedPost}
-        setNotice={setNotice}
-        token={session.token}
-        translationPreferencesLoaded={translationPreferencesLoaded}
-        targetLanguage={targetLanguage}
-        setActivePostId={openFeedPostDetails}
-        onToggleComments={() => setInlineCommentsId((current) => current === post.id ? null : post.id)}
-        discussion={inlineCommentsId === post.id ? renderPostDiscussion(post, openVisitor) : null}
-        showSave={showSave}
-        likePreviews={likePreviews}
-        like={like}
-        onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
-        onEditPost={openEditPost}
-        onRepostChanged={refreshAfterRepost}
-        onShareToChat={setPostLinkToSend}
-        taggedNames={friendTaggedNames}
-      />
-    ));
+  const renderPosts = createFeedPostListPresenter({
+    card: {
+      name,
+      onAuthorOpen: openVisitor,
+      ownDisplayName: profileMedia?.displayName || session.user.displayName || name,
+      apiFetch,
+      syncFeedPost,
+      removeFeedPost,
+      setNotice,
+      token: session.token,
+      translationPreferencesLoaded,
+      targetLanguage,
+      likePreviews,
+      like,
+      onEditPost: openEditPost,
+      onRepostChanged: refreshAfterRepost,
+      onShareToChat: setPostLinkToSend,
+      taggedNames: friendTaggedNames,
+    },
+    onOpenPost: openFeedPostDetails,
+    toggleInlineComments: id => setInlineCommentsId(current => current === id ? null : id),
+    inlineCommentsId,
+    renderDiscussion: post => renderPostDiscussion(post, openVisitor),
+    onReactionUsers: post => setReactionTarget({ kind: 'post', id: post.id, reactions: post.reactions }),
+  });
 
   const contactsContent = (
     <ContactsView
@@ -2563,63 +1910,31 @@ export default function AuthedApp({
     tab === "feed" ||
     tab === "notifications" ||
     (tab === "chat" && desktopSection === "groups");
-  const searchText = searchLabels(tab);
   const quickSearchControl = (
-    <HeaderSearch
+    <AppQuickSearch
+      tab={tab}
       anchorRef={quickSearchAnchorRef}
-      icon={<UiIcon name="search" size={27} />}
-      value={tab === "contacts" ? friendQuery : globalSearch}
-      maxLength={tab === "feed" || tab === "chat" ? 120 : undefined}
-      placeholder={searchText.placeholder}
-      ariaLabel={searchText.ariaLabel}
-      expanded={tab === "chat" && conversationSearching && quickSearchOpen}
-      controls={tab === "chat" ? "chat-quick-search-results" : undefined}
-      onKeyDown={(event) => {
-        if (tab === "discover" && event.key === "Enter") {
-          event.preventDefault();
-          navigate('/search?q=' + encodeURIComponent(globalSearch.trim()))
-        }
-        if (tab === "chat" && event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          setQuickSearchOpen(false);
-        }
-      }}
-      onFocus={() => {
-        if (tab === "chat" && globalSearch.trim()) setQuickSearchOpen(true);
-      }}
-      onClick={() => {
-        if (tab === "chat" && globalSearch.trim()) setQuickSearchOpen(true);
-      }}
-      onChange={(value) => {
-        if (tab === "contacts") setFriendQuery(value);
-        else if (tab === "profile") {
-          setFeedFilter("all");
-          setGlobalSearch(value);
-          setTab("feed");
-        } else {
-          setGlobalSearch(value);
-          if (tab === "chat") setQuickSearchOpen(Boolean(value.trim()));
-        }
-      }}
-      results={
-        tab === "chat" && conversationSearching && quickSearchOpen ? (
-          <ChatQuickSearch
-            results={chatQuickSearch.results}
-            loading={chatQuickSearch.loading}
-            error={chatQuickSearch.error}
-            onRetry={chatQuickSearch.retry}
-            onClose={() => setQuickSearchOpen(false)}
-            onContact={openChatQuickContact}
-            onHit={openChatQuickHit}
-          />
-        ) : undefined
-      }
+      friendQuery={friendQuery}
+      globalSearch={globalSearch}
+      conversationSearching={conversationSearching}
+      quickSearchOpen={quickSearchOpen}
+      setQuickSearchOpen={setQuickSearchOpen}
+      setFriendQuery={setFriendQuery}
+      setGlobalSearch={setGlobalSearch}
+      setTab={setTab}
+      navigate={navigate}
+      results={chatQuickSearch.results}
+      loading={chatQuickSearch.loading}
+      error={chatQuickSearch.error}
+      retry={chatQuickSearch.retry}
+      onContact={openChatQuickContact}
+      onHit={openChatQuickHit}
     />
   );
 
   return (
     <AppLayout
+      activeTab={tab}
       className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""} ${tab === "chat" && !desktopSection && translationSettingsConversationId === null ? "chat-rail-screen" : ""}`}
       sidebar={
         <AppSidebar
@@ -2635,13 +1950,14 @@ export default function AuthedApp({
         notificationCount={notificationItemCount}
         feedSaved={feedFilter === "saved"}
         settingsActive={desktopProfileSettings}
+        searchActive={isSearchResultsRoute}
+        onSearch={() => navigate(ROUTE.search)}
         onNavigate={switchTab}
         onScreenshot={screenshot.captureWithoutWindow}
         screenshotBusy={screenshot.busy}
         onSaved={() => {
           switchTab("feed");
           setFeedFilter("saved");
-          void loadSavedPosts();
         }}
         onSettings={() => {
           switchTab("profile");
@@ -2675,6 +1991,8 @@ export default function AuthedApp({
         <VisitorProfile
           key={session.sessionId + ":" + visitorUsername}
           username={visitorUsername}
+          friendOnline={friends.some((friend) => friend.username === visitorUsername.toLowerCase()
+            && friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther && friend.online)}
           request={apiFetch}
           currentUser={name}
           token={session.token}
@@ -2724,10 +2042,12 @@ export default function AuthedApp({
       )}
         </>
       }
-      header={
+      // The search page owns its search field and title, so the shared header is omitted there.
+      header={isSearchResultsRoute || tab === "market" || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
         <AppHeader
-          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
-          title={
+          mobileSearchActions={tab === "feed"}
+          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" ? "mobile-section-header" : ""}`}
+          start={
             <HeaderTitle
               tab={tab}
               searchResults={isSearchResultsRoute}
@@ -2743,8 +2063,16 @@ export default function AuthedApp({
               profileEditing={Boolean(desktopProfileOverview && profileEditorOpen)}
             />
           }
-          search={searchInConversationList ? null : quickSearchControl}
-        >
+          center={tab === "feed" ? (
+            <>
+              <div className="appbar-feed-desktop"><HeaderFeedTabs
+                filter={feedFilter}
+                onChange={(next) => { setFeedCommunitiesOpen(false); setFeedFilter(next); }}
+              /></div>
+              <div className="appbar-feed-mobile">{quickSearchControl}</div>
+            </>
+          ) : searchInConversationList ? null : quickSearchControl}
+          end={
           <AppHeaderActions
             account={
               <HeaderAccount
@@ -2823,8 +2151,9 @@ export default function AuthedApp({
               }}
             />
           </AppHeaderActions>
-        </AppHeader>
-      }
+          }
+        />
+      )}
       beforePage={<AppShellNotices
         showPushPrompt={pushPrompt && !pushPromptDismissed && !pushEnabled}
         pushBusy={pushBusy}
@@ -2872,6 +2201,7 @@ export default function AuthedApp({
             sessionId: session.sessionId,
             onOpenProfile: username => openVisitorProfile(username),
             onOpenPost: postId => navigate(feedPostPath(postId)),
+            renderPosts: (items, onOpen) => renderPosts(items, false, onOpen),
           },
           discover: {
             request: apiFetch,
@@ -2911,7 +2241,12 @@ export default function AuthedApp({
           mediaUploading={mediaUploading}
           name={name}
           openVisitor={openVisitor}
+          onCreateStory={() => setStoryDraft({ kind: "choose" })}
           pendingPost={pendingPost}
+          postDraft={postText}
+          onCreateMediaPost={(files) => { setProfileComposerOpen(true); void addFeedFiles(files); }}
+          onCheckIn={() => { setFeedCheckInOpen(true); setProfileComposerOpen(true); }}
+          storyBusy={storyBusy || mediaUploading === 'story'}
           privacy={privacy}
           privacyBusy={privacyBusy}
           privacyError={privacyError}
@@ -2919,6 +2254,8 @@ export default function AuthedApp({
           profileBioDraft={profileBioDraft}
           profileBusy={profileBusy}
           profileCityDraft={profileCityDraft}
+          publicDetailsDraft={profilePublicDetailsDraft}
+          setPublicDetailsDraft={setProfilePublicDetailsDraft}
           profileDisplayNameDraft={profileDisplayNameDraft}
           profileEditorOpen={profileEditorOpen}
           profileHasMore={profileHasMore}
@@ -2948,6 +2285,8 @@ export default function AuthedApp({
         {!desktopProfileOverview && (
           <ProfileSection
           apiFetch={apiFetch}
+          onCreateStory={() => setStoryDraft({ kind: "choose" })}
+          onOpenPost={setActivePostId}
           appLocale={appLocale}
           autoTranslate={autoTranslate}
           avatarFileInputRef={avatarFileInputRef}
@@ -2985,6 +2324,7 @@ export default function AuthedApp({
           profileBusy={profileBusy}
           profileHasMore={profileHasMore}
           profileHeadingRef={profileHeadingRef}
+          friendCount={friends.filter(friend => friend.status === "accepted").length}
           profileIdentityForm={profileIdentityForm}
           profileIdentityRef={profileIdentityRef}
           profileMedia={profileMedia}
@@ -3045,13 +2385,9 @@ export default function AuthedApp({
           addChatFiles={addChatFiles}
           uploadMediaFiles={uploadMediaFiles}
           apiFetch={apiFetch}
-          beginConversationLongPress={beginConversationLongPress}
-          beginMessageLongPress={beginMessageLongPress}
           blockContact={blockContact}
           blockedBusy={blockedBusy}
           bottomRef={bottomRef}
-          cancelConversationLongPress={cancelConversationLongPress}
-          cancelMessageLongPress={cancelMessageLongPress}
           canEditGroup={canEditGroup}
           canInviteActiveGroup={canInviteActiveGroup}
           canManageActiveGroup={canManageActiveGroup}
@@ -3060,11 +2396,6 @@ export default function AuthedApp({
           changeGroupMemberRole={changeGroupMemberRole}
           changeTargetLanguage={changeTargetLanguage}
           chatCreateError={chatCreateError}
-          chatDragActive={chatDragActive}
-          chatDragDepth={chatDragDepth}
-          setChatDragDepth={setChatDragDepth}
-          chatFileInputRef={chatFileInputRef}
-          chatFiltersPill={chatFiltersPill}
           chatFriend={chatFriend}
           chatFriendRelationship={chatFriendRelationship}
           allChatConversations={displayConversations}
@@ -3108,8 +2439,8 @@ export default function AuthedApp({
           groupInviteSearch={groupInviteSearch}
           groupInviteSelection={groupInviteSelection}
           groupMembers={groupMembers}
-          groupMemberViewOpen={groupMemberViewOpen}
           groupSettingsOpen={groupSettingsOpen}
+          groupMemberViewOpen={groupMemberViewOpen}
           hasMoreConversations={hasMoreConversations}
           hasMoreMessages={hasMoreMessages}
           historyActionBusy={historyActionBusy}
@@ -3135,18 +2466,13 @@ export default function AuthedApp({
           retryMessageHistory={retryMessageHistory}
           messagesScrollRef={messagesScrollRef}
           messageText={messageText}
-          moveConversationLongPress={moveConversationLongPress}
-          moveMessageLongPress={moveMessageLongPress}
           newChatMode={newChatMode}
           openConnectSurface={openConnectSurface}
           openGroupSettings={openGroupSettings}
-          openMessageActions={openMessageActions}
-          openMessageReactions={openMessageReactions}
           onReactionUsers={(message, emoji) => setReactionTarget({kind: "message", id: message.id, initialEmoji: emoji, reactions: message.reactions})}
           onForwardMessage={setForwardSource}
           openVisitor={openVisitor}
           pinBusy={pinBusy}
-          pinnedExpanded={pinnedExpanded}
           pinnedItems={pinnedItems}
           quickSearchControl={quickSearchControl}
           reactionPreviews={reactionPreviews}
@@ -3162,11 +2488,13 @@ export default function AuthedApp({
           session={session}
           setActiveConversationId={selectRoutedConversation}
           setChatCreateError={setChatCreateError}
-          setChatDragActive={setChatDragActive}
           setChatListFilter={setChatListFilter}
           setChatListQuery={setChatListQuery}
           setChatSearchJump={setChatSearchJump}
           setConversationActionId={setConversationActionId}
+          setMessageActionId={setMessageActionId}
+          setMessageActionMode={setMessageActionMode}
+          setMessageCopyTarget={setMessageCopyTarget}
           setConversationDetailsOpen={setConversationDetailsOpen}
           setConversationMenuPosition={setConversationMenuPosition}
           setConversations={setConversations}
@@ -3178,8 +2506,8 @@ export default function AuthedApp({
           setGroupActivityViewedId={setGroupActivityViewedId}
           setGroupInviteSearch={setGroupInviteSearch}
           setGroupInviteSelection={setGroupInviteSelection}
-          setGroupMemberViewOpen={setGroupMemberViewOpen}
           setGroupSettingsOpen={setGroupSettingsOpen}
+          setGroupMemberViewOpen={setGroupMemberViewOpen}
           setLanguageSearch={setLanguageSearch}
           setManuallyTranslated={setManuallyTranslated}
           setMessageAttachments={setMessageAttachments}
@@ -3187,7 +2515,6 @@ export default function AuthedApp({
           setMessageText={setMessageText}
           setNewChatMode={setNewChatMode}
           setNotice={setNotice}
-          setPinnedExpanded={setPinnedExpanded}
           setQrOpen={setQrOpen}
           setQuickSearchOpen={setQuickSearchOpen}
           setReplyingTo={setReplyingTo}
@@ -3200,8 +2527,6 @@ export default function AuthedApp({
           shareMyProfile={shareMyProfile}
           sortedChatListConversations={sortedChatListConversations}
           sortedGroupActivityEvents={sortedGroupActivityEvents}
-          suppressConversationClick={suppressConversationClick}
-          suppressMessageClick={suppressMessageClick}
           switchTab={switchTab}
           t={t}
           toggleMessagePin={toggleMessagePin}
@@ -3308,6 +2633,7 @@ export default function AuthedApp({
           feedFiltersPill={feedFiltersPill}
           feedInfiniteScrollRef={feedInfiniteScrollRef}
           feedLoadingMore={feedLoadingMore}
+          feedInitialLoading={feedInitialLoading}
           feedPagingError={feedPagingError}
           feedSearchActive={feedSearchActive}
           feedViewRef={feedViewRef}
@@ -3323,6 +2649,21 @@ export default function AuthedApp({
           mediaUploading={mediaUploading}
           name={name}
           normalizedSearch={normalizedSearch}
+          searchQuery={globalSearch}
+          onSearchChange={setGlobalSearch}
+          communityCard={<CommunitySuggestions
+            title="Cộng đồng của bạn"
+            joinedItems={conversations.filter(group => group.type === "group").slice(0, 3).map(group => ({
+              id: group.id, name: group.name, memberCount: group.memberCount,
+              avatarUrl: group.avatarUrl,
+            }))}
+            onViewAll={() => switchTab("discover")}
+            onOpenJoined={(id) => {
+              switchTab("chat");
+              setChatListFilter("all");
+              selectRoutedConversation(id);
+            }}
+          />}
           openVisitor={openVisitor}
           pendingPost={pendingPost}
           postComposerRef={postComposerRef}
@@ -3332,7 +2673,6 @@ export default function AuthedApp({
           profileMedia={profileMedia}
           refreshPosts={refreshPosts}
           renderPosts={renderPosts}
-          savedPosts={savedPosts}
           searchedPosts={searchedPosts}
           session={session}
           setActiveConversationId={selectRoutedConversation}
@@ -3397,6 +2737,8 @@ export default function AuthedApp({
 
         {activeStory && (
           <StoryOverlay
+          key={session.sessionId}
+          request={apiFetch}
           activeStory={activeStory}
           deleteStory={deleteStory}
           name={name}
@@ -3414,7 +2756,7 @@ export default function AuthedApp({
       }}
     >
 
-      {storyDraft && tab === "feed" && (
+      {storyDraft && (tab === "feed" || tab === "profile") && (
           <StoryDraftOverlay
           createStory={createStory}
           mediaUploading={mediaUploading}
@@ -3423,52 +2765,22 @@ export default function AuthedApp({
           storyDraft={storyDraft}
         />
         )}
-      {feedComposerOpen && tab === "feed" && (
-          <FeedComposerOverlay
-          editingPost={editingPost}
-          mediaUploading={mediaUploading}
-          pendingPost={pendingPost}
-          postComposer={postComposer}
-          postEditBusy={postEditBusy}
-          restoreDraftAfterEdit={restoreDraftAfterEdit}
-          setFeedCheckInOpen={setFeedCheckInOpen}
-          setFeedComposerOpen={setFeedComposerOpen}
-        />
-        )}
-      {profileComposerOpen &&
-        tab === "profile" &&
-        (profileTimelineOpen || desktopProfileOverview) && (
-          <ProfileComposerOverlay
-          editingPost={editingPost}
-          mediaUploading={mediaUploading}
-          pendingPost={pendingPost}
-          postComposer={postComposer}
-          postEditBusy={postEditBusy}
-          restoreDraftAfterEdit={restoreDraftAfterEdit}
-          setProfileComposerOpen={setProfileComposerOpen}
-        />
-        )}
-      {profileEditorOpen &&
-        !isProfileDesktop &&
-        tab === "profile" &&
-        profileTimelineOpen && (
-          <ProfileOverlay
-            title="Chỉnh sửa hồ sơ"
-            drawer
-            busy={profileSaving || privacyBusy}
-            onClose={() => setProfileEditorOpen(false)}
-          >
-            {profileIdentityForm}
-            <section
-              className="settings-card profile-field-permissions"
-              aria-label="Quyền trường thông tin"
-            >
-              <h3>Quyền trường thông tin</h3>
-              {profilePrivacyControls}
-            </section>
-          </ProfileOverlay>
-        )}
-
+      <AppComposerOverlays
+        tab={tab}
+        feedComposerOpen={feedComposerOpen}
+        profileComposerOpen={profileComposerOpen}
+        profileTimelineOpen={profileTimelineOpen}
+        desktopProfileOverview={desktopProfileOverview}
+        editingPost={editingPost}
+        mediaUploading={mediaUploading}
+        pendingPost={pendingPost}
+        postComposer={postComposer}
+        postEditBusy={postEditBusy}
+        restoreDraftAfterEdit={restoreDraftAfterEdit}
+        setFeedCheckInOpen={setFeedCheckInOpen}
+        setFeedComposerOpen={setFeedComposerOpen}
+        setProfileComposerOpen={setProfileComposerOpen}
+      />
       {postLinkToSend && (
         <SharedPostLinkPicker
           key={session.sessionId + ":" + postLinkToSend}

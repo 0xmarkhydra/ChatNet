@@ -63,10 +63,13 @@ export default function HeaderTitle(p: HeaderTitleProps) {
       : p.tab === "chat" && p.desktopSection === "calls"
         ? "Cuộc gọi"
         : title[p.tab];
+  const showSubtitle = p.searchResults || p.translationSettingsOpen ||
+    (p.tab === "chat" && p.desktopSection === "groups" && p.groupWorkspaceMode !== "list") ||
+    (p.tab === "profile" && (p.profileEditing || p.profileSettings));
   return (
     <div className="app-page-heading">
       <strong>{heading}</strong>
-      <small>{p.searchResults ? "Tìm người, bài viết, cộng đồng và sản phẩm" : subtitle[p.tab]}</small>
+      {showSubtitle && <small>{p.searchResults ? "Tìm người, bài viết, cộng đồng và sản phẩm" : subtitle[p.tab]}</small>}
     </div>
   );
 }

@@ -79,12 +79,15 @@ function ExplorePageContent(props: DiscoverSectionProps) {
     <button type="button" onClick={() => setTab('recent')}><MapPin size={18} aria-hidden="true" /> Quét người gần đây</button>
   </section>
 
-  return <main className="explore-page">
-    <h1 className="explore-visually-hidden">Khám phá</h1>
+  // Keep navigation outside the scrolling pane on Web and PWA.
+  // It remains visible when the content scrolls or the global header collapses.
+  return <div className="explore-shell">
     <nav className="explore-tabs" aria-label="Danh mục khám phá">
       {tabs.map(item => <button key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined}
         className={tab === item.id ? 'active' : ''} onClick={() => setTab(item.id)}>{item.title}</button>)}
     </nav>
+    <main className="explore-page">
+      <h1 className="explore-visually-hidden">Khám phá</h1>
 
     {tab === 'all' && <>
       <section className="explore-feature" aria-labelledby="explore-feature-title">
@@ -158,5 +161,6 @@ function ExplorePageContent(props: DiscoverSectionProps) {
         {nearby}
       </aside>}
     </div>}
-  </main>
+    </main>
+  </div>
 }

@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
-  ChevronLeft, ChevronRight, Flag, Heart, LockKeyhole, MessageCircle,
+  BookmarkPlus, ChevronLeft, ChevronRight, Flag, LockKeyhole, MessageCircle,
   MoreHorizontal, Pause, Play, Send, Share2, Trash2, UserRound,
   Volume2, VolumeX, X,
 } from 'lucide-react'
 import { userLabel } from '../../../shared/utils/userLabel'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Story } from '../types'
+import type { ApiRequest } from '@/shared/types/api'
+import StoryLikeControl from './StoryLikeControl'
+import StoryHighlightEditor from './StoryHighlightEditor'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/shared/ui/dialog'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/story-text.css'
@@ -14,15 +18,18 @@ import '../styles/story-text.css'
 type Props = {
   activeStory: Story
   stories: Story[]
+  setActiveStoryId: (id: number | null) => void
+} & ({ mode: 'highlight'; title: string } | {
+  mode?: 'feed'
+  request?: ApiRequest
   name: string
   storyBusy: boolean
   deleteStory: (story: Story) => Promise<void>
-  setActiveStoryId: (id: number | null) => void
   onReply: (story: Story, message: string) => Promise<boolean>
   onProfile: (username: string) => void
   onShare: (story: Story) => void
   onReport: (story: Story) => void
-}
+})
 
 const STORY_DURATION = 7000
 
@@ -32,13 +39,15 @@ function relativeStoryTime(date: string): string {
   if (!Number.isFinite(minutes)) return ''
   if (minutes < 1) return 'Vừa đăng'
   if (minutes < 60) return minutes + ' phút trước'
-  return Math.floor(minutes / 60) + ' giờ trước'
+  if (minutes < 1440) return Math.floor(minutes / 60) + ' giờ trước'
+  return Math.floor(minutes / 1440) + ' ngày trước'
 }
 
-export default function StoryViewer({
-  activeStory, stories, name, storyBusy, deleteStory, setActiveStoryId,
-  onReply, onProfile, onShare, onReport,
-}: Props) {
+export default function StoryViewer(props: Props) {
+  const { activeStory, stories, setActiveStoryId } = props
+  const highlight = props.mode === 'highlight' ? props : null
+  const feed = props.mode === 'highlight' ? null : props
+  const request = feed?.request
   const authorLabel = userLabel(activeStory.authorDisplayName, activeStory.author)
   const [paused, setPaused] = useScopedState(activeStory.id, false)
   const [muted, setMuted] = useState(true)
@@ -46,6 +55,8 @@ export default function StoryViewer({
   const [imageProgress, setImageProgress] = useScopedState(activeStory.id, 0)
   const [reply, setReply] = useScopedState(activeStory.id, '')
   const [replySending, setReplySending] = useScopedState(activeStory.id, false)
+  const [highlightOpen, setHighlightOpen] = useScopedState(activeStory.id, false)
+  const [highlightSaved, setHighlightSaved] = useScopedState(activeStory.id, false)
   const [menuOpen, setMenuOpen] = useScopedState(activeStory.id, false)
   const imageElapsedRef = useRef(0)
   const replySequence = useRef(0)
@@ -53,6 +64,7 @@ export default function StoryViewer({
   const videoRef = useRef<HTMLVideoElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const replyInputRef = useRef<HTMLInputElement>(null)
+  const optionsButtonRef = useRef<HTMLButtonElement>(null)
 
   const groups = useMemo(() => {
     const authors = new Map<string, Story[]>()
@@ -60,10 +72,10 @@ export default function StoryViewer({
       if (!authors.has(story.author)) authors.set(story.author, [])
       authors.get(story.author)!.push(story)
     }
-    return Array.from(authors.values()).map((items) =>
-      [...items].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
+    return Array.from(authors.values()).map((items) => props.mode === 'highlight' ? items
+      : [...items].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
     )
-  }, [stories])
+  }, [stories, props.mode])
 
   const sequence = useMemo(() => groups.flat(), [groups])
   const sequenceIndex = sequence.findIndex((story) => story.id === activeStory.id)
@@ -71,7 +83,7 @@ export default function StoryViewer({
   const nextId = sequence[sequenceIndex + 1]?.id ?? null
   const authorStories = groups.find((items) => items[0]?.author === activeStory.author) ?? [activeStory]
   const authorIndex = authorStories.findIndex((story) => story.id === activeStory.id)
-  const isOwner = activeStory.author === name
+  const isOwner = activeStory.author === feed?.name
   const attachment = activeStory.attachment
   const isVideo = attachment?.kind === 'video'
   const duration = attachment ? STORY_DURATION : 15_000
@@ -112,6 +124,7 @@ export default function StoryViewer({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (highlightOpen) return
       if (event.key === 'Escape') {
         event.preventDefault()
         if (menuOpen) setMenuOpen(false)
@@ -136,17 +149,17 @@ export default function StoryViewer({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [menuOpen, nextId, previousId, setActiveStoryId, setMenuOpen, setPaused])
+  }, [highlightOpen, menuOpen, nextId, previousId, setActiveStoryId, setMenuOpen, setPaused])
 
   async function submitReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const text = reply.trim()
-    if (isOwner || replySending || !text) return
+    if (!feed || isOwner || replySending || !text) return
     const id = ++replySequence.current
     const storyId = activeStory.id
     setReplySending(true)
     try {
-      if (await onReply(activeStory, text) && id === replySequence.current && activeStoryId.current === storyId) setReply('')
+      if (await feed.onReply(activeStory, text) && id === replySequence.current && activeStoryId.current === storyId) setReply('')
     } finally {
       if (id === replySequence.current && activeStoryId.current === storyId) setReplySending(false)
     }
@@ -168,7 +181,7 @@ export default function StoryViewer({
         <div className="story-screen-topbar">
           <div className="story-screen-brand">
             <strong>SocCo</strong>
-            <span>Khoảnh khắc</span>
+            <span>{highlight ? 'Tin nổi bật' : 'Khoảnh khắc'}</span>
           </div>
           <button className="story-screen-close" type="button" onClick={() => setActiveStoryId(null)}>
             <X size={19} aria-hidden="true" /> Đóng
@@ -177,8 +190,8 @@ export default function StoryViewer({
 
         <aside className="story-screen-people" aria-label="Danh sách người đăng Story">
           <header>
-            <h2>Khoảnh khắc mới</h2>
-            <p>{groups.length} người vừa đăng tin</p>
+            <h2>{highlight ? 'Tin nổi bật' : 'Khoảnh khắc mới'}</h2>
+            <p>{highlight ? stories.length + ' tin trên hồ sơ' : groups.length + ' người vừa đăng tin'}</p>
           </header>
           <div className="story-screen-people-list">
             {groups.map((items) => {
@@ -237,13 +250,21 @@ export default function StoryViewer({
               ))}
             </div>
             <div className="story-screen-author">
-              <button type="button" className="story-screen-author-profile" onClick={() => onProfile(activeStory.author)}
-                title={'Xem hồ sơ ' + authorLabel}>
-                <UserAvatar username={activeStory.author} name={authorLabel} className="story-screen-author-avatar" />
-                <strong>{authorLabel}</strong>
-              </button>
+              {feed ? (
+                <button type="button" className="story-screen-author-profile" onClick={() => feed.onProfile(activeStory.author)}
+                  title={'Xem hồ sơ ' + authorLabel}>
+                  <UserAvatar username={activeStory.author} name={authorLabel} className="story-screen-author-avatar" />
+                  <strong>{authorLabel}</strong>
+                </button>
+              ) : (
+                <span className="story-screen-author-profile">
+                  <UserAvatar username={activeStory.author} name={authorLabel} className="story-screen-author-avatar" />
+                  <strong>{authorLabel}</strong>
+                </span>
+              )}
               <time dateTime={activeStory.createdAt}>{relativeStoryTime(activeStory.createdAt)}</time>
               <div className="story-screen-author-controls">
+                {request && <StoryLikeControl key={activeStory.id} request={request} storyId={activeStory.id} owner={isOwner} onInspect={() => setPaused(true)} />}
                 <button type="button" className="story-screen-icon-button" title={paused ? 'Tiếp tục' : 'Tạm dừng'}
                   aria-label={paused ? 'Tiếp tục Story' : 'Tạm dừng Story'} onClick={() => setPaused((v) => !v)}>
                   {paused ? <Play size={19} /> : <Pause size={19} />}
@@ -254,31 +275,38 @@ export default function StoryViewer({
                     {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
                   </button>
                 )}
-                <div className="story-screen-options">
-                  <button type="button" className="story-screen-icon-button" aria-label="Tùy chọn Story"
+                {feed && <div className="story-screen-options">
+                  <button ref={optionsButtonRef} type="button" className="story-screen-icon-button" aria-label="Tùy chọn Story"
                     aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>
                     <MoreHorizontal size={22} />
                   </button>
                   {menuOpen && (
                     <div className="story-screen-options-menu">
                       {isOwner ? (
-                        <button type="button" disabled={storyBusy} onClick={() => {
+                        <button type="button" disabled={feed.storyBusy} onClick={() => {
                           setMenuOpen(false)
-                          void deleteStory(activeStory)
+                          void feed.deleteStory(activeStory)
                         }}><Trash2 size={17} /> Xóa Story</button>
                       ) : (
                         <button type="button" onClick={() => {
                           setMenuOpen(false)
-                          onReport(activeStory)
+                          feed.onReport(activeStory)
                         }}><Flag size={17} /> Báo cáo Story</button>
+                      )}
+                      {request && isOwner && (
+                        <button type="button" onClick={() => {
+                          setMenuOpen(false)
+                          setPaused(true)
+                          setHighlightOpen(true)
+                        }}><BookmarkPlus size={17} aria-hidden="true" /> Thêm vào Tin nổi bật</button>
                       )}
                       <button type="button" onClick={() => {
                         setMenuOpen(false)
-                        onShare(activeStory)
+                        feed.onShare(activeStory)
                       }}><Share2 size={17} /> Chia sẻ</button>
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             </div>
           </div>
@@ -296,7 +324,7 @@ export default function StoryViewer({
             </button>
           )}
 
-          {!isOwner && (
+          {feed && !isOwner && (
             <form className="story-screen-reply" onSubmit={submitReply}>
               <input ref={replyInputRef} value={reply}
                 onChange={(event) => setReply(event.target.value)}
@@ -312,32 +340,46 @@ export default function StoryViewer({
         </section>
 
         <aside className="story-screen-insights" aria-label="Thông tin Story">
-          <h2>Thông tin Story</h2>
-          <p className="story-screen-expiry">Khả dụng trong 24 giờ</p>
-          <div className="story-screen-insights-divider" />
-          <p className="story-screen-action-label">Những hành động có thể làm</p>
-          <div className="story-screen-actions">
-            <button type="button" disabled={isOwner} onClick={() => replyInputRef.current?.focus()}>
-              <MessageCircle size={22} aria-hidden="true" /> Trả lời
-            </button>
-            <button type="button" disabled title="Thả tim Story chưa được hỗ trợ trên máy chủ">
-              <Heart size={22} aria-hidden="true" /> Thả tim
-            </button>
-            <button type="button" onClick={() => onProfile(activeStory.author)}>
-              <UserRound size={22} aria-hidden="true" /> Xem hồ sơ
-            </button>
-            <button type="button" onClick={() => onShare(activeStory)}>
-              <Share2 size={22} aria-hidden="true" /> Chia sẻ
-            </button>
-            <button type="button" disabled={isOwner} onClick={() => onReport(activeStory)}>
-              <Flag size={22} aria-hidden="true" /> Báo cáo
-            </button>
-          </div>
-          <div className="story-screen-privacy">
-            <div><LockKeyhole size={21} aria-hidden="true" /> <strong>Quyền xem tin</strong></div>
-            <p>Hiển thị theo quyền riêng tư của tác giả.</p>
-          </div>
+          <h2>{highlight ? 'Tin nổi bật' : 'Thông tin Story'}</h2>
+          {highlight && <p className="story-screen-expiry">{highlight.title}</p>}
+          {feed && <>
+            <p className="story-screen-expiry">Khả dụng trong 24 giờ</p>
+            <div className="story-screen-insights-divider" />
+            <p className="story-screen-action-label">Những hành động có thể làm</p>
+            <div className="story-screen-actions">
+              <button type="button" disabled={isOwner} onClick={() => replyInputRef.current?.focus()}>
+                <MessageCircle size={22} aria-hidden="true" /> Trả lời
+              </button>
+              <button type="button" onClick={() => feed.onProfile(activeStory.author)}>
+                <UserRound size={22} aria-hidden="true" /> Xem hồ sơ
+              </button>
+              <button type="button" onClick={() => feed.onShare(activeStory)}>
+                <Share2 size={22} aria-hidden="true" /> Chia sẻ
+              </button>
+              <button type="button" disabled={isOwner} onClick={() => feed.onReport(activeStory)}>
+                <Flag size={22} aria-hidden="true" /> Báo cáo
+              </button>
+            </div>
+            <div className="story-screen-privacy">
+              <div><LockKeyhole size={21} aria-hidden="true" /> <strong>Quyền xem tin</strong></div>
+              <p>Hiển thị theo quyền riêng tư của tác giả.</p>
+            </div>
+          </>}
         </aside>
+        {highlightSaved && <p role="status" className="absolute bottom-4 left-4 rounded-lg bg-card p-2 text-foreground">Đã thêm vào Tin nổi bật.</p>}
+        {request && isOwner && <Dialog open={highlightOpen} onOpenChange={setHighlightOpen}>
+          <DialogContent className="story-highlight-dialog z-[352]" onCloseAutoFocus={event => {
+            event.preventDefault()
+            optionsButtonRef.current?.focus()
+          }}>
+            <DialogTitle>Thêm vào Tin nổi bật</DialogTitle>
+            <DialogDescription>Giữ Story này trên hồ sơ sau khi hết 24 giờ.</DialogDescription>
+            <StoryHighlightEditor key={activeStory.id} request={request} storyId={activeStory.id} onSaved={() => {
+              setHighlightOpen(false)
+              setHighlightSaved(true)
+            }} />
+          </DialogContent>
+        </Dialog>}
       </div>
     </div>
   )

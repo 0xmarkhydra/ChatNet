@@ -18,6 +18,38 @@ Future<void> openDirectChat(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('mobile tabs initialize on first visit and retain their state', (
+    tester,
+  ) async {
+    await openMobile(tester, DemoApi());
+    expect(
+      find.byKey(const ValueKey('contacts'), skipOffstage: false),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('feed'), skipOffstage: false),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('nav-contacts')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('contacts'), skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('feed'), skipOffstage: false),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('nav-chat')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('contacts'), skipOffstage: false),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('chat searches sender text without leaving the conversation', (
     tester,
   ) async {
@@ -255,15 +287,19 @@ void main() {
     expect(find.text('Bật thông báo hội thoại'), findsOneWidget);
   });
 
-  testWidgets('friends plus opens native friend discovery', (tester) async {
+  testWidgets('friends plus opens incoming friend invitations', (tester) async {
     final api = DemoApi();
     await openMobile(tester, api);
     await tester.tap(find.byKey(const ValueKey('nav-contacts')));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Thêm bạn'));
     await tester.pumpAndSettle();
-    expect(find.text('Khám phá bạn bè'), findsWidgets);
-    expect(find.byKey(const ValueKey('contacts-discovery-stats')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('friend-invitation-screen')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('invitation-incoming')), findsOneWidget);
+    expect(find.text('Chấp nhận'), findsWidgets);
   });
 
   testWidgets(
@@ -299,6 +335,8 @@ void main() {
     await openMobile(tester, api);
     await tester.tap(find.byKey(const ValueKey('nav-profile')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('profile-settings-open')));
+    await tester.pumpAndSettle();
     final privacyToggle = find.byKey(
       const ValueKey('privacy-searchableByUsername'),
     );
@@ -308,6 +346,16 @@ void main() {
     await tester.tap(privacyToggle);
     await tester.pumpAndSettle();
     expect(api.privacy['searchableByUsername'], false);
+    final back = find.byKey(const ValueKey('profile-back'));
+    await tester.ensureVisible(back);
+    await tester.pumpAndSettle();
+    await tester.tap(back.hitTestable());
+    await tester.pumpAndSettle();
+    final edit = find.byKey(const ValueKey('profile-edit-open'));
+    await tester.ensureVisible(edit);
+    await tester.pumpAndSettle();
+    await tester.tap(edit.hitTestable());
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const ValueKey('profile-bio')));
     await tester.enterText(
       find.byKey(const ValueKey('profile-bio')),
@@ -318,9 +366,10 @@ void main() {
       'Hà Nội',
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Save changes'));
+    final save = find.widgetWithText(FilledButton, 'Lưu hồ sơ');
+    await tester.ensureVisible(save);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Save changes'));
+    await tester.tap(save);
     await tester.pumpAndSettle();
     expect(api.profile['bio'], 'Flutter và PWA đồng bộ');
     expect(api.profile['city'], 'Hà Nội');
@@ -449,6 +498,10 @@ void main() {
     expect(find.byKey(const ValueKey('visitor-profile-content')), findsNothing);
     expect(find.text('Alex Chen'), findsWidgets);
     expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
+    // The demo message endpoint resolves on a 160ms timer. Let that request
+    // finish before disposing the Chat widget or fake_async reports a leak.
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('visitor timeline can open full native post details', (

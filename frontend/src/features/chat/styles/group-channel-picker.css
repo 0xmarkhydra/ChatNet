@@ -80,7 +80,7 @@
   border: 1px solid #e7edf6;
   border-radius: 15px;
   box-shadow: 0 14px 40px rgba(30, 53, 91, .17);
-  background: #fff;
+  background: var(--soco-surface);
   color: #243954;
   display: flex;
   flex-direction: column;
@@ -132,7 +132,7 @@
 .group-channel-menu-unread {
   display:grid; place-items:center; flex-shrink:0;
   min-width:19px; height:19px; padding:1px 4px;
-  border-radius:12px; background:#4c81ea; color:#fff;
+  border-radius:12px; background:#4c81ea; color:var(--soco-surface);
   font-size:10px; font-weight:800; font-variant-numeric:tabular-nums;
 }
 .group-channel-creator {
@@ -252,7 +252,7 @@
   border: 1px solid #dfe7f1;
   border-radius: 9px;
   outline: none;
-  background: #fff;
+  background: var(--soco-surface);
   color: #253955;
   font: inherit;
   font-size: 12px;
@@ -291,7 +291,7 @@
 }
 .group-channel-create-actions .group-channel-create-cancel {
   border: 1px solid #dde5f0;
-  background: #fff;
+  background: var(--soco-surface);
   color: #62758e;
 }
 .group-channel-create-actions .group-channel-create-cancel:hover {
@@ -300,7 +300,7 @@
 .group-channel-create-actions button.group-channel-create-submit {
   border: 1px solid #2d64c7;
   background: #2d64c7;
-  color: #fff;
+  color: var(--soco-surface);
 }
 .group-channel-create-actions button.group-channel-create-submit:hover:not(:disabled) {
   background: #2355b1;
@@ -308,43 +308,6 @@
 .group-channel-create-actions button:disabled {
   opacity: .55;
   cursor: not-allowed;
-}
-.conversation-channel-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.conversation-channel-list button {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 10px 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #405571;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-.conversation-channel-list button:hover,
-.conversation-channel-list button[aria-current="true"] {
-  background: #eff4ff;
-  color: #225fc4;
-}
-.conversation-channel-list button span {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.conversation-channel-list-header {
-  margin: 8px 3px 4px;
-  color: #7388a1;
-  font-size: 12px;
 }
 @media (max-width: 760px) {
   .group-channel-current-name {

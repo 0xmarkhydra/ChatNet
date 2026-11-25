@@ -3,6 +3,8 @@ export type ProfileMediaState = {
   displayName: string
   bio?: string
   city?: string
+  workplace?: string
+  school?: string
   avatarSet: boolean
   coverSet: boolean
   updatedAt: string
@@ -19,3 +21,5 @@ export type UserPrivacy = {
   allowFriendRequests: boolean
   showOnlineStatus: boolean
 }
+
+export type ProfilePublicDetails = { workplace: string; school: string }

@@ -39,7 +39,7 @@
   box-sizing: border-box;
   width: 13px;
   height: 13px;
-  border: 2px solid #fff;
+  border: 2px solid var(--soco-surface);
   border-radius: 50%;
   background: #16bd70;
   box-shadow: 0 0 0 1px rgba(14, 137, 82, .18);
@@ -65,6 +65,32 @@
 }
 
 @media (min-width: 761px) {
+  /* A long direct-chat name may shrink, but must not push actions offscreen. */
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) > .chat-head > .room-info {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) .chat-head .room-info > div:last-child {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) .chat-head .room-info :is(strong, .visitor-name-link) {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: start;
+  }
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) > .chat-head > .translate-controls {
+    flex: none;
+  }
+
+
   .modern-shell.app-layout .social-chat-layout > .conversation-panel > .chat-head,
   .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .conversation-panel.group-chat-panel > .chat-head {
     box-sizing: border-box;
@@ -73,8 +99,8 @@
     min-height: 79px;
     max-height: 79px;
     padding: 11px 14px;
-    border-bottom: 1px solid #e8ecf5;
-    background: #fff;
+    border-bottom: 1px solid var(--soco-border-subtle);
+    background: var(--soco-surface);
   }
 }
 @media (max-width: 760px) {
@@ -92,8 +118,8 @@
     max-height: 58px;
     padding: 6px 8px;
     gap: 5px;
-    border-bottom: 1px solid #e8ecf5;
-    background: #fff;
+    border-bottom: 1px solid var(--soco-border-subtle);
+    background: var(--soco-surface);
   }
   .modern-shell.app-layout .social-chat-layout > .conversation-panel > .chat-head > .room-info {
     flex: 1 1 0;
@@ -124,7 +150,7 @@
   min-width: 0;
   padding: 7px;
   border-radius: 12px;
-  background: #f7f9fd;
+  background: var(--soco-surface-page);
 }
 .conversation-info-group-menu > button,
 .conversation-info-group-menu > .conversation-options-danger {
@@ -136,7 +162,7 @@
   padding: 7px 9px;
   border: 0;
   border-radius: 9px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #344b6b;
   font: inherit;
   font-size: 12px;

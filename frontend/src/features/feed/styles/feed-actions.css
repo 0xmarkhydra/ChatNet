@@ -169,7 +169,7 @@
 }
 .feed-actions-footer button:last-child {
   color: white;
-  background: linear-gradient(120deg, #2563eb, #8b5cf6);
+  background: linear-gradient(120deg, var(--soco-blue), var(--soco-violet));
 }
 .feed-actions-footer .feed-confirm-delete {
   background: #cc3955 !important;
@@ -185,76 +185,7 @@
   color: #56617a;
   margin: 3px 0 7px;
 }
-
-.post-engagement-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-  padding: 8px 3px 0;
-  color: #6b7893;
-  font-size: 12px;
-}
-.post-engagement-summary .feed-post-likes {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 8px;
-  margin-right: auto;
-  white-space: nowrap;
-}
-.post-engagement-summary .feed-post-likes svg {
-  color: #ef426b;
-  flex-shrink: 0;
-}
-.post-engagement-summary .feed-post-conversation-stats {
-  margin-left: auto;
-  text-align: right;
-  white-space: nowrap;
-}
 /* The same single-heart button works in a feed card and in post details. */
-.post-toolbar > .feed-like-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 0;
-  border-radius: 10px;
-  color: #243a5d;
-  background: transparent;
-  cursor: pointer;
-}
-.post-toolbar > .feed-like-button:hover { background: #f4f6fc; }
-.post-toolbar > .feed-like-button.is-liked { color: #ee416a; }
-.post-toolbar > .feed-like-button.is-liked:hover { background: #fff2f6; }
-.post-toolbar > .feed-like-button:disabled { cursor: not-allowed; opacity: .6; }
-.post-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: nowrap;
-  min-width: 0;
-}
-.post-toolbar > button {
-  flex: 1 1 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 0;
-  min-height: 42px;
-  padding: 7px 4px;
-  border-radius: 12px;
-  white-space: nowrap;
-}
-.post-toolbar button span {
-  font-size: 12px;
-  line-height: 1.25;
-}
-.post-toolbar button svg {
-  flex-shrink: 0;
-}
 .feed-share-action {
   display: inline-flex;
   align-items: center;
@@ -263,15 +194,6 @@
   white-space: nowrap;
   flex: 1 1 0;
   min-width: 0;
-}
-.post-toolbar > .feed-reaction-control {
-  display: flex;
-  flex: 0 0 auto;
-  width: max-content;
-  max-width: 100%;
-  min-width: 0;
-  position: relative;
-  align-items: center;
 }
 .feed-reaction-control.is-open::before {
   content: "";
@@ -286,22 +208,6 @@
   background: transparent;
   color: #627394;
   cursor: pointer;
-}
-.post-toolbar .feed-reaction-control > .feed-reaction-primary {
-  flex: 0 0 auto;
-  width: auto;
-  min-width: 0;
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 650;
-  white-space: nowrap;
-  padding: 5px 10px;
-  border-radius: 999px;
 }
 .feed-reaction-control > .feed-reaction-primary > span:first-child {
   font-size: 18px;
@@ -333,141 +239,14 @@
   padding: 6px 7px;
   border: 1px solid #e3e8f6;
   border-radius: 999px;
-  background: #fff;
+  background: var(--soco-surface);
   box-shadow: 0 8px 24px #202f5a33;
   overflow: visible;
-}
-.post-toolbar .feed-reaction-picker > button.feed-reaction-option,
-.zalo-post .post-toolbar .feed-reaction-picker > button.feed-reaction-option {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
-  max-width: 36px;
-  max-height: 36px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  line-height: 1;
-  transform-origin: center center;
-  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.post-toolbar .feed-reaction-picker > button.feed-reaction-option:hover,
-.post-toolbar .feed-reaction-picker > button.feed-reaction-option:focus-visible,
-.zalo-post
-  .post-toolbar
-  .feed-reaction-picker
-  > button.feed-reaction-option:hover,
-.zalo-post
-  .post-toolbar
-  .feed-reaction-picker
-  > button.feed-reaction-option:focus-visible {
-  z-index: 2;
-  transform: translateY(-3px) scale(1.12);
-}
-.post-toolbar .feed-reaction-picker > button.reaction-like,
-.post-toolbar .feed-reaction-picker > button.reaction-like:hover,
-.post-toolbar .feed-reaction-picker > button.reaction-like:focus-visible,
-.zalo-post .post-toolbar .feed-reaction-picker > button.reaction-like,
-.zalo-post .post-toolbar .feed-reaction-picker > button.reaction-like:hover {
-  background: #2879f4;
-  color: #fff;
-}
-.post-toolbar .feed-reaction-picker > button.reaction-love,
-.post-toolbar .feed-reaction-picker > button.reaction-love:hover,
-.post-toolbar .feed-reaction-picker > button.reaction-love:focus-visible,
-.zalo-post .post-toolbar .feed-reaction-picker > button.reaction-love,
-.zalo-post .post-toolbar .feed-reaction-picker > button.reaction-love:hover {
-  background: #f13058;
-  color: #fff;
-}
-.post-toolbar .feed-reaction-picker .feed-reaction-emoji {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  flex: none;
-  width: 34px;
-  height: 34px;
-  font-family:
-    "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
-  font-size: 32px;
-  line-height: 1;
-  white-space: nowrap;
 }
 @media (max-width: 340px) {
   .feed-reaction-picker {
     gap: 3px;
     padding: 5px;
-  }
-  .post-toolbar .feed-reaction-picker > button.feed-reaction-option,
-  .zalo-post .post-toolbar .feed-reaction-picker > button.feed-reaction-option {
-    flex-basis: 34px;
-    width: 34px;
-    height: 34px;
-    min-width: 34px;
-    min-height: 34px;
-    max-width: 34px;
-    max-height: 34px;
-  }
-}
-.post-toolbar.post-toolbar-compact {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 4px;
-  overflow: visible;
-}
-.zalo-post .post-toolbar.post-toolbar-compact > button {
-  flex: 0 0 40px;
-  width: 40px;
-  min-width: 40px;
-  min-height: 40px !important;
-  height: 40px;
-  padding: 0;
-  border-radius: 50%;
-  background: transparent;
-}
-.zalo-post .post-toolbar.post-toolbar-compact > button:hover {
-  background: #eef3f7;
-}
-.post-toolbar-compact .feed-reaction-control > .feed-reaction-primary {
-  min-height: 40px !important;
-  padding: 6px 8px;
-  background: transparent;
-}
-.post-toolbar-compact .feed-reaction-primary > span:nth-child(2),
-.post-toolbar-compact > button > span {
-  display: none;
-}
-.post-toolbar-compact .feed-reaction-current {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-}
-.zalo-post .post-toolbar-compact .feed-reaction-primary b {
-  color: #68768c;
-  font-size: 12px;
-  font-weight: 500;
-}
-@media (prefers-reduced-motion: reduce) {
-  .post-toolbar .feed-reaction-picker button {
-    transition: none;
-  }
-  .post-toolbar .feed-reaction-picker button:hover,
-  .post-toolbar .feed-reaction-picker button:focus-visible {
-    transform: none;
   }
 }
 
@@ -522,23 +301,23 @@
 }
 .bg-violet {
   background: linear-gradient(130deg, #536be9, #ad52d5) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .bg-blue {
   background: linear-gradient(135deg, #1d70e9, #19bad1) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .bg-sunset {
   background: linear-gradient(135deg, #ec668f, #feae5e) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .bg-mint {
   background: linear-gradient(135deg, #0d9488, #5ba6e9) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .bg-night {
   background: linear-gradient(135deg, #121d3d, #49527c) !important;
-  color: #fff !important;
+  color: var(--soco-surface) !important;
 }
 .feed-text-background {
   border-radius: 17px;
@@ -578,7 +357,7 @@
   font-weight: 700;
 }
 .feed-filter-tabs .feed-filter-active-pill {
-  background: #fff;
+  background: var(--soco-surface);
   border-radius: 9px;
   box-shadow: 0 1px 6px #2a4c8a20;
 }
@@ -675,7 +454,7 @@
     max-height: calc(85dvh - env(safe-area-inset-bottom));
     border-radius: 26px;
     padding: 10px 12px 15px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 -10px 40px rgba(16, 24, 54, 0.2);
   }
   .feed-actions-grabber {

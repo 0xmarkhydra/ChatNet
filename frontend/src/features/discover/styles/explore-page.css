@@ -5,8 +5,8 @@
   min-width: 0;
   margin-inline: auto;
   padding: 28px 40px 48px;
-  background: var(--soco-canvas, #f6f6fb);
-  color: var(--soco-text, #19233c);
+  background: var(--soco-canvas);
+  color: var(--soco-text);
   display: grid;
   align-content: start;
   gap: 24px;
@@ -15,7 +15,7 @@
 .explore-page :is(h1, h2, h3, p) { margin: 0; }
 .explore-page h2 { font-size: 20px; line-height: 1.35; font-weight: 700; }
 .explore-page h3 { font-size: 16px; line-height: 1.4; font-weight: 600; }
-.explore-page p, .explore-page small { color: var(--soco-muted, #5b5b7b); }
+.explore-page p, .explore-page small { color: var(--soco-muted); }
 .explore-page button { font: inherit; cursor: pointer; }
 .explore-page button:disabled { cursor: not-allowed; opacity: .7; }
 .explore-page button:focus-visible { outline: 3px solid #4f46e5; outline-offset: 3px; }
@@ -39,6 +39,40 @@
   overscroll-behavior-x: contain;
   padding: 2px 2px 5px;
 }
+
+/* Category tabs are an independent, non-scrolling flex row above the
+   Explore page body, not a sticky child of the vertically scrolling area.
+   This keeps tabs reachable even during PWA header-collapse animations. */
+.modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell > .explore-tabs {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  align-self: center;
+  width: min(100%, 1200px);
+  max-width: 100%;
+  margin: 0;
+  padding: 12px 40px;
+  background: var(--soco-canvas);
+  border-bottom: 1px solid var(--soco-line);
+}
+@media (max-width: 760px) {
+  .modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell > .explore-tabs {
+    width: 100%;
+    padding: 8px 16px 10px;
+    background: var(--soco-surface);
+    box-shadow: 0 3px 8px rgba(24, 39, 75, .04);
+  }
+}
 .explore-tabs::-webkit-scrollbar,
 .explore-topic-list::-webkit-scrollbar,
 .explore-community-grid::-webkit-scrollbar { display: none; }
@@ -47,16 +81,16 @@
   flex: none;
   padding: 0 20px;
   border-radius: 999px;
-  background: var(--soco-surface, #fff);
-  border: 1px solid var(--soco-line, #e3e3f0);
-  color: var(--soco-text, #19233c);
+  background: var(--soco-surface);
+  border: 1px solid var(--soco-line);
+  color: var(--soco-text);
   font-size: 14px;
   font-weight: 600;
 }
 .explore-tabs button.active {
   background: #4f46e5;
   border-color: #4f46e5;
-  color: #fff;
+  color: var(--soco-surface);
 }
 
 .explore-feature {
@@ -96,7 +130,7 @@
 }
 .explore-feature-content { position: relative; z-index: 1; min-width: 0; max-width: 680px; }
 .explore-feature h2 {
-  color: #fff;
+  color: var(--soco-surface);
   font-size: 26px;
   font-weight: 700;
   line-height: 1.3;
@@ -120,9 +154,9 @@
   font-size: 13px;
   font-weight: 700;
 }
-.explore-feature-primary { background: #fff; color: #3730a3; border: 1px solid #fff; }
-.explore-feature-secondary { background: transparent; color: #fff; border: 1px solid #fff; }
-.explore-feature-actions button:focus-visible { outline-color: #fff; }
+.explore-feature-primary { background: var(--soco-surface); color: #3730a3; border: 1px solid var(--soco-surface); }
+.explore-feature-secondary { background: transparent; color: var(--soco-surface); border: 1px solid var(--soco-surface); }
+.explore-feature-actions button:focus-visible { outline-color: var(--soco-surface); }
 
 .explore-topics { min-width: 0; display: grid; gap: 12px; }
 .explore-topics h2 { font-size: 18px; }
@@ -138,7 +172,7 @@
   font-size: 13px;
   font-weight: 650;
 }
-.explore-topic-list button[aria-pressed='true'] { border-color: #3730a3; background: #3730a3; color: #fff; }
+.explore-topic-list button[aria-pressed='true'] { border-color: #3730a3; background: #3730a3; color: var(--soco-surface); }
 
 .explore-content-layout {
   display: grid;
@@ -171,9 +205,9 @@
 .explore-community-grid { min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 16px; }
 .explore-community-card {
   min-width: 0;
-  border: 1px solid var(--soco-line, #e3e3f0);
+  border: 1px solid var(--soco-line);
   border-radius: 20px;
-  background: var(--soco-surface, #fff);
+  background: var(--soco-surface);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -197,7 +231,7 @@
   position: relative;
   font-size: 20px;
   font-weight: 750;
-  border: 2px solid var(--soco-surface, #fff);
+  border: 2px solid var(--soco-surface);
 }
 .explore-community-copy { margin-top: 10px; flex: 1; min-width: 0; }
 .explore-community-copy h3 { overflow-wrap: anywhere; }
@@ -222,8 +256,8 @@
 @keyframes explore-shimmer { to { background-position-x: -220%; } }
 
 .explore-people, .explore-near, .explore-state, .explore-step {
-  background: var(--soco-surface, #fff);
-  border: 1px solid var(--soco-line, #e3e3f0);
+  background: var(--soco-surface);
+  border: 1px solid var(--soco-line);
   border-radius: 20px;
 }
 .explore-people, .explore-near { min-width: 0; padding: 20px; }
@@ -247,7 +281,7 @@
 .explore-person p { font-size: 12px; margin-top: 3px; }
 .explore-person button { flex: none; padding: 0 12px; }
 .explore-content-layout-single .explore-people-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
-.explore-content-layout-single .explore-person { padding: 16px; border: 1px solid var(--soco-line, #e3e3f0); border-radius: 18px; background: var(--soco-surface, #fff); }
+.explore-content-layout-single .explore-person { padding: 16px; border: 1px solid var(--soco-line); border-radius: 18px; background: var(--soco-surface); }
 .explore-state {
   min-width: 0;
   padding: 20px;
@@ -267,7 +301,7 @@
   color: #3730a3;
 }
 .explore-empty-copy { flex: 1 1 175px; min-width: 0; }
-.explore-empty-copy strong { font-size: 14px; color: var(--soco-text, #19233c); }
+.explore-empty-copy strong { font-size: 14px; color: var(--soco-text); }
 .explore-empty-copy p, .explore-state p { font-size: 13px; line-height: 1.5; margin-top: 4px; }
 .explore-state button {
   min-height: 44px;
@@ -307,7 +341,7 @@
   height: 14px;
   background: #4f46e5;
   border-radius: 50%;
-  border: 3px solid #fff;
+  border: 3px solid var(--soco-surface);
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
@@ -319,7 +353,7 @@
   align-items: center;
   gap: 8px;
   background: #4f46e5;
-  color: #fff;
+  color: var(--soco-surface);
   border: 0;
   border-radius: 12px;
   font-size: 13px;
@@ -346,15 +380,15 @@
   font-size: 13px;
   font-weight: 700;
 }
-.explore-step .explore-step-primary { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+.explore-step .explore-step-primary { background: #4f46e5; color: var(--soco-surface); border-color: #4f46e5; }
 .explore-empty-community {
   border: 2px dashed #c9cbf5;
   border-radius: 18px;
-  background: var(--soco-surface, #fff);
+  background: var(--soco-surface);
   padding: 24px;
   text-align: center;
   font-weight: 650;
-  color: var(--soco-muted, #5b5b7b);
+  color: var(--soco-muted);
 }
 
 @media (max-width: 768px) {
@@ -382,6 +416,38 @@
   .explore-step { border-radius: 18px; }
   .explore-people-grid { gap: 14px; }
 }
+/*
+ * Explore owns its vertical scroll viewport on both desktop Web and PWA.
+ * The shared application shell keeps the top header and navigation fixed.
+ * Horizontally scrolling category tabs/cards retain their independent axis.
+ */
+.modern-shell.app-layout > .modern-frame[data-route-page="discover"] {
+  min-height: 0;
+  overflow: hidden;
+}
+.modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell > .explore-page {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 760px) {
+  .modern-shell.app-layout > .modern-frame[data-route-page="discover"] > .explore-shell > .explore-page {
+    width: 100%;
+    margin: 0;
+    /* Bottom breathing room is inside the page scroller, not a footer band. */
+    padding-bottom: max(36px, var(--bottom-nav-space, 80px));
+    scroll-padding-bottom: var(--bottom-nav-space, 80px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .explore-skeleton { animation: none; }
 }

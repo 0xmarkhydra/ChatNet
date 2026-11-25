@@ -12,8 +12,8 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #fff;
-  border: 1px solid #e8ecf5;
+  background: var(--soco-surface);
+  border: 1px solid var(--soco-border-subtle);
   border-radius: 16px;
   box-shadow: 0 3px 20px rgba(30, 51, 96, .035);
 }
@@ -32,7 +32,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  background: #fff;
+  background: var(--soco-surface);
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -181,7 +181,7 @@
   padding: 10px 14px;
   border: 1px solid #d7e1fb;
   border-radius: 12px;
-  color: #fff;
+  color: var(--soco-surface);
   background: #4267db;
   font: inherit;
   font-size: 13px;
@@ -204,7 +204,7 @@
   padding: 12px;
   border: 1px solid #e4eaf7;
   border-radius: 16px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #1c3158;
   font: inherit;
   text-align: left;
@@ -326,7 +326,7 @@
   padding: 5px;
   border: 1px solid #e1e8f6;
   border-radius: 13px;
-  background: #fff;
+  background: var(--soco-surface);
   box-shadow: 0 12px 34px rgba(27,45,93,.16);
 }
 .modern-shell .group-settings-sidebar .group-member-menu.open-up {

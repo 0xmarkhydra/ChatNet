@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ImagePlus } from 'lucide-react'
 import { ProfileOverlay } from '../../profile'
 import type { StoryDraft, TextStoryInput } from '../types'
 import StoryComposer from './StoryComposer'
 import StoryTextComposer from './StoryTextComposer'
+import { STORY_MEDIA_ACCEPT, storyMediaError } from '../utils/storyMedia'
 import '../styles/story-text.css'
 
 export type StoryDraftOverlayProps = {
@@ -21,13 +22,18 @@ const choiceLabel = 'grid min-h-10 place-items-center text-balance sm:min-h-12'
 export default function StoryDraftOverlay({
   createStory, mediaUploading, setStoryDraft, storyBusy, storyDraft,
 }: StoryDraftOverlayProps) {
+  const [fileError, setFileError] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
   const mediaChoice = useRef<HTMLButtonElement>(null)
   const mode = storyDraft.kind
   useEffect(() => {
     if (mode === 'choose') mediaChoice.current?.focus({ preventScroll: true })
   }, [mode])
-  const pickFile = (file: File) => setStoryDraft({ kind: 'media', file })
+  const pickFile = (file: File) => {
+    const error = storyMediaError(file)
+    setFileError(error ?? '')
+    if (!error) setStoryDraft({ kind: 'media', file })
+  }
   const busy = storyBusy || (storyDraft.kind === 'media' && Boolean(mediaUploading))
 
   return (
@@ -36,7 +42,7 @@ export default function StoryDraftOverlay({
       <div className="box-border px-4 pt-4 pb-5 sm:px-6 sm:pt-5 sm:pb-6">
         {storyDraft.kind === 'choose' ? (
           <div className="grid grid-cols-2 gap-3 sm:gap-4" aria-label="Chọn loại tin" role="group">
-            <input ref={fileInput} hidden type="file" accept="image/*,video/*" aria-label="Chọn ảnh hoặc video cho Story"
+            <input ref={fileInput} hidden type="file" accept={STORY_MEDIA_ACCEPT} aria-label="Chọn ảnh hoặc video cho Story"
               onChange={event => {
                 const selected = event.currentTarget.files?.[0]
                 event.currentTarget.value = ''
@@ -48,18 +54,20 @@ export default function StoryDraftOverlay({
               <span className={choiceLabel}>Tạo tin có ảnh hoặc video</span>
             </button>
             <button type="button" data-story-background="berry" className={choiceCard}
-              onClick={() => setStoryDraft({ kind: 'text' })}>
+              onClick={() => { setFileError(''); setStoryDraft({ kind: 'text' }) }}>
               <span className={choiceIcon} aria-hidden="true">Aa</span>
               <span className={choiceLabel}>Tạo tin dạng văn bản</span>
             </button>
           </div>
         ) : storyDraft.kind === 'media' ? (
           <StoryComposer file={storyDraft.file} busy={busy}
-            onPublish={() => void createStory({ file: storyDraft.file })} onChangeFile={pickFile} />
+            onPublish={() => createStory({ file: storyDraft.file })}
+            onBack={() => { setFileError(''); setStoryDraft({ kind: 'choose' }) }} onChangeFile={pickFile} />
         ) : (
           <StoryTextComposer busy={busy} onBack={() => setStoryDraft({ kind: 'choose' })}
             onPublish={createStory} />
         )}
+        {fileError && storyDraft.kind !== 'text' && <p role="alert" className="mt-3 text-sm text-destructive">{fileError}</p>}
       </div>
     </ProfileOverlay>
   )

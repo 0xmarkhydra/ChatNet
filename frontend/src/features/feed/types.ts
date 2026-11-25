@@ -3,7 +3,10 @@ import type { MediaAttachment } from '../../shared/utils/media'
 
 export const FEED_PAGE_SIZE = 15
 
+export type PublishLocation = { latitude: number; longitude: number; accuracy: number; capturedAt: string; placeName?: string }
+
 export type Post = {
+  publishLocation?: PublishLocation
   id: number
   author: string
   authorDisplayName?: string

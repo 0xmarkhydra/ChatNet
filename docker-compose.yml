@@ -53,6 +53,7 @@ services:
       ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID:-}
       ONESIGNAL_REST_API_KEY: ${ONESIGNAL_REST_API_KEY:-}
       CHATNET_WEB_URL: ${CHATNET_WEB_URL:-https://chat.codelocal.cloud}
+      MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:-http://localhost:8080}
       LIVEKIT_URL: ${LIVEKIT_URL:-}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
@@ -66,6 +67,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        # Keep Docker preview on the same cloud account/data as chat.codelocal.cloud.
+        # An empty VITE_API_URL must not silently switch to the local demo backend.
+        VITE_API_URL: ${VITE_API_URL:-https://api-chat.codelocal.cloud}
+        VITE_API_PROXY: "0"
     environment:
       PORT: "8080"
       BACKEND_URL: http://backend:8080

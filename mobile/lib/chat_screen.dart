@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'state/app_providers.dart';
 import 'presentation/mobile_avatar_channel_split.dart';
 import 'presentation/mobile_channel_picker.dart';
+import 'presentation/mobile_reverse_scroll_region.dart';
 import 'presentation/conversation_avatar.dart';
 import 'presentation/chat_information_sheet.dart';
 import 'presentation/conversation_list_presenter.dart';
@@ -32,18 +33,28 @@ class ChatScreen extends ConsumerStatefulWidget {
     required this.query,
     required this.onConversationChanged,
     this.requestedConversation,
+    this.openConversationRequest = 0,
     this.createRequest = 0,
     this.resetRequest = 0,
     this.onUnreadChanged,
+    this.onMobileScroll,
+    this.onMobileReverseScroll,
   });
 
   final Api api;
   final String query;
   final ValueChanged<bool> onConversationChanged;
   final Json? requestedConversation;
+  final int openConversationRequest;
   final int createRequest;
   final int resetRequest;
   final ValueChanged<int>? onUnreadChanged;
+
+  /// Forward only the visible inbox/channel scrollers to the shared chrome.
+  final void Function(ScrollNotification, String)? onMobileScroll;
+
+  /// Direct upward content scroll gesture; also fires at the list boundary.
+  final VoidCallback? onMobileReverseScroll;
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -129,7 +140,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     super.didUpdateWidget(oldWidget);
     final requested = widget.requestedConversation;
     if (requested != null &&
-        !identical(requested, oldWidget.requestedConversation) &&
+        (widget.openConversationRequest != oldWidget.openConversationRequest ||
+            !identical(requested, oldWidget.requestedConversation)) &&
         requested['id'] != active?['id']) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && widget.requestedConversation == requested) {
@@ -2172,277 +2184,316 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _mobileConversationRail(List<Json> filtered) {
     final visible = filterConversations(filtered, filter: roomFilter);
 
-    return Material(
-      color: Colors.white,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(10, 9, 11, 8),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: socoLine)),
-            ),
-            child: Row(
-              children: [
-                _mobileRailMenu(),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SizedBox(
-                    height: 32,
-                    child: TextField(
-                      key: const ValueKey('mobile-chat-search'),
-                      controller: chatSearchController,
-                      focusNode: chatSearchFocus,
-                      onChanged: (_) => setState(() {}),
-                      decoration: InputDecoration(
-                        hintText: 'Tìm hội thoại...',
-                        hintStyle: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF8C96AC),
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.search_rounded,
-                          color: Color(0xFF8293B1),
-                          size: 18,
-                        ),
-                        suffixIcon: chatSearchController.text.isNotEmpty
-                            ? IconButton(
-                                tooltip: 'Xóa tìm kiếm',
-                                icon: const Icon(Icons.close_rounded, size: 18),
-                                onPressed: () =>
-                                    setState(chatSearchController.clear),
-                              )
-                            : null,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 5),
-                        filled: true,
-                        fillColor: const Color(0xFFF4F6FD),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFDCE4F4),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFDCE4F4),
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.depth == 0) {
+          widget.onMobileScroll?.call(notification, 'chat-inbox');
+        }
+        return false;
+      },
+      child: MobileReverseScrollRegion(
+        onReverseScroll: widget.onMobileReverseScroll,
+        child: Material(
+          color: Colors.white,
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(10, 9, 11, 8),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: socoLine)),
+                ),
+                child: Row(
+                  children: [
+                    _mobileRailMenu(),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 32,
+                        child: TextField(
+                          key: const ValueKey('mobile-chat-search'),
+                          controller: chatSearchController,
+                          focusNode: chatSearchFocus,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            hintText: 'Tìm hội thoại...',
+                            hintStyle: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF8C96AC),
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              color: Color(0xFF8293B1),
+                              size: 18,
+                            ),
+                            suffixIcon: chatSearchController.text.isNotEmpty
+                                ? IconButton(
+                                    tooltip: 'Xóa tìm kiếm',
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 18,
+                                    ),
+                                    onPressed: () =>
+                                        setState(chatSearchController.clear),
+                                  )
+                                : null,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 5,
+                            ),
+                            filled: true,
+                            fillColor: const Color(0xFFF4F6FD),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFDCE4F4),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFDCE4F4),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: loading && conversations.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : error.isNotEmpty && conversations.isEmpty
-                ? EmptyState(
-                    icon: Icons.cloud_off_outlined,
-                    title: 'Không tải được hội thoại',
-                    description: error,
-                    action: FilledButton(
-                      onPressed: _refresh,
-                      child: const Text('Thử lại'),
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: _refresh,
-                    child: ListView.builder(
-                      key: const ValueKey('mobile-avatar-rail'),
-                      controller: avatarScrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(5, 6, 5, 22),
-                      itemCount: visible.isEmpty
-                          ? 1
-                          : visible.length + (hasMoreConversations ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (visible.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.only(top: 100),
-                            child: EmptyState(
-                              icon: Icons.forum_outlined,
-                              title: 'Không có hội thoại',
-                              description: 'Thử tìm kiếm theo tên.',
-                            ),
-                          );
-                        }
-                        if (index >= visible.length) {
-                          return Center(
-                            child: TextButton(
-                              onPressed: conversationLoadingMore
-                                  ? null
-                                  : _loadMoreConversations,
-                              child: Text(
-                                conversationLoadingMore
-                                    ? 'Đang tải thêm…'
-                                    : 'Tải thêm hội thoại',
-                              ),
-                            ),
-                          );
-                        }
-                        final room = visible[index];
-                        final unread =
-                            (room['unreadCount'] as num?)?.toInt() ?? 0;
-                        final pinned =
-                            room['pinnedAt']?.toString().isNotEmpty == true;
-                        final muted = room['muted'] == true;
-                        final selected =
-                            pickerGroup?['id'] == room['id'] ||
-                            active?['id'] == room['id'];
-                        return InkWell(
-                          key: ValueKey('rail-room-${room['id']}'),
-                          onTap: () => _openRoom(room),
-                          onLongPress: () => _roomActions(room),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? const Color(0xFFEDF3FF)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 4,
-                            ),
-                            child: Row(
-                              children: [
-                                Stack(
-                                  clipBehavior: Clip.none,
+              ),
+              Expanded(
+                child: loading && conversations.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : error.isNotEmpty && conversations.isEmpty
+                    ? EmptyState(
+                        icon: Icons.cloud_off_outlined,
+                        title: 'Không tải được hội thoại',
+                        description: error,
+                        action: FilledButton(
+                          onPressed: _refresh,
+                          child: const Text('Thử lại'),
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _refresh,
+                        child: ListView.builder(
+                          key: const ValueKey('mobile-avatar-rail'),
+                          controller: avatarScrollController,
+                          // Clamp overscroll on both platforms: only the inbox
+                          // viewport moves, never its search header or bottom tabs.
+                          physics: const ClampingScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
+                          ),
+                          // The floating footer overlays the list by 72px.
+                          // Reserve its clearance INSIDE the scroller, not as an
+                          // additional blank app-shell/footer strip.
+                          padding: const EdgeInsets.fromLTRB(5, 6, 5, 104),
+                          itemCount: visible.isEmpty
+                              ? 1
+                              : visible.length + (hasMoreConversations ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (visible.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.only(top: 100),
+                                child: EmptyState(
+                                  icon: Icons.forum_outlined,
+                                  title: 'Không có hội thoại',
+                                  description: 'Thử tìm kiếm theo tên.',
+                                ),
+                              );
+                            }
+                            if (index >= visible.length) {
+                              return Center(
+                                child: TextButton(
+                                  onPressed: conversationLoadingMore
+                                      ? null
+                                      : _loadMoreConversations,
+                                  child: Text(
+                                    conversationLoadingMore
+                                        ? 'Đang tải thêm…'
+                                        : 'Tải thêm hội thoại',
+                                  ),
+                                ),
+                              );
+                            }
+                            final room = visible[index];
+                            final unread =
+                                (room['unreadCount'] as num?)?.toInt() ?? 0;
+                            final pinned =
+                                room['pinnedAt']?.toString().isNotEmpty == true;
+                            final muted = room['muted'] == true;
+                            final selected =
+                                pickerGroup?['id'] == room['id'] ||
+                                active?['id'] == room['id'];
+                            return InkWell(
+                              key: ValueKey('rail-room-${room['id']}'),
+                              onTap: () => _openRoom(room),
+                              onLongPress: () => _roomActions(room),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? const Color(0xFFEDF3FF)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 4,
+                                ),
+                                child: Row(
                                   children: [
-                                    ConversationAvatarView(
-                                      room: room,
-                                      size: 38,
-                                      fetchProfileImage: !widget.api.isDemo,
-                                    ),
-                                    if (unread > 0)
-                                      Positioned(
-                                        right: -6,
-                                        top: -3,
-                                        child: CircleAvatar(
-                                          radius: 10,
-                                          backgroundColor: socoBlue,
-                                          child: Text(
-                                            unread > 99 ? '99+' : '$unread',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 8,
-                                              fontWeight: FontWeight.w800,
+                                    Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        ConversationAvatarView(
+                                          room: room,
+                                          size: 38,
+                                          fetchProfileImage: !widget.api.isDemo,
+                                        ),
+                                        if (unread > 0)
+                                          Positioned(
+                                            right: -6,
+                                            top: -3,
+                                            child: CircleAvatar(
+                                              radius: 10,
+                                              backgroundColor: socoBlue,
+                                              child: Text(
+                                                unread > 99 ? '99+' : '$unread',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(width: 11),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Row(
+                                      ],
+                                    ),
+                                    const SizedBox(width: 11),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          if (pinned) ...[
-                                            const Icon(
-                                              Icons.push_pin_rounded,
-                                              size: 13,
-                                              color: socoBlue,
-                                            ),
-                                            const SizedBox(width: 3),
-                                          ],
-                                          Expanded(
-                                            child: Text(
-                                              room['name']?.toString() ?? '',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w800,
-                                                color: Color(0xFF253650),
+                                          Row(
+                                            children: [
+                                              if (pinned) ...[
+                                                const Icon(
+                                                  Icons.push_pin_rounded,
+                                                  size: 13,
+                                                  color: socoBlue,
+                                                ),
+                                                const SizedBox(width: 3),
+                                              ],
+                                              Expanded(
+                                                child: Text(
+                                                  room['name']?.toString() ??
+                                                      '',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Color(0xFF253650),
+                                                  ),
+                                                ),
                                               ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            room['lastMessage']
+                                                        ?.toString()
+                                                        .isNotEmpty ==
+                                                    true
+                                                ? room['lastMessage'].toString()
+                                                : room['type'] == 'group'
+                                                ? 'Nhóm hội thoại'
+                                                : 'Bắt đầu trò chuyện',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: unread > 0
+                                                  ? socoText
+                                                  : const Color(0xFF8494B0),
+                                              fontWeight: unread > 0
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w400,
                                             ),
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        room['lastMessage']
-                                                    ?.toString()
-                                                    .isNotEmpty ==
-                                                true
-                                            ? room['lastMessage'].toString()
-                                            : room['type'] == 'group'
-                                            ? 'Nhóm hội thoại'
-                                            : 'Bắt đầu trò chuyện',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: unread > 0
-                                              ? socoText
-                                              : const Color(0xFF8494B0),
-                                          fontWeight: unread > 0
-                                              ? FontWeight.w600
-                                              : FontWeight.w400,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      displayTime(room['lastMessageAt']),
-                                      style: const TextStyle(
-                                        color: Color(0xFF8A9AB5),
-                                        fontSize: 10,
-                                      ),
                                     ),
-                                    if (room['categoryId'] != null ||
-                                        muted) ...[
-                                      const SizedBox(height: 6),
-                                      Icon(
-                                        muted
-                                            ? Icons.notifications_off_outlined
-                                            : Icons.sell_rounded,
-                                        size: 16,
-                                        color: muted
-                                            ? socoMuted
-                                            : const Color(0xFF9F3D21),
-                                      ),
-                                    ],
+                                    const SizedBox(width: 8),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          displayTime(room['lastMessageAt']),
+                                          style: const TextStyle(
+                                            color: Color(0xFF8A9AB5),
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                        if (room['categoryId'] != null ||
+                                            muted) ...[
+                                          const SizedBox(height: 6),
+                                          Icon(
+                                            muted
+                                                ? Icons
+                                                      .notifications_off_outlined
+                                                : Icons.sell_rounded,
+                                            size: 16,
+                                            color: muted
+                                                ? socoMuted
+                                                : const Color(0xFF9F3D21),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(width: 5),
                                   ],
                                 ),
-                                const SizedBox(width: 5),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _mobileChannelList() => MobileChannelPicker(
-    group: pickerGroup!,
-    channels: channels,
-    generalChannel: generalChannel,
-    searchController: channelSearchController,
-    loading: channelsLoading,
-    selectedId: selectedChannelId,
-    onSearchChanged: () => setState(() {}),
-    onSelect: _openChannel,
+  Widget _mobileChannelList() => NotificationListener<ScrollNotification>(
+    onNotification: (notification) {
+      if (notification.depth == 0) {
+        widget.onMobileScroll?.call(notification, 'chat-channels');
+      }
+      return false;
+    },
+    child: MobileReverseScrollRegion(
+      onReverseScroll: widget.onMobileReverseScroll,
+      child: MobileChannelPicker(
+        group: pickerGroup!,
+        channels: channels,
+        generalChannel: generalChannel,
+        searchController: channelSearchController,
+        loading: channelsLoading,
+        selectedId: selectedChannelId,
+        onSearchChanged: () => setState(() {}),
+        onSelect: _openChannel,
+      ),
+    ),
   );
 
   Widget _conversationList(List<Json> filtered) {

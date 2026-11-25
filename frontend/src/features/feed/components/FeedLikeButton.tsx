@@ -2,6 +2,7 @@ import { Heart } from 'lucide-react'
 import type { Post } from '../types'
 import { burstPostHearts } from '../utils/postHeartBurst'
 import '../styles/feed-actions.css'
+import { postActionClassName } from './postCardStyles'
 
 // A single like affordance across feed cards, profile timelines and post details.
 export default function FeedLikeButton({
@@ -16,7 +17,7 @@ export default function FeedLikeButton({
   return (
     <button
       type="button"
-      className={'feed-post-like feed-like-button' + (liked ? ' is-liked' : '')}
+      className={`feed-post-like feed-like-button ${postActionClassName}${liked ? ' is-liked text-reaction-like! hover:bg-reaction-like-hover!' : ''}`}
       disabled={busy}
       aria-pressed={liked}
       aria-busy={busy}
@@ -26,7 +27,7 @@ export default function FeedLikeButton({
         onLike(selectedReaction || '❤️')
       }}
     >
-      <Heart size={22} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
+      <Heart size={18} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
       <span>{liked ? 'Đã thích' : 'Thích'}</span>
     </button>
   )

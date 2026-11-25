@@ -1,7 +1,7 @@
 .nearby-explorer {
   width: 100%; min-width: 0; height: 100%; min-height: 0; margin: 0 auto; padding: 12px 20px;
   display: flex; flex-direction: column; overflow-y: auto;
-  background: #fff; color: #20372c; box-sizing: border-box; letter-spacing: 0;
+  background: var(--soco-surface); color: #20372c; box-sizing: border-box; letter-spacing: 0;
 }
 .nearby-explorer * { box-sizing: border-box; letter-spacing: 0; }
 .nearby-explorer > * { flex-shrink: 0; }
@@ -25,7 +25,7 @@
 .nearby-search input { width: 100%; min-width: 0; background: transparent; border: 0; font: inherit; font-size: 15px; color: #20372c; outline: none; }
 .nearby-radius-field { display: grid; gap: 5px; font-size: 12px; color: #667a6d; }
 .nearby-radius-field select { border: 1px solid #d4dfd7; border-radius: 6px; background: white; height: 44px; padding: 0 8px; color: #20372c; }
-.nearby-refresh, .nearby-route, .nearby-view button { width: 44px; flex-shrink: 0; border: 1px solid #d4dfd7; border-radius: 6px; background: #fff; color: #3e6050; }
+.nearby-refresh, .nearby-route, .nearby-view button { width: 44px; flex-shrink: 0; border: 1px solid #d4dfd7; border-radius: 6px; background: var(--soco-surface); color: #3e6050; }
 .nearby-explorer .nearby-privacy { display: flex; align-items: center; gap: 8px; max-width: none; margin: 12px 0; font-size: 13px; line-height: 1.5; color: #6c7e72; }
 .nearby-privacy svg { flex-shrink: 0; }
 .nearby-results-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; min-height: 44px; margin: 0 0 6px; }
@@ -45,14 +45,14 @@
 .nearby-empty { padding: 56px 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; color: #778b7c; }
 .nearby-empty h2 { font-size: 20px; color: #2d4937; margin: 0; }
 .nearby-empty p { margin: 0; font-size: 14px; line-height: 1.6; max-width: 360px; }
-.nearby-primary { margin-top: 8px; background: #08774a; color: #fff; border: 0; border-radius: 6px; padding: 10px 18px; font-weight: 600 !important; }
+.nearby-primary { margin-top: 8px; background: #08774a; color: var(--soco-surface); border: 0; border-radius: 6px; padding: 10px 18px; font-weight: 600 !important; }
 .nearby-categories { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 4px; }
-.nearby-categories button { white-space: nowrap; border: 1px solid #dce5df; border-radius: 6px; padding: 8px 12px; background: #fff; font-size: 13px; }
+.nearby-categories button { white-space: nowrap; border: 1px solid #dce5df; border-radius: 6px; padding: 8px 12px; background: var(--soco-surface); font-size: 13px; }
 .nearby-categories button[aria-pressed="true"] { border-color: #147449; color: #147449; background: #eef7f1; }
 .nearby-view { display: flex; gap: 4px; }
 .nearby-view button[aria-pressed="true"] { background: #eaf2ed; color: #147449; }
 .nearby-error { padding: 12px; background: #fff1df; color: #764c22; font-size: 14px; display: flex; align-items: center; gap: 12px; }
-.nearby-error button, .nearby-map-error button { background: #fff; border: 1px solid #dbbb92; border-radius: 6px; padding: 8px; flex-shrink: 0; }
+.nearby-error button, .nearby-map-error button { background: var(--soco-surface); border: 1px solid #dbbb92; border-radius: 6px; padding: 8px; flex-shrink: 0; }
 .nearby-place-content { flex: 1; min-height: 240px; overflow-y: auto; }
 .nearby-place-content.map-view { display: grid; grid-template-columns: minmax(0, 1fr) 300px; overflow: hidden; }
 .map-view .nearby-place-list { min-height: 0; overflow-y: auto; padding-left: 16px; }
@@ -61,9 +61,9 @@
 .nearby-map { position: relative; min-width: 0; min-height: 240px; height: 100%; background: #edf1ef; }
 .nearby-map > .nearby-map-canvas { position: absolute; inset: 0; }
 .nearby-map-controls { position: absolute; right: 12px; top: 12px; display: grid; gap: 8px; }
-.nearby-map-controls button { width: 44px; border: 1px solid #cfdbd3; border-radius: 6px; background: #fff; }
+.nearby-map-controls button { width: 44px; border: 1px solid #cfdbd3; border-radius: 6px; background: var(--soco-surface); }
 .nearby-map-error { position: absolute; top: 12px; left: 12px; right: 70px; background: white; padding: 12px; font-size: 13px; display: grid; gap: 8px; }
-.nearby-place-marker { width: 36px; min-height: 36px !important; background: #fff; color: #186940; border: 2px solid #186940; border-radius: 50%; font-weight: 700 !important; box-shadow: 0 2px 8px #0003; }
+.nearby-place-marker { width: 36px; min-height: 36px !important; background: var(--soco-surface); color: #186940; border: 2px solid #186940; border-radius: 50%; font-weight: 700 !important; box-shadow: 0 2px 8px #0003; }
 .nearby-place-marker.selected { background: #186940; color: white; }
 .nearby-place-number { width: 40px; flex-shrink: 0; background: #edf2ef; color: #396549; border: 0; border-radius: 6px; }
 .nearby-place-row.selected { background: #f1f7f3; }

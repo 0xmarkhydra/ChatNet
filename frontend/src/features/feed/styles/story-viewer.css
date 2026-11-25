@@ -10,6 +10,11 @@
 
 .story-screen-backdrop * { box-sizing: border-box; }
 
+/* The shared dialog portals to body, above the full-screen Story viewer. */
+body:has(.story-highlight-dialog) > [data-slot="dialog-overlay"] {
+  z-index: 351;
+}
+
 .story-screen {
   width: min(100%, 1586px);
   height: min(100dvh, 992px);
@@ -54,7 +59,7 @@
   gap: 5px;
   border: 0;
   border-radius: 12px;
-  color: #2563eb;
+  color: var(--soco-blue);
   background: #eff3ff;
   font-size: 13px !important;
   font-weight: 700 !important;
@@ -249,7 +254,7 @@
   height: 100%;
   width: 0;
   border-radius: inherit;
-  background: #fff;
+  background: var(--soco-surface);
 }
 .story-screen-progress-track > span.complete { width: 100%; }
 .story-screen-progress-track > span.playing { animation: story-screen-progress 7s linear forwards; }
@@ -265,7 +270,7 @@
   flex: 0 1 auto;
   border: 0;
   padding: 0;
-  color: #fff;
+  color: var(--soco-surface);
   background: transparent;
 }
 .story-screen-author-profile strong {
@@ -292,7 +297,7 @@
   padding: 0;
   border: 0;
   border-radius: 9px;
-  color: #fff;
+  color: var(--soco-surface);
   background: transparent;
 }
 .story-screen-icon-button:hover,
@@ -339,7 +344,7 @@
   border: 0;
   border-radius: 12px;
   background: rgba(15, 26, 47, .55);
-  color: #fff;
+  color: var(--soco-surface);
   opacity: .3;
 }
 .story-screen-navigation.previous { left: 25px; }
@@ -357,7 +362,7 @@
   align-items: center;
   border-radius: 25px;
   background: rgba(25, 41, 75, .96);
-  color: #fff;
+  color: var(--soco-surface);
   overflow: hidden;
 }
 .story-screen-reply input {
@@ -367,7 +372,7 @@
   padding: 0 20px;
   border: 0;
   outline: 0;
-  color: #fff;
+  color: var(--soco-surface);
   background: transparent;
   font: inherit;
   font-size: 14px;
@@ -390,7 +395,7 @@
   height: 100%;
   border: 0;
   background: transparent;
-  color: #fff;
+  color: var(--soco-surface);
 }
 .story-screen-reply button:hover { background: rgba(255,255,255,.12); }
 
@@ -398,6 +403,12 @@
   grid-column: 3;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #415781 transparent; /* design-debt-ignore: dark story viewer scrollbar thumb has no token */
   border-radius: 19px;
   padding: 24px 15px 63px;
 }
@@ -414,7 +425,7 @@
   padding: 0 17px;
   border: 0;
   border-radius: 12px;
-  color: #fff;
+  color: var(--soco-surface);
   background: #243451;
   text-align: left;
   font-size: 14px;

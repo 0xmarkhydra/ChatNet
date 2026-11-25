@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'presentation/mobile_shell_state.dart';
+import 'presentation/mobile_scroll_chrome.dart';
 import 'presentation/soco_bottom_navigation.dart';
 
 import 'api.dart';
 import 'chat_screen.dart';
 import 'contacts_screen.dart';
-import 'discover_screen.dart';
+import 'explore_screen.dart';
 import 'feed_screen.dart';
 import 'notification_sheet.dart';
 import 'profile_qr.dart';
@@ -37,12 +38,70 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int get unreadTotal => ref.read(mobileShellProvider).unreadTotal;
   String search = '';
   Json? requestedConversation;
+  int openConversationRequest = 0;
   int createChatRequest = 0;
   int chatHomeRequest = 0;
   int createPostRequest = 0;
+  int openPostRequest = 0;
+  int? requestedPostId;
   int newFriendRequest = 0;
+  int profileVisitRequest = 0;
+  int profileSettingsRequest = 0;
+  bool feedCommunitiesOpen = false;
+  // Mount screens only after their first visit; IndexedStack still preserves
+  // navigation state and scroll positions for every previously opened tab.
+  final Set<SocoTab> _visitedTabs = <SocoTab>{};
   final contentKey = GlobalKey();
+  final _scrollChrome = MobileScrollChrome();
+  SocoTab? _lastChromeTab;
+  bool _lastConversationOpen = false;
+  bool _chromeFramePending = false;
   late final TextEditingController searchController = TextEditingController();
+
+  void _onMobileScroll(
+    ScrollNotification notification, {
+    String source = 'page',
+  }) {
+    if (notification.metrics.axis != Axis.vertical) return;
+    // A scroll ending at the last pixel must NOT reveal the bars. Flutter
+    // forwards the direct drag flag so momentum/bounce never mimics a swipe.
+    final delta = switch (notification) {
+      ScrollUpdateNotification update => update.scrollDelta ?? 0.0,
+      OverscrollNotification overscroll => overscroll.overscroll,
+      _ => null,
+    };
+    if (delta == null) return;
+    final isUserDrag = switch (notification) {
+      ScrollUpdateNotification update => update.dragDetails != null,
+      OverscrollNotification overscroll => overscroll.dragDetails != null,
+      _ => false,
+    };
+    final metrics = notification.metrics;
+    if (_scrollChrome.update(
+      offset: metrics.pixels - metrics.minScrollExtent,
+      scrollRange: metrics.maxScrollExtent - metrics.minScrollExtent,
+      delta: delta,
+      isUserDrag: isUserDrag,
+      isChat: tab == SocoTab.chat,
+      source: source,
+    )) {
+      // Scroll notifications arrive during layout; rebuild after this frame.
+      if (_chromeFramePending) return;
+      _chromeFramePending = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _chromeFramePending = false;
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  // A genuine reverse finger drag or upward wheel/trackpad event can occur
+  // while the inbox is clamped at an edge, producing no scroll notification.
+  // Reveal both bars together without changing the list's scroll position.
+  void _revealMobileChatChrome() {
+    if (!mounted || tab != SocoTab.chat || conversationOpen) return;
+    if (_scrollChrome.reveal()) setState(() {});
+  }
 
   void _select(int index) {
     final destination = SocoTab.values[index];
@@ -51,6 +110,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       search = '';
       searchController.clear();
       if (destination == SocoTab.chat) chatHomeRequest++;
+      if (destination == SocoTab.profile) profileVisitRequest++;
     });
   }
 
@@ -59,9 +119,36 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     ref.read(mobileShellProvider.notifier).openConversation();
     setState(() {
       requestedConversation = room;
+      openConversationRequest++;
       search = '';
       searchController.clear();
     });
+  }
+
+  void _openFeedPost(int postId) {
+    ref.read(mobileShellProvider.notifier).select(SocoTab.feed);
+    setState(() {
+      requestedPostId = postId;
+      feedCommunitiesOpen = false;
+      openPostRequest++;
+      search = '';
+      searchController.clear();
+    });
+  }
+
+  void _openInvitations() {
+    ref.read(mobileShellProvider.notifier).select(SocoTab.contacts);
+    setState(() => newFriendRequest++);
+  }
+
+  void _showNotifications() {
+    showNotificationSheet(
+      context,
+      widget.api,
+      onOpenConversation: _openChat,
+      onOpenPost: _openFeedPost,
+      onOpenInvitations: _openInvitations,
+    );
   }
 
   void _createChat() {
@@ -78,145 +165,192 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   };
 
   Widget _screens() {
+    _visitedTabs.add(tab);
     return IndexedStack(
       index: tab.index,
       children: [
-        ChatScreen(
-          key: const ValueKey('chat'),
-          api: widget.api,
-          query: tab == SocoTab.chat ? search : '',
-          requestedConversation: requestedConversation,
-          createRequest: createChatRequest,
-          resetRequest: chatHomeRequest,
-          onUnreadChanged: (count) {
-            if (mounted) {
-              ref.read(mobileShellProvider.notifier).setUnreadTotal(count);
-            }
-          },
-          onConversationChanged: (value) {
-            if (mounted) {
-              ref.read(mobileShellProvider.notifier).setConversationOpen(value);
-            }
-          },
-        ),
-        ContactsScreen(
-          key: const ValueKey('contacts'),
-          api: widget.api,
-          query: tab == SocoTab.contacts ? search : '',
-          onOpenConversation: _openChat,
-          onAddFriend: _createChat,
-          onCreateGroup: _createChat,
-          newFriendRequest: newFriendRequest,
-          onScanQr: () => _showQr(initialScan: true),
-          onShowQr: () => _showQr(),
-        ),
-        DiscoverScreen(
-          key: const ValueKey('discover'),
-          api: widget.api,
-          query: tab == SocoTab.discover ? search : '',
-        ),
-        FeedScreen(
-          key: const ValueKey('feed'),
-          api: widget.api,
-          query: tab == SocoTab.feed ? search : '',
-          createRequest: createPostRequest,
-          onOpenOwnProfile: () => _select(SocoTab.profile.index),
-          onOpenConversation: _openChat,
-        ),
-        ProfileScreen(
-          key: const ValueKey('profile'),
-          api: widget.api,
-          onLogout: widget.onLogout,
-          onConnect: _connectProfile,
-          onLocaleChanged: widget.onLocaleChanged,
-          onCreatePost: () {
-            ref.read(mobileShellProvider.notifier).select(SocoTab.feed);
-            setState(() => createPostRequest++);
-          },
-        ),
+        if (_visitedTabs.contains(SocoTab.chat))
+          ChatScreen(
+            key: const ValueKey('chat'),
+            api: widget.api,
+            query: tab == SocoTab.chat ? search : '',
+            requestedConversation: requestedConversation,
+            openConversationRequest: openConversationRequest,
+            createRequest: createChatRequest,
+            resetRequest: chatHomeRequest,
+            onUnreadChanged: (count) {
+              if (mounted) {
+                ref.read(mobileShellProvider.notifier).setUnreadTotal(count);
+              }
+            },
+            onConversationChanged: (value) {
+              if (mounted) {
+                ref
+                    .read(mobileShellProvider.notifier)
+                    .setConversationOpen(value);
+              }
+            },
+            // The avatar and channel lists have independent scrollports.
+            // Do not read every nested Chat scroll notification from IndexedStack.
+            onMobileScroll: (notification, source) {
+              if (tab == SocoTab.chat && !conversationOpen) {
+                _onMobileScroll(notification, source: source);
+              }
+            },
+            onMobileReverseScroll: _revealMobileChatChrome,
+          )
+        else
+          const SizedBox.shrink(),
+        if (_visitedTabs.contains(SocoTab.contacts))
+          ContactsScreen(
+            key: const ValueKey('contacts'),
+            api: widget.api,
+            query: tab == SocoTab.contacts ? search : '',
+            onOpenConversation: _openChat,
+            onAddFriend: _createChat,
+            onCreateGroup: _createChat,
+            newFriendRequest: newFriendRequest,
+            onScanQr: () => _showQr(initialScan: true),
+            onShowQr: () => _showQr(),
+          )
+        else
+          const SizedBox.shrink(),
+        if (_visitedTabs.contains(SocoTab.discover))
+          ExploreScreen(
+            key: const ValueKey('discover'),
+            api: widget.api,
+            query: tab == SocoTab.discover ? search : '',
+            onOpenConversation: _openChat,
+            onViewPosts: () => _select(SocoTab.feed.index),
+          )
+        else
+          const SizedBox.shrink(),
+        if (_visitedTabs.contains(SocoTab.feed))
+          FeedScreen(
+            key: const ValueKey('feed'),
+            api: widget.api,
+            query: tab == SocoTab.feed ? search : '',
+            createRequest: createPostRequest,
+            showCommunities: feedCommunitiesOpen,
+            onToggleCommunities: () =>
+                setState(() => feedCommunitiesOpen = !feedCommunitiesOpen),
+            openPostId: requestedPostId,
+            openPostRequest: openPostRequest,
+            onOpenOwnProfile: () => _select(SocoTab.profile.index),
+            onOpenConversation: _openChat,
+          )
+        else
+          const SizedBox.shrink(),
+        if (_visitedTabs.contains(SocoTab.profile))
+          ProfileScreen(
+            key: const ValueKey('profile'),
+            api: widget.api,
+            refreshRequest: profileVisitRequest,
+            settingsRequest: profileSettingsRequest,
+            onLogout: widget.onLogout,
+            onConnect: _connectProfile,
+            onLocaleChanged: widget.onLocaleChanged,
+            onNotifications: _showNotifications,
+            onOpenPost: _openFeedPost,
+            onOpenContacts: () => _select(SocoTab.contacts.index),
+            onOpenConversation: _openChat,
+            onCreatePost: () {
+              ref.read(mobileShellProvider.notifier).select(SocoTab.feed);
+              setState(() {
+                feedCommunitiesOpen = false;
+                createPostRequest++;
+              });
+            },
+          )
+        else
+          const SizedBox.shrink(),
       ],
     );
   }
 
-  bool get _showsHeader =>
-      tab == SocoTab.chat || tab == SocoTab.contacts || tab == SocoTab.feed;
+  // PWA: one shared toolbar on all five primary tabs.
+  bool get _showsHeader => true;
 
   Widget _header(bool compact) {
     return Container(
       key: const ValueKey('web-appbar'),
-      height: compact ? (hint.isEmpty ? 70 : 112) : 76,
-      padding: EdgeInsets.fromLTRB(
-        compact ? 14 : 20,
-        compact ? 10 : 12,
-        compact ? 14 : 20,
-        compact ? 9 : 12,
-      ),
+      height: compact ? 52 : 76,
+      padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 20),
       decoration: const BoxDecoration(
-        color: Color(0xFFFEFEFF),
-        border: Border(bottom: BorderSide(color: socoLine)),
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE9EDF5))),
       ),
-      child: compact
-          ? Column(
-              children: [
-                Row(
-                  children: [
-                    const SocoLogo(size: 34),
-                    const SizedBox(width: 7),
-                    const GradientText(
-                      'SocCO',
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const Spacer(),
-                    ..._headerActions(),
-                  ],
-                ),
-                const SizedBox(height: 7),
-                if (hint.isNotEmpty) _searchField(compact: true),
-              ],
+      child: Row(
+        children: [
+          SocoLogo(size: compact ? 27 : 40),
+          SizedBox(width: compact ? 6 : 10),
+          if (compact)
+            const Text(
+              'SocCO',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -.3,
+                color: Color(0xFF2358BD),
+              ),
             )
-          : Row(
-              children: [
-                const SocoLogo(size: 40),
-                const SizedBox(width: 10),
-                const GradientText(
-                  'SocCO',
-                  style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(width: 26),
-                if (hint.isNotEmpty) Expanded(child: _searchField()),
-                const SizedBox(width: 18),
-                ..._headerActions(),
-              ],
+          else
+            const GradientText(
+              'SocCO',
+              style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
             ),
+          if (!compact && hint.isNotEmpty) ...[
+            const SizedBox(width: 26),
+            Expanded(child: _searchField()),
+          ],
+          const Spacer(),
+          ..._headerActions(),
+        ],
+      ),
     );
   }
+
+  /// Search is always its own persistent row, independent of the collapsing
+  /// toolbar (Contacts/Discover/Feed), exactly like the PWA mobile shell.
+  Widget _mobileSearchDock() => Container(
+    key: const ValueKey('mobile-search-dock'),
+    height: 60,
+    padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      border: Border(bottom: BorderSide(color: Color(0xFFE9EDF5))),
+    ),
+    child: _searchField(compact: true),
+  );
 
   List<Widget> _headerActions() {
     final style = IconButton.styleFrom(
       foregroundColor: socoBlue,
       backgroundColor: Colors.transparent,
       hoverColor: socoSoftBlue,
-      minimumSize: const Size.square(40),
-      maximumSize: const Size.square(40),
+      minimumSize: const Size.square(42),
+      maximumSize: const Size.square(42),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
     final bell = IconButton(
       tooltip: 'Thông báo',
       style: style,
-      onPressed: () => showNotificationSheet(context, widget.api),
-      icon: const SocoIcon(SocoIconType.bell, size: 26),
+      onPressed: _showNotifications,
+      icon: const SocoIcon(SocoIconType.bell, size: 20),
     );
     if (tab == SocoTab.feed) {
       return [
         IconButton(
-          tooltip: 'Bạn bè',
+          key: const ValueKey('feed-communities-toggle'),
+          tooltip: 'Cộng đồng',
           style: style,
-          onPressed: () => _select(SocoTab.contacts.index),
-          icon: const Icon(Icons.people_outline_rounded, size: 27),
+          onPressed: () =>
+              setState(() => feedCommunitiesOpen = !feedCommunitiesOpen),
+          icon: Icon(
+            feedCommunitiesOpen ? Icons.groups_rounded : Icons.groups_outlined,
+            size: 21,
+          ),
         ),
         bell,
         Padding(
@@ -228,7 +362,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             child: UserAvatar(
               name: widget.api.user['displayName']?.toString() ?? '',
               username: widget.api.user['username']?.toString(),
-              size: 35,
+              size: 32,
               fetchProfileImage: !widget.api.isDemo,
             ),
           ),
@@ -241,9 +375,42 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           tooltip: 'Thêm bạn',
           style: style,
           onPressed: () => setState(() => newFriendRequest++),
-          icon: const SocoIcon(SocoIconType.plus, size: 31),
+          icon: const SocoIcon(SocoIconType.plus, size: 21),
         ),
         bell,
+      ];
+    }
+    if (tab == SocoTab.discover) return [bell];
+    if (tab == SocoTab.profile) {
+      return [
+        IconButton(
+          key: const ValueKey('profile-create-post'),
+          tooltip: 'Đăng bài',
+          style: style,
+          onPressed: () {
+            ref.read(mobileShellProvider.notifier).select(SocoTab.feed);
+            setState(() {
+              feedCommunitiesOpen = false;
+              createPostRequest++;
+            });
+          },
+          icon: const Icon(Icons.edit_outlined, size: 20),
+        ),
+        bell,
+        Padding(
+          padding: const EdgeInsets.only(left: 2),
+          child: InkWell(
+            key: const ValueKey('header-my-avatar'),
+            onTap: () => setState(() => profileSettingsRequest++),
+            borderRadius: BorderRadius.circular(50),
+            child: UserAvatar(
+              name: widget.api.user['displayName']?.toString() ?? '',
+              username: widget.api.user['username']?.toString(),
+              size: 32,
+              fetchProfileImage: !widget.api.isDemo,
+            ),
+          ),
+        ),
       ];
     }
     return [
@@ -251,14 +418,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         tooltip: 'Quét QR',
         style: style,
         onPressed: () => _showQr(initialScan: true),
-        icon: const SocoIcon(SocoIconType.qr, size: 27),
+        icon: const SocoIcon(SocoIconType.qr, size: 21),
       ),
       IconButton(
         key: const ValueKey('quick-create'),
         tooltip: 'Tạo mới',
         style: style,
         onPressed: _createChat,
-        icon: const SocoIcon(SocoIconType.plus, size: 31),
+        icon: const SocoIcon(SocoIconType.plus, size: 21),
       ),
       bell,
     ];
@@ -330,6 +497,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     ref.watch(mobileShellProvider);
+    if (_lastChromeTab != tab || _lastConversationOpen != conversationOpen) {
+      _lastChromeTab = tab;
+      _lastConversationOpen = conversationOpen;
+      _scrollChrome.reset();
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth <= 760;
@@ -360,15 +532,98 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                           ]
                         : null,
                   ),
-                  child: Column(
+                  child: Stack(
                     children: [
-                      if (_showsHeader &&
-                          !(compact && tab == SocoTab.chat && conversationOpen))
-                        _header(compact),
-                      Expanded(
-                        child: KeyedSubtree(key: contentKey, child: _screens()),
+                      Column(
+                        children: [
+                          if (_showsHeader &&
+                              !(compact &&
+                                  tab == SocoTab.chat &&
+                                  conversationOpen))
+                            AnimatedContainer(
+                              key: const ValueKey('mobile-header-slot'),
+                              duration: compact
+                                  ? const Duration(milliseconds: 290)
+                                  : Duration.zero,
+                              curve: Curves.easeOutCubic,
+                              height: compact
+                                  ? (_scrollChrome.hidden ? 0 : 52)
+                                  : 76,
+                              child: ClipRect(
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  child: IgnorePointer(
+                                    ignoring: compact && _scrollChrome.hidden,
+                                    child: AnimatedSlide(
+                                      duration: const Duration(
+                                        milliseconds: 290,
+                                      ),
+                                      curve: Curves.easeOutCubic,
+                                      offset: compact && _scrollChrome.hidden
+                                          ? const Offset(0, -1)
+                                          : Offset.zero,
+                                      child: AnimatedOpacity(
+                                        duration: const Duration(
+                                          milliseconds: 240,
+                                        ),
+                                        opacity: compact && _scrollChrome.hidden
+                                            ? 0
+                                            : 1,
+                                        child: _header(compact),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Search is persistent even while the shared header
+                          // slides away, like the PWA independent search dock.
+                          if (compact && hint.isNotEmpty && !hideBottomNav)
+                            _mobileSearchDock(),
+                          Expanded(
+                            child: NotificationListener<ScrollNotification>(
+                              onNotification: (notification) {
+                                if (compact &&
+                                    tab != SocoTab.chat &&
+                                    notification.depth == 0) {
+                                  _onMobileScroll(notification);
+                                }
+                                return false;
+                              },
+                              child: KeyedSubtree(
+                                key: contentKey,
+                                child: _screens(),
+                              ),
+                            ),
+                          ),
+                          if (!compact && !hideBottomNav)
+                            _bottomNavigation(compact),
+                        ],
                       ),
-                      if (!hideBottomNav) _bottomNavigation(compact),
+                      // The PWA bottom bar floats over the content, without
+                      // creating a blank 69px layout band below every screen.
+                      if (compact && !hideBottomNav)
+                        Positioned(
+                          bottom: 16,
+                          left: 24,
+                          right: 24,
+                          height: 56,
+                          child: IgnorePointer(
+                            ignoring: _scrollChrome.hidden,
+                            child: AnimatedSlide(
+                              duration: const Duration(milliseconds: 290),
+                              curve: Curves.easeOutCubic,
+                              offset: _scrollChrome.hidden
+                                  ? const Offset(0, 2)
+                                  : Offset.zero,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 240),
+                                opacity: _scrollChrome.hidden ? 0 : 1,
+                                child: _bottomNavigation(true),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),

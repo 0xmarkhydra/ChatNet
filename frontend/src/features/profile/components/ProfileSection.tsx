@@ -1,11 +1,18 @@
+import { StoryHighlights } from '../../feed'
 import { SettingsWorkspace } from "../../settings";
-import { PencilLine, Download, LogOut, ChevronDown, Volume2, ArrowLeft, Settings, Images, RefreshCw } from "lucide-react";
+import { PencilLine, Download, LogOut, ChevronDown, ChevronRight, Volume2, ArrowLeft, Settings, Images, RefreshCw, Camera, Plus } from "lucide-react";
 import { BlockedUsersPanel } from "../../contacts";
 import { isDesktopBuild } from "../../../platform/desktop";
 import { AccountSessionsPanel } from "../../auth";
-import UserAvatar, { profileAssetUrl } from "../../../shared/ui/UserAvatar";
+import UserAvatar, { avatarTone, profileAssetUrl } from "../../../shared/ui/UserAvatar";
+import { Button } from "@/shared/ui/button";
 import UiIcon from "../../../shared/ui/UiIcon";
 import ProfileNote from "./ProfileNote";
+import ProfileAvatarMenu from "./ProfileAvatarMenu";
+import ProfileAvatarPicker from "./ProfileAvatarPicker";
+import ProfileHero from "./ProfileHero";
+import ProfileDetailsCard from "./ProfileDetailsCard";
+import ProfileMediaGallery from "./ProfileMediaGallery";
 import { userLabel } from "../../../shared/utils/userLabel";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
@@ -13,7 +20,7 @@ import type { ManagedAccountSession } from "../../auth";
 import { type Post } from "../../feed";
 import type { UserPrivacy, ProfileMediaState } from "../types";
 import { type Session } from "../../../shared/types/session";
-import { type SetStateAction } from "react";
+import { useState, type SetStateAction } from "react";
 import type { Tab } from "../../../shared/types/navigation";
 import { UI_MESSAGES } from "../../i18n";
 import type { LanguageOption } from "../../i18n";
@@ -47,6 +54,8 @@ export type ProfileSectionProps = {
   mediaUploading: "chat" | "feed" | "story" | "profile" | null;
   messageSoundEnabled: boolean;
   name: string;
+  onCreateStory: () => void;
+  onOpenPost: (postId: number) => void;
   nativeNotifications: { enabled: boolean; toggle: () => void; warning: string; };
   pendingPost: Post | null;
   postText: string;
@@ -58,6 +67,7 @@ export type ProfileSectionProps = {
   profileBusy: "avatar" | "cover" | null;
   profileHasMore: boolean;
   profileHeadingRef: RefObject<HTMLHeadingElement | null>;
+  friendCount: number;
   profileIdentityForm: ReactNode;
   profileIdentityRef: RefObject<HTMLButtonElement | null>;
   profileMedia: ProfileMediaState | null;
@@ -133,6 +143,8 @@ export default function ProfileSection({
   mediaUploading,
   messageSoundEnabled,
   name,
+  onCreateStory,
+  onOpenPost,
   nativeNotifications,
   pendingPost,
   postText,
@@ -144,6 +156,7 @@ export default function ProfileSection({
   profileBusy,
   profileHasMore,
   profileHeadingRef,
+  friendCount,
   profileIdentityForm,
   profileIdentityRef,
   profileMedia,
@@ -190,6 +203,14 @@ export default function ProfileSection({
   visibleProfilePosts,
   visibleTranslationSettingsOptions,
 }: ProfileSectionProps) {
+  const [avatarPicker, setAvatarPicker] = useState<{ opener: HTMLButtonElement | null } | null>(null);
+  const openAvatarPicker = (opener: HTMLButtonElement | null) => setAvatarPicker({ opener });
+  const displayName = userLabel(profileMedia?.displayName || session.user.displayName, name);
+  const [timelineView, setTimelineView] = useState<"all" | "media" | "edit">("all");
+  const mobileTimeline = profileTimelineOpen && !isProfileDesktop;
+  const mediaSelected = mobileTimeline && timelineView === "media";
+  const editSelected = mobileTimeline && timelineView === "edit";
+  const coverLabel = profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover");
   return (
       <div
             className={`simple-view profile-view ${profileTimelineOpen ? "personal-timeline-view" : ""} ${isProfileDesktop && desktopProfileSettings ? "settings-workspace-open" : ""}`}
@@ -347,18 +368,19 @@ export default function ProfileSection({
                 }
               />
             )}
-            <input
-              ref={avatarFileInputRef}
-              className="hidden-media-input"
-              type="file"
-              accept="image/*"
-              aria-label="Chọn ảnh đại diện"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                void updateProfileImage("avatar", file);
-              }}
-            />
+            {avatarPicker && (
+              <ProfileAvatarPicker
+                key={session.sessionId}
+                username={name}
+                avatarUrl={profileMedia?.avatarSet ? profileAssetUrl(name, 'avatar', profileMedia.updatedAt) : undefined}
+                posts={profilePosts}
+                busy={profileBusy !== null || mediaUploading === 'profile'}
+                opener={avatarPicker.opener}
+                inputRef={avatarFileInputRef}
+                onSave={file => updateProfileImage('avatar', file)}
+                onClose={() => setAvatarPicker(null)}
+              />
+            )}
             <input
               ref={coverFileInputRef}
               className="hidden-media-input"
@@ -373,7 +395,7 @@ export default function ProfileSection({
             />
 
             {profileTimelineOpen && (
-              <header className="personal-timeline-header">
+              <header className="personal-timeline-header profile-page-toolbar">
                 <button
                   type="button"
                   onClick={closeProfileTimeline}
@@ -381,137 +403,101 @@ export default function ProfileSection({
                 >
                   <ArrowLeft size={20} />
                 </button>
-                <h1 ref={profileHeadingRef} tabIndex={-1}>
+                <h2 ref={profileHeadingRef} tabIndex={-1}>
                   Trang cá nhân
-                </h1>
-                <button
+                </h2>
+                {!mobileTimeline && <button
                   type="button"
                   onClick={() => setProfileEditorOpen(true)}
                 >
                   <Settings size={18} />
                   <span>Chỉnh sửa</span>
-                </button>
+                </button>}
               </header>
             )}
-            <section className="profile-hero">
-              <div
-                className={`profile-cover-art ${profileMedia?.coverSet ? "has-cover" : ""}`}
-              >
-                <div className="profile-cover-placeholder">
-                  <strong>SocCO</strong>
-                  <small>Understand. Connect. Together.</small>
-                </div>
-                {profileMedia?.coverSet && (
-                  <img
-                    src={profileAssetUrl(name, "cover", profileMedia.updatedAt)}
-                    alt="Ảnh bìa"
-                    draggable={false}
-                    onError={(event) => {
-                      event.currentTarget.hidden = true;
-                      event.currentTarget.parentElement?.classList.remove(
-                        "has-cover",
-                      );
-                    }}
-                  />
-                )}
-                <button
-                  type="button"
-                  className="profile-cover-edit"
-                  disabled={
-                    profileBusy !== null || mediaUploading === "profile"
-                  }
-                  onClick={() => coverFileInputRef.current?.click()}
-                >
-                  <UiIcon name="photo" size={17} />
-                  {profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover")}
-                </button>
-              </div>
+            <ProfileHero username={name}
+              compact={!profileTimelineOpen && !isProfileDesktop}
+              centered={mobileTimeline}
+              displayName={displayName}
+              city={profileMedia?.city} workplace={profileMedia?.workplace} school={profileMedia?.school}
+              friendCount={friendCount}
+              coverUrl={profileMedia?.coverSet ? profileAssetUrl(name, "cover", profileMedia.updatedAt) : undefined}
+              fallbackCoverTone={isProfileDesktop ? undefined : avatarTone(displayName)}
+              coverAction={<button type="button" className="profile-page-cover-action"
+                aria-label={coverLabel} title={coverLabel}
+                disabled={profileBusy !== null || mediaUploading === "profile"}
+                onClick={() => coverFileInputRef.current?.click()}>
+                {mobileTimeline ? <Camera size={19} aria-hidden="true" /> : <><UiIcon name="photo" size={17} />{coverLabel}</>}
+              </button>}
+              avatar={<>
+                <ProfileNote key={session.sessionId + ":profile-note"} username={name} displayName={displayName} owner request={apiFetch} />
+                <ProfileAvatarMenu username={name} displayName={displayName}
+                  avatarClassName="profile-page-avatar" avatarSet={Boolean(profileMedia?.avatarSet)}
+                  avatarVersion={profileMedia?.updatedAt} editBusy={profileBusy !== null || mediaUploading === "profile"}
+                  onChangeAvatar={openAvatarPicker} />
+              </>}
+              actions={mobileTimeline ? (
+                <Button size="lg" className="profile-page-story-action min-w-0 gap-1.5 px-2 text-ui-label" onClick={onCreateStory}>
+                  <Plus size={17} aria-hidden="true" />Tạo tin
+                </Button>
+              ) : !profileTimelineOpen && (
+                <>
+                  <small className="profile-page-overview-email text-ui-label text-muted-foreground" title={session.user.email}>
+                    {session.user.email}
+                  </small>
+                  <Button ref={profileIdentityRef} variant="ghost" size="lg" className="gap-1 px-2 text-primary"
+                    aria-label="Mở trang cá nhân" onClick={() => {
+                      setTimelineView("all");
+                      setProfileTimelineOpen(true);
+                      setGlobalSearch("");
+                    }}>
+                    Xem trang cá nhân <ChevronRight size={16} aria-hidden="true" />
+                  </Button>
+                </>
+              )} />
 
-              <div
-                className="profile-identity"
-                onClick={(event) => {
-                  if (
-                    !profileTimelineOpen &&
-                    !(event.target as HTMLElement).closest("button")
-                  ) {
-                    setProfileTimelineOpen(true);
-                    setGlobalSearch("");
-                  }
-                }}
-              >
-                <div className="profile-avatar-editor">
-                  <ProfileNote
-                    key={session.sessionId + ":note"}
-                    username={name}
-                    owner
-                    request={apiFetch}
-                  />
-                  <UserAvatar
-                    username={name}
-                    name={userLabel(
-                      profileMedia?.displayName || session.user.displayName,
-                      name,
-                    )}
-                    className="profile-avatar"
-                    online
-                  />
-                  <button
-                    type="button"
-                    className="profile-avatar-edit"
-                    aria-label="Đổi ảnh đại diện"
-                    title="Đổi ảnh đại diện"
-                    disabled={
-                      profileBusy !== null || mediaUploading === "profile"
-                    }
-                    onClick={() => avatarFileInputRef.current?.click()}
-                  >
-                    <UiIcon name="photo" size={17} />
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  ref={profileIdentityRef}
-                  className="profile-identity-copy profile-identity-link"
-                  aria-label="Mở trang cá nhân"
-                  disabled={profileTimelineOpen}
-                  onClick={() => {
-                    setProfileTimelineOpen(true);
-                    setGlobalSearch("");
-                  }}
-                >
-                  <strong>
-                    {profileMedia?.displayName ||
-                      session.user.displayName ||
-                      name}
-                  </strong>
-                  <span>@{name}</span>
-                  <small className="profile-email">{session.user.email}</small>
-                  {!profileTimelineOpen && (
-                    <small className="profile-media-hint">
-                      Xem trang cá nhân · Dòng thời gian ›
-                    </small>
-                  )}
-                </button>
+            {mobileTimeline && (
+              <div className="profile-mobile-section-picker" role="group" aria-label="Nội dung trang cá nhân">
+                <Button size="lg" variant={timelineView === "all" ? "secondary" : "ghost"}
+                  aria-pressed={timelineView === "all"} onClick={() => setTimelineView("all")}>Tất cả</Button>
+                <Button size="lg" variant={timelineView === "media" ? "secondary" : "ghost"}
+                  aria-pressed={timelineView === "media"} onClick={() => setTimelineView("media")}>Ảnh &amp; video</Button>
+                <Button size="lg" variant={timelineView === "edit" ? "secondary" : "ghost"}
+                  aria-pressed={timelineView === "edit"} onClick={() => setTimelineView("edit")}>Chỉnh sửa hồ sơ</Button>
               </div>
-            </section>
+            )}
 
-            {profileTimelineOpen ? (
+            {editSelected ? (
+              <section className="personal-timeline-content profile-mobile-edit-panel" aria-label="Chỉnh sửa hồ sơ">
+                {profileIdentityForm}
+                <section className="settings-card profile-field-permissions" aria-label="Quyền trường thông tin">
+                  <h3>Quyền trường thông tin</h3>
+                  {profilePrivacyControls}
+                </section>
+              </section>
+            ) : mediaSelected ? (
+              <section className="personal-timeline-content profile-mobile-media" aria-label="Ảnh và video">
+                {profilePostsError && <p role="alert">{profilePostsError}{" "}
+                  <Button variant="outline" onClick={() => void loadProfilePosts(false, true)}>Thử lại</Button></p>}
+                <ProfileMediaGallery
+                  items={profilePosts.flatMap(post => (post.attachments ?? []).flatMap((attachment, index) =>
+                    attachment.kind === "image" || attachment.kind === "video" ? [{ postId: post.id, attachment, index }] : [],
+                  ))}
+                  emptyText="Chưa có ảnh hoặc video trong các bài viết đã tải."
+                  postsBusy={profilePostsBusy} onOpenPost={onOpenPost} onCreatePost={() => setProfileComposerOpen(true)} />
+                {profileHasMore && <Button variant="outline" disabled={profilePostsBusy}
+                  onClick={() => void loadProfilePosts(true)}>Xem thêm từ bài viết cũ</Button>}
+              </section>
+            ) : profileTimelineOpen ? (
               <section
                 className="personal-timeline-content"
                 aria-label="Dòng thời gian cá nhân"
               >
-                <div className="personal-timeline-intro">
-                  <div>
-                    <strong>Khoảnh khắc của bạn</strong>
-                    <p>Lưu giữ và chia sẻ những câu chuyện mỗi ngày.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setProfileComposerOpen(true)}
-                  >
-                    <PencilLine size={18} />
-                    Đăng bài
-                  </button>
+                <div className="profile-page-aside">
+                  <ProfileDetailsCard username={name} bio={profileMedia?.bio} city={profileMedia?.city}
+                    workplace={profileMedia?.workplace} school={profileMedia?.school} iconEdit={mobileTimeline}
+                    hasPrivateEmail={Boolean(session.user.email)} onEdit={() => mobileTimeline ? setTimelineView("edit") : setProfileEditorOpen(true)} />
+                  <StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} className="profile-page-about" owner />
                 </div>
                 <div className="profile-post-launcher">
                   <UserAvatar
@@ -565,10 +551,10 @@ export default function ProfileSection({
                   </div>
                 )}
 
-                <div className="feed zalo-feed">
+                <div className="feed zalo-feed app-mobile:-mx-3! app-mobile:w-[calc(100%+24px)]!">
                   {pendingPost && (
                     <article
-                      className="post zalo-post outgoing-preview"
+                      className="outgoing-preview mb-3.5 grid grid-cols-[42px_minmax(0,1fr)] gap-2.5 overflow-hidden rounded-ui-xl border border-border bg-card px-3 pt-3.5 pb-3 text-foreground shadow-[0_4px_22px_rgba(38,61,120,0.043)]"
                       aria-busy="true"
                     >
                       <UserAvatar
@@ -579,11 +565,9 @@ export default function ProfileSection({
                         )}
                         className="avatar"
                       />
-                      <div className="post-body">
-                        <strong>{userLabel(profileMedia?.displayName || session.user.displayName, name)}</strong>
-                        <p>{pendingPost.content}</p>
-                        <MediaAttachmentsView items={pendingPost.attachments} />
-                      </div>
+                      <strong className="min-w-0 text-ui-body font-bold text-foreground">{userLabel(profileMedia?.displayName || session.user.displayName, name)}</strong>
+                      <p className="col-span-full mt-2.5 mb-1.5 text-ui-body leading-normal whitespace-pre-wrap">{pendingPost.content}</p>
+                      <MediaAttachmentsView items={pendingPost.attachments} />
                     </article>
                   )}
                   {renderPosts(visibleProfilePosts)}
@@ -1037,9 +1021,12 @@ export default function ProfileSection({
                         </span>
                         <span className="locale-option-copy">
                           <strong>{language.localizedLanguage}</strong>
-                          <small>{language.nativeLanguage}</small>
+                          {language.nativeLanguage !== language.localizedLanguage && (
+                            <small>{language.nativeLanguage}</small>
+                          )}
                           <em>
-                            {language.localizedRegion} · {language.nativeRegion}
+                            {language.localizedRegion}
+                            {language.nativeRegion !== language.localizedRegion && ` · ${language.nativeRegion}`}
                           </em>
                         </span>
                         <b>{language.code}</b>

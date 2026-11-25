@@ -26,6 +26,7 @@ class FeedComment {
     this.parentId,
     this.authorDisplayName,
     this.updatedAt,
+    this.liked,
   });
 
   final int id;
@@ -35,6 +36,7 @@ class FeedComment {
   final int? parentId;
   final String? authorDisplayName;
   final String? updatedAt;
+  final bool? liked;
 
   factory FeedComment.fromJson(JsonMap json) => FeedComment(
     id: requiredField<int>(json, 'id'),
@@ -44,6 +46,7 @@ class FeedComment {
     parentId: optionalField<int>(json, 'parentId'),
     authorDisplayName: optionalField<String>(json, 'authorDisplayName'),
     updatedAt: optionalField<String>(json, 'updatedAt'),
+    liked: optionalField<bool>(json, 'liked'),
   );
 
   FeedComment copyWith({
@@ -54,6 +57,7 @@ class FeedComment {
     Object? parentId = absent,
     Object? authorDisplayName = absent,
     Object? updatedAt = absent,
+    Object? liked = absent,
   }) => FeedComment(
     id: id ?? this.id,
     author: author ?? this.author,
@@ -66,6 +70,7 @@ class FeedComment {
     updatedAt: identical(updatedAt, absent)
         ? this.updatedAt
         : updatedAt as String?,
+    liked: identical(liked, absent) ? this.liked : liked as bool?,
   );
 
   JsonMap toJson() => {
@@ -76,6 +81,7 @@ class FeedComment {
     if (parentId != null) 'parentId': parentId,
     if (authorDisplayName != null) 'authorDisplayName': authorDisplayName,
     if (updatedAt != null) 'updatedAt': updatedAt,
+    if (liked != null) 'liked': liked,
   };
 }
 
@@ -93,9 +99,14 @@ class FeedPost {
     this.reactions,
     this.attachments,
     this.visibility,
+    this.publishLocation,
     this.background,
     this.updatedAt,
     this.saved,
+    this.repostKind,
+    this.originalPost,
+    this.repostCount,
+    this.myRepostId,
   });
 
   final int id;
@@ -110,9 +121,14 @@ class FeedPost {
   final List<FeedReaction>? reactions;
   final List<MediaAttachment>? attachments;
   final PostVisibility? visibility;
+  final JsonMap? publishLocation;
   final String? background;
   final String? updatedAt;
   final bool? saved;
+  final String? repostKind;
+  final JsonMap? originalPost;
+  final int? repostCount;
+  final int? myRepostId;
 
   factory FeedPost.fromJson(JsonMap json) => FeedPost(
     id: requiredField<int>(json, 'id'),
@@ -132,9 +148,18 @@ class FeedPost {
       PostVisibility.values,
       (value) => value.name,
     ),
+    publishLocation: json['publishLocation'] == null
+        ? null
+        : jsonMap(json['publishLocation']),
     background: optionalField<String>(json, 'background'),
     updatedAt: optionalField<String>(json, 'updatedAt'),
     saved: optionalField<bool>(json, 'saved'),
+    repostKind: optionalField<String>(json, 'repostKind'),
+    originalPost: json['originalPost'] == null
+        ? null
+        : jsonMap(json['originalPost']),
+    repostCount: optionalField<int>(json, 'repostCount'),
+    myRepostId: optionalField<int>(json, 'myRepostId'),
   );
 
   FeedPost copyWith({
@@ -150,9 +175,14 @@ class FeedPost {
     Object? reactions = absent,
     Object? attachments = absent,
     Object? visibility = absent,
+    Object? publishLocation = absent,
     Object? background = absent,
     Object? updatedAt = absent,
     Object? saved = absent,
+    Object? repostKind = absent,
+    Object? originalPost = absent,
+    Object? repostCount = absent,
+    Object? myRepostId = absent,
   }) => FeedPost(
     id: id ?? this.id,
     author: author ?? this.author,
@@ -176,6 +206,9 @@ class FeedPost {
     visibility: identical(visibility, absent)
         ? this.visibility
         : visibility as PostVisibility?,
+    publishLocation: identical(publishLocation, absent)
+        ? this.publishLocation
+        : publishLocation as JsonMap?,
     background: identical(background, absent)
         ? this.background
         : background as String?,
@@ -183,6 +216,18 @@ class FeedPost {
         ? this.updatedAt
         : updatedAt as String?,
     saved: identical(saved, absent) ? this.saved : saved as bool?,
+    repostKind: identical(repostKind, absent)
+        ? this.repostKind
+        : repostKind as String?,
+    originalPost: identical(originalPost, absent)
+        ? this.originalPost
+        : originalPost as JsonMap?,
+    repostCount: identical(repostCount, absent)
+        ? this.repostCount
+        : repostCount as int?,
+    myRepostId: identical(myRepostId, absent)
+        ? this.myRepostId
+        : myRepostId as int?,
   );
 
   JsonMap toJson() => {
@@ -200,9 +245,14 @@ class FeedPost {
     if (attachments != null)
       'attachments': attachments!.map((item) => item.toJson()).toList(),
     if (visibility != null) 'visibility': visibility!.name,
+    if (publishLocation != null) 'publishLocation': publishLocation,
     if (background != null) 'background': background,
     if (updatedAt != null) 'updatedAt': updatedAt,
     if (saved != null) 'saved': saved,
+    if (repostKind != null) 'repostKind': repostKind,
+    if (originalPost != null) 'originalPost': originalPost,
+    if (repostCount != null) 'repostCount': repostCount,
+    if (myRepostId != null) 'myRepostId': myRepostId,
   };
 }
 
@@ -210,15 +260,19 @@ class Story {
   const Story({
     required this.id,
     required this.author,
-    required this.attachment,
     required this.createdAt,
     required this.expiresAt,
+    this.attachment,
+    this.text,
+    this.background,
     this.authorDisplayName,
   });
 
   final int id;
   final String author;
-  final MediaAttachment attachment;
+  final MediaAttachment? attachment;
+  final String? text;
+  final String? background;
   final String createdAt;
   final String expiresAt;
   final String? authorDisplayName;
@@ -226,7 +280,11 @@ class Story {
   factory Story.fromJson(JsonMap json) => Story(
     id: requiredField<int>(json, 'id'),
     author: requiredField<String>(json, 'author'),
-    attachment: MediaAttachment.fromJson(jsonMap(json['attachment'])),
+    attachment: json['attachment'] == null
+        ? null
+        : MediaAttachment.fromJson(jsonMap(json['attachment'])),
+    text: optionalField<String>(json, 'text'),
+    background: optionalField<String>(json, 'background'),
     createdAt: requiredField<String>(json, 'createdAt'),
     expiresAt: requiredField<String>(json, 'expiresAt'),
     authorDisplayName: optionalField<String>(json, 'authorDisplayName'),
@@ -235,14 +293,22 @@ class Story {
   Story copyWith({
     int? id,
     String? author,
-    MediaAttachment? attachment,
+    Object? attachment = absent,
+    Object? text = absent,
+    Object? background = absent,
     String? createdAt,
     String? expiresAt,
     Object? authorDisplayName = absent,
   }) => Story(
     id: id ?? this.id,
     author: author ?? this.author,
-    attachment: attachment ?? this.attachment,
+    attachment: identical(attachment, absent)
+        ? this.attachment
+        : attachment as MediaAttachment?,
+    text: identical(text, absent) ? this.text : text as String?,
+    background: identical(background, absent)
+        ? this.background
+        : background as String?,
     createdAt: createdAt ?? this.createdAt,
     expiresAt: expiresAt ?? this.expiresAt,
     authorDisplayName: identical(authorDisplayName, absent)
@@ -253,7 +319,9 @@ class Story {
   JsonMap toJson() => {
     'id': id,
     'author': author,
-    'attachment': attachment.toJson(),
+    if (attachment != null) 'attachment': attachment!.toJson(),
+    if (text != null) 'text': text,
+    if (background != null) 'background': background,
     'createdAt': createdAt,
     'expiresAt': expiresAt,
     if (authorDisplayName != null) 'authorDisplayName': authorDisplayName,

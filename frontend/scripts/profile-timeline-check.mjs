@@ -42,6 +42,7 @@ let failCreate = false
 let privacy = { searchableByUsername: true, searchableByName: true, searchableByEmail: false, allowFriendRequests: true, showOnlineStatus: true }
 let privacyWrites = 0
 const errors = []
+const avatarOnly = process.argv.includes('--avatar-navigation')
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization, Content-Type', 'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS' }
 try {
   for (let i = 0; i < 60; i++) {
@@ -55,7 +56,7 @@ try {
     if (!String(error).includes("Executable doesn't exist")) throw error
     browser = await chromium.launch({ headless: true, channel: 'chrome' })
   }
-  for (const width of [390, 768, 1024, 1440]) {
+  for (const width of avatarOnly ? [390] : [390, 768, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: 'reduce', serviceWorkers: 'block' })
     await context.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
     const page = await context.newPage()
@@ -98,8 +99,81 @@ try {
     })
     await page.goto(origin)
     await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('button', { name: 'Cá nhân' }).click()
+    async function checkMobileProfileColors() {
+      const colors = await page.evaluate(() => {
+        const avatar = document.querySelector('.profile-view > .profile-page-hero .profile-hero-avatar')
+        const account = document.querySelector('.app-sidebar-avatar')
+        const cover = document.querySelector('.profile-view > .profile-page-hero .has-account-cover')
+        if (!avatar || !account || !cover) return null
+        const read = node => getComputedStyle(node).getPropertyValue('--soco-avatar-gradient').trim()
+        return { cover: read(cover), account: read(account), avatar: getComputedStyle(avatar).backgroundImage,
+          accountAvatar: getComputedStyle(account).backgroundImage, overflow: document.documentElement.scrollWidth > innerWidth + 1 }
+      })
+      check(colors?.account && colors.cover === colors.account, 'Mobile fallback cover must share the account palette')
+      check(colors.avatar === colors.accountAvatar && !colors.overflow, 'Mobile avatar color or profile width differs from the account layout')
+    }
+    if (width === 390) {
+      const avatar = page.getByRole('button', { name: 'Tùy chọn ảnh đại diện' })
+      const profileLink = page.getByRole('button', { name: 'Mở trang cá nhân' })
+      await profileLink.waitFor()
+      await checkMobileProfileColors()
+      const hero = page.locator('.profile-view > .profile-page-hero-compact')
+      const bounds = await hero.boundingBox()
+      check(bounds && bounds.height <= 196, 'Mobile overview card is too tall')
+      const touch = await profileLink.boundingBox()
+      check(touch && touch.height >= 44, 'Mobile profile action must keep a 44 px touch target')
+      await avatar.click()
+      await page.getByRole('menuitem', { name: 'Xem ảnh đại diện' }).click()
+      const preview = page.getByRole('dialog', { name: 'Ảnh đại diện', exact: true })
+      await preview.waitFor()
+      await preview.getByRole('button', { name: 'Thêm ảnh đại diện' }).click()
+      await preview.waitFor({ state: 'hidden' })
+      const picker = page.getByRole('dialog', { name: 'Đổi ảnh đại diện' })
+      await picker.waitFor()
+      await page.keyboard.press('Escape')
+      await picker.waitFor({ state: 'hidden' })
+      await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Tùy chọn ảnh đại diện')
+      check(await profileLink.isVisible(), 'Avatar preview changed the profile screen')
+      await avatar.click()
+      await page.getByRole('menuitem', { name: 'Đổi ảnh đại diện' }).click()
+      await picker.waitFor()
+      await page.keyboard.press('Escape')
+      await picker.waitFor({ state: 'hidden' })
+      check(await profileLink.isVisible(), 'Avatar picker changed the profile screen')
+    }
     await page.getByRole('button', { name: 'Mở trang cá nhân' }).click()
     await page.getByRole('heading', { name: 'Trang cá nhân', exact: true }).waitFor()
+    if (width === 390) {
+      await checkMobileProfileColors()
+      const hero = page.locator('.profile-page-hero-centered')
+      await hero.waitFor()
+      const cover = await hero.locator('.profile-page-cover').boundingBox()
+      const avatar = await hero.locator('.profile-page-avatar-wrap').boundingBox()
+      check(cover && avatar && Math.abs((cover.x + cover.width / 2) - (avatar.x + avatar.width / 2)) <= 1
+        && avatar.y < cover.y + cover.height && avatar.y + avatar.height > cover.y + cover.height, 'Timeline avatar must center across the cover edge')
+      check(await hero.getByRole('button', { name: 'Tạo tin' }).isVisible(), 'Mobile Story action missing')
+      check(await hero.getByRole('button', { name: 'Chỉnh sửa hồ sơ', exact: true }).count() === 0, 'Editor should not be beside the Story action')
+      check(await hero.locator('.profile-page-avatar-camera').count() === 0, 'Avatar camera badge should not be displayed')
+      check(await page.getByText('Khoảnh khắc của bạn', { exact: true }).count() === 0, 'Old timeline intro should not be displayed')
+      const picker = page.getByRole('group', { name: 'Nội dung trang cá nhân' })
+      await picker.getByRole('button', { name: 'Chỉnh sửa hồ sơ' }).click()
+      const edit = page.getByRole('region', { name: 'Chỉnh sửa hồ sơ' })
+      await edit.getByRole('textbox', { name: 'Tên hiển thị' }).waitFor()
+      await edit.getByRole('region', { name: 'Quyền trường thông tin' }).waitFor()
+      check(await page.getByRole('dialog', { name: 'Chỉnh sửa hồ sơ' }).count() === 0, 'Mobile editor must be inline')
+      await picker.getByRole('button', { name: 'Tất cả', exact: true }).click()
+      await page.getByRole('button', { name: 'Chỉnh sửa thông tin' }).click()
+      await edit.waitFor()
+      await picker.getByRole('button', { name: 'Tất cả', exact: true }).click()
+      await page.getByRole('button', { name: 'Ảnh & video' }).click()
+      await page.getByRole('region', { name: 'Ảnh và video' }).waitFor()
+      await page.getByRole('button', { name: 'Tất cả', exact: true }).click()
+      await page.getByRole('region', { name: 'Dòng thời gian cá nhân' }).waitFor()
+    }
+    if (avatarOnly) {
+      await context.close()
+      continue
+    }
     const timeline = page.getByRole('region', { name: 'Dòng thời gian cá nhân' })
     await timeline.locator('.post').nth(14).waitFor()
     check(await timeline.locator('.post').count() === 15, 'First page must have 15 own posts')
@@ -107,9 +181,9 @@ try {
     await timeline.getByText('Khoảnh khắc 1', { exact: true }).waitFor()
     check(await timeline.locator('.post').count() === 17, 'Older own posts missing or duplicated')
     await timeline.locator('.post').first().getByRole('button', { name: 'Thích', exact: true }).click()
-    await page.waitForFunction(() => document.querySelector('.personal-timeline-content .post .liked'))
+    await page.waitForFunction(() => document.querySelector('.personal-timeline-content .feed-post-card .liked'))
     check(await timeline.getByRole('textbox', { name: 'Nội dung bài viết' }).count() === 0, 'Composer must open in a popup')
-    await timeline.getByRole('button', { name: 'Đăng bài', exact: true }).click()
+    await timeline.getByRole('button', { name: 'Bạn đang nghĩ gì?', exact: true }).click()
     const popup = page.getByRole('dialog', { name: 'Tạo bài viết', exact: true })
     await popup.waitFor()
     check(await popup.getByRole('button', { name: 'Đăng', exact: true }).isDisabled(), 'Empty post can be submitted')
@@ -130,11 +204,11 @@ try {
     await timeline.locator('.post').filter({ hasText: 'Bản nháp được giữ khi đăng lỗi' }).waitFor()
     check(posts[0].visibility === 'private', 'Visibility not sent to server')
     await popup.waitFor({ state: 'hidden' })
-    await timeline.getByRole('button', { name: 'Đăng bài', exact: true }).click()
+    await timeline.getByRole('button', { name: 'Bạn đang nghĩ gì?', exact: true }).click()
     check(await draft.inputValue() === '', 'Successful create did not clear draft')
     await popup.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
-    await page.getByRole('button', { name: 'Chỉnh sửa', exact: true }).click()
-    const drawer = page.getByRole('dialog', { name: 'Chỉnh sửa hồ sơ' })
+    await page.getByRole('group', { name: 'Nội dung trang cá nhân' }).getByRole('button', { name: 'Chỉnh sửa hồ sơ' }).click()
+    const drawer = page.getByRole('region', { name: 'Chỉnh sửa hồ sơ' })
     await drawer.waitFor()
     await drawer.getByRole('region', { name: 'Quyền trường thông tin' }).waitFor()
     const searchable = drawer.getByRole('switch', { name: 'Cho phép tìm bằng tên', exact: true })
@@ -144,10 +218,8 @@ try {
     await page.waitForFunction(expected => document.querySelector('.profile-field-permissions [aria-label="Cho phép tìm bằng tên"]')?.getAttribute('aria-checked') === expected, String(wasChecked !== 'true'))
     check(privacyWrites === writesBefore + 1, 'Privacy was not saved through the API')
     check(await searchable.getAttribute('aria-checked') !== wasChecked, 'Privacy toggle did not update')
-    const bounds = await drawer.boundingBox()
-    check(Math.abs(bounds.x + bounds.width - width) <= 1, 'Editor must attach to right edge')
     await page.screenshot({ path: 'output/playwright/layout/profile-editor-' + width + '.png' })
-    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Tất cả', exact: true }).click()
     await drawer.waitFor({ state: 'hidden' })
     check(await page.getByRole('heading', { name: 'Trang cá nhân', exact: true }).isVisible(), 'Editor navigated away from timeline')
     // Check reload recovery without replacing the existing timeline with fake empty state.
@@ -165,7 +237,8 @@ try {
     posts = posts.filter(post => post.id !== 100).map(post => ({ ...post, liked: false, likes: 0 }))
   }
   check(errors.length === 0, errors.join('\n'))
-  console.log('PASS: profile timeline, pagination, publishing, privacy input, failed drafts, likes, recovery and responsive widths')
+  console.log(avatarOnly ? 'PASS: mobile profile colors, avatar navigation, compact overview and centered timeline'
+    : 'PASS: profile timeline, pagination, publishing, privacy input, failed drafts, likes, recovery and responsive widths')
 } finally {
   await browser?.close()
   server.kill()

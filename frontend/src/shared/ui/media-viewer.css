@@ -100,7 +100,7 @@
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 10px;
   background: rgba(255,255,255,.10);
-  color: #fff;
+  color: var(--soco-surface);
   cursor: pointer;
 }
 .media-viewer-actions a,

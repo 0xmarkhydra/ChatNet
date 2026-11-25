@@ -7,24 +7,7 @@
 
 .notification-button.active {
   background: #edf4ff;
-  border-color: #eff4ff;
-}
-
-.notification-test-button {
-  min-height: 40px;
-  padding: 0 12px !important;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.notification-test-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.notification-test-icon {
-  display: none;
+  border-color: var(--soco-soft-blue);
 }
 
 .push-onboarding {
@@ -63,7 +46,7 @@
   padding: 8px 12px;
   border: 1px solid #b5c7d2;
   border-radius: 8px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #193e56;
   font-size: 14px;
 }
@@ -71,7 +54,7 @@
 .push-onboarding-actions .push-onboarding-enable {
   background: #245f82;
   border-color: #245f82;
-  color: #fff;
+  color: var(--soco-surface);
 }
 
 .push-onboarding-actions button:disabled {
@@ -84,22 +67,6 @@
     width: 38px;
     min-width: 38px;
     min-height: 38px;
-  }
-
-  .notification-test-button {
-    width: 38px;
-    min-width: 38px;
-    min-height: 38px;
-    padding: 0 !important;
-    font-size: 16px;
-  }
-
-  .notification-test-label {
-    display: none;
-  }
-
-  .notification-test-icon {
-    display: inline;
   }
 }
 .outgoing-preview { opacity: .75; }

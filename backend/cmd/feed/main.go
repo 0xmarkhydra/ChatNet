@@ -1,9 +1,9 @@
 package main
 
 import (
-	"errors"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -38,6 +38,7 @@ type comment struct {
 }
 
 type post struct {
+	PublishLocation   *postLocation       `json:"publishLocation,omitempty"`
 	Visibility        string              `json:"visibility"`
 	Background        string              `json:"background"`
 	Saved             bool                `json:"saved"`
@@ -54,7 +55,7 @@ type post struct {
 	Attachments       []mediax.Attachment `json:"attachments,omitempty"`
 	CreatedAt         time.Time           `json:"createdAt"`
 	RepostKind        string              `json:"repostKind,omitempty"`
-	OriginalPost     *repostPreview      `json:"originalPost,omitempty"`
+	OriginalPost      *repostPreview      `json:"originalPost,omitempty"`
 	RepostCount       int                 `json:"repostCount"`
 	MyRepostID        int64               `json:"myRepostId,omitempty"`
 }
@@ -132,6 +133,12 @@ func main() {
 	mux.Handle("GET /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStories)))
 	mux.Handle("POST /api/stories", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.createStory)))
 	mux.Handle("DELETE /api/stories/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.deleteStory)))
+	mux.Handle("GET /api/stories/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getStoryLikes)))
+	mux.Handle("PUT /api/stories/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryLike)))
+	mux.Handle("DELETE /api/stories/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryLike)))
+	mux.Handle("GET /api/stories/highlights", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStoryHighlights)))
+	mux.Handle("PUT /api/stories/{id}/highlight", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryHighlight)))
+	mux.Handle("DELETE /api/stories/{id}/highlight", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryHighlight)))
 	s.mountMarketplace(mux)
 
 	port := config.Env("PORT", "8083")
@@ -183,7 +190,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := s.db.Query(r.Context(), `
 		SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
-		       p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0),
+		       p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0), CASE WHEN p.visibility='public' THEN p.publish_location END,
 		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND `+feedAccessSQL+`
@@ -211,7 +218,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var p post
 		var originalID int64
-		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.Saved) != nil {
+		if rows.Scan(&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt, &p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.PublishLocation, &p.Saved) != nil {
 			continue
 		}
 		entries = append(entries, feedRow{post: p, originalID: originalID})
@@ -300,10 +307,11 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Content     string                   `json:"content"`
-		Visibility  string                   `json:"visibility"`
-		Background  string                   `json:"background"`
-		Attachments []mediax.AttachmentInput `json:"attachments"`
+		Content         string                   `json:"content"`
+		Visibility      string                   `json:"visibility"`
+		Background      string                   `json:"background"`
+		Attachments     []mediax.AttachmentInput `json:"attachments"`
+		PublishLocation *postLocation            `json:"publishLocation"`
 	}
 	if json.NewDecoder(r.Body).Decode(&body) != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body")
@@ -316,6 +324,14 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	if !validVisibility(body.Visibility) || !validBackground(body.Background) {
 		httpx.Error(w, http.StatusBadRequest, "invalid post visibility or background")
 		return
+	}
+	if body.Visibility == "public" {
+		if !validPostLocation(body.PublishLocation, time.Now()) {
+			httpx.Error(w, http.StatusBadRequest, publicLocationRequired)
+			return
+		}
+	} else {
+		body.PublishLocation = nil
 	}
 	if utf8.RuneCountInString(body.Content) > 5000 {
 		httpx.Error(w, http.StatusBadRequest, "content must be <= 5000 characters")
@@ -353,12 +369,13 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 	}
 	p.Visibility = body.Visibility
 	p.Background = body.Background
+	p.PublishLocation = body.PublishLocation
 	p.Attachments = attachments
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO posts(user_id,content,visibility,background)
-		VALUES($1,$2,$3,$4)
+		INSERT INTO posts(user_id,content,visibility,background,publish_location)
+		VALUES($1,$2,$3,$4,$5)
 		RETURNING id,content,likes_count,created_at,updated_at`,
-		claims.UserID, body.Content, body.Visibility, body.Background,
+		claims.UserID, body.Content, body.Visibility, body.Background, body.PublishLocation,
 	).Scan(&p.ID, &p.Content, &p.Likes, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot create post")
@@ -400,7 +417,7 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 func (s *server) listStories(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	// ponytail: rows expire eagerly on reads; add object-store lifecycle cleanup when orphan cleanup ships.
-	_, _ = s.db.Exec(r.Context(), `DELETE FROM stories WHERE expires_at <= NOW()`)
+	_, _ = s.db.Exec(r.Context(), `DELETE FROM stories WHERE expires_at <= NOW() AND highlight_title IS NULL`)
 	rows, err := s.db.Query(r.Context(), `
 		SELECT s.id,u.username,u.display_name,COALESCE(s.storage_ref,''),COALESCE(s.original_name,''),
 		       COALESCE(s.content_type,''),COALESCE(s.size_bytes,0),s.kind,

@@ -57,13 +57,13 @@ func (s *server) respondPost(w http.ResponseWriter, r *http.Request, id, uid int
 	var p post
 	var originalID int64
 	err := s.db.QueryRow(r.Context(), `SELECT p.id,u.username,u.display_name,p.content,p.likes_count,p.created_at,
- p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0),
+ p.visibility,p.background,p.updated_at,COALESCE(p.repost_kind,''),COALESCE(p.repost_of,0), CASE WHEN p.visibility='public' THEN p.publish_location END,
  EXISTS(SELECT 1 FROM post_likes WHERE post_id=p.id AND user_id=$2),
  EXISTS(SELECT 1 FROM saved_posts WHERE post_id=p.id AND user_id=$2)
  FROM posts p JOIN users u ON u.id=p.user_id
  WHERE p.id=$1 AND `+feedAccessSQL, id, uid).Scan(
 		&p.ID, &p.Author, &p.AuthorDisplayName, &p.Content, &p.Likes, &p.CreatedAt,
-		&p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.Liked, &p.Saved)
+		&p.Visibility, &p.Background, &p.UpdatedAt, &p.RepostKind, &originalID, &p.PublishLocation, &p.Liked, &p.Saved)
 	if err != nil {
 		httpx.Error(w, 404, "post not found")
 		return
@@ -98,7 +98,10 @@ func (s *server) editPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, _ := authx.ClaimsFromContext(r.Context())
-	var b struct{ Content, Visibility, Background string }
+	var b struct {
+		Content, Visibility, Background string
+		PublishLocation                 *postLocation `json:"publishLocation"`
+	}
 	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32*1024))
 	d.DisallowUnknownFields()
 	if d.Decode(&b) != nil || d.Decode(new(any)) != io.EOF {
@@ -128,7 +131,22 @@ func (s *server) editPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	tag, err := tx.Exec(r.Context(), `UPDATE posts SET content=$1,visibility=$2,background=$3,updated_at=NOW() WHERE id=$4 AND user_id=$5 AND repost_kind IS DISTINCT FROM 'quick'`, b.Content, b.Visibility, b.Background, id, c.UserID)
+	var previousVisibility string
+	var location *postLocation
+	if err := tx.QueryRow(r.Context(), `SELECT visibility,publish_location FROM posts WHERE id=$1 AND user_id=$2 AND repost_kind IS DISTINCT FROM 'quick' FOR UPDATE`, id, c.UserID).Scan(&previousVisibility, &location); err != nil {
+		httpx.Error(w, 404, "post not found")
+		return
+	}
+	if b.Visibility != "public" {
+		location = nil
+	} else if previousVisibility != "public" {
+		if !validPostLocationNow(b.PublishLocation) {
+			httpx.Error(w, 400, publicLocationRequired)
+			return
+		}
+		location = b.PublishLocation
+	}
+	tag, err := tx.Exec(r.Context(), `UPDATE posts SET content=$1,visibility=$2,background=$3,updated_at=NOW(),publish_location=$6 WHERE id=$4 AND user_id=$5 AND repost_kind IS DISTINCT FROM 'quick'`, b.Content, b.Visibility, b.Background, id, c.UserID, location)
 	if err != nil {
 		httpx.Error(w, 500, "cannot update post")
 		return

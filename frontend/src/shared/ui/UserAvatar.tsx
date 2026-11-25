@@ -8,7 +8,8 @@ function avatarInitials(name: string) {
   return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
 }
 
-function avatarTone(name: string) {
+export function avatarTone(displayName: string) {
+  const name = displayName.trim()
   let hash = 0
   for (let index = 0; index < name.length; index += 1) {
     hash = (hash * 31 + name.charCodeAt(index)) >>> 0
@@ -30,6 +31,7 @@ export default function UserAvatar({
   online = false,
   group = false,
   imageUrl: suppliedImageUrl,
+  initialsOnly = false,
 }: {
   name: string
   username?: string
@@ -37,9 +39,10 @@ export default function UserAvatar({
   online?: boolean
   group?: boolean
   imageUrl?: string
+  initialsOnly?: boolean
 }) {
   const version = avatarRefreshVersions.get(username)
-  const imageUrl = group ? (suppliedImageUrl || '') : profileAssetUrl(username, 'avatar', version)
+  const imageUrl = initialsOnly ? '' : group ? (suppliedImageUrl || '') : profileAssetUrl(username, 'avatar', version)
   const [imageFailed, setImageFailed] = useScopedState(imageUrl, false)
 
   return (

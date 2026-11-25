@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { addedArchitectureDebt, increasedLintDebt } from './baseline-ratchet-check.mjs'
+import { addedArchitectureDebt, increasedDesignDebt, increasedLintDebt } from './baseline-ratchet-check.mjs'
 
 test('architecture baseline permits only deletion', () => {
   const previous = { violations: ['cycle:a', 'entry:b'] }
@@ -16,5 +16,13 @@ test('lint baseline permits reductions but never hides new pair findings', () =>
   ])
   assert.deepEqual(increasedLintDebt(previous, { total: 5, counts: { 'A|rule': 4, 'B|rule': 1 } }), [
     'total: 4 -> 5', 'A|rule: 3 -> 4',
+  ])
+})
+
+test('design-debt baseline permits reductions but rejects increases and new pairs', () => {
+  const previous = { totals: { 'css.hex': 3 }, counts: { 'a.css|css.hex': 3 } }
+  assert.deepEqual(increasedDesignDebt(previous, { totals: { 'css.hex': 2 }, counts: { 'a.css|css.hex': 2 } }), [])
+  assert.deepEqual(increasedDesignDebt(previous, { totals: { 'css.hex': 4 }, counts: { 'a.css|css.hex': 3, 'b.css|css.hex': 1 } }), [
+    'total css.hex: 3 -> 4', 'b.css|css.hex: 0 -> 1',
   ])
 })

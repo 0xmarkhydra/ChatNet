@@ -125,9 +125,13 @@ try {
     return answer(route, {})
   })
 
-  const openConversation = targetPage => targetPage.getByRole('navigation', { name: 'Thanh avatar và hội thoại' })
-    .getByRole('button', { name: `Mở tin nhắn ${conversation.name}`, exact: true })
-    .click({ timeout: 30000 })
+  const openConversation = async targetPage => {
+    const row = targetPage.getByRole('navigation', { name: 'Thanh avatar và hội thoại' })
+      .getByRole('button', { name: `Mở tin nhắn ${conversation.name}`, exact: true })
+    // HTML commit does not mean Vite's module graph or the conversation list is ready.
+    await row.waitFor({ state: 'visible', timeout: 90_000 })
+    await row.click({ timeout: 30_000 })
+  }
 
   await page.goto(origin, { waitUntil: 'commit' })
   try { await openConversation(page) }

@@ -28,7 +28,7 @@
     min-height: 0;
     padding: 18px clamp(16px, 2.6vw, 38px) 32px;
     overflow: auto;
-    background: #f7f9fd;
+    background: var(--soco-surface-page);
   }
   .modern-shell .profile-view.settings-workspace-open > :not(.settings-workspace):not(.locale-picker-overlay) {
     display: none !important;
@@ -51,7 +51,7 @@
   box-sizing: border-box;
   min-width: 0;
   border-radius: 17px;
-  background: #fff;
+  background: var(--soco-surface);
 }
 .settings-workspace-menu { padding: 23px 10px 20px; }
 .settings-workspace-menu h2 {
@@ -255,7 +255,7 @@
   cursor: pointer;
 }
 .settings-workspace-cancel { background: #edf2ff; color: #3363d7; }
-.settings-workspace-save { background: #2861ea; color: #fff; }
+.settings-workspace-save { background: #2861ea; color: var(--soco-surface); }
 .settings-workspace-footer button:disabled { cursor: default; opacity: .55; }
 .settings-workspace-content { width: 100%; padding: 20px 0; }
 .settings-workspace-content .settings-card {

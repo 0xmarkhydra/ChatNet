@@ -9,6 +9,7 @@ import type { FriendConnection } from "../../contacts";
 import { patchPost, submitPost } from "../api/posts";
 import type { Post } from "../types";
 import { composePostContent, parsePostExtras } from "../utils/postExtras";
+import { capturePublicPostLocation } from "../utils/publicPostLocation";
 
 export type TaggedFriend = { id: number; username: string; displayName: string };
 
@@ -171,7 +172,9 @@ export function usePostComposer({
         actionLocks.current.add(key);
         setPostEditBusy(true);
         try {
-          const response = await patchPost(apiFetch, editingPost.id, { content, visibility, background });
+          const publishLocation = visibility === 'public' && editingPost.visibility && editingPost.visibility !== 'public' ? await capturePublicPostLocation() : undefined;
+          if (sessionRef.current?.sessionId !== sessionId) return;
+          const response = await patchPost(apiFetch, editingPost.id, { content, visibility, background, publishLocation });
           const updated = await response.json().catch(() => null) as (Post & { error?: string }) | null;
           if (sessionRef.current?.sessionId !== sessionId) return;
           if (!response.ok || !updated || updated.id !== editingPost.id) {
@@ -208,7 +211,9 @@ export function usePostComposer({
         createdAt: new Date().toISOString(),
       });
       try {
-        const response = await submitPost(apiFetch, { content, attachments, visibility, background });
+        const publishLocation = visibility === 'public' ? await capturePublicPostLocation() : undefined;
+        if (sessionRef.current?.sessionId !== sessionId) return;
+        const response = await submitPost(apiFetch, { content, attachments, visibility, background, publishLocation });
         const post = (await response.json()) as Post & { error?: string };
         if (sessionRef.current?.sessionId !== sessionId) return;
         if (!response.ok || !Number.isSafeInteger(post.id) || post.id <= 0)

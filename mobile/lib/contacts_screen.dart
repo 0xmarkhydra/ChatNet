@@ -71,7 +71,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   void didUpdateWidget(covariant ContactsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.newFriendRequest != widget.newFriendRequest) {
-      setState(() => contactTab = 4);
+      // Match the PWA: the header's add-friend action opens invitations.
+      setState(() {
+        contactTab = 2;
+        invitationTab = 'incoming';
+      });
     }
     if (oldWidget.query != widget.query) {
       _scheduleSearch(widget.query);
@@ -492,48 +496,55 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   @override
   Widget build(BuildContext context) {
     final tabs = const [
-      ('Danh sách bạn bè', Icons.perm_contact_calendar_outlined),
-      ('Danh sách nhóm', Icons.groups_outlined),
-      ('Lời mời kết bạn', Icons.person_add_alt_1_outlined),
-      ('Lịch sử cuộc gọi', Icons.call_outlined),
-      ('Khám phá bạn bè', Icons.travel_explore_outlined),
-      ('Dịch AI cuộc gọi', Icons.translate_rounded),
+      'Bạn bè',
+      'Nhóm chat',
+      'Lời mời',
+      'Cuộc gọi',
+      'Khám phá',
+      'Dịch AI',
     ];
+    const selectedColor = Color(0xFF245DEB);
+    const selectedBackground = Color(0xFFE9EFFF);
     return Material(
       color: socoCanvas,
       child: Column(
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: socoLine)),
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 12, 6, 12),
+            color: Colors.white,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
                   for (var index = 0; index < tabs.length; index++)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: ChoiceChip(
-                        key: ValueKey('contacts-tab-$index'),
+                      padding: const EdgeInsets.only(right: 14),
+                      child: Semantics(
+                        button: true,
                         selected: contactTab == index,
-                        showCheckmark: false,
-                        avatar: Icon(
-                          tabs[index].$2,
-                          size: 18,
-                          color: contactTab == index ? socoBlue : socoMuted,
+                        child: Material(
+                          color: contactTab == index ? selectedBackground : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            key: ValueKey('contacts-tab-$index'),
+                            onTap: () => setState(() => contactTab = index),
+                            child: Container(
+                              constraints: const BoxConstraints(minHeight: 44),
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              child: Text(
+                                tabs[index],
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: contactTab == index ? FontWeight.w700 : FontWeight.w500,
+                                  color: contactTab == index ? selectedColor : const Color(0xFF64799E),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                        label: Text(tabs[index].$1),
-                        labelStyle: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: contactTab == index ? socoBlue : socoText,
-                        ),
-                        selectedColor: const Color(0xFFE7EEFF),
-                        side: const BorderSide(color: socoLine),
-                        onSelected: (_) => setState(() => contactTab = index),
                       ),
                     ),
                 ],

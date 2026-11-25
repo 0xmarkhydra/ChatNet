@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: web-pwa-${{ github.workflow }}-${{ github.ref }}
@@ -36,6 +37,19 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: Enforce Tailwind-only CSS changes in pull requests
+        if: github.event_name == 'pull_request'
+        env:
+          CSS_APPROVER_LOGIN: ${{ vars.CSS_APPROVER_LOGIN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/tailwind-css-pr-check.mjs "origin/${{ github.base_ref }}"
+      - name: Test Tailwind CSS PR guard
+        run: npm run check:tailwind-policy
+      - name: Enforce design-debt ratchet
+        run: npm run check:design-debt
       - name: Enforce React Hooks lint baseline
         run: npm run lint
       - name: Test architecture boundary rules

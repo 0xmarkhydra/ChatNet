@@ -10,43 +10,16 @@
     padding: 0;
     overflow-x: hidden;
     overflow-y: auto;
-    background: #f7f9fd;
+    background: var(--soco-surface-page);
     scrollbar-gutter: auto;
-  }
-  .modern-shell.app-layout .social-feed-grid {
-    box-sizing: border-box;
-    display: grid;
-    grid-template-columns: minmax(0, 620px) minmax(260px, 320px);
-    align-items: start;
-    justify-content: center;
-    gap: 22px;
-    width: 100%;
-    max-width: 1040px;
-    min-width: 0;
-    margin-inline: auto;
-    padding: 20px 24px 36px;
-  }
-  .modern-shell.app-layout .social-feed-center,
-  .modern-shell.app-layout .social-feed-side {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    gap: 15px;
-  }
-  .modern-shell.app-layout .social-feed-center > *,
-  .modern-shell.app-layout .social-feed-side > * {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
   }
   .modern-shell.app-layout .social-feed-stories-card,
   .modern-shell.app-layout .social-feed-launcher,
   .modern-shell.app-layout .social-feed-filter-bar,
-  .modern-shell.app-layout .social-feed-center > .feed > .post,
   .modern-shell.app-layout .social-feed-side-card {
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
     border-radius: 16px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 3px 16px rgba(30, 51, 96, 0.035);
   }
   /* Stories */
@@ -135,7 +108,7 @@
     height: 69px;
     padding: 4px;
     border-radius: 50%;
-    background: #2563eb;
+    background: var(--soco-blue);
     flex: 0 0 69px;
     box-sizing: border-box;
   }
@@ -150,7 +123,7 @@
     display: block;
     width: 61px;
     height: 61px;
-    border: 3px solid #fff;
+    border: 3px solid var(--soco-surface);
     border-radius: 50%;
     box-sizing: border-box;
     object-fit: cover;
@@ -165,10 +138,10 @@
     place-items: center;
     width: 24px;
     height: 24px;
-    border: 3px solid #fff;
+    border: 3px solid var(--soco-surface);
     border-radius: 50%;
-    color: #fff;
-    background: #2563eb;
+    color: var(--soco-surface);
+    background: var(--soco-blue);
   }
   .social-feed-story-label {
     display: block;
@@ -197,12 +170,6 @@
     gap: 15px;
     min-height: 49px;
   }
-  .social-feed-me-avatar {
-    flex: 0 0 46px;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-  }
   .social-feed-launcher-prompt {
     flex: 1 1 auto;
     height: 49px;
@@ -210,7 +177,7 @@
     padding: 0 23px;
     border: 1px solid transparent;
     border-radius: 11px;
-    background: #f8fafe;
+    background: var(--soco-surface-input);
     color: #8b99ae;
     font: inherit;
     font-size: 13px;
@@ -228,7 +195,7 @@
     gap: 13px;
     margin-top: 8px;
     padding-top: 3px;
-    border-top: 1px solid #e8ecf5;
+    border-top: 1px solid var(--soco-border-subtle);
   }
   .social-feed-launcher-shortcuts {
     display: flex;
@@ -252,13 +219,13 @@
     cursor: pointer;
   }
   .social-feed-launcher-shortcuts button:hover {
-    color: #2563eb;
+    color: var(--soco-blue);
   }
   .social-feed-launcher-shortcuts button:first-child svg {
     color: #3e9b77;
   }
   .social-feed-launcher-shortcuts button:nth-child(2) svg {
-    color: #8b5cf6;
+    color: var(--soco-violet);
   }
   .social-feed-launcher-shortcuts button:nth-child(3) svg {
     color: #f3a13f;
@@ -274,8 +241,8 @@
     padding: 0 11px;
     border: none;
     border-radius: 999px;
-    color: #fff;
-    background: #2563eb;
+    color: var(--soco-surface);
+    background: var(--soco-blue);
     font: inherit;
     font-size: 12px;
     font-weight: 720;
@@ -284,9 +251,6 @@
   }
   .social-feed-launcher-publish:hover {
     background: #1d52ce;
-  }
-  .social-feed-launcher-publish-plus {
-    display: none;
   }
 
   /* Social V4 filter row */
@@ -324,7 +288,7 @@
   }
   .social-feed-filter-options button[aria-pressed="true"] {
     background: #eff3ff;
-    color: #2563eb;
+    color: var(--soco-blue);
     font-weight: 750;
   }
   .social-feed-filter-options button:not([aria-pressed="true"]):hover {
@@ -356,256 +320,15 @@
     max-width: none;
     min-width: 0;
   }
-  .modern-shell.app-layout
-    .social-feed-center
-    > .feed.zalo-feed
-    > .post.zalo-post {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 6px 11px;
-    min-width: 0;
-    margin: 0;
-    padding: 14px 18px 11px;
-    border: 1px solid #e8ecf5;
-    border-radius: 17px;
-    background: #fff;
-    box-shadow: 0 3px 16px rgba(30, 51, 96, 0.035);
-    overflow: hidden;
-  }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post > .avatar {
-    display: grid;
-    grid-column: 1;
-    grid-row: 1;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-  }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-body {
-    display: contents;
-  }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-body > * {
-    grid-column: 1 / -1;
-    min-width: 0;
-  }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-author {
-    grid-column: 2;
-    grid-row: 1;
-    align-items: flex-start;
-    min-height: 44px;
-  }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-author
-    strong {
-    color: #233756;
-    font-size: 14px;
-    font-weight: 750;
-  }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-author
-    small {
-    color: #8694a9;
-    font-size: 11px;
-    line-height: 1.6;
-  }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-more {
-    width: 32px;
-    min-width: 32px;
-    height: 32px;
-    min-height: 32px;
-    padding: 0;
-    color: #74839c;
-  }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .feed-text-background {
-    margin: 2px 1px 0;
-    min-width: 0;
-    color: #3e4e67;
-    font-size: 14px;
-  }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .feed-media-preview {
-    min-width: 0;
-    margin-top: 12px;
-    border-radius: 13px;
-    overflow: hidden;
-  }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .media-count-1
-    .media-item
-    img {
-    display: block;
-    width: 100%;
-    height: 247px;
-    min-height: 0;
-    max-height: 400px;
-    object-fit: cover;
-    border-radius: 13px;
-  }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-engagement-summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 7px 0 0;
-    color: #71809a;
-    font-size: 12px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-    margin-top: 1px;
-    padding: 7px 0 0;
-    border-top: 1px solid #e8ecf5;
-  }
-  .modern-shell.app-layout
-    .social-feed-center
-    .post.zalo-post
-    .post-toolbar
-    > button {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    gap: 7px;
-    min-width: 0;
-    width: 100%;
-    min-height: 39px;
-    margin: 0;
-    padding: 0 4px;
-    border: 0;
-    border-radius: 10px;
-    color: #6d7e98;
-    background: transparent;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 650;
-  }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar > button:hover { background: #f2f5ff; }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar > button.liked { color: #d83d60; }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar > button.is-saved { color: #2563eb; }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar svg { flex: 0 0 auto; }
-  .modern-shell.app-layout .social-feed-center .post.zalo-post .post-toolbar > button span { font-size: 12px; }
-
-  /* Four equal post actions and a single heart reaction, matching the post card layout. */
-  .modern-shell.app-layout .social-feed-center > .feed.zalo-feed > .post.zalo-post.feed-post-card {
-    padding: 14px 18px 11px;
-    border-radius: 16px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card > .avatar {
-    width: 44px; height: 44px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .post-author {
-    min-height: 44px;
-    align-items: center;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .post-author strong {
-    color: #142443; font-size: 14px; font-weight: 750;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .post-author small {
-    color: #7889aa; font-size: 11px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-text {
-    padding-top: 6px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-text .feed-text > p {
-    margin: 0 0 5px; line-height: 1.5; font-size: 14px;
-    white-space: pre-wrap; overflow-wrap: anywhere;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview {
-    margin-top: 8px; border-radius: 12px; overflow: hidden;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-attachments {
-    box-sizing: border-box; width: 100%; max-width: none; margin: 0; gap: 6px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-item .media-image-button {
-    display: block; width: 100%;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .media-count-1 .media-item img {
-    display: block;
-    width: 100%;
-    height: auto;
-    min-height: 0;
-    max-height: 440px;
-    aspect-ratio: auto;
-    border-radius: 12px;
-    object-fit: contain;
-    background: #f4f6fa;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .media-count-1 .media-item video {
-    display: block;
-    width: 100%;
-    height: auto;
-    max-height: 440px;
-    object-fit: contain;
-    background: #f4f6fa;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-engagement {
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
-    gap: 6px 12px; padding: 7px 2px 8px;
-    color: #7585a7; font-size: 11px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-likes {
-    display: inline-flex; align-items: center; gap: 8px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-likes svg {
-    color: #f34373; flex: 0 0 auto; width: 19px; height: 19px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-conversation-stats {
-    margin-left: auto; text-align: right;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 4px; margin-top: 0; padding-top: 5px; border-top: 1px solid #e8ecf5;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button {
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-    width: 100%; min-width: 0; min-height: 39px; padding: 3px 4px;
-    border: 0; border-radius: 10px; background: transparent;
-    color: #243a5d; font-size: 12px; font-weight: 550; cursor: pointer;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button:hover {
-    background: #f4f6fc;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button.feed-post-like.is-liked {
-    background: transparent; color: #ee416a;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button.feed-post-like.is-liked:hover {
-    background: #fff2f6;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button.is-saved {
-    color: #2563eb;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button span {
-    font-size: 12px;
-  }
-  @media (max-width: 600px) {
-    .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button {
-      gap: 4px; font-size: 12px; padding: 4px 2px;
-    }
-    .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > button span {
-      font-size: 12px;
-    }
-  }
+  /* FeedPostCard owns its visual styling with Tailwind in both Feed and Profile. */
   .modern-shell.app-layout .social-feed-center .feed-empty {
     border-radius: 15px;
     background: white;
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
   }
   .modern-shell.app-layout .social-feed-center .soco-feed-load-more {
     background: white;
-    border: 1px solid #e8ecf5;
+    border: 1px solid var(--soco-border-subtle);
     border-radius: 12px;
     padding: 14px;
     color: #7284a0;
@@ -614,9 +337,6 @@
   }
 
   /* Right discovery rail */
-  .modern-shell.app-layout .social-feed-side {
-    gap: 16px;
-  }
   .modern-shell.app-layout .social-feed-side-card {
     padding: 17px 19px 19px;
   }
@@ -685,7 +405,7 @@
     border: 0;
     border-radius: 10px;
     background: #eff3ff;
-    color: #2563eb;
+    color: var(--soco-blue);
     font: inherit;
     font-size: 12px;
     font-weight: 720;
@@ -730,7 +450,7 @@
   /* Header geometry is owned by the application layout. */
   .modern-shell.app-layout .social-feed-header-community {
     background: #eff3ff;
-    color: #2563eb;
+    color: var(--soco-blue);
   }
   .modern-shell.app-layout .social-feed-header-community:hover,
   .modern-shell.app-layout .social-feed-header-community[aria-pressed="true"] {
@@ -758,27 +478,18 @@
     height: 46px;
     border-radius: 50%;
   }
-  .modern-shell.app-layout .social-feed button:focus-visible {
+  /* Do not override buttons owned by shared Tailwind components. */
+  .modern-shell.app-layout .social-feed :is(.social-feed-story, .social-feed-refresh, .social-feed-connect, .social-feed-suggestion-person, .social-feed-filter-options button, .social-feed-header-account):focus-visible {
     outline: 3px solid #a7bfff;
     outline-offset: 2px;
   }
-  .modern-shell.app-layout .social-feed button:disabled {
+  .modern-shell.app-layout .social-feed :is(.social-feed-story, .social-feed-refresh, .social-feed-connect, .social-feed-suggestion-person, .social-feed-filter-options button, .social-feed-header-account):disabled {
     opacity: 0.55;
     cursor: not-allowed;
   }
 }
 
 @media (min-width: 761px) and (max-width: 1330px) {
-  .modern-shell.app-layout .social-feed-grid {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 700px;
-    padding: 17px 18px 36px;
-  }
-  .modern-shell.app-layout .social-feed-side {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-  }
   .social-feed-story-strip {
     overflow-x: auto;
   }
@@ -793,18 +504,6 @@
 }
 
 @media (max-width: 760px) {
-  .modern-shell.app-layout .feed-view.zalo-feed-view.social-feed {
-    padding: 0 12px max(24px, env(safe-area-inset-bottom)) !important;
-  }
-  .modern-shell.app-layout .social-feed-grid,
-  .modern-shell.app-layout .social-feed-center {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    width: 100%;
-    min-width: 0;
-    padding: 0;
-  }
   .modern-shell.app-layout .social-feed-center > .soco-feed-section-label,
   .modern-shell.app-layout .social-feed-center > .stories-row,
   .modern-shell.app-layout .social-feed-center > .zalo-post-composer,
@@ -822,19 +521,12 @@
   .modern-shell.app-layout .social-feed-center > .soco-feed-posts-label {
     margin-top: 23px;
   }
+  /* Keep a viewport of results below the filters, even when the next list is empty. */
+  .modern-shell.app-layout .social-feed-center > .soco-feed-posts-label + .zalo-feed {
+    min-block-size: calc(100dvh - var(--mobile-nav-height, 0px));
+  }
   .modern-shell.app-layout .social-feed-center > .zalo-post-composer {
     margin-bottom: 15px;
-  }
-  .modern-shell.app-layout .social-feed-side {
-    display: none;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card {
-    padding: 12px 12px 10px;
-  }
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-count-1 .media-item img,
-  .modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-media-preview .media-count-1 .media-item video {
-    max-height: min(60dvh, 420px);
-    object-fit: contain;
   }
 }
 
@@ -846,7 +538,7 @@
   padding: 12px 15px;
   border: 1px solid #e5ecfa;
   border-radius: 12px;
-  background: #f8fafe;
+  background: var(--soco-surface-input);
 }
 .social-feed-checkin-field strong {
   color: #435b84;
@@ -861,7 +553,7 @@
   border: 1px solid #e4eafa;
   border-radius: 9px;
   outline: none;
-  background: #fff;
+  background: var(--soco-surface);
   color: #253955;
   font: inherit;
   font-size: 13px;
@@ -883,19 +575,20 @@
   }
 }
 
-/* Keep discovery menus visible while the feed column scrolls.
- * The rail stays within its grid track; if the screen is too short,
- * the rail itself scrolls independently, without moving the posts. */
+/* Keep connection suggestions below the desktop feed header as posts scroll.
+ * The rail can scroll independently on shorter screens. */
 @media (min-width: 1121px) {
   .modern-shell.app-layout .social-feed-grid > .social-feed-side {
+    /* Scrollport starts below the shared header. Match the feed grid's
+       20px inset so the rail is pinned from the first frame, not after scrolling. */
     position: sticky;
-    top: 16px;
+    top: 20px;
     align-self: start;
     display: flex;
     flex-direction: column;
     gap: 14px;
     box-sizing: border-box;
-    max-height: calc(100dvh - 126px);
+    max-height: calc(100dvh - 96px);
     min-height: 0;
     padding: 0 5px 1px 0;
     overflow-x: hidden;
@@ -911,31 +604,58 @@
     border-radius: 6px;
     background: #c5d2e7;
   }
-  .modern-shell.app-layout .social-feed-grid > .social-feed-side > * {
-    flex: 0 0 auto;
-  }
-}
-
-/* Keep connection suggestions beside the feed on compact laptop screens. */
-@media (min-width: 1121px) and (max-width: 1330px) {
-  .modern-shell.app-layout .social-feed-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
-    max-width: 1040px;
-    gap: 18px;
-    padding: 17px 18px 36px;
-  }
-  .modern-shell.app-layout .social-feed-grid > .social-feed-side {
-    grid-template-columns: none;
-  }
 }
 
 /* Use denser connection suggestions on short desktop viewports. */
 @media (min-width: 1121px) and (max-height: 780px) {
-  .modern-shell.app-layout .social-feed-grid > .social-feed-side { gap: 11px; }
   .modern-shell.app-layout .social-feed-side-card { padding: 13px 15px 15px; }
   .modern-shell.app-layout .social-feed-suggestions { min-height: 260px; }
 }
 
-.modern-shell.app-layout .social-feed-center .post.feed-post-card .feed-post-toolbar > .feed-repost-action[data-reposted='true'] {
-  color: var(--soco-blue);
+/* Desktop Feed sidebar: existing post search and member communities, not a second search backend. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-feed-side-card.social-feed-search-card {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .modern-shell.app-layout .social-feed-search-field {
+    display: flex; align-items: center; gap: 9px; min-width: 0;
+    height: 44px; padding: 0 12px; border-radius: 22px;
+    background: #eef1fb; color: var(--soco-muted);
+  }
+  .modern-shell.app-layout .social-feed-search-field input {
+    flex: 1; min-width: 0; width: 100%; border: 0; outline: 0;
+    background: transparent; color: var(--soco-text); font: inherit; font-size: 12px;
+  }
+  /* Draw the focus ring inside the field: the independently scrolling rail clips outward outlines. */
+  .modern-shell.app-layout .social-feed-search-field:focus-within { outline: 2px solid var(--soco-blue); outline-offset: -2px; }
+  .modern-shell.app-layout .social-feed-search-field kbd {
+    flex: 0 0 auto; border: 1px solid #dce3f5; border-radius: 5px;
+    padding: 3px 5px; background: var(--soco-surface); color: var(--soco-muted); font-size: 10px;
+  }
+  .modern-shell.app-layout .social-feed-community-list {
+    display: grid; gap: 6px; margin-top: 13px;
+  }
+  .modern-shell.app-layout .social-feed-community-item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    min-height: 52px; padding: 6px 8px; border: 0; border-radius: 10px;
+    background: transparent; text-align: left; cursor: pointer; color: var(--soco-text);
+  }
+  .modern-shell.app-layout .social-feed-community-item:hover { background: #f0f3ff; }
+  .modern-shell.app-layout .social-feed-community-item:focus-visible { outline: 2px solid var(--soco-blue); outline-offset: 2px; }
+  .modern-shell.app-layout .social-feed-community-icon {
+    display: grid; place-items: center; flex: 0 0 38px;
+    width: 38px; height: 38px; border-radius: 11px; background: #eef1fb; color: var(--soco-blue);
+  }
+  .modern-shell.app-layout .social-feed-community-item > span:last-child {
+    display: flex; flex-direction: column; min-width: 0; gap: 3px;
+  }
+  .modern-shell.app-layout .social-feed-community-item strong {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;
+  }
+  .modern-shell.app-layout .social-feed-community-item small,
+  .modern-shell.app-layout .social-feed-community-empty { color: var(--soco-muted); font-size: 11px; }
 }
