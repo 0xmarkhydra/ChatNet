@@ -3,6 +3,7 @@ import type { FriendConnection, FriendSearchResult } from "../types";
 import { blockUser, unblockUser, listBlockedUsers, reportUser } from "../api/contacts";
 import type { UseContactActionsDeps } from "./contactActionTypes";
 import { parseBlockedUsers } from "../utils/blockedUsers";
+import { parseContactReportReason, parseContactReportDetails } from "../utils/contactReportInput";
 
 type UseContactModerationDeps = Pick<UseContactActionsDeps,
   | "apiFetch"
@@ -117,14 +118,7 @@ export function useContactModeration({
       "Lý do báo cáo: 1 - Spam, 2 - Quấy rối, 3 - Giả mạo, 4 - Khác",
     );
     if (answer === null) return;
-    const reason = (
-      {
-        "1": "spam",
-        "2": "harassment",
-        "3": "impersonation",
-        "4": "other",
-      } as Record<string, string>
-    )[answer.trim()];
+    const reason = parseContactReportReason(answer);
     if (!reason) {
       setNotice("Vui lòng chọn lý do từ 1 đến 4.", "warning");
       return;
@@ -133,13 +127,14 @@ export function useContactModeration({
       "Mô tả sự việc (không quá 1000 ký tự, có thể để trống):",
     );
     if (details === null) return;
-    if (details.length > 1000) {
+    const normalizedDetails = parseContactReportDetails(details);
+    if (normalizedDetails === null) {
       setNotice("Mô tả không được quá 1000 ký tự.", "warning");
       return;
     }
     setFriendMenuId(null);
     try {
-      const response = await reportUser(apiFetch, friend.id, reason, details.trim());
+      const response = await reportUser(apiFetch, friend.id, reason, normalizedDetails);
       const result = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
