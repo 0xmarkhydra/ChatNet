@@ -136,6 +136,8 @@ func main() {
 	mux.Handle("GET /api/stories/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.getStoryLikes)))
 	mux.Handle("PUT /api/stories/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryLike)))
 	mux.Handle("DELETE /api/stories/{id}/like", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryLike)))
+	mux.Handle("PUT /api/stories/{id}/view", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.recordStoryView)))
+	mux.Handle("GET /api/stories/{id}/views", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStoryViews)))
 	mux.Handle("GET /api/stories/highlights", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listStoryHighlights)))
 	mux.Handle("PUT /api/stories/{id}/highlight", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryHighlight)))
 	mux.Handle("DELETE /api/stories/{id}/highlight", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.changeStoryHighlight)))

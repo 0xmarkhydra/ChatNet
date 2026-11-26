@@ -14,13 +14,26 @@ export function submitStory(request: ApiRequest, input: TextStoryInput | { attac
   })
 }
 
-export type StoryLiker = { id: number; username: string; displayName: string; emoji?: string }
-export type StoryLikesResult = { liked: boolean; emoji?: string } | { likers: StoryLiker[]; next?: number }
-
-export async function readStoryLikes(request: ApiRequest, storyId: number, signal: AbortSignal, after?: number) {
-  const response = await request(`/api/stories/${storyId}/like${after ? `?after=${after}` : ''}`, { signal, cache: 'no-store' })
+/** The signed-in viewer's own reaction to someone else's story. */
+export async function readStoryReaction(request: ApiRequest, storyId: number, signal: AbortSignal) {
+  const response = await request(`/api/stories/${storyId}/like`, { signal, cache: 'no-store' })
   if (!response.ok) throw new Error('Không thể tải cảm xúc.')
-  return await response.json() as StoryLikesResult
+  return await response.json() as { liked: boolean; emoji?: string }
+}
+
+export async function recordStoryView(request: ApiRequest, storyId: number) {
+  const response = await request(`/api/stories/${storyId}/view`, { method: 'PUT' })
+  if (!response.ok) throw new Error('Không thể ghi lượt xem.')
+}
+
+export type StoryViewerEntry = { id: number; username: string; displayName: string; emoji?: string; viewedAt?: string }
+export type StoryViewsResult = { total: number; viewers: StoryViewerEntry[]; next?: number }
+
+/** Owner only: everyone who viewed or reacted. */
+export async function readStoryViews(request: ApiRequest, storyId: number, signal: AbortSignal, after?: number) {
+  const response = await request(`/api/stories/${storyId}/views${after ? `?after=${after}` : ''}`, { signal, cache: 'no-store' })
+  if (!response.ok) throw new Error('Không thể tải lượt xem.')
+  return await response.json() as StoryViewsResult
 }
 
 /** An empty emoji removes the reaction. */
