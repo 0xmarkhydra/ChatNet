@@ -20,8 +20,8 @@ export default function ProfileDetailsCard({ username, bio, city, workplace, sch
     <section className={iconEdit ? "grid gap-ui-4 bg-card px-ui-1 pb-ui-2" : "profile-page-about"}>
       {iconEdit && onEdit ? (
         <header className="flex items-center justify-between gap-ui-2">
-          <h2 className="m-0 text-ui-section font-bold text-foreground">Xem nhanh</h2>
-          <button type="button" className="min-h-control-touch cursor-pointer rounded-ui-sm border-0 bg-transparent px-ui-1 text-[15px] font-medium text-primary focus-visible:outline-2 focus-visible:outline-ring" aria-label="Chỉnh sửa thông tin" onClick={onEdit}>
+          <h2 className="m-0 text-ui-section! font-semibold! tracking-[-0.3px] text-foreground!">Xem nhanh</h2>
+          <button type="button" className="min-h-control-touch cursor-pointer rounded-ui-sm border-0 bg-transparent px-ui-1 text-[15px]! font-medium! text-primary! focus-visible:outline-2 focus-visible:outline-ring" aria-label="Chỉnh sửa thông tin" onClick={onEdit}>
             Chỉnh sửa
           </button>
         </header>

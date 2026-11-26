@@ -10,8 +10,10 @@ describe('post composer CSS ownership', () => {
     const launcher = readSource('../src/shared/ui/PostComposerLauncher.tsx')
     const feed = readSource('../src/features/feed/components/SocialFeedComposer.tsx')
     const profile = readSource('../src/features/profile/components/ProfilePage.tsx')
-    // Accept literal, template and conditional className variants; all must retain the shared layout.
-    expect(launcher).toMatch(/className=\{(?:mobileProfile \? "|`)?box-border flex w-full min-w-0 flex-col|className="box-border flex w-full min-w-0 flex-col/)
+    expect(launcher).toMatch(/className=(?:"|\{`)box-border flex w-full/)
+    const mobileProfile = readSource('../src/features/profile/components/ProfileSection.tsx')
+    expect(mobileProfile).toContain('<PostComposerLauncher flushOnMobile')
+    expect(launcher).not.toContain('mobileProfile')
     expect(feed).toContain('<PostComposerLauncher')
     expect(profile).toContain('<PostComposerLauncher')
     expect(launcher).not.toContain('social-feed-launcher')

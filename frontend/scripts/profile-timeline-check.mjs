@@ -156,11 +156,14 @@ try {
       check(await profileLink.isVisible(), 'Avatar picker changed the profile screen')
     }
     await page.getByRole('button', { name: 'Mở trang cá nhân' }).click()
-    await page.getByRole('heading', { name: 'Trang cá nhân', exact: true }).waitFor()
+    await page.locator('.profile-mobile-full-hero h1').waitFor()
     if (width <= 390) {
       await checkMobileProfileColors()
       const hero = page.locator('.profile-mobile-full-hero')
       await hero.waitFor()
+      check(await hero.getByRole('button', { name: 'Quay lại hồ sơ' }).count() === 0, 'Cover toolbar must be removed')
+      const style = await hero.getByRole('button', { name: 'Tạo tin' }).evaluate(node => { const c = getComputedStyle(node); return { color: c.color, weight: c.fontWeight, size: c.fontSize } })
+      check(style.color === 'rgb(255, 255, 255)' && style.weight === '700' && style.size === '14px', 'Story button typography and contrast: ' + JSON.stringify(style))
       const cover = await hero.locator('.has-account-cover').boundingBox()
       const avatar = await hero.locator('[data-profile-avatar-wrap]').boundingBox()
       check(cover && avatar && Math.abs((cover.x + cover.width / 2) - (avatar.x + avatar.width / 2)) <= 1
@@ -182,10 +185,16 @@ try {
       const highlight = page.getByRole('button', { name: 'Du lịch', exact: true })
       await highlight.waitFor()
       const tile = await highlight.boundingBox()
-      check(tile && Math.abs(tile.width - 136) <= 1 && Math.abs(tile.height - 240) <= 1, 'Mobile highlight tile size')
-      const title = await page.getByRole('heading', { name: 'Dòng thời gian', exact: true }).boundingBox()
-      const prompt = await page.getByRole('button', { name: 'Bạn đang nghĩ gì?', exact: true }).boundingBox()
-      check(title && prompt && title.y < prompt.y, 'Timeline title should precede composer')
+      check(tile && Math.abs(tile.width - 112) <= 1 && Math.abs(tile.height - 184) <= 1, 'Mobile highlight tile size: ' + JSON.stringify(tile))
+      check(await highlight.evaluate(node => getComputedStyle(node).borderTopLeftRadius) === '12px', 'Highlight radius must match StoryTray')
+      check(await page.getByRole('heading', { name: 'Dòng thời gian', exact: true }).count() === 0, 'Timeline title must be hidden')
+      check(await page.getByRole('button', { name: 'Tải lại dòng thời gian' }).count() === 0, 'Refresh button must be hidden')
+      const composer = await page.getByRole('region', { name: 'Tạo nội dung mới' }).boundingBox()
+      check(composer && Math.abs(composer.width - width) <= 1 && Math.abs(composer.x) <= 1, 'Composer must be full width: ' + JSON.stringify(composer))
+      for (const label of ['Xem nhanh', 'Bạn bè', 'Tin nổi bật']) {
+        const heading = page.getByRole('heading', { name: label, exact: true })
+        check(await heading.evaluate(node => getComputedStyle(node).fontSize) === '18px', 'Section heading size: ' + label)
+      }
       await page.screenshot({ path: 'output/playwright/layout/profile-mobile-redesign-' + width + '.png', fullPage: true })
       check(await page.getByText('Khoảnh khắc của bạn', { exact: true }).count() === 0, 'Old timeline intro should not be displayed')
       const picker = page.getByRole('group', { name: 'Nội dung trang cá nhân' })
@@ -224,7 +233,7 @@ try {
     await draft.fill('Bản nháp được giữ khi đăng lỗi')
     await page.keyboard.press('Escape')
     await popup.waitFor({ state: 'hidden' })
-    await timeline.getByRole('button', { name: 'Tiếp tục bản nháp của bạn...' }).click()
+    await timeline.getByRole('button', { name: 'Tiếp tục bài viết của bạn...' }).click()
     check(await draft.inputValue() === 'Bản nháp được giữ khi đăng lỗi', 'Closing popup lost draft')
     await page.screenshot({ path: 'output/playwright/layout/profile-popup-' + width + '.png' })
     failCreate = true
@@ -255,17 +264,18 @@ try {
     await page.screenshot({ path: 'output/playwright/layout/profile-editor-' + width + '.png' })
     await page.getByRole('button', { name: 'Tất cả', exact: true }).click()
     await drawer.waitFor({ state: 'hidden' })
-    check(await page.getByRole('heading', { name: 'Trang cá nhân', exact: true }).isVisible(), 'Editor navigated away from timeline')
+    check(await page.locator('.profile-mobile-full-hero h1').isVisible(), 'Editor navigated away from timeline')
     // Check reload recovery without replacing the existing timeline with fake empty state.
     failList = true
-    await timeline.getByRole('button', { name: 'Tải lại dòng thời gian' }).click()
+    await page.getByRole('button', { name: 'Cài đặt', exact: true }).click()
+    await page.getByRole('button', { name: 'Mở trang cá nhân' }).click()
     await timeline.getByRole('alert').waitFor()
     failList = false
     await timeline.getByRole('button', { name: 'Thử lại' }).click()
     await timeline.getByRole('alert').waitFor({ state: 'detached' })
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Horizontal overflow at ' + width)
     await page.screenshot({ path: 'output/playwright/layout/personal-timeline-' + width + '.png', fullPage: true })
-    await page.getByRole('button', { name: 'Quay lại hồ sơ' }).click()
+    await page.getByRole('button', { name: 'Cài đặt', exact: true }).click()
     await page.locator('.profile-edit-card').waitFor()
     await context.close()
     posts = posts.filter(post => post.id !== 100).map(post => ({ ...post, liked: false, likes: 0, myReaction: '' }))

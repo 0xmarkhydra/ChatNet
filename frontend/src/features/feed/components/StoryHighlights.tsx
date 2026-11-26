@@ -14,7 +14,7 @@ type Props = { request: ApiRequest; username: string; owner?: boolean; className
 
 function HighlightPreview({ item, full }: { item: StoryHighlight; full: boolean }) {
   const media = item.attachment
-  const thumbnail = full ? 'size-full rounded-ui-lg' : 'aspect-[9/16] w-full rounded-ui-md'
+  const thumbnail = full ? 'size-full rounded-ui-md' : 'aspect-[9/16] w-full rounded-ui-md'
   if (!media) return (
     <span data-story-background={item.background} className={`${thumbnail} grid box-border place-items-center overflow-hidden p-2 text-center text-ui-label font-medium leading-snug text-white`}>
       <span className="line-clamp-3 wrap-anywhere">{item.text}</span>
@@ -72,16 +72,16 @@ export default function StoryHighlights({ request, username, owner = false, clas
   if (!owner && (!items || items.length === 0)) return null
   return (
     <section className={cn('min-w-0 bg-card text-foreground', full ? 'py-ui-1' : 'rounded-ui-lg border border-solid border-border p-ui-4', className)} aria-label="Tin nổi bật">
-      <h2 className={cn("m-0 mb-3 text-ui-section", full ? "font-bold" : "font-semibold")}>Tin nổi bật</h2>
+      <h2 className={cn("m-0 mb-3", full ? "text-[length:var(--soco-type-section)]! font-semibold! tracking-[-0.3px] text-foreground!" : "text-ui-section font-semibold")}>Tin nổi bật</h2>
       {refreshError ? <div><p role="status">Không tải được Tin nổi bật.</p><Button size={full ? "lg" : "sm"} type="button" variant="outline" onClick={refresh}>Tải lại</Button></div>
-        : !items ? <p role="status" className={full ? "min-h-[240px]" : undefined}>Đang tải…</p>
+        : !items ? <p role="status" className={full ? "min-h-46" : undefined}>Đang tải…</p>
         : items.length === 0 && <p className={cn("text-sm", full ? "text-foreground/80" : "text-muted-foreground")}>Mở Story của bạn và chọn “Thêm vào Tin nổi bật” để giữ tin trên hồ sơ.</p>}
       {items && items.length > 0 && (
-        <ul role="list" className={cn("m-0 mt-2 grid list-none grid-flow-col gap-ui-2 overflow-x-auto overscroll-x-contain p-1", full ? "auto-cols-[136px]" : "auto-cols-[calc((100%_-_1rem)/3)]")}>
+        <ul role="list" className={cn("m-0 mt-2 grid list-none grid-flow-col gap-ui-2 overflow-x-auto overscroll-x-contain p-1", full ? "auto-cols-[calc(var(--spacing)*28)]" : "auto-cols-[calc((100%_-_1rem)/3)]")}>
           {items.map(item => (
             <li key={item.id} className="relative min-w-0">
               <button type="button" aria-label={item.title} onClick={() => setActiveStoryId(item.id)}
-                className={cn("grid w-full min-w-0 cursor-pointer appearance-none border-0 bg-transparent p-0 font-sans focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring", full ? "relative h-[240px] overflow-hidden rounded-ui-lg text-left" : "gap-1.5 rounded-ui-md text-center text-foreground hover:bg-accent")}>
+                className={cn("grid w-full min-w-0 cursor-pointer appearance-none border-0 bg-transparent p-0 font-sans focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring", full ? "relative h-46 w-28! overflow-hidden rounded-ui-md! text-left" : "gap-1.5 rounded-ui-md text-center text-foreground hover:bg-accent")}>
                 <HighlightPreview item={item} full={full} />
                 <span className={cn("wrap-anywhere text-ui-label leading-snug", full ? "absolute inset-x-0 bottom-0 bg-linear-to-t from-black/85 to-transparent px-ui-2 pt-ui-6 pb-ui-3 font-bold text-white" : "line-clamp-2 px-0.5 pb-0.5 font-medium")}><span className="line-clamp-2">{item.title}</span></span>
               </button>

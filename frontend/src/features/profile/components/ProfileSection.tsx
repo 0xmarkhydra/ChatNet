@@ -225,7 +225,7 @@ export default function ProfileSection({
   const coverLabel = profileMedia?.coverSet ? t("profile.changeCover") : t("profile.addCover");
   return (
       <div
-            className={`simple-view profile-view ${profileTimelineOpen ? "personal-timeline-view" : ""} ${mobileTimeline ? "bg-card! px-0! pt-0!" : ""} ${isProfileDesktop && desktopProfileSettings ? "settings-workspace-open" : ""}`}
+            className={`simple-view profile-view ${profileTimelineOpen ? "personal-timeline-view" : ""} ${mobileTimeline ? "bg-card! px-0! pt-0! font-[family-name:var(--soco-font-sans)] text-foreground" : ""} ${isProfileDesktop && desktopProfileSettings ? "settings-workspace-open" : ""}`}
           >
             {isProfileDesktop && desktopProfileSettings && (
               <SettingsWorkspace
@@ -431,10 +431,7 @@ export default function ProfileSection({
               compact={!profileTimelineOpen && !isProfileDesktop}
               centered={mobileTimeline}
               bio={mobileTimeline ? profileMedia?.bio : undefined}
-              toolbar={mobileTimeline && <header className="absolute inset-x-4 top-2 z-20 flex items-center gap-ui-2">
-                <button type="button" className="grid size-control-touch shrink-0 place-items-center rounded-full border-0 bg-black/60 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={closeProfileTimeline} aria-label="Quay lại hồ sơ"><ArrowLeft size={20} aria-hidden="true" /></button>
-                <h2 ref={profileHeadingRef} tabIndex={-1} className="m-0 rounded-ui-md bg-black/60 px-ui-3 py-ui-2 text-ui-subtitle font-semibold text-white">Trang cá nhân</h2>
-              </header>}
+              headingRef={mobileTimeline ? profileHeadingRef : undefined}
               displayName={displayName}
               city={profileMedia?.city} workplace={profileMedia?.workplace} school={profileMedia?.school}
               friendCount={friendCount}
@@ -453,10 +450,10 @@ export default function ProfileSection({
                   onChangeAvatar={openAvatarPicker} />}
               actions={mobileTimeline ? (
                 <>
-                  <Button size="lg" className="min-h-control-touch min-w-0 gap-ui-1 whitespace-normal rounded-ui-md px-ui-2 text-ui-label font-bold" onClick={onCreateStory}>
+                  <Button size="lg" className="min-h-control-touch min-w-0 gap-ui-1 whitespace-normal rounded-ui-md! px-ui-2 text-[14px]! font-bold! text-white! bg-primary!" onClick={onCreateStory}>
                     <Plus size={17} aria-hidden="true" />Tạo tin
                   </Button>
-                  <Button size="lg" variant="secondary" className="min-h-control-touch min-w-0 gap-ui-1 whitespace-normal rounded-ui-md px-ui-2 text-ui-label font-bold" aria-pressed={editSelected} onClick={() => setTimelineView("edit")}>
+                  <Button size="lg" variant="secondary" className="min-h-control-touch min-w-0 gap-ui-1 whitespace-normal rounded-ui-md! px-ui-2 text-[14px]! font-bold! text-foreground! bg-secondary!" aria-pressed={editSelected} onClick={() => setTimelineView("edit")}>
                     <PencilLine size={17} aria-hidden="true" />Chỉnh sửa hồ sơ
                   </Button>
                 </>
@@ -479,11 +476,12 @@ export default function ProfileSection({
             {mobileTimeline && (
               <div className="flex w-full shrink-0 flex-wrap gap-ui-2 px-ui-4 py-ui-2 box-border" role="group" aria-label="Nội dung trang cá nhân">
                 <Button size="lg" variant={timelineView === "all" ? "secondary" : "ghost"}
-                  className="min-h-control-touch rounded-full aria-pressed:font-bold aria-pressed:text-primary"
+                  className="min-h-control-touch rounded-full! text-[14px]! font-semibold! text-foreground! aria-pressed:bg-[#e2ecff]! aria-pressed:font-bold! aria-pressed:text-primary!"
                   aria-pressed={timelineView === "all"} onClick={() => setTimelineView("all")}>Tất cả</Button>
                 <Button size="lg" variant={timelineView === "media" ? "secondary" : "ghost"}
-                  className="min-h-control-touch rounded-full aria-pressed:font-bold aria-pressed:text-primary"
+                  className="min-h-control-touch rounded-full! text-[14px]! font-semibold! text-foreground! aria-pressed:bg-[#e2ecff]! aria-pressed:font-bold! aria-pressed:text-primary!"
                   aria-pressed={timelineView === "media"} onClick={() => setTimelineView("media")}>Ảnh &amp; video</Button>
+                <Button variant="ghost" size="icon" className="ml-auto size-control-touch rounded-full! text-muted-foreground!" aria-label="Cài đặt" onClick={closeProfileTimeline}><Settings size={20} aria-hidden="true" /></Button>
               </div>
             )}
 
@@ -520,15 +518,13 @@ export default function ProfileSection({
                   {mobileTimeline && <ProfileFriendsPreview friends={friends} onViewFriend={onViewFriend} onViewAll={() => switchTab("contacts")} />}
                   <StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} className={mobileTimeline ? undefined : "profile-page-about"} owner mobileProfile={mobileTimeline} />
                 </div>
-                {mobileTimeline && <div className="flex min-h-control-touch items-center justify-between gap-ui-2">
-                  <h2 className="m-0 text-ui-section font-bold text-foreground">Dòng thời gian</h2>
-                  <Button variant="ghost" size="icon" className="size-control-touch text-primary" aria-label="Tải lại dòng thời gian" disabled={profilePostsBusy || !!pendingPost} onClick={() => void loadProfilePosts(false, true)}><RefreshCw size={18} aria-hidden="true" /></Button>
-                </div>}
                 {mobileTimeline ? (
-                  <PostComposerLauncher username={name} displayName={displayName}
-                    prompt={postText.trim() ? "Tiếp tục bản nháp của bạn..." : "Bạn đang nghĩ gì?"}
+                  <div className="-mx-4! w-[calc(100%+32px)]! max-w-none! min-w-0">
+                  <PostComposerLauncher flushOnMobile username={name} displayName={displayName}
+                    prompt={postText.trim() ? "Tiếp tục bài viết của bạn..." : "Bạn đang nghĩ gì?"}
                     onCreatePost={() => setProfileComposerOpen(true)} onCreateMediaPost={onCreateMediaPost}
-                    onCreateStory={onCreateStory} onCheckIn={onCheckIn} pending={!!pendingPost || mediaUploading === "feed"} storyBusy={storyBusy} mobileProfile />
+                    onCreateStory={onCreateStory} onCheckIn={onCheckIn} pending={!!pendingPost || mediaUploading === "feed"} storyBusy={storyBusy} />
+                  </div>
                 ) : (
                 <div className="profile-post-launcher">
                   <UserAvatar
