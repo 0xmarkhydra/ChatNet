@@ -78,6 +78,9 @@ export function useMessageData({
     return () => { mounted.current = false }
   }, [])
   const historyGeneration = useRef(0)
+  // Freeze the server cursor before marking the room read. Never derive it from a changing badge.
+  const unreadSnapshot = useRef<{ visit: typeof visit; id: number | null } | null>(null)
+  const [unreadBoundary, setUnreadBoundary] = useState<{ visit: typeof visit; id: number | null } | null>(null)
   const isCurrentVisit = useCallback((expected: typeof visit) => mounted.current &&
     latestVisit.current === expected && sessionRef.current?.sessionId === expected.sessionId &&
     sessionRef.current?.user.id === expected.userId &&
@@ -167,6 +170,8 @@ export function useMessageData({
     const refresh = () => {
       historyGeneration.current += 1
       setHistory(previous => ({ scope: previous.scope, rooms: new Map() }))
+      unreadSnapshot.current = null
+      setUnreadBoundary(null)
       setPrivacyRevision(current => current + 1)
     }
     const clearHistory = (event: Event) => {
@@ -181,6 +186,8 @@ export function useMessageData({
         setMessageGapBefore(null)
         setMessageGapLoading(false)
         pendingMessageScrollRestore.current = null
+        unreadSnapshot.current = { visit: latestVisit.current, id: null }
+        setUnreadBoundary(null)
       }
       removeConversationHistory(conversationId)
     }
@@ -190,7 +197,7 @@ export function useMessageData({
       window.removeEventListener('chatnet:privacy-updated', refresh)
       window.removeEventListener('chatnet:message-history-cleared', clearHistory)
     }
-  }, [activeConversationIdRef, removeConversationHistory])
+  }, [activeConversationIdRef, latestVisit, removeConversationHistory])
 
   useEffect(() => {
     const { conversationId, channelId, sessionId, userId, targetLanguage } = visit
@@ -225,6 +232,25 @@ export function useMessageData({
         if (responses.some((response) => !response.ok)) throw new Error('Không tải được tin nhắn')
         const pages = await Promise.all(responses.map(async (response) => (await response.json()) as Message[]))
         if (!isCurrent()) return
+        // Load a bounded window at the first unread message plus the latest page.
+        const snapshot = unreadSnapshot.current?.visit === visit ? unreadSnapshot.current : null
+        const unreadId = snapshot ? snapshot.id : (pages[0][0]?.firstUnreadMessageId || null)
+        let unreadWindow: Message[] | null = null
+        if (!jump && unreadId && !pages[0].some(item => item.id === unreadId)) {
+          const windows = await Promise.all([
+            listMessages(apiFetch, { ...page, limit: 20, before: unreadId }),
+            listMessages(apiFetch, { ...page, limit: MESSAGE_PAGE_SIZE, after: unreadId - 1 }),
+          ])
+          if (!isCurrent()) return
+          if (windows.some(response => !response.ok)) throw new Error('Không tải được tin nhắn chưa đọc')
+          const [older, newer] = await Promise.all(windows.map(async response => await response.json() as Message[]))
+          if (!isCurrent()) return
+          unreadWindow = [...older, ...newer]
+          pages.unshift(unreadWindow)
+          setHasMoreMessages(older.length === 20)
+        }
+        unreadSnapshot.current = { visit, id: unreadId }
+        setUnreadBoundary(unreadSnapshot.current)
         // Include the targeted history and newer messages from BOTH participants.
         const byId = new Map(pages.flat().map((item) => [item.id, item]))
         const data = [...byId.values()].filter(item => item.conversationId === conversationId &&
@@ -249,10 +275,9 @@ export function useMessageData({
         const anchorMax = pages[0].reduce((max, item) => Math.max(max, item.id), 0)
         const recent = pages[1] || []
         const recentMin = recent.reduce((min, item) => Math.min(min, item.id), Infinity)
-        setMessageGapBefore(jump && recent.length === 200 && anchorMax > 0 && anchorMax < recentMin
-          ? recentMin : null)
-        // The older-page cursor applies to the anchor page, not the combined result.
-        setHasMoreMessages(pages[0].length === pageSize)
+        setMessageGapBefore((jump ? recent.length === 200 : Boolean(unreadWindow) && recent.length === MESSAGE_PAGE_SIZE)
+          && anchorMax > 0 && anchorMax < recentMin ? recentMin : null)
+        if (!unreadWindow) setHasMoreMessages(pages[0].length === pageSize)
         setMessages((current) => {
           const live = current.filter((item) => item.conversationId === conversationId && (item.channelId || 0) === channelId && changes.has(item.id))
           const existing = jump ? current.filter((item) => item.conversationId === conversationId && (item.channelId || 0) === channelId) : []
@@ -308,7 +333,7 @@ export function useMessageData({
     if (!token || !id) return
     let cancelled = false
     const markWhenVisible = () => {
-      if (cancelled || !isCurrentVisit(visit)) return
+      if (cancelled || !isCurrentVisit(visit) || unreadSnapshot.current?.visit !== visit) return
       if (!canMarkConversationRead(activeConversationIdRef.current, id, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) return
       const { apiFetch, refreshConversations, setConversations } = callbacks.current
       void (activeConversationType === 'group'
@@ -422,6 +447,8 @@ export function useMessageData({
     messages,
     setMessages,
     messageHistoryLoading,
+    unreadMessageId: jumpToMessage?.conversationId === activeConversationId ? null :
+      unreadBoundary?.visit === visit ? unreadBoundary.id : null,
     messageHistoryError,
     retryMessageHistory,
     hasMoreMessages,

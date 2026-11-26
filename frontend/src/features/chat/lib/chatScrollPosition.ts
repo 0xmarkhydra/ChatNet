@@ -35,3 +35,14 @@ export function reconcileChatScroll(activeConversationId: number | null, refs: C
 export function resetChatFollowBottom(refs: Pick<ChatScrollRefs, "messageScrollAtBottom">) {
   refs.messageScrollAtBottom.current = true;
 }
+
+/** Set the initial position exactly once without smooth-scroll layout jumps. */
+export function positionAtUnread(unreadMessageId: number | null | undefined, refs: ChatScrollRefs): boolean {
+  const container = refs.messagesScrollRef.current;
+  const marker = unreadMessageId && container?.querySelector<HTMLElement>(`[data-unread-message-id="${unreadMessageId}"]`);
+  if (!container || !marker) return false;
+  refs.pendingMessageScrollRestore.current = null;
+  container.scrollTop += marker.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
+  refs.messageScrollAtBottom.current = container.scrollHeight - container.scrollTop - container.clientHeight < 96;
+  return true;
+}

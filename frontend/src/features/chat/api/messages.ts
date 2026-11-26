@@ -80,12 +80,14 @@ export type MessagePageQuery = {
   channelId: number;
   limit: number;
   before?: number;
+  after?: number;
 };
 
 export function listMessages(request: ApiRequest, query: MessagePageQuery) {
   const before = query.before === undefined ? "" : `&before=${query.before}`;
+  const after = query.after === undefined ? "" : `&after=${query.after}`;
   return request(
-    `/api/conversations/${query.conversationId}/messages?target=${encodeURIComponent(query.target)}&channelId=${query.channelId}&limit=${query.limit}${before}`,
+    `/api/conversations/${query.conversationId}/messages?target=${encodeURIComponent(query.target)}&channelId=${query.channelId}&limit=${query.limit}${before}${after}`,
   );
 }
 

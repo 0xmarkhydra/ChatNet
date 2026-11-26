@@ -1,4 +1,4 @@
-import { RefreshCw, Languages, MoreHorizontal, SmilePlus, LoaderCircle, CornerUpLeft, Forward } from "lucide-react";
+import { ArrowDown, RefreshCw, Languages, MoreHorizontal, SmilePlus, LoaderCircle, CornerUpLeft, Forward } from "lucide-react";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { userLabel } from "../../../shared/utils/userLabel";
 import { formatTime } from "../../../shared/utils/format";
@@ -6,7 +6,7 @@ import { MessageReadersInline } from "./MessageReadersDialog";
 import { getMessageTranslationView } from "../utils/messageTranslationPresentation";
 import { messageReactionLabel } from "../utils/messageReactions";
 import { getLatestDirectDelivery, getLatestGroupReaderIdsByMessage } from "../utils/messageReaders";
-import { Fragment, useMemo } from "react";
+import { Fragment, useLayoutEffect, useMemo, useState } from "react";
 import { GroupActivityMarker } from "./GroupActivities";
 import { messageTextParts, messageLinkHref } from "../lib/messageClipboard";
 import { getMessageGroupPosition } from "../utils/messageGrouping";
@@ -19,14 +19,57 @@ import type { Dispatch, SetStateAction } from "react";
 import type { Message, GroupMember } from "../types";
 import MessageMentionText from "./MessageMentionText";
 
-type Props = Omit<Pick<ChatSectionProps, "activeChatTranslationSettings" | "activeConversation" | "activeConversationId" | "apiFetch" | "bottomRef" | "chatOnline" | "chatOutbox" | "conversationBlocked" | "effectiveAutoTranslate" | "effectiveTargetLanguage" | "groupActivities" | "hasMoreMessages" | "languageOptions" | "loadMissingMessages" | "loadOlderMessages" | "manuallyTranslated" | "messageGapBefore" | "messageGapLoading" | "messageInputRef" | "setMessageScrollAtBottom" | "messagesLoadingMore" | "messageHistoryLoading" | "messageHistoryError" | "retryMessageHistory" | "messagesScrollRef" | "onReactionUsers" | "onForwardMessage" | "reactionPreviews" | "retryQueuedChatMessages" | "selectedChannelId" | "session" | "setGroupActivityViewedId" | "setManuallyTranslated" | "setReplyingTo" | "setTranslationOriginals" | "sortedGroupActivityEvents" | "t" | "translateMessage" | "translationFailures" | "translationOriginals" | "translationPending" | "translations" | "updateChatOutbox" | "visibleMessages">, "activeConversation"> & Pick<ReturnType<typeof useMessageLongPress>, "beginMessageLongPress" | "cancelMessageLongPress" | "moveMessageLongPress" | "openMessageActions" | "openMessageReactions" | "suppressMessageClick"> & {
+const timelineDateFormatter = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+// Isolate scroll-button state so scrolling never rerenders the message bubbles.
+function JumpToLatest({ messagesScrollRef }: Pick<ChatSectionProps, 'messagesScrollRef'>) {
+  const [showLatest, setShowLatest] = useState(false);
+  useLayoutEffect(() => {
+    const element = messagesScrollRef.current;
+    if (!element) return;
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        setShowLatest(element.scrollHeight - element.scrollTop - element.clientHeight >= 96);
+      });
+    };
+    // Recheck when translated text, media, or message rows change geometry.
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    const observeRows = () => {
+      observer?.disconnect();
+      observer?.observe(element);
+      for (const child of element.children) observer?.observe(child);
+      update();
+    };
+    const mutations = new MutationObserver(observeRows);
+    mutations.observe(element, { childList: true });
+    observeRows();
+    element.addEventListener('scroll', update, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      element.removeEventListener('scroll', update);
+      mutations.disconnect();
+      observer?.disconnect();
+    };
+  }, [messagesScrollRef]);
+  if (!showLatest) return null;
+  const jumpLatest = () => {
+    const element = messagesScrollRef.current;
+    if (!element) return;
+    element.scrollTo({ top: element.scrollHeight, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+  };
+  return <button type="button" className="chat-jump-latest absolute bottom-ui-3 left-1/2 z-[12] grid size-control-touch -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-solid border-border-subtle bg-card p-0 text-primary shadow-ui-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={jumpLatest} aria-label="Đến tin nhắn mới nhất" title="Đến tin nhắn mới nhất"><ArrowDown size={20} aria-hidden="true" /></button>;
+}
+
+type Props = Omit<Pick<ChatSectionProps, "activeChatTranslationSettings" | "activeConversation" | "activeConversationId" | "apiFetch" | "bottomRef" | "chatOnline" | "chatOutbox" | "conversationBlocked" | "effectiveAutoTranslate" | "effectiveTargetLanguage" | "groupActivities" | "hasMoreMessages" | "languageOptions" | "loadMissingMessages" | "loadOlderMessages" | "manuallyTranslated" | "messageGapBefore" | "messageGapLoading" | "messageInputRef" | "setMessageScrollAtBottom" | "messagesLoadingMore" | "messageHistoryLoading" | "unreadMessageId" | "messageHistoryError" | "retryMessageHistory" | "messagesScrollRef" | "onReactionUsers" | "onForwardMessage" | "reactionPreviews" | "retryQueuedChatMessages" | "selectedChannelId" | "session" | "setGroupActivityViewedId" | "setManuallyTranslated" | "setReplyingTo" | "setTranslationOriginals" | "sortedGroupActivityEvents" | "t" | "translateMessage" | "translationFailures" | "translationOriginals" | "translationPending" | "translations" | "updateChatOutbox" | "visibleMessages">, "activeConversation"> & Pick<ReturnType<typeof useMessageLongPress>, "beginMessageLongPress" | "cancelMessageLongPress" | "moveMessageLongPress" | "openMessageActions" | "openMessageReactions" | "suppressMessageClick"> & {
   activeConversation: NonNullable<ChatSectionProps["activeConversation"]>;
   messageReaderMembers: Array<{ id: number; username: string; displayName: string }>;
   groupMembers: GroupMember[];
   onProfile: (username: string) => void;
   setReadersTarget: Dispatch<SetStateAction<{ message: Message; readerIds: number[]; sessionId: string } | null>>;
 };
-export default function MessageTimeline({ activeChatTranslationSettings, activeConversation, activeConversationId, apiFetch, beginMessageLongPress, bottomRef, cancelMessageLongPress, chatOnline, chatOutbox, conversationBlocked, effectiveAutoTranslate, effectiveTargetLanguage, groupActivities, hasMoreMessages, languageOptions, loadMissingMessages, loadOlderMessages, manuallyTranslated, messageGapBefore, messageGapLoading, messageInputRef, setMessageScrollAtBottom, messagesLoadingMore, messageHistoryLoading, messageHistoryError, retryMessageHistory, messagesScrollRef, moveMessageLongPress, openMessageActions, openMessageReactions, onReactionUsers, onForwardMessage, reactionPreviews, retryQueuedChatMessages, selectedChannelId, session, setGroupActivityViewedId, setManuallyTranslated, setReplyingTo, setTranslationOriginals, sortedGroupActivityEvents, suppressMessageClick, t, translateMessage, translationFailures, translationOriginals, translationPending, translations, updateChatOutbox, visibleMessages, messageReaderMembers, setReadersTarget, groupMembers, onProfile }: Props) {
+export default function MessageTimeline({ activeChatTranslationSettings, activeConversation, activeConversationId, apiFetch, beginMessageLongPress, bottomRef, cancelMessageLongPress, chatOnline, chatOutbox, conversationBlocked, effectiveAutoTranslate, effectiveTargetLanguage, groupActivities, hasMoreMessages, languageOptions, loadMissingMessages, loadOlderMessages, manuallyTranslated, messageGapBefore, messageGapLoading, messageInputRef, setMessageScrollAtBottom, messagesLoadingMore, messageHistoryLoading, unreadMessageId, messageHistoryError, retryMessageHistory, messagesScrollRef, moveMessageLongPress, openMessageActions, openMessageReactions, onReactionUsers, onForwardMessage, reactionPreviews, retryQueuedChatMessages, selectedChannelId, session, setGroupActivityViewedId, setManuallyTranslated, setReplyingTo, setTranslationOriginals, sortedGroupActivityEvents, suppressMessageClick, t, translateMessage, translationFailures, translationOriginals, translationPending, translations, updateChatOutbox, visibleMessages, messageReaderMembers, setReadersTarget, groupMembers, onProfile }: Props) {
   const latestDirectDelivery = useMemo(() => (
     activeConversation.type === 'direct' && activeConversation.otherUserId !== undefined
       ? getLatestDirectDelivery(visibleMessages, session.user.id, activeConversation.otherUserId)
@@ -38,11 +81,19 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
       : new Map<number, number[]>()
   ), [activeConversation, messageReaderMembers, session.user.id, visibleMessages]);
 
+  const syncScroll = (element: HTMLDivElement) => {
+    setMessageScrollAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < 96);
+  };
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const todayLabel = today.toDateString();
+  const yesterdayLabel = yesterday.toDateString();
+  const translatedLanguage = languageOptions.find(option => option.value === effectiveTargetLanguage)?.localizedLanguage || effectiveTargetLanguage.toUpperCase();
+
   return (
-    <div className="messages" ref={messagesScrollRef} onScroll={(event) => {
-                    const element = event.currentTarget
-                    setMessageScrollAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < 100)
-                  }}>
+    <div className="chat-timeline-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <div className="messages min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain scroll-auto!" ref={messagesScrollRef} onScroll={event => syncScroll(event.currentTarget)}>
                     {hasMoreMessages && (
                       <button type="button" className="soco-load-more soco-older-messages"
                         onClick={() => void loadOlderMessages()} disabled={messagesLoadingMore}
@@ -66,18 +117,16 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                       const messageDay = new Date(message.createdAt)
                       const previousDay = index > 0 ? new Date(visibleMessages[index - 1].createdAt) : null
                       const displayDay = !previousDay || messageDay.toDateString() !== previousDay.toDateString()
-                      const today = new Date()
-                      const yesterday = new Date(today)
-                      yesterday.setDate(yesterday.getDate() - 1)
-                      const dayLabel = messageDay.toDateString() === today.toDateString() ? 'Hôm nay'
-                        : messageDay.toDateString() === yesterday.toDateString() ? 'Hôm qua'
-                          : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(messageDay)
+                      const dayLabel = !displayDay ? '' : messageDay.toDateString() === todayLabel ? 'Hôm nay'
+                        : messageDay.toDateString() === yesterdayLabel ? 'Hôm qua'
+                          : timelineDateFormatter.format(messageDay)
                       const mine = message.senderId === session.user.id
                       const groupReaderIds = activeConversation.type === 'group' && mine
                         ? groupReaderIdsByMessage.get(message.id) || []
                         : []
                       const groupPosition = getMessageGroupPosition(visibleMessages, index, {
                         gapBeforeId: messageGapBefore,
+                        unreadBeforeId: unreadMessageId,
                         interruptions: activeConversation.type === 'group' ? sortedGroupActivityEvents : undefined,
                       })
                       const groupStart = groupPosition === 'single' || groupPosition === 'start'
@@ -86,7 +135,6 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                       const translatedText = !message.deleted && !giphyUrl ? translations[message.id] : ''
                       const photoOnly = !message.deleted && !message.text && message.attachments?.length === 1 && message.attachments[0].kind === 'image' && Boolean(message.attachments[0].url)
                       const originalVisible = Boolean(translationOriginals[message.id])
-                      const translatedLanguage = languageOptions.find(option => option.value === effectiveTargetLanguage)?.localizedLanguage || effectiveTargetLanguage.toUpperCase()
                       const translationEnabled = effectiveAutoTranslate || Boolean(manuallyTranslated[message.id])
                       const translationView = getMessageTranslationView({
                         originalText: message.text,
@@ -140,9 +188,14 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                               Tải tin nhắn ở giữa
                             </button>
                           )}
+                          {unreadMessageId === message.id && (
+                            <div className="chat-unread-divider my-ui-4 flex min-w-0 shrink-0 items-center gap-ui-2 text-ui-label font-semibold text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border" data-unread-message-id={message.id} role="separator" aria-label="Tin nhắn chưa đọc">
+                              <span className="text-center">Tin nhắn chưa đọc</span>
+                            </div>
+                          )}
                         <article
                           data-message-id={message.id}
-                          className={'message message-press-target' + (mine ? ' mine' : '') + (activeConversation.type === 'group' ? ' channel-message' : '') + (groupPosition !== 'single' ? ` message-group-${groupPosition}` : '')}
+                          className={'message message-press-target min-w-0 animate-none!' + (mine ? ' mine' : '') + (activeConversation.type === 'group' ? ' channel-message' : '') + (groupPosition !== 'single' ? ` message-group-${groupPosition}` : '')}
                           title={!groupEnd ? formatTime(message.createdAt) + (message.editedAt && !message.deleted ? ' · đã sửa' : '') : undefined}
                           onPointerDown={(event) => {
                             suppressMessageClick.current = null
@@ -345,5 +398,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                     ))}
                     <div ref={bottomRef} />
                   </div>
+      <JumpToLatest messagesScrollRef={messagesScrollRef} />
+    </div>
   );
 }

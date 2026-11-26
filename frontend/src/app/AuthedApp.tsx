@@ -748,6 +748,7 @@ export default function AuthedApp({
     setHasMoreMessages,
     messagesLoadingMore,
     messageHistoryLoading,
+    unreadMessageId,
     messageHistoryError,
     retryMessageHistory,
     setMessagesLoadingMore,
@@ -1542,6 +1543,8 @@ export default function AuthedApp({
   useChatScrollCoordinator({
     activeConversationId,
     selectedChannelId,
+    unreadMessageId,
+    messageHistoryLoading,
     messages,
     outgoingMessage,
     chatOutbox,
@@ -2430,6 +2433,7 @@ export default function AuthedApp({
           messageSending={messageSending}
           messagesLoadingMore={messagesLoadingMore}
           messageHistoryLoading={messageHistoryLoading}
+          unreadMessageId={unreadMessageId}
           messageHistoryError={messageHistoryError}
           retryMessageHistory={retryMessageHistory}
           messagesScrollRef={messagesScrollRef}

@@ -95,9 +95,12 @@
   }
 
   /* One scroll controller for every tab (including Newsfeed). The header leaves
-     layout instantly (the scroll hook compensates scrollTop, so content never
-     slides under the finger) and only its transform/opacity are animated. */
-  .modern-shell.app-layout > .chatnet-appbar,
+     and re-enters layout instantly (the scroll hook compensates scrollTop, so
+     content never slides under the finger). It must not animate: its space is
+     reserved at once, so sliding it in would show an empty band first. */
+  .modern-shell.app-layout > .chatnet-appbar {
+    transition: none;
+  }
   .modern-shell.app-layout > .bottom-navigation {
     transition:
       transform 600ms cubic-bezier(.4, 0, .2, 1),

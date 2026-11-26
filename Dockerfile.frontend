@@ -1,19 +1,26 @@
 FROM node:24-alpine AS build
-# Pin the API origin for Docker preview builds; never fall back to local demo data.
+
 ARG VITE_API_URL=https://api-chat.codelocal.cloud
 ENV VITE_API_URL=${VITE_API_URL}
+
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
+
 COPY backend/cmd/call/translation.go /backend/cmd/call/translation.go
 COPY backend/cmd/call/main.go /backend/cmd/call/main.go
 COPY backend/cmd/call/revocations.go /backend/cmd/call/revocations.go
 COPY backend/cmd/chat/groups.go /backend/cmd/chat/groups.go
+
 ARG VITE_API_URL
 ARG VITE_API_PROXY
+ARG VITE_GIPHY_API_KEY
+
 ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_API_PROXY=${VITE_API_PROXY}
+ENV VITE_GIPHY_API_KEY=${VITE_GIPHY_API_KEY}
+
 RUN npm run build \
     && npm run check:pwa \
     && npm run check:session \
@@ -25,7 +32,9 @@ FROM nginx:1.27-alpine
 COPY frontend-nginx-security-headers.conf /etc/nginx/chatnet-security-headers.conf
 COPY frontend-nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /src/dist /usr/share/nginx/html
+
 ENV PORT=8080
 ENV BACKEND_URL=http://backend.railway.internal:8080
+
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

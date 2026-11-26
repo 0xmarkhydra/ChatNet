@@ -45,6 +45,8 @@ describe("message burst grouping", () => {
     ];
     expect(messages.map((_, i) => getMessageGroupPosition(messages, i, { gapBeforeId: 2 })))
       .toEqual(["single", "start", "end"]);
+    expect(messages.map((_, i) => getMessageGroupPosition(messages, i, { unreadBeforeId: 2 })))
+      .toEqual(["single", "start", "end"]);
     expect(messages.map((_, i) => getMessageGroupPosition(messages, i, {
       interruptions: [{ createdAt: "2026-11-13T10:01:30Z" }],
     }))).toEqual(["start", "end", "single"]);

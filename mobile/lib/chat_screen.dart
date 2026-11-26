@@ -71,7 +71,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final chatSearchFocus = FocusNode();
   final channelSearchController = TextEditingController();
   final messageSearchController = TextEditingController();
-  final scrollController = ScrollController();
+  final scrollController = ScrollController(keepScrollOffset: false);
+  final showLatest = ValueNotifier<bool>(false);
+  int messageLoadGeneration = 0;
+  bool initialTimelinePending = true;
+  int? unreadMessageId;
+  int? messageGapBefore;
+  bool gapLoading = false;
+  bool get centeredTimeline =>
+      !searchingMessages &&
+      unreadMessageId != null &&
+      messages.any((m) => m['id'] == unreadMessageId);
+  static const unreadCenterKey = ValueKey('unread-timeline-center');
   final avatarScrollController = ScrollController();
   final conversationListScrollController = ScrollController();
   List<Json> conversations = [];
@@ -131,6 +142,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       reverseDuration: const Duration(milliseconds: 380),
     );
     _refresh();
+    scrollController.addListener(_syncMessageScroll);
     avatarScrollController.addListener(_checkConversationScroll);
     conversationListScrollController.addListener(_checkConversationScroll);
   }
@@ -322,11 +334,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Future<void> _loadMessages(Json conversation, {int channelId = 0}) async {
     final changedConversation =
         active?['id'] != conversation['id'] || selectedChannelId != channelId;
+    final generation = ++messageLoadGeneration;
+    final wasAtLatest = !showLatest.value;
+    bool current() =>
+        mounted &&
+        generation == messageLoadGeneration &&
+        active?['id'] == conversation['id'] &&
+        selectedChannelId == channelId;
+    if (changedConversation) showLatest.value = false;
     setState(() {
       active = conversation;
       selectedChannelId = channelId;
       if (conversation['type'] == 'group') pickerGroup = conversation;
       if (changedConversation) {
+        messages = [];
+        unreadMessageId = null;
+        initialTimelinePending = true;
+        messageGapBefore = null;
+        gapLoading = false;
         if (mentionRoomId != (conversation['id'] as num?)?.toInt()) {
           mentionMembers = [];
           mentionRoomId = null;
@@ -344,8 +369,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         searchHasMore = false;
         searchLoading = false;
       }
-      loading = true;
-      replyingTo = null;
+      gapLoading = false;
+      loading = changedConversation || messages.isEmpty;
+      if (changedConversation) replyingTo = null;
       if (changedConversation) {
         friendConnection = null;
         friendLoading = conversation['type'] == 'direct';
@@ -376,32 +402,73 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       } catch (_) {
         // Keep last known preferences when only the preference request fails.
       }
-      final data = objects(
-        await widget.api.request(
-          'GET',
+      final path =
           '/api/conversations/${conversation['id']}/messages'
-              '?target=${Uri.encodeQueryComponent(target)}&channelId=$channelId',
-        ),
+          '?target=${Uri.encodeQueryComponent(target)}&channelId=$channelId';
+      final recent = objects(
+        await widget.api.request('GET', '$path&limit=200'),
       );
+      if (!current()) return;
+      final opening = initialTimelinePending;
+      final snapshot = opening
+          ? (recent.firstOrNull?['firstUnreadMessageId'] as num?)?.toInt()
+          : unreadMessageId;
+      final anchor = snapshot != null && snapshot > 0 ? snapshot : null;
+      var data = recent;
+      int? gap;
+      if (anchor != null && !recent.any((m) => m['id'] == anchor)) {
+        final windows = await Future.wait([
+          widget.api.request('GET', '$path&limit=20&before=$anchor'),
+          widget.api.request('GET', '$path&limit=80&after=${anchor - 1}'),
+        ]);
+        if (!current()) return;
+        final around = [...objects(windows[0]), ...objects(windows[1])];
+        if (around.isNotEmpty &&
+            recent.length == 200 &&
+            (around.last['id'] as num) < (recent.first['id'] as num)) {
+          gap = (recent.first['id'] as num).toInt();
+        }
+        final byId = {
+          for (final m in [...around, ...recent]) m['id']: m,
+        };
+        data = byId.values.toList()
+          ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
+      }
       for (final message in data) {
         if (message['translationLanguage'] != target) {
           message.remove('translatedText');
         }
       }
-      await widget.api.request(
-        'POST',
-        '/api/conversations/${conversation['id']}/read',
-        {'channelId': channelId},
-      );
-      if (!mounted || active?['id'] != conversation['id']) return;
+      if (!current()) return;
       setState(() {
         messages = data;
+        unreadMessageId = anchor;
+        initialTimelinePending = false;
+        messageGapBefore = gap;
         targetLanguage = target;
         autoTranslate = shouldAutoTranslate;
         appLocale = locale;
         loading = false;
         error = '';
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!current()) return;
+        if (!opening && wasAtLatest && !searchingMessages) {
+          unawaited(_scrollToBottom(animate: false));
+        }
+        _syncMessageScroll();
+      });
+      try {
+        final group = conversation['type'] == 'group';
+        await widget.api.request(
+          'POST',
+          '/api/conversations/${conversation['id']}/${group ? 'channel-read' : 'read'}',
+          group ? {'channelId': channelId} : <String, dynamic>{},
+        );
+      } catch (_) {
+        // History remains visible even when a read receipt could not be sent.
+      }
+      if (!current()) return;
       if (changedConversation) {
         unawaited(_refreshPins(conversation));
       }
@@ -415,9 +482,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               _translate(message, target: target, silent: true),
         ]);
       }
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     } catch (value) {
-      if (mounted) {
+      if (current()) {
         setState(() {
           error = value.toString();
           loading = false;
@@ -1008,6 +1074,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void _closeConversation() {
     setState(() {
       active = null;
+      messageLoadGeneration++;
+      unreadMessageId = null;
+      messageGapBefore = null;
       messages = [];
       pinnedMessages = [];
       pendingAttachments = [];
@@ -1658,13 +1727,82 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     await _openRoom(room);
   }
 
-  void _scrollToBottom() {
+  void _syncMessageScroll() {
+    if (!mounted || !scrollController.hasClients) return;
+    final position = scrollController.position;
+    if (!position.hasContentDimensions) return;
+    showLatest.value =
+        (centeredTimeline ? position.extentAfter : position.extentBefore) >= 96;
+  }
+
+  Future<void> _scrollToBottom({bool animate = true}) async {
     if (!scrollController.hasClients) return;
-    scrollController.animateTo(
-      scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOut,
-    );
+    final generation = messageLoadGeneration;
+    for (var pass = 0; pass < 3; pass++) {
+      if (!mounted ||
+          generation != messageLoadGeneration ||
+          !scrollController.hasClients) {
+        return;
+      }
+      final position = scrollController.position;
+      final bottom = centeredTimeline
+          ? position.maxScrollExtent
+          : position.minScrollExtent;
+      if ((position.pixels - bottom).abs() < 1) break;
+      if (animate && pass == 0) {
+        await scrollController.animateTo(
+          bottom,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+      } else {
+        scrollController.jumpTo(bottom);
+      }
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    _syncMessageScroll();
+  }
+
+  Future<void> _loadMessageGap() async {
+    final before = messageGapBefore;
+    final room = active;
+    if (before == null || room == null || gapLoading) return;
+    final generation = messageLoadGeneration;
+    final channel = selectedChannelId;
+    setState(() => gapLoading = true);
+    try {
+      final data = objects(
+        await widget.api.request(
+          'GET',
+          '/api/conversations/${room['id']}/messages?target=${Uri.encodeQueryComponent(targetLanguage)}&channelId=$channel&limit=80&before=$before',
+        ),
+      );
+      if (!mounted || generation != messageLoadGeneration) return;
+      final lower = messages.where((m) => (m['id'] as num) < before).lastOrNull;
+      final next = data.firstOrNull?['id'] as num?;
+      final byId = {
+        for (final m in [...data, ...messages]) m['id']: m,
+      };
+      setState(() {
+        messages = byId.values.toList()
+          ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
+        messageGapBefore =
+            data.length == 80 &&
+                next != null &&
+                lower != null &&
+                next > (lower['id'] as num)
+            ? next.toInt()
+            : null;
+      });
+    } catch (_) {
+      if (mounted && generation == messageLoadGeneration) {
+        _show('Không tải được tin nhắn ở giữa');
+      }
+    } finally {
+      if (mounted && generation == messageLoadGeneration) {
+        setState(() => gapLoading = false);
+      }
+    }
   }
 
   void _show(String text) {
@@ -2118,7 +2256,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     chatSearchFocus.dispose();
     channelSearchController.dispose();
     messageSearchController.dispose();
+    scrollController.removeListener(_syncMessageScroll);
     scrollController.dispose();
+    showLatest.dispose();
     avatarScrollController.dispose();
     conversationListScrollController.dispose();
     railSplitController.dispose();
@@ -3229,23 +3369,129 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                             ? 'Thử thay đổi từ khóa hoặc bộ lọc.'
                             : 'Gửi tin nhắn đầu tiên ngay bây giờ.',
                       )
-                    : ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 16,
-                        ),
-                        itemCount: visibleMessages.length + 1,
-                        itemBuilder: (context, index) => index == 0
-                            ? _dayDivider()
-                            : _messageBubble(visibleMessages[index - 1]),
-                      ),
+                    : _messageTimeline(visibleMessages),
               ),
               _composer(),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _messageTimeline(List<Json> rows) {
+    final anchor = centeredTimeline
+        ? rows.indexWhere((m) => m['id'] == unreadMessageId)
+        : -1;
+    final centered = anchor >= 0;
+    Widget row(Json message, {bool marker = false}) => Column(
+      key: ValueKey(message['id']),
+      children: [
+        if (message['id'] == messageGapBefore && !searchingMessages)
+          TextButton(
+            onPressed: gapLoading ? null : _loadMessageGap,
+            child: Text(gapLoading ? 'Đang tải…' : 'Tải tin nhắn ở giữa'),
+          ),
+        if (marker)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                Expanded(child: Divider()),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(
+                    'Tin nhắn chưa đọc',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+                Expanded(child: Divider()),
+              ],
+            ),
+          ),
+        _messageBubble(message),
+      ],
+    );
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: centered
+              ? CustomScrollView(
+                  key: ValueKey(
+                    'timeline-${active?['id']}-$selectedChannelId-$unreadMessageId',
+                  ),
+                  controller: scrollController,
+                  center: unreadCenterKey,
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      sliver: SliverList.builder(
+                        itemCount: anchor + 1,
+                        itemBuilder: (_, i) => i == anchor
+                            ? _dayDivider()
+                            : row(rows[anchor - 1 - i]),
+                      ),
+                    ),
+                    SliverPadding(
+                      key: unreadCenterKey,
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+                      sliver: SliverList.builder(
+                        itemCount: rows.length - anchor,
+                        itemBuilder: (_, i) =>
+                            row(rows[anchor + i], marker: i == 0),
+                      ),
+                    ),
+                  ],
+                )
+              : ListView.builder(
+                  key: ValueKey(
+                    'timeline-${active?['id']}-$selectedChannelId-latest',
+                  ),
+                  controller: scrollController,
+                  reverse: true,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
+                  itemCount: rows.length + 1,
+                  itemBuilder: (_, i) => i == rows.length
+                      ? _dayDivider()
+                      : row(rows[rows.length - 1 - i]),
+                  findChildIndexCallback: (key) {
+                    if (key is! ValueKey) return null;
+                    final index = rows.indexWhere((m) => m['id'] == key.value);
+                    return index < 0 ? null : rows.length - 1 - index;
+                  },
+                ),
+        ),
+        Positioned(
+          bottom: 12,
+          left: 0,
+          right: 0,
+          child: ValueListenableBuilder<bool>(
+            valueListenable: showLatest,
+            builder: (_, visible, _) => visible
+                ? Center(
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      elevation: 3,
+                      child: IconButton(
+                        tooltip: 'Đến tin nhắn mới nhất',
+                        color: socoBlue,
+                        onPressed: () => unawaited(_scrollToBottom()),
+                        icon: const Icon(Icons.arrow_downward_rounded),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      ],
     );
   }
 
