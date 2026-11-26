@@ -4,13 +4,13 @@ import type { FriendConnection } from "../types";
 import type { UseContactActionsDeps } from "./contactActionTypes";
 
 type MetadataDeps = Pick<UseContactActionsDeps,
-  "apiFetch" | "contactMetadata" | "friendBusyIds" | "session" | "sessionRef" |
+  "apiFetch" | "contactMetadata" | "friendActionRef" | "friendBusyIds" | "session" | "sessionRef" |
   "setContactMetadata" | "setFriendBusyIds" | "setFriendMenuId" | "setNotice"
 >;
 
 /** Owns personal contact metadata mutations independently of friend moderation. */
 export function createContactMetadataActions({
-  apiFetch, contactMetadata, friendBusyIds, session, sessionRef,
+  apiFetch, contactMetadata, friendActionRef, friendBusyIds, session, sessionRef,
   setContactMetadata, setFriendBusyIds, setFriendMenuId, setNotice,
 }: MetadataDeps) {
   async function changePersonalContact(
@@ -18,7 +18,7 @@ export function createContactMetadataActions({
     field: "nickname" | "note" | "favorite",
   ) {
     const sid = session?.sessionId;
-    if (!sid || friendBusyIds.has(friend.id)) return;
+    if (!sid || friendBusyIds.has(friend.id) || friendActionRef.current.has(friend.id)) return;
     const previous = contactMetadata[friend.id] || {
       nickname: "",
       note: "",
@@ -40,6 +40,7 @@ export function createContactMetadataActions({
         return;
       }
     }
+    friendActionRef.current.add(friend.id);
     setFriendMenuId(null);
     setFriendBusyIds((ids) => new Set(ids).add(friend.id));
     try {
@@ -63,6 +64,7 @@ export function createContactMetadataActions({
         setNotice("Không thể lưu liên hệ. Hãy thử lại.", "error");
     } finally {
       if (sessionRef.current?.sessionId === sid) {
+        friendActionRef.current.delete(friend.id);
         setFriendBusyIds((ids) => {
           const nextIDs = new Set(ids);
           nextIDs.delete(friend.id);

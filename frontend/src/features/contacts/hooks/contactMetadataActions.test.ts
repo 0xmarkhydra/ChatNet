@@ -14,17 +14,18 @@ function setup(apiFetch: UseContactActionsDeps["apiFetch"] = async () =>
   const metadata: UseContactActionsDeps["contactMetadata"] = {
     12: { nickname: "", note: "", favorite: false },
   };
+  const friendActionRef = { current: new Set<number>() };
   const setContactMetadata = vi.fn();
   const setFriendBusyIds = vi.fn();
   const setFriendMenuId = vi.fn();
   const setNotice = vi.fn();
   const action = createContactMetadataActions({
-    apiFetch, contactMetadata: metadata, friendBusyIds: new Set<number>(),
+    apiFetch, contactMetadata: metadata, friendActionRef, friendBusyIds: new Set<number>(),
     session, sessionRef, setContactMetadata, setFriendBusyIds,
     setFriendMenuId, setNotice,
   });
   return {
-    action, sessionRef, setContactMetadata, setFriendBusyIds,
+    action, sessionRef, friendActionRef, setContactMetadata, setFriendBusyIds,
     setFriendMenuId, setNotice,
   };
 }
@@ -68,4 +69,27 @@ it("uses a safe fallback when an error response contains a non-string message", 
   await state.action.changePersonalContact(friend, "favorite");
   expect(state.setContactMetadata).not.toHaveBeenCalled();
   expect(state.setNotice).toHaveBeenCalledWith("Không lưu được liên hệ.", "error");
+});
+
+it("does not send duplicate metadata mutations while the first request is pending", async () => {
+  let finish!: (value: Response) => void;
+  const apiFetch = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
+  const state = setup(apiFetch);
+  const first = state.action.changePersonalContact(friend, "favorite");
+  const second = state.action.changePersonalContact(friend, "favorite");
+  expect(apiFetch).toHaveBeenCalledOnce();
+  expect(state.friendActionRef.current.has(friend.id)).toBe(true);
+  finish(Response.json({ id: 12, favorite: true }));
+  await Promise.all([first, second]);
+  expect(state.friendActionRef.current.has(friend.id)).toBe(false);
+  expect(state.setContactMetadata).toHaveBeenCalledOnce();
+});
+
+it("releases metadata mutation lock after a failed request", async () => {
+  const apiFetch = vi.fn(async () => Response.json({ error: "failed" }, { status: 400 }));
+  const state = setup(apiFetch);
+  await state.action.changePersonalContact(friend, "favorite");
+  expect(state.friendActionRef.current.has(friend.id)).toBe(false);
+  await state.action.changePersonalContact(friend, "favorite");
+  expect(apiFetch).toHaveBeenCalledTimes(2);
 });
