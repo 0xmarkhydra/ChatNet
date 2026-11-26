@@ -15,7 +15,7 @@ export type SearchFormProps = {
   autoFocus?: boolean
   className?: string
   /** Typeahead: the draft, the user's past searches, and matching people and communities. */
-  suggest: SuggestConfig
+  suggest?: SuggestConfig
   onSubmit: (query: string, scope: SearchType) => void
 }
 
@@ -40,9 +40,9 @@ export default function SearchForm({ initialQuery, placeholder, large = false, a
   }
   const pick = (option: Suggestion) => {
     setOpen(false)
-    if (option.kind === 'query') suggest.onQuery(option.query)
-    else if (option.kind === 'person') suggest.onPerson(option.username, option.title)
-    else suggest.onCommunity(option.name)
+    if (option.kind === 'query') suggest?.onQuery(option.query)
+    else if (option.kind === 'person') suggest?.onPerson(option.username, option.title)
+    else suggest?.onCommunity(option.name)
   }
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Escape' && showList) {

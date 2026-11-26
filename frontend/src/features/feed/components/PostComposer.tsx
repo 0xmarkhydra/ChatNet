@@ -144,10 +144,10 @@ export default function PostComposer({
             placeholder="Nhập tên địa điểm" disabled={isPosting} required /> :
             <Suspense fallback={<small>Đang tải bản đồ…</small>}><PostMapPicker value={checkInLocation} disabled={isPosting} onConfirm={pin => { setCheckInLocation(formatMapCheckIn(pin)); setActiveTool(null) }} /></Suspense>}
           <small>{postVisibility === "public" ? "Bài công khai luôn có vị trí GPS. Địa điểm nhập thêm là check-in tùy chọn." : "Không bắt buộc. Chỉ người có quyền xem bài viết mới thấy vị trí này."}</small>
-          {location && <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary"><MapPin size={14} aria-hidden="true" /><span className="truncate">Đang ở {checkInDisplayName(location)}</span></span>}
+          {location && <span className="flex min-w-0 max-w-full items-start gap-1 text-xs font-medium text-neutral-600"><MapPin size={14} className="mt-1 shrink-0 text-neutral-500" aria-hidden="true" /><span className="min-w-0 rounded-md bg-neutral-100 px-1.5 py-0.5 line-clamp-2 [overflow-wrap:anywhere]" title={checkInDisplayName(location)}>{checkInDisplayName(location)}</span></span>}
         </div>
       )}
-      {activeTool !== 'checkin' && location && <div className="flex items-center gap-2 text-sm"><MapPin size={15} aria-hidden="true" /> <span className="min-w-0 truncate">Đang ở {checkInDisplayName(location)}</span><button type="button" disabled={isPosting} aria-label="Bỏ vị trí" onClick={() => { setCheckInLocation?.(''); setCheckInOpen?.(false) }}><X size={16} /></button></div>}
+      {activeTool !== 'checkin' && location && <div className="flex min-w-0 max-w-full items-center gap-2 text-sm"><MapPin size={15} className="shrink-0 text-neutral-500" aria-hidden="true" /><span className="min-w-0 max-w-full rounded-md bg-neutral-100 px-1.5 py-0.5 text-neutral-600 line-clamp-2 [overflow-wrap:anywhere]" title={checkInDisplayName(location)}>{checkInDisplayName(location)}</span><button type="button" className="shrink-0" disabled={isPosting} aria-label="Bỏ vị trí" onClick={() => { setCheckInLocation?.(''); setCheckInOpen?.(false) }}><X size={16} /></button></div>}
       {activeTool === 'tag' && (tagPickerOpen || taggedFriends.length > 0) && (
         <PostTagPicker
           tagPickerOpen={tagPickerOpen}

@@ -53,17 +53,17 @@ it("formats a map tag and uses broader names for coarse coordinates", () => {
   expect(locationPlaceName(data, 120)).toBe("Cầu Giấy, Hà Nội");
   expect(locationPlaceName(data, 60000)).toBe("Hà Nội, Việt Nam");
   const location = toPublishLocation(position(10), now)!;
-  expect(publishLocationTag({...location, placeName: "Hà Nội"})).toBe("Đang ở Hà Nội");
-  expect(publishLocationTag(location)).toBe("Đang ở vị trí đã chia sẻ");
+  expect(publishLocationTag({...location, placeName: "Hà Nội"})).toBe("Hà Nội");
+  expect(publishLocationTag(location)).toBe("21.000000, 105.000000");
 });
 it("shows optional named check-ins for friends and private posts, with no duplicate GPS source", () => {
   for (const visibility of ["friends", "private"] as const) {
     const tag = postLocationTag({ visibility, content: "📍 Hồ Hoàn Kiếm, Hà Nội\nHello" });
-    expect(tag?.label).toBe("Đang ở Hồ Hoàn Kiếm, Hà Nội");
+    expect(tag?.label).toBe("Hồ Hoàn Kiếm, Hà Nội");
     expect(tag?.href).toContain(encodeURIComponent("Hồ Hoàn Kiếm, Hà Nội"));
     expect(postLocationTag({ visibility, content: "Hello" })).toBeNull();
   }
   const tag = postLocationTag({ visibility: "public", content: "📍 Check-in", publishLocation: { latitude: 21, longitude: 105, accuracy: 1200, capturedAt: new Date().toISOString(), placeName: "Hà Nội" } });
-  expect(tag?.label).toBe("Đang ở Hà Nội");
+  expect(tag?.label).toBe("Hà Nội");
   expect(tag?.href).toContain("21%2C105");
 });

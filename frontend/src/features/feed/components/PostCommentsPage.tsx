@@ -102,7 +102,7 @@ export default function PostCommentsPage({
         <ModalPortalContext.Provider value={portalContainer}>
 
           <article className="post-comments-original" aria-label="Nội dung bài viết">
-            <header className="post-comments-author">
+            <header className="post-comments-author items-start!">
               <UserAvatar username={post.author} name={authorName} className="post-comments-author-avatar" />
               <div className="post-comments-author-copy">
                 <button type="button" className="post-comments-author-name" onClick={() => onAuthorOpen(post.author)}>{authorName}</button>
