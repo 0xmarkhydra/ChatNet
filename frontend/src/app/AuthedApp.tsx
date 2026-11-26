@@ -1890,16 +1890,9 @@ export default function AuthedApp({
     />
   );
 
-  // On phones search is its own persistent row, never part of the collapsing header.
-  const sharedHeaderVisible = !isSearchResultsRoute && tab !== "market" &&
-    !(tab === "profile" && desktopProfileOverview && !profileEditorOpen && !phoneSearchLayout);
-  const detachedMobileSearch = phoneSearchLayout && tab !== "profile" &&
-    !searchInConversationList && sharedHeaderVisible;
-
   return (
     <AppLayout
       activeTab={tab}
-      mobileSearch={detachedMobileSearch ? quickSearchControl : null}
       className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""} ${tab === "chat" && !desktopSection && translationSettingsConversationId === null ? "chat-rail-screen" : ""}`}
       sidebar={
         <AppSidebar
@@ -2008,9 +2001,10 @@ export default function AuthedApp({
         </>
       }
       // The search page owns its search field and title, so the shared header is omitted there.
-      header={!sharedHeaderVisible ? null : (
+      header={isSearchResultsRoute || tab === "market" || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
         <AppHeader
-          className={`chatnet-appbar app-unified-header ${searchInConversationList ? "mobile-search-in-list" : ""}`}
+          mobileSearchActions={tab === "feed"}
+          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" ? "mobile-section-header" : ""}`}
           start={
             <HeaderTitle
               tab={tab}
@@ -2033,9 +2027,9 @@ export default function AuthedApp({
                 filter={feedFilter}
                 onChange={(next) => { setFeedCommunitiesOpen(false); setFeedFilter(next); }}
               /></div>
-              {!detachedMobileSearch && <div className="appbar-feed-mobile">{quickSearchControl}</div>}
+              <div className="appbar-feed-mobile">{quickSearchControl}</div>
             </>
-          ) : searchInConversationList || detachedMobileSearch || tab === "profile" ? null : quickSearchControl}
+          ) : searchInConversationList ? null : quickSearchControl}
           end={
           <AppHeaderActions
             account={
