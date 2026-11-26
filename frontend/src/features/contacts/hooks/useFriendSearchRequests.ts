@@ -19,13 +19,13 @@ type Options = {
 
 /** Owns the contacts suggestion/search request lifecycle, including stale-request cancellation. */
 export function useFriendSearchRequests({
-  sessionToken, sessionId, tab, desktopSection, newChatMode,
+  sessionToken, sessionId, tab, newChatMode,
   friendQuery, friendSearchRetry, apiFetch,
   setFriendResults, setFriendSearching, setFriendSearchError,
 }: Options) {
   const friendSearchSessionRef = useRef(sessionId);
+  const friendSurfaceOpen = newChatMode === "friends" || tab === "contacts";
   useEffect(() => {
-    const friendSurfaceOpen = newChatMode === "friends" || tab === "contacts";
     if (friendSearchSessionRef.current !== sessionId) {
       friendSearchSessionRef.current = sessionId;
       setFriendResults([]);
@@ -91,6 +91,6 @@ export function useFriendSearchRequests({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [friendQuery, friendSearchRetry, newChatMode, sessionToken, sessionId, tab, desktopSection, apiFetch, setFriendResults, setFriendSearching, setFriendSearchError]);
+  }, [friendQuery, friendSearchRetry, friendSurfaceOpen, sessionToken, sessionId, apiFetch, setFriendResults, setFriendSearching, setFriendSearchError]);
 
 }
