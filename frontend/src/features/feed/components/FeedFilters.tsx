@@ -42,8 +42,7 @@ export default function FeedFilters({
       </button>
     </div>
   ) : (
-    <div className="soco-feed-section-label soco-feed-posts-label">
-      <strong>{filter === 'saved' ? 'Bài viết đã lưu' : 'Bài viết mới'}</strong>
+    <div className="soco-feed-section-label soco-feed-posts-label justify-end!">
       <div ref={onHostMount} className="feed-filter-tabs sliding-pill-host" role="group" aria-label="Lọc bảng tin">
         <span ref={onPillMount} className="sliding-pill feed-filter-active-pill" aria-hidden="true" />
         <button ref={filter === 'all' ? onActiveMount : undefined} type="button"

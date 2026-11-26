@@ -27,7 +27,7 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
       <div className="flex gap-ui-2 overflow-x-auto pb-ui-1 [scrollbar-width:none]">
         {pending ? (
           <div role={pending.status === 'failed' ? 'alert' : 'status'} aria-label={pending.status === 'failed' ? 'Không đăng được tin' : 'Đang đăng tin'}
-            className={cn('relative grid h-46 w-28 flex-none place-content-center justify-items-center gap-ui-2 overflow-hidden rounded-ui-lg bg-(image:--soco-gradient) p-ui-2 text-center text-white', pending.status === 'failed' && 'ring-2 ring-destructive ring-inset')}>
+            className={cn('relative grid h-46 w-28 flex-none place-content-center justify-items-center gap-ui-2 overflow-hidden rounded-ui-md bg-(image:--soco-gradient) p-ui-2 text-center text-white', pending.status === 'failed' && 'ring-2 ring-destructive ring-inset')}>
             <span aria-hidden="true" className="absolute inset-0 bg-black/55" />
             {pending.status === 'failed' ? (
               <>
@@ -45,7 +45,7 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
           </div>
         ) : (
         <button type="button" disabled={busy} onClick={onCreate} aria-label="Tạo Story mới"
-          className="relative flex h-46 w-28 flex-none cursor-pointer flex-col overflow-hidden rounded-ui-lg border border-border bg-card p-0 text-left disabled:cursor-not-allowed disabled:opacity-60">
+          className="relative flex h-46 w-28 flex-none cursor-pointer flex-col overflow-hidden rounded-ui-md border border-border bg-card p-0 text-left disabled:cursor-not-allowed disabled:opacity-60">
           <span className="grid flex-1 place-items-center overflow-hidden bg-(image:--soco-gradient)">
             <UserAvatar username={username} name={displayName} className="avatar size-full! rounded-none! shadow-none! text-ui-page font-bold" />
           </span>
@@ -60,7 +60,7 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
         {groups.map(group => (
           <button key={group.author} type="button" onClick={() => onOpen(group.openId)}
             aria-label={group.own ? 'Xem tin của bạn' : `Xem Story của ${group.displayName}, ${group.hasUnseen ? 'chưa xem' : 'đã xem'}`}
-            className={cn('relative h-46 w-28 flex-none cursor-pointer overflow-hidden rounded-ui-lg border-0 bg-muted p-0 shadow-ui-sm', !group.hasUnseen && 'opacity-80')}>
+            className={cn('relative h-46 w-28 flex-none cursor-pointer overflow-hidden rounded-ui-md border-0 bg-muted p-0 shadow-ui-sm', !group.hasUnseen && 'opacity-80')}>
             <StoryPreview story={group.latest} />
             <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-black/60 to-transparent" />
             <span className={cn('absolute top-ui-2 left-ui-2 grid size-10 place-items-center overflow-hidden rounded-full p-0.75', group.hasUnseen ? 'bg-(image:--soco-gradient)' : 'bg-border')}>
