@@ -1,3 +1,4 @@
+import { useFriendActionSessionReset } from "./useFriendActionSessionReset";
 import { createFriendActions } from "./useFriendActions";
 import { createBlockedConversationActions } from "./blockedConversationActions";
 import { useContactModeration } from "./useContactModeration";
@@ -39,9 +40,12 @@ export function useContactActions({
   setNotice,
   setTab,
 }: UseContactActionsDeps) {
+  useFriendActionSessionReset(friendActionRef, session?.sessionId);
+
   const moderationActions = useContactModeration({
     apiFetch,
     blockedBusy,
+    friendActionRef,
     friendBusyIds,
     refreshConversations,
     refreshFriendConnections,
@@ -86,7 +90,7 @@ export function useContactActions({
   });
 
   const { changePersonalContact } = createContactMetadataActions({
-    apiFetch, contactMetadata, friendBusyIds, session, sessionRef,
+    apiFetch, contactMetadata, friendActionRef, friendBusyIds, session, sessionRef,
     setContactMetadata, setFriendBusyIds, setFriendMenuId, setNotice,
   });
 
