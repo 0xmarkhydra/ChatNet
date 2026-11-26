@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { listContactMetadata, listFriendRequests, listFriends, listFriendSuggestions, searchFriendUsers } from "./contacts";
+import { listContactMetadata, listFriendRequests, listFriends, listFriendSuggestions, searchFriendUsers, listBlockedUsers } from "./contacts";
 
 it("forwards cancellation signals to all independent contacts GET endpoints", async () => {
   const controller = new AbortController();
@@ -38,4 +38,10 @@ it("centralizes friend search URLs, encoding and cancellation in Contacts API", 
     ["/api/users/suggestions", controller.signal],
     ["/api/users/search?q=a%20b%26c", controller.signal],
   ]);
+});
+it("forwards blocked-list cancellation without changing the URL", async () => {
+  const controller = new AbortController();
+  const request = vi.fn(async (_path: string, _init?: RequestInit) => Response.json([]));
+  await listBlockedUsers(request, controller.signal);
+  expect(request).toHaveBeenCalledWith("/api/users/blocked", { signal: controller.signal });
 });

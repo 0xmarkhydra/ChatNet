@@ -65,8 +65,8 @@ export function unblockUser(request: ContactsRequest, id: number) {
   return request(`/api/users/${id}/block`, { method: 'DELETE' })
 }
 
-export function listBlockedUsers(request: ContactsRequest) {
-  return request('/api/users/blocked')
+export function listBlockedUsers(request: ContactsRequest, signal?: AbortSignal) {
+  return request('/api/users/blocked', { signal })
 }
 
 export function reportUser(request: ContactsRequest, id: number, reason: string, details: string) {
