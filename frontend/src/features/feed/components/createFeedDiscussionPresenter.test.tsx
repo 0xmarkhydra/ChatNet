@@ -41,6 +41,7 @@ describe('Feed discussion presenter', () => {
     expect(t.view.type).toBe(FeedDiscussion)
     expect(t.view.key).toBe('18')
     expect(t.view.props.sortOrder).toBe('newest')
+    expect(t.view.props.showComments).toBe(true)
     expect(t.view.props.editor).toEqual(editor)
     expect(t.view.props.target).toBe('vi')
     expect(t.view.props.token).toBe('session-token')
@@ -78,7 +79,8 @@ describe('Feed discussion presenter', () => {
       addComment: vi.fn(async () => {}), manageFeedComment: vi.fn(async () => {}),
       reportFeedComment: vi.fn(async () => {}), setCommentLike: vi.fn(async () => {}),
     })
-    const view = render(post, t.onAuthorOpen) as ReactElement<ComponentProps<typeof FeedDiscussion>>
+    const view = render(post, t.onAuthorOpen, false) as ReactElement<ComponentProps<typeof FeedDiscussion>>
+    expect(view.props.showComments).toBe(false)
     expect(view.props.editor).toEqual({ replyTo: null, drafts: {} })
     expect(view.props.target).toBe('')
   })

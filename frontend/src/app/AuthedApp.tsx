@@ -385,7 +385,6 @@ export default function AuthedApp({
   } = useAppRouteNavigation();
   const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraft, storyBusy, storyDraft } = useFeedUiState({ tab });
 
-  const [inlineCommentsId, setInlineCommentsId] = useScopedState<number | null>(tab, null);
   const tabRef = useLatest(tab);
   const {
     globalSearch, setGlobalSearch, chatListQuery, setChatListQuery,
@@ -1791,6 +1790,7 @@ export default function AuthedApp({
     setCommentLike,
   });
 
+
   function refreshAfterRepost() {
     void refreshPosts();
     if (feedFilter === 'following') followingFeed.refresh();
@@ -1818,11 +1818,10 @@ export default function AuthedApp({
       taggedNames: friendTaggedNames,
     },
     onOpenPost: openFeedPostDetails,
-    toggleInlineComments: id => setInlineCommentsId(current => current === id ? null : id),
-    inlineCommentsId,
-    renderDiscussion: post => renderPostDiscussion(post, openVisitor),
+    renderDiscussion: post => renderPostDiscussion(post, openVisitor, false),
     onReactionUsers: post => setReactionTarget({ kind: 'post', id: post.id, reactions: post.reactions }),
   });
+
 
   const contactsContent = (
     <ContactsView

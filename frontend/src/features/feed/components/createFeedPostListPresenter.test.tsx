@@ -9,9 +9,8 @@ const posts: Post[] = [
   { id: 14, author: 'b', comments: [], content: '', createdAt: '', likes: 0, liked: false },
 ]
 
-function setup(inlineCommentsId: number | null = null) {
+function setup() {
   const open = vi.fn()
-  const toggle = vi.fn()
   const discussion = vi.fn(post => <span>Discussion {post.id}</span>)
   const reaction = vi.fn()
   const card = {
@@ -32,16 +31,14 @@ function setup(inlineCommentsId: number | null = null) {
     onShareToChat: vi.fn(),
     taggedNames: {},
   } as unknown as Omit<ComponentProps<typeof FeedPostCard>,
-    'post' | 'setActivePostId' | 'onToggleComments' | 'discussion' | 'showSave' | 'onReactionUsers'>
+    'post' | 'setActivePostId' | 'discussion' | 'showSave' | 'onReactionUsers'>
   const render = createFeedPostListPresenter({
     card,
     onOpenPost: open,
-    toggleInlineComments: toggle,
-    inlineCommentsId,
     renderDiscussion: discussion,
     onReactionUsers: reaction,
   })
-  return { render, open, toggle, discussion, reaction }
+  return { render, open, discussion, reaction }
 }
 
 describe('FeedPostCard list presenter', () => {
@@ -51,21 +48,20 @@ describe('FeedPostCard list presenter', () => {
     expect(rendered.map(element => element.key)).toEqual(['12', '14'])
     expect(rendered.every(element => element.type === FeedPostCard)).toBe(true)
     expect(rendered.map(element => element.props.post.id)).toEqual([12, 14])
-    expect(rendered.every(element => element.props.discussion === null)).toBe(true)
+    expect(rendered.every(element => element.props.discussion != null)).toBe(true)
     rendered[0].props.setActivePostId(12)
     expect(t.open).toHaveBeenCalledWith(12)
-    rendered[1].props.onToggleComments?.()
-    expect(t.toggle).toHaveBeenCalledWith(14)
+    expect(t.discussion).toHaveBeenCalledTimes(2)
   })
 
-  it('renders only the selected inline discussion and supports custom detail open handlers', () => {
-    const t = setup(14)
+  it('renders an inline composer for each post and supports custom detail open handlers', () => {
+    const t = setup()
     const customOpen = vi.fn()
     const rendered = t.render(posts, true, customOpen) as ReactElement<ComponentProps<typeof FeedPostCard>>[]
-    expect(t.discussion).toHaveBeenCalledOnce()
-    expect(t.discussion).toHaveBeenCalledWith(posts[1])
-    expect(rendered[0].props.discussion).toBeNull()
-    expect(rendered[1].props.discussion).not.toBeNull()
+    expect(t.discussion).toHaveBeenCalledTimes(2)
+    expect(t.discussion).toHaveBeenNthCalledWith(1, posts[0])
+    expect(t.discussion).toHaveBeenNthCalledWith(2, posts[1])
+    expect(rendered.every(element => element.props.discussion != null)).toBe(true)
     expect(rendered.every(element => element.props.showSave === true)).toBe(true)
     rendered[0].props.setActivePostId(12)
     expect(customOpen).toHaveBeenCalledWith(12)
