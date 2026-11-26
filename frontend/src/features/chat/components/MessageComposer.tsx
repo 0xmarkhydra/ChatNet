@@ -42,7 +42,7 @@ export default function MessageComposer({ activeConversation, activeConversation
 
   function composerMenu(onSchedule?: () => void) {
     return <ChatComposerPlusMenu
-      key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
+      key={`menu:${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
       disabled={Boolean(mediaUploading) || messageSending}
       onAttachFile={() => openAttachmentPicker(false)}
       onAttachMedia={() => openAttachmentPicker(true)}
