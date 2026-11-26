@@ -25,6 +25,7 @@ export function useFriendSearchRequests({
 }: Options) {
   const friendSearchSessionRef = useRef(sessionId);
   const friendSurfaceOpen = newChatMode === "friends" || tab === "contacts";
+  const query = friendQuery.trim();
   useEffect(() => {
     if (friendSearchSessionRef.current !== sessionId) {
       friendSearchSessionRef.current = sessionId;
@@ -39,7 +40,6 @@ export function useFriendSearchRequests({
     if (!friendSurfaceOpen) return;
 
     const controller = new AbortController();
-    const query = friendQuery.trim();
     // Keep the last successful suggestions visible while refreshing in the background.
     if (query) setFriendResults([]);
     setFriendSearching(true);
@@ -91,6 +91,6 @@ export function useFriendSearchRequests({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [friendQuery, friendSearchRetry, friendSurfaceOpen, sessionToken, sessionId, apiFetch, setFriendResults, setFriendSearching, setFriendSearchError]);
+  }, [query, friendSearchRetry, friendSurfaceOpen, sessionToken, sessionId, apiFetch, setFriendResults, setFriendSearching, setFriendSearchError]);
 
 }
