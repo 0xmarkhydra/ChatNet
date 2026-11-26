@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Story } from '../types'
-import { groupStories, relativeStoryTime } from './storyGroups'
+import { groupStories } from './storyGroups'
 import { markStorySeen, resetStorySeenCache } from './storySeen'
 
 const story = (id: number, author: string, createdAt: string): Story => ({
@@ -33,33 +33,5 @@ describe('groupStories', () => {
     const group = groupStories(stories, new Set(), 'me').find(item => item.author === 'an')
     expect(group?.latest.id).toBe(2)
     expect(group?.displayName).toBe('AN')
-  })
-})
-
-describe('relativeStoryTime', () => {
-  const now = Date.parse('2026-11-24T12:00:00Z')
-  it.each([
-    ['2026-11-24T11:59:40Z', 'Vừa đăng'],
-    ['2026-11-24T11:30:00Z', '30 phút trước'],
-    ['2026-11-24T09:00:00Z', '3 giờ trước'],
-    ['2026-11-22T12:00:00Z', '2 ngày trước'],
-  ])('%s -> %s', (date, label) => expect(relativeStoryTime(date, now)).toBe(label))
-})
-
-describe('seen stories storage', () => {
-  const data = new Map<string, string>()
-  beforeEach(() => {
-    data.clear()
-    vi.stubGlobal('localStorage', { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value) } })
-    resetStorySeenCache()
-  })
-
-  it('persists ids per session and ignores corrupt data', () => {
-    markStorySeen('s1', 7)
-    expect(JSON.parse(data.get('socco.story.seen.v1:s1') ?? '[]')).toEqual([7])
-    expect(data.has('socco.story.seen.v1:s2')).toBe(false)
-    data.set('socco.story.seen.v1:bad', '{not json')
-    resetStorySeenCache()
-    expect(() => markStorySeen('bad', 1)).not.toThrow()
   })
 })

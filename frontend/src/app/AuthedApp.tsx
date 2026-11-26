@@ -2711,6 +2711,7 @@ export default function AuthedApp({
           deleteStory={deleteStory}
           name={name}
           openVisitor={openVisitor}
+          openMessages={() => switchTab("chat")}
           replyToStory={replyToStory}
           reportStory={reportStory}
           setActiveStoryId={setActiveStoryId}
