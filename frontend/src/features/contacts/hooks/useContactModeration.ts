@@ -1,6 +1,9 @@
+import { useEffect, useRef } from "react";
 import type { FriendConnection, FriendSearchResult } from "../types";
 import { blockUser, unblockUser, listBlockedUsers, reportUser } from "../api/contacts";
 import type { UseContactActionsDeps } from "./contactActionTypes";
+import { parseBlockedUsers } from "../utils/blockedUsers";
+import { parseContactReportReason, parseContactReportDetails } from "../utils/contactReportInput";
 
 type UseContactModerationDeps = Pick<UseContactActionsDeps,
   | "apiFetch"
@@ -45,6 +48,11 @@ export function useContactModeration({
   setFriends,
   setNotice,
 }: UseContactModerationDeps) {
+  const blockedLoadFlight = useRef<{ sessionId: string; controller: AbortController; promise: Promise<void> } | null>(null);
+  useEffect(() => () => {
+    blockedLoadFlight.current?.controller.abort();
+  }, [session?.sessionId]);
+
   async function blockContact(friend: Pick<FriendSearchResult, 'id' | 'username' | 'displayName'>) {
     const sid = session?.sessionId;
     if (!sid || friendBusyIds.has(friend.id)) return;
@@ -110,14 +118,7 @@ export function useContactModeration({
       "Lý do báo cáo: 1 - Spam, 2 - Quấy rối, 3 - Giả mạo, 4 - Khác",
     );
     if (answer === null) return;
-    const reason = (
-      {
-        "1": "spam",
-        "2": "harassment",
-        "3": "impersonation",
-        "4": "other",
-      } as Record<string, string>
-    )[answer.trim()];
+    const reason = parseContactReportReason(answer);
     if (!reason) {
       setNotice("Vui lòng chọn lý do từ 1 đến 4.", "warning");
       return;
@@ -126,13 +127,14 @@ export function useContactModeration({
       "Mô tả sự việc (không quá 1000 ký tự, có thể để trống):",
     );
     if (details === null) return;
-    if (details.length > 1000) {
+    const normalizedDetails = parseContactReportDetails(details);
+    if (normalizedDetails === null) {
       setNotice("Mô tả không được quá 1000 ký tự.", "warning");
       return;
     }
     setFriendMenuId(null);
     try {
-      const response = await reportUser(apiFetch, friend.id, reason, details.trim());
+      const response = await reportUser(apiFetch, friend.id, reason, normalizedDetails);
       const result = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
@@ -150,27 +152,37 @@ export function useContactModeration({
   }
   async function loadBlockedUsers() {
     const sid = session?.sessionId;
-    if (!sid || blockedBusy) return;
-    setBlockedBusy(true);
-    setBlockedError("");
-    try {
-      const response = await listBlockedUsers(apiFetch);
-      if (!response.ok) throw new Error();
-      const data = (await response.json()) as Array<{
-        id: number;
-        username: string;
-        displayName: string;
-      }>;
-      if (sessionRef.current?.sessionId === sid) {
-        setBlockedUsers(data);
-        setBlockedOpen(true);
+    if (!sid) return;
+    const active = blockedLoadFlight.current;
+    if (active?.sessionId === sid) return active.promise;
+    if (blockedBusy) return;
+    // A synchronous flight lock prevents duplicate GETs before React commits busy state.
+    const controller = new AbortController();
+    const promise = (async () => {
+      setBlockedBusy(true);
+      setBlockedError("");
+      try {
+        const response = await listBlockedUsers(apiFetch, controller.signal);
+        if (!response.ok) throw new Error();
+        const data: unknown = await response.json();
+        const blocked = parseBlockedUsers(data);
+        if (!blocked) throw new Error("Invalid blocked users response");
+        if (!controller.signal.aborted && sessionRef.current?.sessionId === sid) {
+          setBlockedUsers(blocked);
+          setBlockedOpen(true);
+        }
+      } catch {
+        if (!controller.signal.aborted && sessionRef.current?.sessionId === sid)
+          setBlockedError("Không tải được danh sách chặn.");
+      } finally {
+        if (!controller.signal.aborted && sessionRef.current?.sessionId === sid)
+          setBlockedBusy(false);
       }
-    } catch {
-      if (sessionRef.current?.sessionId === sid)
-        setBlockedError("Không tải được danh sách chặn.");
-    } finally {
-      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false);
-    }
+    })();
+    const flight = { sessionId: sid, controller, promise };
+    blockedLoadFlight.current = flight;
+    try { await promise; }
+    finally { if (blockedLoadFlight.current === flight) blockedLoadFlight.current = null; }
   }
   async function unblockContact(userId: number) {
     const sid = session?.sessionId;
