@@ -36,6 +36,7 @@ import {
   useChatQuickSearch,
 } from "../features/chat/hooks/useChatQuickSearch";
 import { useContactData } from "../features/contacts/hooks/useContactData";
+import { selectFriendRelationship } from "../features/contacts/utils/friendRelationship";
 import { useFeedData } from "../features/feed/hooks/useFeedData";
 import { useFeedPagingOrchestration } from "../features/feed/hooks/useFeedPagingOrchestration";
 import { useFollowingPosts } from "../features/feed/hooks/useFollowingPosts";
@@ -66,6 +67,10 @@ import type { Tab } from "../shared/types/navigation";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
 import { useAppRouteNavigation } from "./router/useAppRouteNavigation";
+import { useGlobalSearchShortcut } from "./navigation/useGlobalSearchShortcut";
+import { resolveDesktopSection } from "./navigation/resolveDesktopSection";
+import { createVisitorNavigation } from "./navigation/createVisitorNavigation";
+import { useMessageSoundPreference } from "./hooks/useMessageSoundPreference";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
 import type {
@@ -191,12 +196,7 @@ import {
   X,
   Download,
 } from "lucide-react";
-import {
-  IncomingMessageSound,
-  MESSAGE_SOUND_SETTING_KEY,
-  persistMessageSoundEnabled,
-  readMessageSoundEnabled,
-} from "../features/notifications/lib/incomingSound";
+
 import {
   createSessionClient,
   type Session,
@@ -280,6 +280,7 @@ import AppComposerOverlays from "./layouts/AppComposerOverlays";
 import { useNearbyDiscovery } from "../features/discover/hooks/useNearbyDiscovery";
 import { useAccountSessions } from "../features/auth/hooks/useAccountSessions";
 import { usePushSettings } from "../features/notifications/hooks/usePushSettings";
+import { requestPushConfig } from "../features/notifications/api/push";
 import { useMessageClipboard } from "../features/chat/hooks/useMessageClipboard";
 import { useMediaUploads } from "../features/chat/hooks/useMediaUploads";
 import { useContactActions } from "../features/contacts/hooks/useContactActions";
@@ -316,6 +317,7 @@ import { useAppLocaleState } from "../features/i18n/hooks/useAppLocaleState";
 import { useLanguagePreferencesLifecycle } from "../features/i18n/hooks/useLanguagePreferencesLifecycle";
 import { useTranslationState } from "../features/chat/hooks/useTranslationState";
 import { useProfileState } from "../features/profile/hooks/useProfileState";
+import { profileEditDraft } from "../features/profile/utils/profileEditDraft";
 import { useProfileIdentityActions } from "../features/profile/hooks/useProfileIdentityActions";
 import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
 import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
@@ -376,16 +378,7 @@ export default function AuthedApp({
   const routeLocation = useLocation();
   const isSearchResultsRoute = routeLocation.pathname === "/search";
   const navigate = useNavigate();
-  useEffect(() => {
-    const openSearch = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        navigate(ROUTE.search);
-      }
-    };
-    window.addEventListener("keydown", openSearch);
-    return () => window.removeEventListener("keydown", openSearch);
-  }, [navigate]);
+  useGlobalSearchShortcut();
   const {
     tab, setTab, contactsScreen, setContactsScreen,
     desktopProfileSettings, setDesktopProfileSettings,
@@ -467,25 +460,21 @@ export default function AuthedApp({
   } = useChatOutboxState({ session, sessionRef, actionLocksRef: actionLocks, setNotice });
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
-  function openVisitor(username: string, returnTo?: string) {
-    if (username === sessionRef.current?.user.username) {
+  const { openVisitor, setFriendPreview } = createVisitorNavigation({
+    getOwnUsername: () => sessionRef.current?.user.username,
+    openOwnProfile: () => {
       setTab("profile");
       setProfileTimelineOpen(true);
-      return;
-    }
-    openVisitorProfile(username, returnTo);
-  }
-  function setFriendPreview(friend: FriendSearchResult | null) {
-    if (friend) openVisitor(friend.username);
-    else if (visitorUsername) closeVisitor();
-  }
+    },
+    openVisitorProfile,
+    closeVisitor,
+    visitorUsername,
+  });
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
   const [desktopSectionState, setDesktopSection] = useState<
     "groups" | "calls" | null
   >(null);
-  const desktopSection = (routeLocation.pathname === ROUTE.calls || routeLocation.pathname.startsWith(`${ROUTE.calls}/`))
-    ? "calls"
-    : desktopSectionState === "calls" ? null : desktopSectionState;
+  const desktopSection = resolveDesktopSection(routeLocation.pathname, desktopSectionState);
   const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);
   const [translationSettingsActiveConversationId, setTranslationSettingsActiveConversationId] = useState(activeConversationId);
   // Reset dialog state during render when the selected conversation changes,
@@ -574,33 +563,7 @@ export default function AuthedApp({
   const [pushConfigured, setPushConfigured] = useState(false);
   const [pushAppId, setPushAppId] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [messageSoundEnabled, setMessageSoundEnabled] = useState(
-    readMessageSoundEnabled,
-  );
-  const messageSoundEnabledRef = useLatest(messageSoundEnabled);
-  const messageSound = useRef<IncomingMessageSound | null>(null);
-  if (!messageSound.current) messageSound.current = new IncomingMessageSound();
-  useEffect(() => {
-    // Browsers permit sound only after an interaction. Warm up Web Audio on a
-    // real user gesture, without playing a notification just for opening SocCO.
-    const unlockAudio = () => {
-      if (messageSoundEnabledRef.current) messageSound.current?.unlock();
-    };
-    const syncPreference = (event: StorageEvent) => {
-      if (event.key !== MESSAGE_SOUND_SETTING_KEY && event.key !== null) return;
-      const enabled = readMessageSoundEnabled();
-      messageSoundEnabledRef.current = enabled;
-      setMessageSoundEnabled(enabled);
-    };
-    window.addEventListener("pointerdown", unlockAudio, { passive: true });
-    window.addEventListener("keydown", unlockAudio);
-    window.addEventListener("storage", syncPreference);
-    return () => {
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
-      window.removeEventListener("storage", syncPreference);
-    };
-  }, [messageSoundEnabledRef]);
+  const { messageSoundEnabled, setMessageSoundEnabled, messageSoundEnabledRef, messageSound } = useMessageSoundPreference();
   const [pushBusy, setPushBusy] = useState(false);
   const [pushInitFailed, setPushInitFailed] = useState(false);
   const [pushPrompt, setPushPrompt] = useState(false);
@@ -1226,7 +1189,7 @@ export default function AuthedApp({
 
     void (async () => {
       try {
-        const response = await apiFetch("/api/push/config");
+        const response = await requestPushConfig(apiFetch);
         if (!response.ok) {
           if (!cancelled) setPushConfigured(false);
           return;
@@ -1320,11 +1283,7 @@ export default function AuthedApp({
   const contactSearchResults = mergeContactSearchResults(friendQuery, friends, friendRequests, friendResults);
 
   function friendRelationship(userId: number) {
-    if (friends.some((item) => item.id === userId)) return "accepted" as const;
-    const request = friendRequests.find((item) => item.id === userId);
-    if (request?.direction === "incoming") return "incoming" as const;
-    if (request?.direction === "outgoing") return "outgoing" as const;
-    return "none" as const;
+    return selectFriendRelationship(userId, friends, friendRequests);
   }
 
   useEffect(() => {
@@ -1728,13 +1687,12 @@ export default function AuthedApp({
   });
 
   const discardDesktopProfileEdits = () => {
-    setProfileDisplayNameDraft(
-      profileMedia?.displayName ?? session.user.displayName ?? name,
-    );
-    setProfileUsernameDraft(profileMedia?.username ?? name);
-    setProfileBioDraft(profileMedia?.bio ?? "");
-    setProfileCityDraft(profileMedia?.city ?? "");
-    setProfilePublicDetailsDraft({ workplace: profileMedia?.workplace ?? "", school: profileMedia?.school ?? "" });
+    const draft = profileEditDraft(profileMedia, name, session.user.displayName);
+    setProfileDisplayNameDraft(draft.displayName);
+    setProfileUsernameDraft(draft.username);
+    setProfileBioDraft(draft.bio);
+    setProfileCityDraft(draft.city);
+    setProfilePublicDetailsDraft(draft.publicDetails);
     setProfileEditorOpen(false);
   };
 

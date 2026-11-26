@@ -1,5 +1,9 @@
 export type PushRequest = (path: string, init?: RequestInit) => Promise<Response>
 
+export function requestPushConfig(request: PushRequest) {
+  return request('/api/push/config')
+}
+
 export function syncPushSubscription(request: PushRequest, subscriptionId: string, optedIn: boolean) {
   return request('/api/push/subscription', {
     method: optedIn ? 'POST' : 'DELETE',
