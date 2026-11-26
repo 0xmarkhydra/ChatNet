@@ -257,7 +257,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
 
       <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
         <DialogContent className="top-auto bottom-0 left-0 w-full max-w-none max-h-[85dvh] translate-x-0 translate-y-0 gap-ui-3 rounded-b-none p-ui-4 pb-[calc(var(--soco-space-4)+env(safe-area-inset-bottom))]">
-          <DialogTitle>Bộ lọc</DialogTitle>
+          <DialogTitle className="m-0 flex min-h-control-touch items-center">Bộ lọc</DialogTitle>
           <DialogDescription className="sr-only">Thu hẹp kết quả tìm kiếm theo loại và tiêu chí.</DialogDescription>
           <SearchFilterPanel {...panelProps} showTypes={false} />
           <div className="flex gap-ui-2">

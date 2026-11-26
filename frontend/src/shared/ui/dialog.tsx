@@ -28,7 +28,7 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             aria-label="Đóng hộp thoại"
-            className="absolute top-ui-4 right-ui-4 inline-flex size-9 items-center justify-center rounded-ui-sm max-lg:size-control-touch text-muted-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+            className="absolute top-ui-4 right-ui-4 inline-flex size-9 cursor-pointer items-center justify-center rounded-ui-sm border-0 bg-transparent p-0 max-lg:size-control-touch text-muted-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
           >
             <X size={18} aria-hidden="true" />
           </DialogPrimitive.Close>
