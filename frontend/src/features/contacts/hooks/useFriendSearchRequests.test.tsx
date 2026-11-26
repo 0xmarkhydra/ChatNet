@@ -102,7 +102,7 @@ describe('useFriendSearchRequests', () => {
     }
     function Probe({ tab }: { tab: 'contacts' | 'feed' }) {
       const [results, setResults] = useState<FriendSearchResult[]>([])
-      const [, setSearching] = useState(false)
+      const [searching, setSearching] = useState(false)
       const [, setError] = useState(false)
       useFriendSearchRequests({
         sessionToken: 'token', sessionId: 'session',
@@ -110,13 +110,15 @@ describe('useFriendSearchRequests', () => {
         friendQuery: '', friendSearchRetry: 0, apiFetch: request,
         setFriendResults: setResults, setFriendSearching: setSearching, setFriendSearchError: setError,
       })
-      return <span>{results.map(item => item.username).join(',')}</span>
+      return <span>{results.map(item => item.username).join(',')}|{searching ? 'busy' : 'idle'}</span>
     }
     try {
       await act(async () => root.render(<Probe tab="contacts" />))
       expect(signal?.aborted).toBe(false)
+      expect(host.textContent).toContain('|busy')
       await act(async () => root.render(<Probe tab="feed" />))
       expect(signal?.aborted).toBe(true)
+      expect(host.textContent).toContain('|idle')
       await act(async () => finish(Response.json([{ id: 4, username: 'stale' }])))
       expect(host.textContent).not.toContain('stale')
     } finally {

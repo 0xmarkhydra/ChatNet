@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { AppDataContext } from '../../../shared/types/api'
 import type { FriendConnection } from '../types'
@@ -22,6 +22,10 @@ export function useContactData({
   const [friendSyncBusy, setFriendSyncBusy] = useScopedState(scope, false)
 
   const friendSyncFlight = useRef<{ sessionId: string; revision: number; promise: Promise<void> } | null>(null)
+  const friendSyncAbort = useRef<AbortController | null>(null)
+  useEffect(() => () => {
+    friendSyncAbort.current?.abort()
+  }, [scope])
   async function refreshFriendConnections() {
     const sessionId = sessionRef.current?.sessionId
     if (!sessionId) return
@@ -36,20 +40,23 @@ export function useContactData({
   async function fetchFriendConnections() {
     const sessionId = session?.sessionId
     if (!sessionId) return
+    friendSyncAbort.current?.abort()
+    const controller = new AbortController()
+    friendSyncAbort.current = controller
     const request = ++friendSyncRequest.current
     setFriendSyncBusy(true)
     try {
       // Load the primary friend list independently. A slow or unavailable
       // requests/metadata endpoint must not delay friends on mobile.
       const isCurrent = () =>
-        sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current
-      void listFriendRequests(apiFetch)
+        !controller.signal.aborted && sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current
+      void listFriendRequests(apiFetch, controller.signal)
         .then(async (response) => {
           if (!response.ok) return
           const items: unknown = await response.json().catch(() => null)
           if (isCurrent() && Array.isArray(items)) setFriendRequests(items as FriendConnection[])
         }).catch(() => undefined)
-      void listContactMetadata(apiFetch)
+      void listContactMetadata(apiFetch, controller.signal)
         .then(async (response) => {
           if (!response.ok) return
           const records: unknown = await response.json().catch(() => null)
@@ -57,7 +64,7 @@ export function useContactData({
           const nextMetadata = toContactMetadataIndex(records)
           if (nextMetadata) setContactMetadata(nextMetadata)
         }).catch(() => undefined)
-      const friendsResponse = await listFriends(apiFetch)
+      const friendsResponse = await listFriends(apiFetch, controller.signal)
       if (!isCurrent()) return
       if (!friendsResponse.ok) {
         throw new Error('Không thể tải danh sách bạn bè. Kiểm tra kết nối và thử lại.')
@@ -69,11 +76,11 @@ export function useContactData({
       setFriendSyncSessionId(sessionId)
       setFriendSyncError('')
     } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) {
+      if (!controller.signal.aborted && sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) {
         setFriendSyncError(error instanceof Error ? error.message : 'Chưa tải được danh sách bạn bè.')
       }
     } finally {
-      if (sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) setFriendSyncBusy(false)
+      if (!controller.signal.aborted && sessionRef.current?.sessionId === sessionId && request === friendSyncRequest.current) setFriendSyncBusy(false)
     }
   }
 

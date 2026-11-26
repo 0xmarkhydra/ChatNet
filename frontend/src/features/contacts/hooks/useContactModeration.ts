@@ -1,6 +1,7 @@
 import type { FriendConnection, FriendSearchResult } from "../types";
 import { blockUser, unblockUser, listBlockedUsers, reportUser } from "../api/contacts";
 import type { UseContactActionsDeps } from "./contactActionTypes";
+import { parseBlockedUsers } from "../utils/blockedUsers";
 
 type UseContactModerationDeps = Pick<UseContactActionsDeps,
   | "apiFetch"
@@ -156,13 +157,11 @@ export function useContactModeration({
     try {
       const response = await listBlockedUsers(apiFetch);
       if (!response.ok) throw new Error();
-      const data = (await response.json()) as Array<{
-        id: number;
-        username: string;
-        displayName: string;
-      }>;
+      const data: unknown = await response.json();
+      const blocked = parseBlockedUsers(data);
+      if (!blocked) throw new Error("Invalid blocked users response");
       if (sessionRef.current?.sessionId === sid) {
-        setBlockedUsers(data);
+        setBlockedUsers(blocked);
         setBlockedOpen(true);
       }
     } catch {
