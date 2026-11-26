@@ -2814,6 +2814,12 @@ export default function AuthedApp({
         switchTab={switchTab}
         unreadTotal={unreadTotal}
         pushEnabled={pushEnabled}
+        username={session.user.username}
+        displayName={
+          profileMedia?.displayName ||
+          session.user.displayName ||
+          session.user.username
+        }
       />
     </AppLayout>
   );
