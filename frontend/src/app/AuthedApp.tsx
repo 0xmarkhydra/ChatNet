@@ -2810,9 +2810,11 @@ export default function AuthedApp({
       <BottomNavigation
         tab={tab}
         t={t}
-        switchTab={switchTab}
+        switchTab={(nextTab) => {
+          switchTab(nextTab);
+          if (nextTab === "profile") setProfileTimelineOpen(true);
+        }}
         unreadTotal={unreadTotal}
-        pushEnabled={pushEnabled}
         username={session.user.username}
         displayName={
           profileMedia?.displayName ||

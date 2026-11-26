@@ -406,7 +406,13 @@ export default function ProfileSection({
                 <h2 ref={profileHeadingRef} tabIndex={-1}>
                   Trang cá nhân
                 </h2>
-                {!mobileTimeline && <button
+                {mobileTimeline ? <button
+                  type="button"
+                  onClick={closeProfileTimeline}
+                  aria-label="Cài đặt"
+                >
+                  <Settings size={18} aria-hidden="true" />
+                </button> : <button
                   type="button"
                   onClick={() => setProfileEditorOpen(true)}
                 >
