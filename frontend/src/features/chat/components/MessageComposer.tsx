@@ -42,10 +42,14 @@ export default function MessageComposer({ activeConversation, activeConversation
 
   function composerMenu(onSchedule?: () => void) {
     return <ChatComposerPlusMenu
+      key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
       disabled={Boolean(mediaUploading) || messageSending}
       onAttachFile={() => openAttachmentPicker(false)}
       onAttachMedia={() => openAttachmentPicker(true)}
       onInsertEmoji={insertEmoji}
+      userId={session.user.id}
+      onSelectGiphy={url => setMessageText([messageText, url].filter(Boolean).join('\n'))}
+      onSelectSticker={file => { void addChatFiles([file]) }}
       onSchedule={onSchedule}
       onGroupActivity={activeConversation.type === 'group' ? setGroupActivityCreateKind : undefined}
     />
