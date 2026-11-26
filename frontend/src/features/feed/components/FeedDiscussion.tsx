@@ -128,7 +128,7 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
   )
 }
 
-export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, onLike, onAuthorOpen, variant = 'default', sortOrder = 'oldest', ...translation }: TranslationProps & {
+export function FeedDiscussion({ comments, pending, submit, editor, updateEditor, currentUser, onEdit, onDelete, onReport, onLike, onAuthorOpen, variant = 'default', sortOrder = 'oldest', showComments = true, ...translation }: TranslationProps & {
   comments: FeedComment[]
   pending?: FeedComment
   submit: (content: string, parentId?: number) => Promise<void>
@@ -142,6 +142,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   onAuthorOpen: (username: string) => void
   variant?: 'default' | 'post-page'
   sortOrder?: 'oldest' | 'newest'
+  showComments?: boolean
 }) {
   const composerTarget = useContext(CommentComposerTarget)
   const modalContainer = useContext(ModalPortalContext)
@@ -355,47 +356,50 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
 
   return (
     <section className="feed-discussion" aria-label="Bình luận">
-      <ul className="feed-comment-threads">
-        {orderedThreads.map(([root, [first, ...replies]]) => (
-          <li key={root}>
-            {renderComment(first)}
-            {replies.length > 0 && (
-              <>
-                <button type="button" className="feed-replies-toggle" aria-expanded={expandedThreads.has(root)}
-                  onClick={() => setExpandedThreads((current) => {
-                    const next = new Set(current)
-                    if (next.has(root)) next.delete(root)
-                    else next.add(root)
-                    return next
-                  })}>
-                  {expandedThreads.has(root) ? `Ẩn ${replies.length} phản hồi` : `Xem ${replies.length} phản hồi`}
-                </button>
-                {expandedThreads.has(root) && (
-                  <ul className="feed-comment-replies">
-                    {replies.map((comment) => <li key={comment.id}>{renderComment(comment)}</li>)}
-                  </ul>
+      {showComments && (
+        <>
+          <ul className="feed-comment-threads">
+            {orderedThreads.map(([root, [first, ...replies]]) => (
+              <li key={root}>
+                {renderComment(first)}
+                {replies.length > 0 && (
+                  <>
+                    <button type="button" className="feed-replies-toggle" aria-expanded={expandedThreads.has(root)}
+                      onClick={() => setExpandedThreads((current) => {
+                        const next = new Set(current)
+                        if (next.has(root)) next.delete(root)
+                        else next.add(root)
+                        return next
+                      })}>
+                      {expandedThreads.has(root) ? `Ẩn ${replies.length} phản hồi` : `Xem ${replies.length} phản hồi`}
+                    </button>
+                    {expandedThreads.has(root) && (
+                      <ul className="feed-comment-replies">
+                        {replies.map((comment) => <li key={comment.id}>{renderComment(comment)}</li>)}
+                      </ul>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
-      {commentActionError && <p role="alert" className="feed-comment-error">{commentActionError}</p>}
-      {pending && (
-        <div className="feed-comment-row outgoing-preview" aria-busy="true">
-          {variant === 'post-page'
-            ? <UserAvatar username={pending.author} name={userLabel(pending.authorDisplayName, pending.author)} className="feed-comment-avatar" />
-            : <span className="feed-comment-avatar" aria-hidden="true">{userLabel(pending.authorDisplayName, pending.author).slice(0, 2).toUpperCase()}</span>}
-          <div className="feed-comment-body">
-            <div className="feed-comment-bubble">
-              <strong>{userLabel(pending.authorDisplayName, pending.author)}</strong>
-              {pending.parentId && <small className="feed-reply-to">Trả lời {userLabel(byID.get(pending.parentId)?.authorDisplayName, byID.get(pending.parentId)?.author)}</small>}
-              <p className="pending-content">{pending.content}</p>
+              </li>
+            ))}
+          </ul>
+          {pending && (
+            <div className="feed-comment-row outgoing-preview" aria-busy="true">
+              {variant === 'post-page'
+                ? <UserAvatar username={pending.author} name={userLabel(pending.authorDisplayName, pending.author)} className="feed-comment-avatar" />
+                : <span className="feed-comment-avatar" aria-hidden="true">{userLabel(pending.authorDisplayName, pending.author).slice(0, 2).toUpperCase()}</span>}
+              <div className="feed-comment-body">
+                <div className="feed-comment-bubble">
+                  <strong>{userLabel(pending.authorDisplayName, pending.author)}</strong>
+                  {pending.parentId && <small className="feed-reply-to">Trả lời {userLabel(byID.get(pending.parentId)?.authorDisplayName, byID.get(pending.parentId)?.author)}</small>}
+                  <p className="pending-content">{pending.content}</p>
+                </div>
+              </div>
             </div>
-
-          </div>
-        </div>
+          )}
+        </>
       )}
+      {commentActionError && <p role="alert" className="feed-comment-error">{commentActionError}</p>}
       {composerTarget ? createPortal(composer, composerTarget) : composer}
     </section>
   )
