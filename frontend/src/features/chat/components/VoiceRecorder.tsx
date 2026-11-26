@@ -42,11 +42,15 @@ export default function VoiceRecorder({
     else stopTracks()
   }
 
+  function cancelPendingRequest() {
+    requestGeneration.current++
+  }
+
   useEffect(() => {
     mounted.current = true
     return () => {
       mounted.current = false
-      requestGeneration.current++
+      cancelPendingRequest()
       saveRequested.current = false
       if (recorderRef.current?.state !== 'inactive') {
         try { recorderRef.current?.stop() } catch { /* Already stopped */ }

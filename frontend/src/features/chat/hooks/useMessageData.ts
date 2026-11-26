@@ -120,14 +120,8 @@ export function useMessageData({
       return rooms.size === previous.rooms.size ? previous : { scope, rooms }
     })
   }, [latestVisit])
-  const [historyRequest, setHistoryRequest] = useState<{
-    visit: typeof visit; state: 'loading' | 'ready' | 'error'
-  } | null>(null)
   const [retryRevision, setRetryRevision] = useState(0)
   const retryMessageHistory = useCallback(() => setRetryRevision(current => current + 1), [])
-  const messageHistoryLoading = Boolean(token && activeConversationId && translationPreferencesLoaded &&
-    (historyRequest?.visit !== visit || historyRequest.state === 'loading'))
-  const messageHistoryError = historyRequest?.visit === visit && historyRequest.state === 'error'
   const [reconnectRevision, setReconnectRevision] = useState(0)
   useEffect(() => {
     const refreshOnReconnect = (event: Event) => {
@@ -158,6 +152,19 @@ export function useMessageData({
     setMessageGapBefore(null)
     setMessageGapLoading(false)
   }
+
+  // A new identity means a new load, so "loading" is derived until this exact request has a result.
+  const historyRequest = useMemo(() => ({
+    visit, token, translationPreferencesLoaded, activeConversationType, jumpToMessage,
+    privacyRevision, reconnectRevision, retryRevision,
+  }), [visit, token, translationPreferencesLoaded, activeConversationType, jumpToMessage,
+    privacyRevision, reconnectRevision, retryRevision])
+  const [historyResult, setHistoryResult] = useState<{
+    request: typeof historyRequest; state: 'ready' | 'error'
+  } | null>(null)
+  const messageHistoryLoading = Boolean(token && activeConversationId && translationPreferencesLoaded &&
+    historyResult?.request !== historyRequest)
+  const messageHistoryError = historyResult?.request === historyRequest && historyResult.state === 'error'
 
   useEffect(() => {
     const refresh = () => {
@@ -206,7 +213,6 @@ export function useMessageData({
     const changes = new Set<number>()
     resetMessageChanges(changes)
     setTranslations({})
-    setHistoryRequest({ visit, state: 'loading' })
     const jump = jumpToMessage?.conversationId === conversationId ? jumpToMessage : null
     const pageSize = jump ? 80 : MESSAGE_PAGE_SIZE
     const page = { conversationId, target: targetLanguage, channelId }
@@ -218,7 +224,7 @@ export function useMessageData({
       .then(async (responses) => {
         if (!isCurrent()) return
         if (responses.some((response) => response.status === 403)) {
-          setHistoryRequest({ visit, state: 'error' })
+          setHistoryResult({ request: historyRequest, state: 'error' })
           removeConversationHistory(conversationId)
           purgeConversation(conversationId)
           return
@@ -291,7 +297,7 @@ export function useMessageData({
           }
         }
         setTranslations(restored)
-        setHistoryRequest({ visit, state: 'ready' })
+        setHistoryResult({ request: historyRequest, state: 'ready' })
         if (!canMarkConversationRead(activeConversationIdRef.current, conversationId, tabRef.current, document.visibilityState, !isDesktopBuild || document.hasFocus())) return
         const read = activeConversationType === 'group'
           ? await markChannelRead(apiFetch, conversationId, channelId)
@@ -311,7 +317,7 @@ export function useMessageData({
       })
       .catch(() => {
         if (isCurrent()) {
-          setHistoryRequest({ visit, state: 'error' })
+          setHistoryResult({ request: historyRequest, state: 'error' })
           setNotice('Không tải được tin nhắn. Kiểm tra kết nối rồi thử lại.', 'error')
         }
       })
@@ -319,9 +325,8 @@ export function useMessageData({
     return () => {
       cancelled = true
     }
-  }, [activeConversationIdRef, activeConversationType, callbacks, isCurrentVisit, jumpToMessage,
-    privacyRevision, reconnectRevision, retryRevision, removeConversationHistory, setMessages, tabRef, token,
-    translationPreferencesLoaded, visit])
+  }, [activeConversationIdRef, activeConversationType, callbacks, historyRequest, isCurrentVisit, jumpToMessage,
+    removeConversationHistory, setMessages, tabRef, token, translationPreferencesLoaded, visit])
 
   useEffect(() => {
     const { conversationId: id, channelId } = visit
