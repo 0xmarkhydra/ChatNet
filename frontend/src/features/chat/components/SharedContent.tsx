@@ -4,6 +4,7 @@ import { FileText, Images, Link2, X } from 'lucide-react'
 import MediaViewer from '../../../shared/ui/MediaViewer'
 import { loadSharedContent } from '../lib/sharedContentLoader'
 import { useLatest } from '../../../shared/hooks/useLatest'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 
 type MediaAttachment = {
   id?: number
@@ -23,6 +24,8 @@ type SharedMessage = {
   attachments?: MediaAttachment[]
   createdAt: string
 }
+
+const NO_ITEMS: SharedMessage[] = []
 
 type RequestFn = (path: string, init?: RequestInit) => Promise<Response>
 export type Tab = 'media' | 'files' | 'links'
@@ -61,17 +64,22 @@ export default function SharedContent({
 }) {
   const requestRef = useLatest(request)
   const [tab, setTab] = useState<Tab>(initialTab)
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
-  const [items, setItems] = useState<SharedMessage[]>([])
-  const [nextBefore, setNextBefore] = useState<number | undefined>()
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState('')
+  const view = [conversationId, channelId, tab].join(':')
+  const [viewerIndex, setViewerIndex] = useScopedState<number | null>(view, null)
+  const [items, setItems] = useScopedState<SharedMessage[]>(view, NO_ITEMS)
+  const [nextBefore, setNextBefore] = useScopedState<number | undefined>(view, undefined)
+  const [loading, setLoading] = useScopedState(view, true)
+  const [loadingMore, setLoadingMore] = useScopedState(view, false)
+  const [error, setError] = useScopedState(view, '')
 
-  async function load(reset: boolean, signal?: AbortSignal) {
+  function load(reset: boolean) {
     if (reset) setLoading(true)
     else setLoadingMore(true)
     setError('')
+    return fetchPage(reset)
+  }
+
+  async function fetchPage(reset: boolean, signal?: AbortSignal) {
     try {
       const page = await loadSharedContent({
         conversationId, channelId, kind: tab, limit: 48,
@@ -90,14 +98,13 @@ export default function SharedContent({
     }
   }
 
+  const fetchPageRef = useLatest(fetchPage)
+
   useEffect(() => {
     const controller = new AbortController()
-    setItems([])
-    setNextBefore(undefined)
-    setViewerIndex(null)
-    void load(true, controller.signal)
+    void fetchPageRef.current(true, controller.signal)
     return () => controller.abort()
-  }, [conversationId, channelId, tab])
+  }, [conversationId, channelId, tab, fetchPageRef])
 
   const media = useMemo(() => items.flatMap((message) =>
     (message.attachments || [])

@@ -8,6 +8,7 @@ import UserAvatar from '../../../shared/ui/UserAvatar'
 import MediaAttachmentsView from '../../../shared/ui/MediaAttachmentsView'
 import GroupGovernancePanel from './GroupGovernancePanel'
 import { useLatest } from '../../../shared/hooks/useLatest'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { createGroupChannel } from '../api/conversations'
 import { deleteChannel, getCommunity, getNotificationSettings, listChannelMessages, listChannels, saveNotificationSettings, sendChannelMessage as sendChannelMessageRequest, updateChannel, updateCommunity } from '../api/community'
 import { useCommunityDiscovery, type CommunityMetadata } from '../hooks/useCommunityDiscovery'
@@ -62,6 +63,8 @@ type Props = {
 }
 
 const nameOf = (item: { username: string; displayName?: string }) => item.displayName || item.username
+const NO_CHANNELS: Channel[] = []
+const NO_MESSAGES: Message[] = []
 
 export default function CommunityGroupsPage({
   mode, onMode, groups, userId, myName, selectedGroup, onSelectGroup, onOpenFullChat, onCreate, onJoinedGroup,
@@ -75,32 +78,31 @@ export default function CommunityGroupsPage({
   const [memberQuery, setMemberQuery] = useState('')
   const [menuId, setMenuId] = useState<number | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [metadata, setMetadata] = useState<CommunityMetadata | null>(null)
+  const groupId=selectedGroup?.id ?? null
+  const [metadata, setMetadata] = useScopedState<CommunityMetadata | null>(groupId, null)
   const [metadataDraft, setMetadataDraft] = useState({description:'',topic:'',rules:'',visibility:'private' as 'public'|'private'})
-  const [channels, setChannels] = useState<Channel[]>([])
-  const [activeChannelId, setActiveChannelId] = useState(0)
-  const [channelMessages, setChannelMessages] = useState<Message[]>([])
+  const [channels, setChannels] = useScopedState<Channel[]>(groupId, NO_CHANNELS)
+  const [activeChannelId, setActiveChannelId] = useScopedState(groupId, 0)
+  const channelScope = groupId + ':' + activeChannelId
+  const [channelMessages, setChannelMessages] = useScopedState<Message[]>(channelScope, NO_MESSAGES)
   const [channelError,setChannelError] = useState('')
+  // Reset while rendering with a stable setter, so a late failure is still reported.
+  const [errorScope,setErrorScope] = useState(channelScope)
+  if(errorScope!==channelScope){setErrorScope(channelScope);setChannelError('')}
   const [newChannelName,setNewChannelName] = useState('')
   const [newChannelDescription,setNewChannelDescription] = useState('')
   const [channelBusy,setChannelBusy] = useState(false)
-  const [channelDraft,setChannelDraft] = useState('')
+  const [channelDraft,setChannelDraft] = useScopedState(groupId, '')
   const [channelSendBusy,setChannelSendBusy] = useState(false)
-  const [channelUnconfirmed,setChannelUnconfirmed] = useState<{clientId:string;text:string}|null>(null)
+  const [channelUnconfirmed,setChannelUnconfirmed] = useScopedState<{clientId:string;text:string}|null>(channelScope, null)
   const [preferences,setPreferences] = useState<NotificationPreferences>({messageNotifications:true,mentionNotifications:true})
   const [settingsBusy,setSettingsBusy] = useState(false)
   const { publicGroups, publicLoading, joiningId, joinPublic } = useCommunityDiscovery({
     active: mode === 'list', query, request, notify, onJoinedGroup,
   })
   const requestRef=useLatest(request)
-  const groupId=selectedGroup?.id ?? null
+  const notifyRef=useLatest(notify)
   useEffect(()=>{
-    setMetadata(null)
-    setChannels([])
-    setActiveChannelId(0)
-    setChannelMessages([])
-    setChannelDraft('')
-    setChannelUnconfirmed(null)
     if(!groupId)return
     let cancelled=false
     const load=async()=>{
@@ -123,17 +125,14 @@ export default function CommunityGroupsPage({
         if(!cancelled)setPreferences(value)
       }
       if(responses.some(item=>item.status==='rejected'||!item.value.ok)) {
-        if(!cancelled)notify('Không tải được đầy đủ dữ liệu cộng đồng. Kiểm tra backend.')
+        if(!cancelled)notifyRef.current('Không tải được đầy đủ dữ liệu cộng đồng. Kiểm tra backend.')
       }
     }
     void load()
     return()=>{cancelled=true}
-  },[groupId])
+  },[groupId, requestRef, notifyRef, setMetadata, setChannels])
 
   useEffect(()=>{
-    setChannelMessages([])
-    setChannelError('')
-    setChannelUnconfirmed(null)
     if(!groupId||activeChannelId===0)return
     let cancelled=false
     void listChannelMessages(requestRef.current,groupId,activeChannelId)
@@ -141,7 +140,7 @@ export default function CommunityGroupsPage({
       .then(value=>{if(!cancelled)setChannelMessages(Array.isArray(value)?value:[])})
       .catch(()=>{if(!cancelled)setChannelError('Không tải được tin nhắn. Thử chọn lại kênh.')})
     return()=>{cancelled=true}
-  },[groupId, activeChannelId, requestRef])
+  },[groupId, activeChannelId, requestRef, setChannelMessages])
 
   useEffect(()=>{
     if(!groupId)return
@@ -154,7 +153,7 @@ export default function CommunityGroupsPage({
     }
     window.addEventListener('chatnet:group-community-updated',onChange)
     return()=>window.removeEventListener('chatnet:group-community-updated',onChange)
-  },[groupId, requestRef])
+  },[groupId, requestRef, setChannels])
 
   useEffect(()=>{
     if(!groupId||activeChannelId===0)return
@@ -167,7 +166,7 @@ export default function CommunityGroupsPage({
     }
     window.addEventListener('chatnet:group-channel-event',onChannelMessage)
     return()=>window.removeEventListener('chatnet:group-channel-event',onChannelMessage)
-  },[groupId,activeChannelId,userId])
+  },[groupId,activeChannelId,userId,setChannelMessages,setChannelUnconfirmed])
 
   async function saveMetadata() {
     if(!groupId||!canEdit||settingsBusy)return

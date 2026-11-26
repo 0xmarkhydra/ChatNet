@@ -360,3 +360,60 @@ describe('chat message pagination visit isolation', () => {
   })
 
 })
+
+describe('chat history derived loading and error state', () => {
+  it('clears the error while retrying and reports it again when the retry fails', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      await act(async () => app.jobs[0].reject(new Error('offline')))
+      await act(async () => app.current.retryMessageHistory())
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await act(async () => app.jobs[1].reject(new Error('still offline')))
+      expect(app.current.messageHistoryError).toBe(true)
+      expect(app.current.messageHistoryLoading).toBe(false)
+    } finally { await app.close() }
+  })
+
+  it('stays loading until the latest retry settles, ignoring a superseded failure', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      await app.respond(0, [message(10)])
+      await act(async () => app.current.retryMessageHistory())
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await act(async () => app.current.retryMessageHistory())
+      expect(app.jobs).toHaveLength(3)
+      await act(async () => app.jobs[1].reject(new Error('superseded')))
+      expect(app.current.messageHistoryLoading).toBe(true)
+      expect(app.current.messageHistoryError).toBe(false)
+      await app.respond(2, [message(11)])
+      expect(app.current.messageHistoryLoading).toBe(false)
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.notice).not.toHaveBeenCalled()
+    } finally { await app.close() }
+  })
+
+  it('does not carry a ready or error result over to a revisited channel', async () => {
+    const app = setup()
+    const session = account('A')
+    try {
+      await app.render(session, 0)
+      await act(async () => app.jobs[0].reject(new Error('offline')))
+      await app.render(session, 1)
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await app.respond(1, [])
+      expect(app.current.messageHistoryLoading).toBe(false)
+      await app.render(session, 0)
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await app.respond(2, [])
+      expect(app.current.messageHistoryLoading).toBe(false)
+      await app.render(session, 0)
+      expect(app.jobs).toHaveLength(3)
+      expect(app.current.messageHistoryLoading).toBe(false)
+    } finally { await app.close() }
+  })
+})

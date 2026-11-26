@@ -21,6 +21,16 @@ const initialState: SearchState = {
   loading: false, loadingMore: false, error: '',
 }
 
+function searchPath(keyword: string, filter: ConversationListFilter, categoryId: number | null, offset: number) {
+  const params = new URLSearchParams({
+    q: keyword, limit: String(CHAT_LIST_PAGE_SIZE), offset: String(offset),
+  })
+  if (categoryId !== null) params.set('category', String(categoryId))
+  if (filter === 'groups') params.set('type', 'group')
+  if (filter === 'unread') params.set('unread', 'true')
+  return '/api/conversations?' + params.toString()
+}
+
 export function useConversationListSearch({
   query, filter, categoryId, sessionId, enabled, request,
 }: {
@@ -42,16 +52,6 @@ export function useConversationListSearch({
   const pageController = useRef<AbortController | null>(null)
   const pageBusy = useRef(false)
 
-  function path(offset: number) {
-    const params = new URLSearchParams({
-      q: keyword, limit: String(CHAT_LIST_PAGE_SIZE), offset: String(offset),
-    })
-    if (categoryId !== null) params.set('category', String(categoryId))
-    if (filter === 'groups') params.set('type', 'group')
-    if (filter === 'unread') params.set('unread', 'true')
-    return '/api/conversations?' + params.toString()
-  }
-
   useEffect(() => {
     if (!key) return
     const controller = new AbortController()
@@ -59,7 +59,7 @@ export function useConversationListSearch({
     pageBusy.current = false
     const timer = window.setTimeout(async () => {
       try {
-        const response = await requestRef.current(path(0), {
+        const response = await requestRef.current(searchPath(keyword, filter, categoryId, 0), {
           signal: controller.signal, cache: 'no-store',
         })
         if (!response.ok) throw new Error('Không thể tìm kiếm cuộc trò chuyện.')
@@ -82,8 +82,8 @@ export function useConversationListSearch({
       pageController.current?.abort()
       pageBusy.current = false
     }
-    // The search key contains the query and all server-side filters.
-  }, [key])
+    // The key already changes with the query and filters whenever search is active.
+  }, [key, keyword, filter, categoryId, requestRef, setState])
 
   async function loadMore() {
     if (!key || state.key !== key || state.loading || state.loadingMore ||
@@ -94,7 +94,7 @@ export function useConversationListSearch({
     setState(current => current.key === key
       ? { ...current, loadingMore: true, error: '' } : current)
     try {
-      const response = await requestRef.current(path(state.offset), {
+      const response = await requestRef.current(searchPath(keyword, filter, categoryId, state.offset), {
         signal: controller.signal, cache: 'no-store',
       })
       if (!response.ok) throw new Error('Không tải thêm được kết quả tìm kiếm.')
