@@ -23,9 +23,11 @@ export function createBlockedConversationActions({
           // The chat may be on a later page of the paginated conversation list.
           const response = await findDirectConversation(apiFetch, username);
           if (response.ok) {
-            const data = (await response.json()) as Conversation[];
+            const data: unknown = await response.json();
             if (sessionRef.current?.sessionId !== sid) return;
-            direct = data.find((item) => item.type === 'direct' && item.otherUserId === userId);
+            if (Array.isArray(data)) direct = data.find((item): item is Conversation =>
+              item !== null && typeof item === 'object' && item.type === 'direct' &&
+              item.otherUserId === userId && Number.isSafeInteger(item.id) && item.id > 0);
             if (direct) {
               const found = direct;
               setConversations((current) => [found, ...current.filter((item) => item.id !== found.id)]);

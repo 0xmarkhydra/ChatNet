@@ -63,3 +63,9 @@ it("does not apply a stale response after the session changes", async () => {
   expect(state.setFriendBusyIds).toHaveBeenCalledTimes(1);
   expect(state.setNotice).not.toHaveBeenCalled();
 });
+it("uses a safe fallback when an error response contains a non-string message", async () => {
+  const state = setup(async () => Response.json({ error: { message: "unexpected" } }, { status: 400 }));
+  await state.action.changePersonalContact(friend, "favorite");
+  expect(state.setContactMetadata).not.toHaveBeenCalled();
+  expect(state.setNotice).toHaveBeenCalledWith("Không lưu được liên hệ.", "error");
+});
