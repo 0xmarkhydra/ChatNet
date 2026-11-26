@@ -62,7 +62,7 @@ import {
   type GroupMember,
   type NewChatMode,
 } from "../features/chat/types";
-import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
+import { FEED_PAGE_SIZE, type PendingStoryView, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
@@ -1588,7 +1588,14 @@ export default function AuthedApp({
   const { sendMessage } = useMessageSender({ activeConversationId, canSend, channelDraftKey, draft, messageAttachments, messageText, ownSendScrollConversationRef: ownSendScrollConversation, replyingTo, retryQueuedChatMessages, selectedChannelId, sendingRef, setChannelDrafts, setChatOnline, setMessageDrafts, setReplyingTo, updateChatOutbox });
   const { editOwnMessage, recallOwnMessage } = useMessageEdits({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReplyingTo, setTranslations });
   const { toggleReaction } = useMessageReactions({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReactionPreviews });
-  const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraft, storyBusy, updateChatOutbox, uploadMediaFiles });
+  const { cancelStory, createStory, deleteStory, pendingStory, replyToStory, reportStory, retryStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraft, storyBusy, updateChatOutbox, uploadMediaFiles });
+  const pendingStoryView: PendingStoryView | null = pendingStory
+    ? {
+        status: pendingStory.status,
+        percent: mediaUploading === "story" && mediaUploadProgress?.total ? Math.min(99, Math.round((mediaUploadProgress.loaded / mediaUploadProgress.total) * 100)) : null,
+        kind: "text" in pendingStory.input ? "Chữ" : pendingStory.input.file.type.startsWith("video/") ? "Video" : "Ảnh",
+      }
+    : null;
 
   const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId: selectRoutedConversation, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
 
@@ -2648,6 +2655,9 @@ export default function AuthedApp({
           setStoryDraft={setStoryDraft}
           stories={stories}
           storyBusy={storyBusy}
+          pendingStory={pendingStoryView}
+          retryStory={retryStory}
+          cancelStory={cancelStory}
           switchTab={switchTab}
         />),
         afterFeed: <>

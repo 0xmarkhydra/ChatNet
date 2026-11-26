@@ -15,7 +15,7 @@ import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
 import SocialFeedSidebar from "./SocialFeedSidebar";
 import type { FriendSearchResult, FriendConnection } from "../../contacts";
 import { type Conversation } from "../../chat";
-import { type Post, type Story, type StoryDraft } from "../types";
+import { type PendingStoryView, type Post, type Story, type StoryDraft } from "../types";
 import type { ProfileMediaState } from "../../profile";
 import { type Session } from "../../../shared/types/session";
 import { useEffect, useState, type SetStateAction } from "react";
@@ -80,6 +80,9 @@ export type FeedSectionProps = {
   setStoryDraft: Dispatch<SetStateAction<StoryDraft | null>>;
   stories: Story[];
   storyBusy: boolean;
+  pendingStory: PendingStoryView | null;
+  retryStory: () => void;
+  cancelStory: () => void;
   switchTab: (nextTab: Tab) => void;
 };
 
@@ -141,6 +144,9 @@ export default function FeedSection({
   setStoryDraft,
   stories,
   storyBusy,
+  pendingStory,
+  retryStory,
+  cancelStory,
   switchTab,
 }: FeedSectionProps) {
   const [storyListOpen, setStoryListOpen] = useState(false);
@@ -203,6 +209,9 @@ export default function FeedSection({
                       stories={stories}
                       seen={seenStories}
                       busy={storyBusy || mediaUploading === "story"}
+                      pending={pendingStory}
+                      onRetry={retryStory}
+                      onCancel={cancelStory}
                       onCreate={() => setStoryDraft({ kind: "choose" })}
                       onOpen={setActiveStoryId}
                       onSeeAll={() => setStoryListOpen(true)}
@@ -215,6 +224,9 @@ export default function FeedSection({
                       stories={stories}
                       seen={seenStories}
                       busy={storyBusy || mediaUploading === "story"}
+                      pending={pendingStory}
+                      onRetry={retryStory}
+                      onCancel={cancelStory}
                       onCreate={() => {
                         setStoryListOpen(false);
                         setStoryDraft({ kind: "choose" });

@@ -1,7 +1,7 @@
-import { Plus } from 'lucide-react'
+import { AlertCircle, Loader2, Plus } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import type { Story } from '../types'
+import type { PendingStoryView, Story } from '../types'
 import { groupStories } from '../utils/storyGroups'
 import StoryPreview from './StoryPreview'
 
@@ -11,13 +11,16 @@ type Props = {
   stories: Story[]
   seen: ReadonlySet<number>
   busy: boolean
+  pending?: PendingStoryView | null
+  onRetry?: () => void
+  onCancel?: () => void
   onCreate: () => void
   onOpen: (id: number) => void
   onSeeAll: () => void
 }
 
 /** Mobile story strip: a "create" card, then one card per person (ring: gradient = unseen, grey = seen). */
-export default function StoryTray({ username, displayName, stories, seen, busy, onCreate, onOpen, onSeeAll }: Props) {
+export default function StoryTray({ username, displayName, stories, seen, busy, pending, onRetry, onCancel, onCreate, onOpen, onSeeAll }: Props) {
   const groups = groupStories(stories, seen, username).filter(group => !group.own)
   return (
     <section aria-label="Tin mới từ bạn bè" className="bg-card py-ui-3">
@@ -26,6 +29,25 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
         <button type="button" onClick={onSeeAll} className="min-h-control-touch cursor-pointer border-0 bg-transparent p-0 text-ui-body font-semibold text-primary">Xem tất cả</button>
       </div>
       <div className="flex gap-ui-2 overflow-x-auto px-ui-4 pb-ui-1 [scrollbar-width:none]">
+        {pending ? (
+          <div role={pending.status === 'failed' ? 'alert' : 'status'} aria-label={pending.status === 'failed' ? 'Không đăng được tin' : 'Đang đăng tin'}
+            className={cn('relative grid h-46 w-28 flex-none place-content-center justify-items-center gap-ui-2 overflow-hidden rounded-ui-lg bg-(image:--soco-gradient) p-ui-2 text-center text-white', pending.status === 'failed' && 'ring-2 ring-destructive ring-inset')}>
+            <span aria-hidden="true" className="absolute inset-0 bg-black/55" />
+            {pending.status === 'failed' ? (
+              <>
+                <AlertCircle size={28} aria-hidden="true" className="relative" />
+                <span className="relative text-ui-label font-semibold">Không đăng được</span>
+                <button type="button" onClick={onRetry} className="relative min-h-control-touch cursor-pointer rounded-full border-0 bg-white px-ui-3 text-ui-label font-bold text-foreground">Thử lại</button>
+                <button type="button" onClick={onCancel} className="relative min-h-control-touch cursor-pointer border-0 bg-transparent p-0 text-ui-label font-semibold text-white underline">Hủy</button>
+              </>
+            ) : (
+              <>
+                <Loader2 size={28} aria-hidden="true" className="relative animate-spin" />
+                <span className="relative text-ui-label font-bold">{pending.percent === null ? 'Đang đăng...' : `Đang đăng ${pending.percent}%`}</span>
+              </>
+            )}
+          </div>
+        ) : (
         <button type="button" disabled={busy} onClick={onCreate} aria-label="Tạo Story mới"
           className="relative flex h-46 w-28 flex-none cursor-pointer flex-col overflow-hidden rounded-ui-lg border border-border bg-card p-0 text-left disabled:cursor-not-allowed disabled:opacity-60">
           <span className="grid flex-1 place-items-center overflow-hidden bg-(image:--soco-gradient)">
@@ -38,6 +60,7 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
             <span className="w-full text-center text-ui-label font-bold text-foreground">Tạo tin</span>
           </span>
         </button>
+        )}
         {groups.map(group => (
           <button key={group.author} type="button" onClick={() => onOpen(group.openId)}
             aria-label={`Xem Story của ${group.displayName}, ${group.hasUnseen ? 'chưa xem' : 'đã xem'}`}
