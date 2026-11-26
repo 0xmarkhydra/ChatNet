@@ -45,10 +45,10 @@ export function PostCardHeader({
   openPost: () => void
 }) {
   return (
-    <header className="feed-post-header post-card-header flex w-full min-w-0 items-center gap-[9px]">
+    <header className="feed-post-header post-card-header flex w-full min-w-0 items-start gap-[9px]">
       <UserAvatar username={post.author} name={authorLabel} className="avatar size-10! basis-10! shrink-0! rounded-full! bg-none! bg-secondary! text-primary!" />
-      <div className="feed-post-author flex min-h-10 min-w-0 flex-1 items-center justify-between">
-        <div className="grid min-w-0 gap-[3px]">
+      <div className="feed-post-author flex min-h-10 min-w-0 flex-1 items-start justify-between gap-2">
+        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-[3px]">
           <strong className="block! truncate! text-base! font-bold! text-[#142443]!">
             {onAuthorOpen ? <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(post.author)}>{authorLabel}</button> : authorLabel}
           </strong>

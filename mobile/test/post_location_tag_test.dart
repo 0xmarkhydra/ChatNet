@@ -16,7 +16,7 @@ void main() {
           home: Scaffold(body: PublicPostLocationLink(post: post)),
         ),
       );
-      expect(find.text('Đang ở Hồ Hoàn Kiếm'), findsOneWidget);
+      expect(find.text('Hồ Hoàn Kiếm'), findsOneWidget);
       expect(postContentWithoutLocation(post), 'Caption');
     }
     await tester.pumpWidget(
@@ -28,7 +28,7 @@ void main() {
         ),
       ),
     );
-    expect(find.byType(ActionChip), findsNothing);
+    expect(find.byKey(const ValueKey('post-location-name-link')), findsNothing);
   });
   testWidgets('public tag uses GPS name without approximation suffix', (
     tester,
@@ -51,7 +51,43 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Đang ở Hà Nội'), findsOneWidget);
+    expect(find.text('Hà Nội'), findsOneWidget);
     expect(find.textContaining('gần đúng'), findsNothing);
   });
+  testWidgets(
+    'pin icon is outside the link and long labels fit a narrow header',
+    (tester) async {
+      final name = List.filled(12, 'Đường Nguyễn Văn Huyên').join(', ');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: 130,
+                child: PublicPostLocationLink(
+                  post: {
+                    'visibility': 'friends',
+                    'content': '📍 $name [map:21.03,105.85]',
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final link = find.byKey(const ValueKey('post-location-name-link'));
+      expect(link, findsOneWidget);
+      expect(
+        find.descendant(
+          of: link,
+          matching: find.byIcon(Icons.location_on_outlined),
+        ),
+        findsNothing,
+      );
+      expect(find.byIcon(Icons.location_on_outlined), findsOneWidget);
+      expect(find.text(name), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

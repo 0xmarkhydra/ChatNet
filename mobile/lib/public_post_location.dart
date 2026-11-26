@@ -215,57 +215,94 @@ String postContentWithoutLocation(Map<String, dynamic> post) {
 class PublicPostLocationLink extends StatelessWidget {
   const PublicPostLocationLink({super.key, required this.post});
   final Map<String, dynamic> post;
+
   @override
   Widget build(BuildContext context) {
     final location = post['publishLocation'];
+    String label, query, tooltip;
     if (post['visibility'] != 'public' || location is! Map) {
       final value = namedPostCheckIn(post);
-      final name = checkInDisplayName(value);
-      if (name.isEmpty) return const SizedBox.shrink();
-      return ActionChip(
-        avatar: const Icon(Icons.location_on_outlined, size: 16),
-        tooltip: parseMapCheckIn(value) == null
-            ? 'Mở bản đồ theo tên địa điểm'
-            : 'Mở vị trí đã ghim trên bản đồ',
-        onPressed: () => launchUrl(
-          Uri.https('www.google.com', '/maps/search/', {
-            'api': '1',
-            'query': checkInMapQuery(value),
-          }),
-        ),
-        label: Text(
-          'Đang ở $name',
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      );
+      label = checkInDisplayName(value);
+      if (label.isEmpty) return const SizedBox.shrink();
+      query = checkInMapQuery(value);
+      tooltip = parseMapCheckIn(value) == null
+          ? 'Mở bản đồ theo tên địa điểm'
+          : 'Mở vị trí đã ghim trên bản đồ';
+    } else {
+      final latitude = location['latitude'];
+      final longitude = location['longitude'];
+      final accuracy = location['accuracy'];
+      if (latitude is! num ||
+          longitude is! num ||
+          accuracy is! num ||
+          !latitude.isFinite ||
+          !longitude.isFinite ||
+          !accuracy.isFinite) {
+        return const SizedBox.shrink();
+      }
+      final name = location['placeName'];
+      label = name is String && name.trim().isNotEmpty
+          ? name.trim()
+          : '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}';
+      query = '$latitude,$longitude';
+      tooltip = 'Sai số ±${accuracy.ceil()} m · Mở bản đồ';
     }
-    final latitude = location['latitude'];
-    final longitude = location['longitude'];
-    final accuracy = location['accuracy'];
-    if (latitude is! num ||
-        longitude is! num ||
-        accuracy is! num ||
-        !accuracy.isFinite) {
-      return const SizedBox.shrink();
-    }
-    final name = location['placeName'];
-    final label = name is String && name.trim().isNotEmpty
-        ? 'Đang ở ${name.trim()}'
-        : 'Đang ở vị trí đã chia sẻ';
-    return ActionChip(
-      avatar: const Icon(Icons.location_on_outlined, size: 16),
-      tooltip: 'Sai số ±${accuracy.ceil()} m · Mở bản đồ',
-      onPressed: () => launchUrl(
-        Uri.https('www.google.com', '/maps/search/', {
-          'api': '1',
-          'query': '$latitude,$longitude',
-        }),
-      ),
-      label: Text(
-        label,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.bodySmall,
+
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Icon(
+              Icons.location_on_outlined,
+              size: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Tooltip(
+              message: '$label · $tooltip',
+              child: Semantics(
+                link: true,
+                child: Material(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(6),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    key: const ValueKey('post-location-name-link'),
+                    onTap: () => launchUrl(
+                      Uri.https('www.google.com', '/maps/search/', {
+                        'api': '1',
+                        'query': query,
+                      }),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      child: Text(
+                        label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
