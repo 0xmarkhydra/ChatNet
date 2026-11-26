@@ -94,7 +94,7 @@ export async function capturePublicPostLocation(): Promise<PublishLocation> {
 
 export function publishLocationTag(location: PublishLocation): string {
   const name = location.placeName?.trim();
-  return name ? `Đang ở ${name}` : "Đang ở vị trí đã chia sẻ";
+  return name || `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
 }
 /** The post's authorized audience receives either its GPS tag or its optional named check-in. */
 export function postLocationTag(post: Pick<Post, "visibility" | "publishLocation" | "content">) {
@@ -103,7 +103,7 @@ export function postLocationTag(post: Pick<Post, "visibility" | "publishLocation
   const value = parsePostExtras(post.content).location;
   const name = checkInDisplayName(value);
   const pin = parseMapCheckIn(value);
-  return name ? { label: `Đang ở ${name}`, title: pin ? "Mở vị trí đã ghim trên bản đồ" : "Mở bản đồ theo tên địa điểm", href: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(checkInMapQuery(value)), usesGps: false } : null;
+  return name ? { label: name, title: pin ? "Mở vị trí đã ghim trên bản đồ" : "Mở bản đồ theo tên địa điểm", href: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(checkInMapQuery(value)), usesGps: false } : null;
 }
 
 // Preserve the existing check-in content format, including on older backend deployments.

@@ -1199,7 +1199,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                         label: Text(
                           editCheckIn.isEmpty
                               ? 'Chọn vị trí trên bản đồ'
-                              : 'Đang ở ${checkInDisplayName(editCheckIn)}',
+                              : checkInDisplayName(editCheckIn),
                         ),
                       ),
                     if (visibility == 'public' &&
@@ -1565,9 +1565,17 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                           ),
                         if (checkInLocation.isNotEmpty)
                           Chip(
-                            avatar: const Icon(Icons.place_outlined, size: 17),
+                            backgroundColor: Colors.grey.shade100,
+                            side: BorderSide.none,
+                            avatar: Icon(
+                              Icons.place_outlined,
+                              size: 17,
+                              color: Colors.grey.shade600,
+                            ),
                             label: Text(
-                              'Đang ở ${checkInDisplayName(checkInLocation)}',
+                              checkInDisplayName(checkInLocation),
+                              style: TextStyle(color: Colors.grey.shade700),
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                             onDeleted: () {
