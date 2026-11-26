@@ -21,32 +21,30 @@ beforeEach(() => {
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove() })
 
-function render(seen: Set<number>, handlers: { pending?: PendingStoryView; onRetry?: () => void; onCancel?: () => void; onOpen?: (id: number) => void; onSeeAll?: () => void; onCreate?: () => void } = {}) {
+function render(seen: Set<number>, handlers: { pending?: PendingStoryView; onRetry?: () => void; onCancel?: () => void; onOpen?: (id: number) => void; onCreate?: () => void } = {}) {
   return act(async () => root.render(
     <StoryTray username="me" displayName="Tôi" stories={stories} seen={seen} busy={false} pending={handlers.pending} onRetry={handlers.onRetry} onCancel={handlers.onCancel}
-      onCreate={handlers.onCreate ?? (() => {})} onOpen={handlers.onOpen ?? (() => {})} onSeeAll={handlers.onSeeAll ?? (() => {})} />,
+      onCreate={handlers.onCreate ?? (() => {})} onOpen={handlers.onOpen ?? (() => {})} />,
   ))
 }
 
 describe('StoryTray', () => {
-  it('shows one card per friend, not the own story, and labels seen state', async () => {
+  it('puts the own story first, then one card per friend with seen state', async () => {
     await render(new Set([1]))
     const labels = [...host.querySelectorAll('button')].map(button => button.getAttribute('aria-label'))
     expect(labels).toContain('Xem Story của binh, chưa xem')
     expect(labels).toContain('Xem Story của an, đã xem')
-    expect(labels.some(label => label?.includes('me'))).toBe(false)
+    expect(labels.indexOf('Xem tin của bạn')).toBe(1)
   })
 
   it('opens the first unseen story of a person and wires the other actions', async () => {
-    const onOpen = vi.fn(), onSeeAll = vi.fn(), onCreate = vi.fn()
-    await render(new Set(), { onOpen, onSeeAll, onCreate })
+    const onOpen = vi.fn(), onCreate = vi.fn()
+    await render(new Set(), { onOpen, onCreate })
     const byLabel = (label: string) => host.querySelector(`button[aria-label^="${label}"]`) as HTMLButtonElement
     await act(async () => byLabel('Xem Story của binh').click())
     expect(onOpen).toHaveBeenCalledWith(2)
     await act(async () => byLabel('Tạo Story mới').click())
     expect(onCreate).toHaveBeenCalled()
-    await act(async () => ([...host.querySelectorAll('button')].find(b => b.textContent === 'Xem tất cả') as HTMLButtonElement).click())
-    expect(onSeeAll).toHaveBeenCalled()
   })
 
   it('shows upload progress in place of the create card while posting', async () => {

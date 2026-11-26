@@ -35,7 +35,7 @@ describe('private Story likes', () => {
   it('loads its own state and uses only idempotent like and unlike methods', async () => {
     const request = vi.fn(async (_url: string, init?: RequestInit) =>
       init?.method ? new Response(null, { status: 204 }) : Response.json({ liked: true }))
-    await render(<StoryLikeControl request={request} storyId={12} owner={false} onInspect={vi.fn()} />)
+    await render(<StoryLikeControl request={request} storyId={12} />)
     const toggle = button('Thả tim Story')
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
     await click(toggle)
@@ -45,14 +45,5 @@ describe('private Story likes', () => {
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
     expect(request).toHaveBeenCalledWith('/api/stories/12/like', { method: 'PUT' })
     expect(document.querySelector('ul[aria-label="Người đã thả tim"]')).toBeNull()
-  })
-
-  it('gets a list only when the author opens it', async () => {
-    const request = vi.fn(async () => Response.json({ likers: [{ id: 2, username: 'viewer', displayName: 'Người xem' }] }))
-    await render(<StoryLikeControl request={request} storyId={12} owner onInspect={vi.fn()} />)
-    expect(request).not.toHaveBeenCalled()
-    await click(button('Người đã thả tim'))
-    expect(document.body.textContent).toContain('Người xem')
-    expect(findButton('Thả tim Story')).toBeUndefined()
   })
 })

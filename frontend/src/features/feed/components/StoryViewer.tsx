@@ -9,6 +9,7 @@ import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Story } from '../types'
 import type { ApiRequest } from '@/shared/types/api'
 import StoryLikeControl from './StoryLikeControl'
+import StoryActivity from './StoryActivity'
 import StoryHighlightEditor from './StoryHighlightEditor'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
@@ -28,6 +29,7 @@ type Props = {
   onProfile: (username: string) => void
   onShare: (story: Story) => void
   onReport: (story: Story) => void
+  onOpenMessages: () => void
 })
 
 const STORY_DURATION = 7000
@@ -57,6 +59,7 @@ export default function StoryViewer(props: Props) {
   const [highlightOpen, setHighlightOpen] = useScopedState(activeStory.id, false)
   const [highlightSaved, setHighlightSaved] = useScopedState(activeStory.id, false)
   const [menuOpen, setMenuOpen] = useScopedState(activeStory.id, false)
+  const [activityOpen, setActivityOpen] = useScopedState(activeStory.id, false)
   const imageElapsedRef = useRef(0)
   const replySequence = useRef(0)
   const activeStoryId = useLatest(activeStory.id)
@@ -93,7 +96,7 @@ export default function StoryViewer(props: Props) {
   }, [activeStory.id])
 
   useEffect(() => {
-    if (isVideo || paused || menuOpen || replySending) return
+    if (isVideo || paused || menuOpen || replySending || activityOpen) return
     const started = performance.now()
     const timer = window.setInterval(() => {
       const elapsed = Math.min(duration, imageElapsedRef.current + performance.now() - started)
@@ -107,13 +110,13 @@ export default function StoryViewer(props: Props) {
       window.clearInterval(timer)
       imageElapsedRef.current = Math.min(duration, imageElapsedRef.current + performance.now() - started)
     }
-  }, [activeStory.id, duration, isVideo, paused, menuOpen, replySending, nextId, setActiveStoryId, setImageProgress])
+  }, [activeStory.id, duration, isVideo, paused, menuOpen, replySending, activityOpen, nextId, setActiveStoryId, setImageProgress])
 
   useEffect(() => {
     if (!isVideo || !videoRef.current) return
-    if (paused || menuOpen || replySending) videoRef.current.pause()
+    if (paused || menuOpen || replySending || activityOpen) videoRef.current.pause()
     else void videoRef.current.play().catch(() => setPaused(true))
-  }, [activeStory.id, isVideo, paused, menuOpen, replySending, setPaused])
+  }, [activeStory.id, isVideo, paused, menuOpen, replySending, activityOpen, setPaused])
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null
@@ -123,6 +126,13 @@ export default function StoryViewer(props: Props) {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (activityOpen) {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          setActivityOpen(false)
+        }
+        return
+      }
       if (highlightOpen) {
         if (event.key === 'Escape') {
           event.preventDefault()
@@ -155,7 +165,7 @@ export default function StoryViewer(props: Props) {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [highlightOpen, menuOpen, nextId, previousId, setActiveStoryId, setHighlightOpen, setMenuOpen, setPaused])
+  }, [activityOpen, setActivityOpen, highlightOpen, menuOpen, nextId, previousId, setActiveStoryId, setHighlightOpen, setMenuOpen, setPaused])
 
   async function submitReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -212,7 +222,7 @@ export default function StoryViewer(props: Props) {
                   aria-current={active ? 'true' : undefined}
                   onClick={() => setActiveStoryId(active ? activeStory.id : items[0].id)}>
                   <span className={'grid size-12 flex-none place-items-center overflow-hidden rounded-full p-0.75 ' + (active ? 'bg-(image:--soco-gradient)' : 'bg-white/30')}>
-                    <UserAvatar username={latest.author} name={label} className="avatar size-full rounded-full border-2 border-[#0b1220] text-ui-label font-bold" />
+                    <UserAvatar username={latest.author} name={label} className="avatar box-border size-full! rounded-full! shadow-none! border-2 border-[#0b1220] text-ui-label font-bold" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block truncate text-ui-body">{label}</strong>
@@ -341,26 +351,31 @@ export default function StoryViewer(props: Props) {
             </div>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 z-3 px-ui-3 pb-[max(var(--soco-space-4,16px),env(safe-area-inset-bottom))]">
-            <div className="flex items-center gap-ui-2">
-              {feed && !isOwner ? (
-                <form className="flex min-w-0 flex-1 items-center gap-ui-2" onSubmit={submitReply}>
-                  <input ref={replyInputRef} value={reply}
-                    onChange={(event) => setReply(event.target.value)}
-                    onFocus={() => setPaused(true)}
-                    onBlur={() => setPaused(false)}
-                    placeholder={'Trả lời ' + authorLabel + '...'}
-                    aria-label={'Trả lời Story của ' + authorLabel} maxLength={2000}
-                    className="h-12 min-w-0 flex-1 rounded-full border border-white/70 bg-black/30 px-ui-4 text-[length:var(--soco-type-subtitle)] text-white outline-none placeholder:text-white/75 focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/40" />
-                  <button type="submit" title="Gửi trả lời Story" aria-label="Trả lời Story" disabled={!reply.trim() || replySending}
-                    className={iconButton + ' size-12'}>
-                    <Send size={22} aria-hidden="true" />
-                  </button>
-                </form>
-              ) : <span className="flex-1" />}
-              {request && <StoryLikeControl key={activeStory.id} request={request} storyId={activeStory.id} owner={isOwner} onInspect={() => setPaused(true)} />}
+          {request && feed && isOwner ? (
+            <StoryActivity key={activeStory.id} request={request} storyId={activeStory.id}
+              open={activityOpen} onOpenChange={setActivityOpen} onOpenMessages={feed.onOpenMessages} />
+          ) : (
+            <div className="absolute inset-x-0 bottom-0 z-3 px-ui-3 pb-[max(var(--soco-space-4,16px),env(safe-area-inset-bottom))]">
+              <div className="flex items-center gap-ui-2">
+                {feed && !isOwner ? (
+                  <form className="flex min-w-0 flex-1 items-center gap-ui-2" onSubmit={submitReply}>
+                    <input ref={replyInputRef} value={reply}
+                      onChange={(event) => setReply(event.target.value)}
+                      onFocus={() => setPaused(true)}
+                      onBlur={() => setPaused(false)}
+                      placeholder={'Trả lời ' + authorLabel + '...'}
+                      aria-label={'Trả lời Story của ' + authorLabel} maxLength={2000}
+                      className="h-12 min-w-0 flex-1 rounded-full border border-white/70 bg-black/30 px-ui-4 text-[length:var(--soco-type-subtitle)] text-white outline-none placeholder:text-white/75 focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/40" />
+                    <button type="submit" title="Gửi trả lời Story" aria-label="Trả lời Story" disabled={!reply.trim() || replySending}
+                      className={iconButton + ' size-12'}>
+                      <Send size={22} aria-hidden="true" />
+                    </button>
+                  </form>
+                ) : <span className="flex-1" />}
+                {request && <StoryLikeControl key={activeStory.id} request={request} storyId={activeStory.id} />}
+              </div>
             </div>
-          </div>
+          )}
 
           {highlightSaved && <p role="status" className="absolute bottom-24 left-ui-3 z-5 m-0 rounded-ui-md bg-card px-ui-3 py-ui-2 text-ui-label text-foreground">Đã thêm vào Tin nổi bật.</p>}
           {request && isOwner && highlightOpen && (
