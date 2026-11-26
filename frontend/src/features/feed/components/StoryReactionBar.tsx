@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ApiRequest } from '@/shared/types/api'
 import { reactionOptions } from '@/shared/utils/reactions'
 import { cn } from '@/shared/lib/utils'
-import { changeStoryReaction, readStoryLikes } from '../api/stories'
+import { changeStoryReaction, readStoryReaction } from '../api/stories'
 
 const loadError = 'Không thể tải cảm xúc.'
 
@@ -16,8 +16,8 @@ export default function StoryReactionBar({ request, storyId }: { request: ApiReq
 
   useEffect(() => {
     const controller = new AbortController()
-    void readStoryLikes(request, storyId, controller.signal).then(data => {
-      if (controller.signal.aborted || !('liked' in data)) return
+    void readStoryReaction(request, storyId, controller.signal).then(data => {
+      if (controller.signal.aborted) return
       setMine(data.liked ? data.emoji || '❤️' : '')
     }).catch(() => {
       if (!controller.signal.aborted) setError(loadError)

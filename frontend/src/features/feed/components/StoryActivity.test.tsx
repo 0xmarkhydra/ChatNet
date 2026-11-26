@@ -26,32 +26,38 @@ function Harness({ request, onOpenMessages = () => {} }: { request: ApiRequest; 
 const click = (selector: string) => act(async () => (host.querySelector(selector) as HTMLButtonElement).click())
 
 describe('StoryActivity', () => {
-  it('shows the reaction count, then lists who reacted with what and links to messages in the sheet', async () => {
-    const request = vi.fn(async () => Response.json({ likers: [{ id: 2, username: 'viewer', displayName: 'Người xem', emoji: '😂' }] }))
+  it('shows the view count, then lists viewers with their reaction and links to messages in the sheet', async () => {
+    const request = vi.fn(async () => Response.json({ total: 2, viewers: [
+      { id: 2, username: 'viewer', displayName: 'Người xem', emoji: '😂', viewedAt: new Date().toISOString() },
+      { id: 3, username: 'quiet', displayName: 'Chỉ xem' },
+    ] }))
     const onOpenMessages = vi.fn()
     await act(async () => root.render(<Harness request={request} onOpenMessages={onOpenMessages} />))
-    expect(host.textContent).toContain('1 cảm xúc')
+    expect(host.textContent).toContain('2 người xem')
+    expect(request).toHaveBeenCalledWith('/api/stories/12/views', expect.anything())
     expect(host.querySelector('[role="dialog"]')).toBeNull()
     await click('button[aria-haspopup="dialog"]')
-    const list = host.querySelector('ul[aria-label="Người đã bày tỏ cảm xúc"]')
+    const list = host.querySelector('ul[aria-label="Người đã xem"]')
     expect(list?.textContent).toContain('Người xem')
     expect(list?.querySelector('[role="img"][aria-label="Haha"]')?.textContent).toBe('😂')
+    expect(list?.querySelectorAll('[data-slot="reaction"]')).toHaveLength(1)
+    expect(list?.textContent).toContain('Vừa xong')
     await act(async () => ([...host.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Mở Tin nhắn') as HTMLButtonElement).click())
     expect(onOpenMessages).toHaveBeenCalled()
     await click('button[aria-label="Đóng hoạt động"]')
     expect(host.querySelector('[role="dialog"]')).toBeNull()
   })
 
-  it('marks the count as partial when more pages exist', async () => {
-    const request = vi.fn(async () => Response.json({ likers: [{ id: 2, username: 'a', displayName: 'A' }], next: 2 }))
+  it('uses the server total when more pages exist', async () => {
+    const request = vi.fn(async () => Response.json({ total: 120, viewers: [{ id: 2, username: 'a', displayName: 'A' }], next: 2 }))
     await act(async () => root.render(<Harness request={request} />))
-    expect(host.textContent).toContain('1+ cảm xúc')
+    expect(host.textContent).toContain('120 người xem')
   })
 
-  it('reports a failed load instead of showing zero likes', async () => {
+  it('reports a failed load instead of showing zero viewers', async () => {
     const request = vi.fn(async () => new Response(null, { status: 500 }))
     await act(async () => root.render(<Harness request={request} />))
     expect(host.textContent).toContain('Không tải được')
-    expect(host.textContent).not.toContain('Chưa có cảm xúc nào')
+    expect(host.textContent).not.toContain('Chưa có người xem')
   })
 })
