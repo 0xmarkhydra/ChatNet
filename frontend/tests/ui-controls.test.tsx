@@ -70,6 +70,29 @@ describe("SocCO shared form controls", () => {
     }
   });
 
+  it("opens the shared Search page without expanding the mobile header input", async () => {
+    const host = document.createElement("div");
+    const root = createRoot(host);
+    const onMobileSearchOpen = vi.fn();
+    const previous = (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    try {
+      await act(async () => root.render(
+        <HeaderSearch anchorRef={{ current: null }} icon={<span aria-hidden="true">⌕</span>}
+          value="" placeholder="Tìm kiếm" ariaLabel="Tìm kiếm"
+          onChange={vi.fn()} onMobileSearchOpen={onMobileSearchOpen} />,
+      ));
+      const trigger = host.querySelector<HTMLButtonElement>('button[aria-label="Mở tìm kiếm"]');
+      await act(async () => trigger?.click());
+      expect(onMobileSearchOpen).toHaveBeenCalledOnce();
+      expect(host.querySelector(".mobile-search-expanded")).toBeNull();
+      expect(trigger?.hasAttribute("aria-expanded")).toBe(false);
+    } finally {
+      await act(async () => root.unmount());
+      (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = previous;
+    }
+  });
+
   it("provides accessible dialog title and description when opened", async () => {
     const host = document.createElement("div");
     document.body.append(host);

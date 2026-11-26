@@ -44,6 +44,7 @@ export default function AppQuickSearch({
       maxLength={tab === 'feed' || tab === 'chat' ? 120 : undefined}
       placeholder={searchText.placeholder}
       ariaLabel={searchText.ariaLabel}
+      onMobileSearchOpen={tab === 'chat' ? undefined : () => navigate('/search')}
       expanded={tab === 'chat' && conversationSearching && quickSearchOpen}
       controls={tab === 'chat' ? 'chat-quick-search-results' : undefined}
       onKeyDown={(event) => {
