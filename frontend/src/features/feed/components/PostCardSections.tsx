@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import UiIcon from '../../../shared/ui/UiIcon'
 import type { Post } from '../types'
@@ -90,32 +90,28 @@ export function PostCardEngagement({ post, onReactionUsers }: {
 }
 
 export function PostCardToolbar({
-  post, busy, like, onToggleComments, discussion, openPost, ...actions
+  post, busy, like, discussion, openPost, ...actions
 }: PostActions & {
   post: Post
   busy: boolean
   like: (post: Post, emoji?: string) => Promise<void>
-  onToggleComments?: () => void
   discussion?: ReactNode
   openPost: () => void
 }) {
-  const commentsId = useId()
   return (
     <>
       <div className="feed-post-toolbar grid grid-cols-3 items-center gap-1 mt-0 mx-4 pt-1 border-t border-border-subtle">
         <FeedLikeButton post={post} busy={busy} onLike={(emoji) => void like(post, emoji)} />
         <button type="button" className={`post-detail-trigger ${postActionClassName}`}
-          aria-expanded={onToggleComments ? Boolean(discussion) : undefined}
-          aria-controls={discussion ? commentsId : undefined}
-          onClick={onToggleComments ?? openPost}>
+          aria-label="Mở bài viết để bình luận"
+          onClick={openPost}>
           <UiIcon name="comment" size={18} /><span>Bình luận</span>
         </button>
         <FeedRepostAction post={post} request={actions.apiFetch} onUpdated={actions.syncFeedPost} onRemoved={actions.removeFeedPost}
           onChanged={actions.onRepostChanged} onShareToChat={actions.onShareToChat} onFeedback={actions.setNotice} />
       </div>
       {discussion && (
-        <section id={commentsId} className="feed-inline-comments" aria-label="Bình luận về bài viết">
-          {!post.comments?.length && <p className="post-comments-empty">Chưa có bình luận. Hãy bắt đầu cuộc trò chuyện.</p>}
+        <section className="feed-inline-comments" aria-label="Ô viết bình luận">
           {discussion}
         </section>
       )}

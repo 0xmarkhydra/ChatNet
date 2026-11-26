@@ -49,3 +49,34 @@ it('opens profiles by username for a comment and its reply, without linking an u
     act(() => root.unmount())
   }
 })
+
+it('keeps a direct comment composer visible without rendering the comment thread', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  vi.stubGlobal('IntersectionObserver', class {
+    observe() {}
+    disconnect() {}
+  })
+  const container = document.createElement('div')
+  const root = createRoot(container)
+  const noop = async () => {}
+
+  try {
+    act(() => root.render(
+      <FeedDiscussion
+        api="" token="" target="" currentUser="me" variant="post-page" showComments={false}
+        comments={[{ id: 1, author: 'alice', content: 'Existing comment', createdAt: '2026-11-17T08:00:00Z' }]}
+        editor={{ drafts: {}, replyTo: null }}
+        updateEditor={vi.fn()}
+        submit={noop} onEdit={noop} onDelete={noop} onReport={noop}
+        onAuthorOpen={vi.fn()}
+      />,
+    ))
+
+    expect(container.querySelector('.feed-comment-threads')).toBeNull()
+    expect(container.textContent).not.toContain('Existing comment')
+    expect(container.querySelector('textarea[aria-label="Viết bình luận"]')).not.toBeNull()
+    expect(container.querySelector('.feed-comment-composer-avatar')).not.toBeNull()
+  } finally {
+    act(() => root.unmount())
+  }
+})

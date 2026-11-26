@@ -69,6 +69,7 @@ const postShareMessages = []
 const mediaOnly = process.argv.includes('--media-only')
 const headerOnly = process.argv.includes('--header-only')
 const postHeaderOnly = process.argv.includes('--post-header-only')
+const commentsOnly = process.argv.includes('--comments-only')
 const postPreviewOnly = process.argv.includes('--post-preview-only')
 const postProfileOnly = process.argv.includes('--socco-67-only')
 let genericPreviewRequests = 0
@@ -1212,6 +1213,65 @@ try {
   await feed.waitFor({ state: 'visible' })
   const feedCards = feed.locator('.social-feed-center .feed-post-card')
   await feedCards.first().waitFor({ state: 'visible' })
+  if (commentsOnly) {
+    const inlineComments = feedCards.first().locator('.feed-inline-comments')
+    const inlineComposer = inlineComments.getByRole('textbox', { name: 'Viết bình luận' })
+    assert(await inlineComposer.isVisible() && await inlineComments.locator('.feed-comment-threads').count() === 0,
+      'Feed cards must show the direct composer without expanding the comment thread')
+    await inlineComposer.focus()
+    const composerStyles = await inlineComposer.evaluate(node => {
+      const style = getComputedStyle(node)
+      return { borderWidth: style.borderTopWidth, outline: style.outlineStyle, shadow: style.boxShadow }
+    })
+    assert(composerStyles.borderWidth === '0px' && composerStyles.outline === 'none' && composerStyles.shadow === 'none',
+      'Inline composer must not draw a blue focus border or ring: ' + JSON.stringify(composerStyles))
+    const sendIconAlignment = await inlineComments.getByRole('button', { name: 'Gửi bình luận' }).evaluate(button => {
+      const buttonRect = button.getBoundingClientRect()
+      const icon = button.querySelector('svg')
+      if (!icon) throw new Error('Inline send icon is missing')
+      const iconRect = icon.getBoundingClientRect()
+      return {
+        horizontal: Math.abs((buttonRect.left + buttonRect.width / 2) - (iconRect.left + iconRect.width / 2)),
+        vertical: Math.abs((buttonRect.top + buttonRect.height / 2) - (iconRect.top + iconRect.height / 2)),
+      }
+    })
+    assert(sendIconAlignment.horizontal < 1 && sendIconAlignment.vertical < 1,
+      'Inline send icon must be centered in its button: ' + JSON.stringify(sendIconAlignment))
+    const topSpacing = await inlineComments.evaluate(node => ({
+      sectionMargin: getComputedStyle(node).marginTop,
+      sectionPadding: getComputedStyle(node).paddingTop,
+      formMargin: node.querySelector('.feed-comment-form') ? getComputedStyle(node.querySelector('.feed-comment-form')).marginTop : 'missing',
+    }))
+    assert(topSpacing.sectionMargin === '0px' && topSpacing.sectionPadding === '6px' && topSpacing.formMargin === '0px',
+      'Inline composer top spacing should stay compact and balanced: ' + JSON.stringify(topSpacing))
+    const directComment = 'Bình luận trực tiếp từ bảng tin'
+    const directCommentResponse = page.waitForResponse(response =>
+      response.url().includes('/api/posts/88/comments') && response.request().method() === 'POST')
+    await inlineComposer.fill(directComment)
+    await inlineComposer.press('Enter')
+    assert((await directCommentResponse).ok() && commentRequests === 1 && lastCommentPayload?.content === directComment,
+      'Direct composer must submit a comment through the existing post comments API')
+    const commentsPage = page.locator('.post-comments-page')
+    await feedCards.first().getByRole('button', { name: 'Mở bài viết để bình luận' }).click()
+    await commentsPage.locator('.post-comments-thread-heading h2').waitFor({ state: 'visible' })
+    const originalScroll = await commentsPage.locator('.post-comments-original').evaluate(node => {
+      const previousHeight = node.style.height
+      node.style.height = '120px'
+      const hasOverflow = node.scrollHeight > node.clientHeight
+      node.scrollTop = 120
+      const scrollTop = node.scrollTop
+      node.style.height = previousHeight
+      return { overflow: getComputedStyle(node).overflow, hasOverflow, scrollTop }
+    })
+    assert(originalScroll.overflow === 'clip' && originalScroll.hasOverflow && originalScroll.scrollTop === 0,
+      'Original post content must be non-scrollable even when content overflows: ' + JSON.stringify(originalScroll))
+    assert(await commentsPage.locator('.feed-comment-threads .feed-comment-bubble').getByText(directComment).isVisible(),
+      'A direct feed comment must remain visible in the full post discussion')
+    console.log('Post comments PASS: direct feed composer, existing comment API, thread display and non-scrollable post column')
+    await browser.close()
+    server.kill('SIGTERM')
+    process.exit(0)
+  }
   if (!postHeaderOnly) {
   const socialGeometry = await page.evaluate(() => {
     const keys = ['.social-feed-stories-card', '.social-feed-launcher', '.social-feed-filter-bar',
@@ -2102,14 +2162,13 @@ try {
   assert(fixturePost.saved, 'Save button must call post save API and update state')
 
   // Post comments open as a dedicated desktop page, not the legacy modal.
-  const commentsOnly = process.argv.includes('--comments-only')
   const feedBeforeDetail = page.url()
-  if (commentsOnly) {
-    await feedCards.first().getByRole('button', { name: 'Mở bài viết' }).press('Enter')
-  } else {
-    await feedCards.first().getByRole('button', { name: 'Mở bài viết' }).click()
-    await reactionTestStyle.evaluate(style => style.remove())
-  }
+  const inlineComments = feedCards.first().locator('.feed-inline-comments')
+  const inlineComposer = inlineComments.getByRole('textbox', { name: 'Viết bình luận' })
+  assert(await inlineComposer.isVisible() && await inlineComments.locator('.feed-comment-threads').count() === 0,
+    'Feed cards must show the direct composer without expanding the comment thread')
+  await feedCards.first().getByRole('button', { name: 'Mở bài viết để bình luận' }).click()
+  await reactionTestStyle.evaluate(style => style.remove())
   const commentsPage = page.locator('.post-comments-page')
   await commentsPage.waitFor({ state: 'visible' })
   await commentsPage.locator('.post-comments-thread-heading h2').waitFor({ state: 'visible' })
@@ -2174,6 +2233,8 @@ try {
   assert(await commentsPage.locator('.post-comments-original').isVisible() &&
     await commentsPage.locator('.post-comments-thread').isVisible(),
     'post comments must show original post and comment thread')
+  const originalOverflow = await commentsPage.locator('.post-comments-original').evaluate(node => getComputedStyle(node).overflow)
+  assert(originalOverflow === 'clip', 'Original post content must not create its own scroll area: ' + originalOverflow)
   await commentsPage.getByRole('textbox', { name: 'Viết bình luận' }).fill('Bình luận kiểm thử trang bài viết')
   await commentsPage.getByRole('button', { name: 'Gửi bình luận' }).click()
   await commentsPage.locator('.feed-comment-threads .feed-comment-bubble').getByText('Bình luận kiểm thử trang bài viết').waitFor()

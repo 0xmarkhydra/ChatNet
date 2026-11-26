@@ -398,7 +398,6 @@ export default function AuthedApp({
   } = useAppRouteNavigation();
   const { activePostId, activeStoryId, commentEditors, commentSortOrder, feedCheckInLocation, feedCheckInOpen, feedCommunitiesOpen, feedComposerOpen, feedFilter, feedViewRef, searchHasScrolled, setActivePostId, setActiveStoryId, setCommentEditors, setCommentSortOrder, setFeedCheckInLocation, setFeedCheckInOpen, setFeedCommunitiesOpen, setFeedComposerOpen, setFeedFilter, setSearchHasScrolled, setStoryBusy, setStoryDraft, storyBusy, storyDraft } = useFeedUiState({ tab });
 
-  const [inlineCommentsId, setInlineCommentsId] = useScopedState<number | null>(tab, null);
   const tabRef = useLatest(tab);
   const {
     globalSearch, setGlobalSearch, chatListQuery, setChatListQuery,
@@ -2180,10 +2179,11 @@ export default function AuthedApp({
     openVisitor(username, returnTo);
   }
 
-  const renderPostDiscussion = (discussionPost: Post, onAuthorOpen: (username: string) => void) => (
+  const renderPostDiscussion = (discussionPost: Post, onAuthorOpen: (username: string) => void, showComments = true) => (
     <FeedDiscussion
       key={discussionPost.id}
       variant="post-page"
+      showComments={showComments}
       sortOrder={commentSortOrder}
       pending={pendingComments[discussionPost.id]}
       comments={discussionPost.comments || []}
@@ -2254,8 +2254,7 @@ export default function AuthedApp({
         translationPreferencesLoaded={translationPreferencesLoaded}
         targetLanguage={targetLanguage}
         setActivePostId={onOpen}
-        onToggleComments={() => setInlineCommentsId((current) => current === post.id ? null : post.id)}
-        discussion={inlineCommentsId === post.id ? renderPostDiscussion(post, openVisitor) : null}
+        discussion={renderPostDiscussion(post, openVisitor, false)}
         showSave={showSave}
         likePreviews={likePreviews}
         like={like}

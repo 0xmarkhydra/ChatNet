@@ -24,7 +24,6 @@ type Props = {
   translationPreferencesLoaded: boolean;
   targetLanguage: string;
   setActivePostId: (id: number) => void;
-  onToggleComments?: () => void;
   discussion?: ReactNode;
   likePreviews: Record<number, boolean>;
   like: (post: Post, emoji?: string) => Promise<void>;
@@ -49,7 +48,6 @@ export default function FeedPostCard({
   translationPreferencesLoaded,
   targetLanguage,
   setActivePostId,
-  onToggleComments,
   discussion,
   likePreviews,
   like,
@@ -96,7 +94,7 @@ export default function FeedPostCard({
         <PostCardToolbar post={post} busy={likeBusy} like={like} apiFetch={apiFetch}
           syncFeedPost={syncFeedPost} removeFeedPost={removeFeedPost} setNotice={setNotice}
           onRepostChanged={onRepostChanged} onShareToChat={onShareToChat}
-          onToggleComments={onToggleComments} discussion={discussion} openPost={openPost} />
+          discussion={discussion} openPost={openPost} />
         </>}
       </div>
       </article>
