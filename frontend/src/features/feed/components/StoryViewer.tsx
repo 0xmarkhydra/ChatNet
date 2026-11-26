@@ -8,7 +8,7 @@ import { userLabel } from '../../../shared/utils/userLabel'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Story } from '../types'
 import type { ApiRequest } from '@/shared/types/api'
-import StoryLikeControl from './StoryLikeControl'
+import StoryReactionBar from './StoryReactionBar'
 import StoryActivity from './StoryActivity'
 import StoryHighlightEditor from './StoryHighlightEditor'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -356,7 +356,8 @@ export default function StoryViewer(props: Props) {
               open={activityOpen} onOpenChange={setActivityOpen} onOpenMessages={feed.onOpenMessages} />
           ) : (
             <div className="absolute inset-x-0 bottom-0 z-3 px-ui-3 pb-[max(var(--soco-space-4,16px),env(safe-area-inset-bottom))]">
-              <div className="flex items-center gap-ui-2">
+              {request && feed && <StoryReactionBar key={activeStory.id} request={request} storyId={activeStory.id} />}
+              <div className="mt-ui-2 flex items-center gap-ui-2">
                 {feed && !isOwner ? (
                   <form className="flex min-w-0 flex-1 items-center gap-ui-2" onSubmit={submitReply}>
                     <input ref={replyInputRef} value={reply}
@@ -372,7 +373,6 @@ export default function StoryViewer(props: Props) {
                     </button>
                   </form>
                 ) : <span className="flex-1" />}
-                {request && <StoryLikeControl key={activeStory.id} request={request} storyId={activeStory.id} />}
               </div>
             </div>
           )}
