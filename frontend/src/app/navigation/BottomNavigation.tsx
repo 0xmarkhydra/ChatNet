@@ -9,7 +9,6 @@ type Props = {
   t: (key: keyof typeof UI_MESSAGES) => string
   switchTab: (tab: Tab) => void
   unreadTotal: number
-  pushEnabled: boolean
   username: string
   displayName: string
 }
@@ -19,7 +18,6 @@ export default function BottomNavigation({
   t,
   switchTab,
   unreadTotal,
-  pushEnabled,
   username,
   displayName,
 }: Props) {
@@ -162,7 +160,6 @@ export default function BottomNavigation({
       >
         <span className="nav-icon">
           <span aria-hidden="true"><UserAvatar username={username} name={displayName} className="bottom-nav-avatar" /></span>
-          {!pushEnabled && <b>!</b>}
         </span>
         <span className="nav-label">{t('nav.profile')}</span>
       </button>
