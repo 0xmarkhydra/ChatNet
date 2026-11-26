@@ -1,9 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
-/** Temporarily off: header and bottom navigation stay visible while scrolling. */
-const AUTO_HIDE_ENABLED = false;
-
 /** Upward scrolling slower than this (px/ms) keeps the bars hidden; only a quick flick reveals them. */
 const REVEAL_SPEED = 0.8;
 
@@ -64,7 +61,6 @@ export function useMobileScrollChrome(activeTab?: string) {
     measure();
 
     const onScroll = (event: Event) => {
-      if (!AUTO_HIDE_ENABLED) return;
       if (!media.matches) return;
       const target = event.target;
       if (!(target instanceof HTMLElement) || !shell.contains(target)) return;

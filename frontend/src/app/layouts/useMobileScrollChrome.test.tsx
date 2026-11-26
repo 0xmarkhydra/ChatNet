@@ -27,8 +27,7 @@ function ScrollShell({ activeTab = "feed" }: { activeTab?: string }) {
   );
 }
 
-// Skipped while AUTO_HIDE_ENABLED is false in useMobileScrollChrome.ts.
-describe.skip("mobile chrome scrolling", () => {
+describe("mobile chrome scrolling", () => {
   it("hides both bars on downward scrolling and reveals them upward, at the top or on input focus", () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const media = { matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() };
