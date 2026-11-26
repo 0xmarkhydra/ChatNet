@@ -77,3 +77,31 @@ describe('shared Tailwind post launcher', () => {
     }
   })
 })
+it('renders the mobile profile action labels and keeps the three real callbacks', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const host = document.createElement('div')
+  const root = createRoot(host)
+  const onCreateMediaPost = vi.fn()
+  const onCreateStory = vi.fn()
+  const onCheckIn = vi.fn()
+  try {
+    await act(async () => root.render(<PostComposerLauncher mobileProfile username="demo" displayName="Demo" prompt="Bạn đang nghĩ gì?"
+      onCreatePost={() => {}} onCreateMediaPost={onCreateMediaPost} onCreateStory={onCreateStory} onCheckIn={onCheckIn} />))
+    const buttons = [...host.querySelectorAll<HTMLButtonElement>('[role="group"] button')]
+    expect(buttons.map(button => button.textContent)).toEqual(['Ảnh / Video', 'Story', 'Check-in'])
+    expect(buttons.every(button => button.className.includes('min-h-control-touch'))).toBe(true)
+    await act(async () => { buttons[1].click(); buttons[2].click() })
+    expect(onCreateStory).toHaveBeenCalledOnce()
+    expect(onCheckIn).toHaveBeenCalledOnce()
+    const input = host.querySelector<HTMLInputElement>('input[type="file"]')!
+    const file = new File(['test'], 'image.png', { type: 'image/png' })
+    await act(async () => {
+      Object.defineProperty(input, 'files', { configurable: true, value: [file] })
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(onCreateMediaPost).toHaveBeenCalledWith([file])
+  } finally {
+    await act(async () => root.unmount())
+    vi.unstubAllGlobals()
+  }
+})

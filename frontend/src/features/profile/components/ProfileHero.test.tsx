@@ -23,3 +23,11 @@ it('uses the account tone for an optional mobile cover but preserves a real cove
   expect(photo).not.toContain('has-account-cover')
   expect(renderToStaticMarkup(<ProfileHero {...identity} />)).toContain('has-default-cover')
 })
+it('shows bio instead of duplicating quick details on the full mobile owner profile', () => {
+  const markup = renderToStaticMarkup(<ProfileHero {...identity} centered city="Hà Nội" workplace="SocCo" school="Trường học" bio="Cà phê sáng" friendCount={4} />)
+  expect(markup).toContain('Cà phê sáng')
+  expect(markup).toContain('4 người bạn')
+  expect(markup).not.toContain('Hà Nội')
+  expect(markup).not.toContain('Nơi làm việc')
+  expect(markup).not.toContain('Trường học')
+})

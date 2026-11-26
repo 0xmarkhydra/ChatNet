@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Image, ImagePlus } from 'lucide-react'
+import { Camera, Image, ImagePlus } from 'lucide-react'
 import UserAvatar, { profileAssetUrl } from '@/shared/ui/UserAvatar'
 import { Button } from '@/shared/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
@@ -10,12 +10,13 @@ type Props = {
   displayName: string
   avatarClassName: string
   avatarVersion?: string
+  cameraBadge?: boolean
   avatarSet: boolean
   editBusy: boolean
   onChangeAvatar: (opener: HTMLButtonElement | null) => void
 }
 
-export default function ProfileAvatarMenu({ username, displayName, avatarClassName, avatarVersion, avatarSet, editBusy, onChangeAvatar }: Props) {
+export default function ProfileAvatarMenu({ username, displayName, avatarClassName, avatarVersion, avatarSet, editBusy, onChangeAvatar, cameraBadge = false }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [failedUrl, setFailedUrl] = useState('')
   const trigger = useRef<HTMLButtonElement>(null)
@@ -30,7 +31,9 @@ export default function ProfileAvatarMenu({ username, displayName, avatarClassNa
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button ref={trigger} type="button" aria-label="Tùy chọn ảnh đại diện"
-          className="absolute inset-0 size-full cursor-pointer appearance-none rounded-full border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
+          className="absolute inset-0 size-full cursor-pointer appearance-none rounded-full border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          {cameraBadge && <span className="absolute bottom-1 right-1 box-border grid size-control-touch place-items-center rounded-full border-4 border-solid border-card bg-secondary text-foreground" aria-hidden="true"><Camera size={20} /></span>}
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" aria-label="Ảnh đại diện" onCloseAutoFocus={event => {
         if (openingDialog.current) {
