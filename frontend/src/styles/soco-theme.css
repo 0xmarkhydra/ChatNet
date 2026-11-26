@@ -66,8 +66,8 @@
   /* Layering for new UI; values match what shared/ui already used. Legacy layers (>= 1000) are migrated per feature. */
   --soco-z-raised: 1;
   --soco-z-dropdown: 20;
-  --soco-z-overlay: 100;
-  --soco-z-modal: 101;
+  --soco-z-overlay: 400;
+  --soco-z-modal: 401;
   --soco-motion-fast: 120ms;
   --soco-motion-normal: 200ms;
   --soco-motion-slow: 320ms;

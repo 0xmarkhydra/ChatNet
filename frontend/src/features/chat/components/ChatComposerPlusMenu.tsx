@@ -2,26 +2,31 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, CalendarClock, ClipboardList, Clock3, FileText, Images, Plus, Smile } from 'lucide-react'
 import ChatEmojiPicker from './ChatEmojiPicker'
+import ChatStickerPicker from './ChatStickerPicker'
+import GiphyPicker from './GiphyPicker'
 import { positionChatComposerMenu, type ChatComposerMenuPosition } from '../utils/positionChatComposerMenu'
 import type { GroupActivityKind } from './GroupActivities'
 import './ChatEmojiPicker.css'
 
-type MenuMode = 'closed' | 'actions' | 'emoji'
+type MenuMode = 'closed' | 'actions' | 'emoji' | 'sticker' | 'giphy'
 
 type Props = {
   disabled: boolean
   onAttachFile: () => void
   onAttachMedia: () => void
   onInsertEmoji: (emoji: string) => void
+  userId?: number
+  onSelectGiphy?: (url: string) => void
+  onSelectSticker?: (file: File) => void
   onSchedule?: () => void
   onGroupActivity?: (kind: GroupActivityKind) => void
 }
 
-export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachMedia, onInsertEmoji, onSchedule, onGroupActivity }: Props) {
+export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachMedia, onInsertEmoji, userId, onSelectSticker, onSelectGiphy, onSchedule, onGroupActivity }: Props) {
   const [mode, setMode] = useState<MenuMode>('closed')
   const [position, setPosition] = useState<ChatComposerMenuPosition | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const actionHeight = 198 + (onSchedule ? 44 : 0)
+  const actionHeight = 198 + (onSelectGiphy ? 44 : 0) + (onSelectSticker ? 44 : 0) + (onSchedule ? 44 : 0)
   const groupHeight = onGroupActivity ? 132 : 0
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -34,7 +39,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
       top: visual?.offsetTop ?? 0,
       width: visual?.width ?? window.innerWidth,
       height: visual?.height ?? window.innerHeight,
-    }, nextMode === 'emoji' ? 430 : actionHeight + (window.innerWidth <= 760 ? groupHeight : 0)))
+    }, nextMode !== 'actions' ? 430 : actionHeight + (window.innerWidth <= 760 ? groupHeight : 0)))
   }
 
   function show(nextMode: Exclude<MenuMode, 'closed'>) {
@@ -66,7 +71,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
         top: visual?.offsetTop ?? 0,
         width: visual?.width ?? window.innerWidth,
         height: visual?.height ?? window.innerHeight,
-      }, mode === 'emoji' ? 430 : actionHeight + (window.innerWidth <= 760 ? groupHeight : 0)))
+      }, mode !== 'actions' ? 430 : actionHeight + (window.innerWidth <= 760 ? groupHeight : 0)))
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -114,7 +119,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
           ref={panelRef}
           className="chat-composer-plus-popover"
           role="dialog"
-          aria-label={mode === 'emoji' ? 'Chọn emoji' : 'Thêm nội dung vào tin nhắn'}
+          aria-label={mode === 'emoji' ? 'Chọn emoji' : mode === 'sticker' ? 'Chọn sticker' : mode === 'giphy' ? 'Chọn GIPHY' : 'Thêm nội dung vào tin nhắn'}
           style={{ left: position.left, top: position.top, width: position.width, maxHeight: position.maxHeight }}
         >
           {mode === 'actions' ? (
@@ -129,6 +134,10 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
               <button type="button" className="chat-composer-plus-option" onClick={() => show('emoji')}>
                 <Smile size={19} aria-hidden="true" /><span>Emoji</span>
               </button>
+              {onSelectSticker && <button type="button" className="chat-composer-plus-option" onClick={() => show('sticker')}>
+                <Smile size={19} aria-hidden="true" /><span>Sticker</span>
+              </button>}
+              {onSelectGiphy && <button type="button" className="chat-composer-plus-option" onClick={() => show('giphy')}><Images size={19} aria-hidden="true" /><span>GIF / Sticker động</span></button>}
               {onSchedule && (
                 <button type="button" className="chat-composer-plus-option" onClick={() => choose(onSchedule)}>
                   <Clock3 size={19} aria-hidden="true" /><span>Hẹn giờ gửi</span>
@@ -152,9 +161,9 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
                 <button type="button" aria-label="Quay lại menu thêm" onClick={() => show('actions')}>
                   <ArrowLeft size={19} aria-hidden="true" />
                 </button>
-                <strong>Chọn emoji</strong>
+                <strong>{mode === 'sticker' ? 'Chọn sticker' : mode === 'giphy' ? 'GIPHY' : 'Chọn emoji'}</strong>
               </div>
-              <ChatEmojiPicker onSelect={(emoji) => choose(() => onInsertEmoji(emoji))} />
+              {mode === 'giphy' && onSelectGiphy ? <GiphyPicker disabled={disabled} onSelect={url => choose(() => onSelectGiphy(url))} /> : mode === 'sticker' && onSelectSticker ? <ChatStickerPicker userId={userId} disabled={disabled} onSelect={file => choose(() => onSelectSticker(file))} /> : <ChatEmojiPicker onSelect={(emoji) => choose(() => onInsertEmoji(emoji))} />}
             </>
           )}
         </div>,
