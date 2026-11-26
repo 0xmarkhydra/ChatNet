@@ -3,6 +3,7 @@ import type { ApiRequest } from '../../../shared/types/api'
 import type { Tab } from '../../../shared/types/navigation'
 import type { FriendSearchResult } from '../types'
 import { listFriendSuggestions, searchFriendUsers } from '../api/contacts'
+import { parseFriendSearchResults } from '../utils/friendSearchResults'
 
 type Options = {
   sessionToken?: string
@@ -53,7 +54,10 @@ export function useFriendSearchRequests({
       listFriendSuggestions(apiFetch, controller.signal)
         .then(async (response) => {
           if (!response.ok) throw new Error("Cannot load suggestions");
-          return response.json() as Promise<FriendSearchResult[]>;
+          const data: unknown = await response.json();
+          const items = parseFriendSearchResults(data);
+          if (!items) throw new Error("Invalid suggestions response");
+          return items;
         })
         .then((items) => {
           if (!controller.signal.aborted) setFriendResults(items);
@@ -76,7 +80,9 @@ export function useFriendSearchRequests({
       try {
         const response = await searchFriendUsers(apiFetch, query, controller.signal);
         if (!response.ok) throw new Error("Cannot search users");
-        const items = (await response.json()) as FriendSearchResult[];
+        const data: unknown = await response.json();
+        const items = parseFriendSearchResults(data);
+        if (!items) throw new Error("Invalid user search response");
         if (!controller.signal.aborted) setFriendResults(items);
       } catch {
         if (!controller.signal.aborted) {

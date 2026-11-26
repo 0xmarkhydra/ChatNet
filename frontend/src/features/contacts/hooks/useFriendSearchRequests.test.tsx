@@ -128,4 +128,33 @@ describe('useFriendSearchRequests', () => {
     }
   })
 
+
+  it('rejects malformed suggestions without passing an object to the results UI', async () => {
+    const restore = setActEnvironment()
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    const request: ApiRequest = async () => Response.json({ users: [] })
+    function Probe() {
+      const [results, setResults] = useState<FriendSearchResult[]>([])
+      const [searching, setSearching] = useState(false)
+      const [error, setError] = useState(false)
+      useFriendSearchRequests({
+        sessionToken: 'token', sessionId: 'session',
+        tab: 'contacts', desktopSection: null, newChatMode: '',
+        friendQuery: '', friendSearchRetry: 0, apiFetch: request,
+        setFriendResults: setResults, setFriendSearching: setSearching, setFriendSearchError: setError,
+      })
+      return <span>{Array.isArray(results) ? results.length : 'invalid'}|{searching ? 'busy' : 'idle'}|{error ? 'error' : 'ok'}</span>
+    }
+    try {
+      await act(async () => root.render(<Probe />))
+      expect(host.textContent).toBe('0|idle|error')
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+      restore()
+    }
+  })
+
 })
