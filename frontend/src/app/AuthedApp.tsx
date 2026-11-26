@@ -2248,6 +2248,11 @@ export default function AuthedApp({
         {!desktopProfileOverview && (
           <ProfileSection
           apiFetch={apiFetch}
+          friends={friends}
+          onViewFriend={openVisitor}
+          onCreateMediaPost={files => { setProfileComposerOpen(true); void addFeedFiles(files); }}
+          onCheckIn={() => { setFeedCheckInOpen(true); setProfileComposerOpen(true); }}
+          storyBusy={storyBusy || mediaUploading === "story"}
           onCreateStory={() => setStoryDraft({ kind: "choose" })}
           onOpenPost={setActivePostId}
           appLocale={appLocale}

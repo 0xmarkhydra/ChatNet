@@ -56,7 +56,8 @@ try {
     if (!String(error).includes("Executable doesn't exist")) throw error
     browser = await chromium.launch({ headless: true, channel: 'chrome' })
   }
-  for (const width of avatarOnly ? [390] : [390, 768, 1024, 1440]) {
+  for (const width of avatarOnly ? [320, 390] : [320, 390, 768, 1024, 1440]) {
+    console.log('Checking viewport ' + width)
     const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: 'reduce', serviceWorkers: 'block' })
     await context.addInitScript(value => localStorage.setItem('chatnet-session', JSON.stringify(value)), session)
     const page = await context.newPage()
@@ -67,7 +68,10 @@ try {
       const json = (data, status = 200) => route.fulfill({ status, headers: cors, contentType: 'application/json', body: JSON.stringify(data) })
       if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
       if (u.pathname === '/api/events') return route.fulfill({ headers: cors, contentType: 'text/event-stream', body: ': connected\n\n' })
-      if (u.pathname === '/api/profile') return json({ ...session.user, avatarSet: false, coverSet: false, updatedAt: new Date().toISOString() })
+      if (u.pathname === '/api/friends') return json(Array.from({ length: 5 }, (_, i) => ({ id: i + 2, username: 'friend' + i, displayName: 'Bạn ' + i, online: false, status: 'accepted', updatedAt: new Date().toISOString() })))
+      if (u.pathname === '/api/profile') return json({ ...session.user, avatarSet: false, coverSet: false, bio: 'Cà phê sáng', updatedAt: new Date().toISOString() })
+      if (u.pathname === '/api/profile/note') return json({ note: { content: 'N'.repeat(60), visibility: 'friends', version: '1', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() } })
+      if (u.pathname === '/api/stories/highlights') return json([{ id: 52, author: 'tester', title: 'Du lịch', text: 'Một ngày đẹp', background: 'indigo', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() }])
       if (u.pathname === '/api/preferences' || u.pathname === '/api/preferences/translation') return json({ appLocale: 'vi', autoTranslate: false, targetLanguage: 'vi' })
       if (u.pathname === '/api/privacy') {
         if (req.method() === 'PUT') {
@@ -89,21 +93,33 @@ try {
         const before = Number(u.searchParams.get('before') || 0)
         return json(posts.filter(item => !before || item.id < before).slice(0, Number(u.searchParams.get('limit') || 15)))
       }
-      if (u.pathname.endsWith('/like')) {
+      if ((u.pathname.endsWith('/like') || u.pathname.endsWith('/reactions'))) {
         const post = posts.find(item => item.id === Number(u.pathname.split('/')[3]))
         post.liked = !post.liked
         post.likes = post.liked ? 1 : 0
+        post.myReaction = post.liked ? (req.postDataJSON()?.emoji || '👍') : ''
         return json(post)
       }
       return json([])
     })
     await page.goto(origin)
+    if (width > 760) {
+      await page.locator('.app-sidebar-account').click()
+      await page.getByRole('button', { name: 'Chỉnh sửa trang cá nhân' }).waitFor()
+      check(await page.locator('.profile-mobile-full-hero').count() === 0, 'Desktop must not use mobile hero')
+      await page.locator('.feed-post-card').nth(14).waitFor()
+      check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Desktop horizontal overflow at ' + width)
+      await context.close()
+      continue
+    }
     await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('button', { name: 'Cá nhân' }).click()
+    await page.locator('.profile-mobile-full-hero h1').waitFor()
+    await page.getByRole('button', { name: 'Cài đặt', exact: true }).click()
     async function checkMobileProfileColors() {
       const colors = await page.evaluate(() => {
-        const avatar = document.querySelector('.profile-view > .profile-page-hero .profile-hero-avatar')
+        const avatar = document.querySelector('.profile-view > :is(.profile-page-hero, .profile-mobile-full-hero) .profile-hero-avatar')
         const account = document.querySelector('.app-sidebar-avatar')
-        const cover = document.querySelector('.profile-view > .profile-page-hero .has-account-cover')
+        const cover = document.querySelector('.profile-view > :is(.profile-page-hero, .profile-mobile-full-hero) .has-account-cover')
         if (!avatar || !account || !cover) return null
         const read = node => getComputedStyle(node).getPropertyValue('--soco-avatar-gradient').trim()
         return { cover: read(cover), account: read(account), avatar: getComputedStyle(avatar).backgroundImage,
@@ -142,21 +158,49 @@ try {
       check(await profileLink.isVisible(), 'Avatar picker changed the profile screen')
     }
     await page.getByRole('button', { name: 'Mở trang cá nhân' }).click()
-    await page.getByRole('heading', { name: 'Trang cá nhân', exact: true }).waitFor()
-    if (width === 390) {
+    await page.locator('.profile-mobile-full-hero h1').waitFor()
+    if (width <= 390) {
       await checkMobileProfileColors()
-      const hero = page.locator('.profile-page-hero-centered')
+      const hero = page.locator('.profile-mobile-full-hero')
       await hero.waitFor()
-      const cover = await hero.locator('.profile-page-cover').boundingBox()
-      const avatar = await hero.locator('.profile-page-avatar-wrap').boundingBox()
+      check(await hero.getByRole('button', { name: 'Quay lại hồ sơ' }).count() === 0, 'Cover toolbar must be removed')
+      const style = await hero.getByRole('button', { name: 'Tạo tin' }).evaluate(node => { const c = getComputedStyle(node); return { color: c.color, weight: c.fontWeight, size: c.fontSize } })
+      check(style.color === 'rgb(255, 255, 255)' && style.weight === '700' && style.size === '14px', 'Story button typography and contrast: ' + JSON.stringify(style))
+      const cover = await hero.locator('.has-account-cover').boundingBox()
+      const avatar = await hero.locator('[data-profile-avatar-wrap]').boundingBox()
       check(cover && avatar && Math.abs((cover.x + cover.width / 2) - (avatar.x + avatar.width / 2)) <= 1
         && avatar.y < cover.y + cover.height && avatar.y + avatar.height > cover.y + cover.height, 'Timeline avatar must center across the cover edge')
       check(await hero.getByRole('button', { name: 'Tạo tin' }).isVisible(), 'Mobile Story action missing')
-      check(await hero.getByRole('button', { name: 'Chỉnh sửa hồ sơ', exact: true }).count() === 0, 'Editor should not be beside the Story action')
-      check(await hero.locator('.profile-page-avatar-camera').count() === 0, 'Avatar camera badge should not be displayed')
+      check(await hero.getByRole('button', { name: 'Chỉnh sửa hồ sơ', exact: true }).isVisible(), 'Editor action missing beside Story')
+      check(avatar && avatar.width === 180 && cover && cover.height === 250, 'Mobile hero dimensions must match brief')
+      check(cover.width === width, 'Cover should span the viewport')
+      const note = hero.getByRole('button', { name: 'Xem ghi chú' })
+      await note.waitFor()
+      const noteBox = await note.boundingBox()
+      check(noteBox && noteBox.y + noteBox.height <= avatar.y, 'Long note overlaps the avatar')
+      check(noteBox.x >= 0 && noteBox.x + noteBox.width <= width, 'Long note overflows viewport')
+      const friends = page.getByRole('region', { name: 'Bạn bè', exact: true })
+      await friends.getByRole('button', { name: 'Xem hồ sơ Bạn 0' }).waitFor()
+      check(await friends.locator('li').count() === 4, 'Four friends from API expected')
+      const shortcuts = page.getByRole('group', { name: 'Tạo nội dung nhanh' })
+      for (const label of ['Ảnh / Video', 'Story', 'Check-in']) await shortcuts.getByRole('button', { name: label, exact: true }).waitFor()
+      const highlight = page.getByRole('button', { name: 'Du lịch', exact: true })
+      await highlight.waitFor()
+      const tile = await highlight.boundingBox()
+      check(tile && Math.abs(tile.width - 112) <= 1 && Math.abs(tile.height - 184) <= 1, 'Mobile highlight tile size: ' + JSON.stringify(tile))
+      check(await highlight.evaluate(node => getComputedStyle(node).borderTopLeftRadius) === '12px', 'Highlight radius must match StoryTray')
+      check(await page.getByRole('heading', { name: 'Dòng thời gian', exact: true }).count() === 0, 'Timeline title must be hidden')
+      check(await page.getByRole('button', { name: 'Tải lại dòng thời gian' }).count() === 0, 'Refresh button must be hidden')
+      const composer = await page.getByRole('region', { name: 'Tạo nội dung mới' }).boundingBox()
+      check(composer && Math.abs(composer.width - width) <= 1 && Math.abs(composer.x) <= 1, 'Composer must be full width: ' + JSON.stringify(composer))
+      for (const label of ['Xem nhanh', 'Bạn bè', 'Tin nổi bật']) {
+        const heading = page.getByRole('heading', { name: label, exact: true })
+        check(await heading.evaluate(node => getComputedStyle(node).fontSize) === '18px', 'Section heading size: ' + label)
+      }
+      await page.screenshot({ path: 'output/playwright/layout/profile-mobile-redesign-' + width + '.png', fullPage: true })
       check(await page.getByText('Khoảnh khắc của bạn', { exact: true }).count() === 0, 'Old timeline intro should not be displayed')
       const picker = page.getByRole('group', { name: 'Nội dung trang cá nhân' })
-      await picker.getByRole('button', { name: 'Chỉnh sửa hồ sơ' }).click()
+      await hero.getByRole('button', { name: 'Chỉnh sửa hồ sơ' }).click()
       const edit = page.getByRole('region', { name: 'Chỉnh sửa hồ sơ' })
       await edit.getByRole('textbox', { name: 'Tên hiển thị' }).waitFor()
       await edit.getByRole('region', { name: 'Quyền trường thông tin' }).waitFor()
@@ -175,13 +219,13 @@ try {
       continue
     }
     const timeline = page.getByRole('region', { name: 'Dòng thời gian cá nhân' })
-    await timeline.locator('.post').nth(14).waitFor()
-    check(await timeline.locator('.post').count() === 15, 'First page must have 15 own posts')
+    await timeline.locator('.feed-post-card').nth(14).waitFor()
+    check(await timeline.locator('.feed-post-card').count() === 15, 'First page must have 15 own posts')
     await timeline.getByRole('button', { name: 'Xem bài viết cũ hơn' }).click()
     await timeline.getByText('Khoảnh khắc 1', { exact: true }).waitFor()
-    check(await timeline.locator('.post').count() === 17, 'Older own posts missing or duplicated')
-    await timeline.locator('.post').first().getByRole('button', { name: 'Thích', exact: true }).click()
-    await page.waitForFunction(() => document.querySelector('.personal-timeline-content .feed-post-card .liked'))
+    check(await timeline.locator('.feed-post-card').count() === 17, 'Older own posts missing or duplicated')
+    await timeline.locator('.feed-post-card').first().getByRole('button', { name: 'Thích bài viết', exact: true }).click()
+    await page.waitForFunction(() => document.querySelector('.personal-timeline-content .feed-post-card .feed-like-button[aria-pressed="true"]'))
     check(await timeline.getByRole('textbox', { name: 'Nội dung bài viết' }).count() === 0, 'Composer must open in a popup')
     await timeline.getByRole('button', { name: 'Bạn đang nghĩ gì?', exact: true }).click()
     const popup = page.getByRole('dialog', { name: 'Tạo bài viết', exact: true })
@@ -191,7 +235,7 @@ try {
     await draft.fill('Bản nháp được giữ khi đăng lỗi')
     await page.keyboard.press('Escape')
     await popup.waitFor({ state: 'hidden' })
-    await timeline.getByRole('button', { name: 'Tiếp tục bản nháp của bạn...' }).click()
+    await timeline.getByRole('button', { name: 'Tiếp tục bài viết của bạn...' }).click()
     check(await draft.inputValue() === 'Bản nháp được giữ khi đăng lỗi', 'Closing popup lost draft')
     await page.screenshot({ path: 'output/playwright/layout/profile-popup-' + width + '.png' })
     failCreate = true
@@ -199,15 +243,16 @@ try {
     await popup.getByRole('alert').waitFor()
     check(await draft.inputValue() === 'Bản nháp được giữ khi đăng lỗi', 'Failed create lost draft')
     failCreate = false
-    await popup.getByLabel('Ai có thể xem?').selectOption('private')
+    await popup.getByRole('button', { name: 'Ai có thể xem bài viết' }).click()
+    await page.getByRole('menuitemradio', { name: 'Chỉ mình tôi' }).click()
     await popup.getByRole('button', { name: 'Đăng', exact: true }).click()
-    await timeline.locator('.post').filter({ hasText: 'Bản nháp được giữ khi đăng lỗi' }).waitFor()
+    await timeline.locator('.feed-post-card').filter({ hasText: 'Bản nháp được giữ khi đăng lỗi' }).waitFor()
     check(posts[0].visibility === 'private', 'Visibility not sent to server')
     await popup.waitFor({ state: 'hidden' })
     await timeline.getByRole('button', { name: 'Bạn đang nghĩ gì?', exact: true }).click()
     check(await draft.inputValue() === '', 'Successful create did not clear draft')
     await popup.getByRole('button', { name: 'Đóng tạo bài viết' }).click()
-    await page.getByRole('group', { name: 'Nội dung trang cá nhân' }).getByRole('button', { name: 'Chỉnh sửa hồ sơ' }).click()
+    await page.getByRole('button', { name: 'Chỉnh sửa hồ sơ', exact: true }).click()
     const drawer = page.getByRole('region', { name: 'Chỉnh sửa hồ sơ' })
     await drawer.waitFor()
     await drawer.getByRole('region', { name: 'Quyền trường thông tin' }).waitFor()
@@ -221,20 +266,21 @@ try {
     await page.screenshot({ path: 'output/playwright/layout/profile-editor-' + width + '.png' })
     await page.getByRole('button', { name: 'Tất cả', exact: true }).click()
     await drawer.waitFor({ state: 'hidden' })
-    check(await page.getByRole('heading', { name: 'Trang cá nhân', exact: true }).isVisible(), 'Editor navigated away from timeline')
+    check(await page.locator('.profile-mobile-full-hero h1').isVisible(), 'Editor navigated away from timeline')
     // Check reload recovery without replacing the existing timeline with fake empty state.
     failList = true
-    await timeline.getByRole('button', { name: 'Tải lại dòng thời gian' }).click()
+    await page.getByRole('button', { name: 'Cài đặt', exact: true }).click()
+    await page.getByRole('button', { name: 'Mở trang cá nhân' }).click()
     await timeline.getByRole('alert').waitFor()
     failList = false
     await timeline.getByRole('button', { name: 'Thử lại' }).click()
     await timeline.getByRole('alert').waitFor({ state: 'detached' })
     check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Horizontal overflow at ' + width)
     await page.screenshot({ path: 'output/playwright/layout/personal-timeline-' + width + '.png', fullPage: true })
-    await page.getByRole('button', { name: 'Quay lại hồ sơ' }).click()
+    await page.getByRole('button', { name: 'Cài đặt', exact: true }).click()
     await page.locator('.profile-edit-card').waitFor()
     await context.close()
-    posts = posts.filter(post => post.id !== 100).map(post => ({ ...post, liked: false, likes: 0 }))
+    posts = posts.filter(post => post.id !== 100).map(post => ({ ...post, liked: false, likes: 0, myReaction: '' }))
   }
   check(errors.length === 0, errors.join('\n'))
   console.log(avatarOnly ? 'PASS: mobile profile colors, avatar navigation, compact overview and centered timeline'
