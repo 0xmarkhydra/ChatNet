@@ -27,6 +27,7 @@ export function getMessageGroupPosition(
   index: number,
   options: {
     gapBeforeId?: number | null;
+    unreadBeforeId?: number | null;
     interruptions?: readonly Interruption[];
   } = {},
 ): MessageGroupPosition {
@@ -45,13 +46,13 @@ export function getMessageGroupPosition(
   const next = messages[index + 1];
   const joinsPrevious = Boolean(
     previous &&
-    options.gapBeforeId !== message.id &&
+    options.gapBeforeId !== message.id && options.unreadBeforeId !== message.id &&
     areMessagesInSameBurst(previous, message) &&
     noInterruption(previous, message),
   );
   const joinsNext = Boolean(
     next &&
-    options.gapBeforeId !== next.id &&
+    options.gapBeforeId !== next.id && options.unreadBeforeId !== next.id &&
     areMessagesInSameBurst(message, next) &&
     noInterruption(message, next),
   );
