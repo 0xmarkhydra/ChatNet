@@ -1,4 +1,4 @@
-import { useFriendActions } from "./useFriendActions";
+import { createFriendActions } from "./useFriendActions";
 import { createBlockedConversationActions } from "./blockedConversationActions";
 import { useContactModeration } from "./useContactModeration";
 import { createContactMetadataActions } from "./contactMetadataActions";
@@ -65,7 +65,7 @@ export function useContactActions({
     setConversations, setDesktopSection, setTab, setActiveConversationId, setNotice,
   });
 
-  const friendActions = useFriendActions({
+  const friendActions = createFriendActions({
     apiFetch,
     friendActionRef,
     friendRelationship,
