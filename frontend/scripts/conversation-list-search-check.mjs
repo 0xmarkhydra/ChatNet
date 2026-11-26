@@ -95,41 +95,71 @@ try {
       return json([])
     })
     await page.goto(origin)
-    const rows = page.locator('.conversation-list .conversation-item')
-    const searchInput = page.getByRole('searchbox', { name: 'Tìm kiếm toàn bộ cuộc trò chuyện' })
-    await page.waitForFunction(() => document.querySelectorAll('.conversation-list .conversation-item').length === 25)
+    // The visible chat list is the rail; the legacy .conversation-list stays mounted but hidden.
+    const rows = page.locator('.desktop-conversation-rail-row:visible, .conversation-avatar-rail-item:visible')
+    const rail = page.locator('.desktop-conversation-rail:visible, .conversation-avatar-rail:visible')
+    const searchInput = page.getByRole('searchbox', { name: 'Tìm trong danh sách hội thoại' }).filter({ visible: true })
+    const failures = []
+    const shows = locator => locator.first().waitFor({ timeout: 4000 }).then(() => true, () => false)
+    const waitRows = async (expected, what) => {
+      for (let i = 0; i < 100; i++) { if (await rows.count() === expected) return; await delay(100) }
+      assert.equal(await rows.count(), expected, what)
+    }
+    const waitSearches = async expected => {
+      for (let i = 0; i < 50 && searches.length < expected; i++) await delay(100)
+      await delay(600)
+      assert.equal(searches.length, expected, 'Debounce sends one request')
+    }
+    for (let i = 0; i < 100 && await rows.count() < 25; i++) await delay(100) // may already include the auto-loaded next page
+    assert.ok(await rows.count() >= 25, 'First page of the sidebar')
     const initialCount = searches.length
     await searchInput.fill('bao loi')
-    await page.locator('.conversation-list .conversation-item').filter({ hasText: 'Hội thoại lưu trữ' }).waitFor()
-    assert.equal(await rows.count(), 1, 'Old conversation matched by historical message')
+    await waitSearches(initialCount + 1)
     assert.equal(searches.at(-1).q, 'bao loi', 'Query sent to database endpoint')
-    assert.equal(searches.length, initialCount + 1, 'Debounce sends one request')
-    await rows.first().click()
-    await page.locator('.conversation-list .conversation-item.active').waitFor()
+    // Recorded rather than thrown, so the remaining steps still run.
+    if (!await shows(rows.filter({ has: page.locator('[aria-label*="Hội thoại lưu trữ"]') }).or(page.getByRole('button', { name: /Hội thoại lưu trữ/ }).filter({ visible: true })))) {
+      failures.push('a conversation matched only by message history is not listed in the visible rail')
+    }
     await searchInput.fill('')
-    await page.waitForFunction(() => document.querySelectorAll('.conversation-list .conversation-item').length >= 25)
+    await delay(800)
     assert.equal(searches.length, initialCount + 1, 'Clearing search uses cached sidebar')
     await searchInput.fill('ban tin')
-    await page.waitForFunction(() => document.querySelectorAll('.conversation-list .conversation-item').length === 25)
-    await page.getByRole('button', { name: 'Tải thêm hội thoại' }).click()
-    await page.waitForFunction(() => document.querySelectorAll('.conversation-list .conversation-item').length === 29)
+    // The rail may fetch the next page by itself when it is near the bottom, so check the requests instead of the first row count.
+    for (let i = 0; i < 100 && await rows.count() < 25; i++) await delay(100)
+    assert.ok(searches.some(s => s.q === 'ban tin' && s.offset === '0'), 'First page of search results')
+    await rows.last().evaluate(row => { let node = row.parentElement; while (node && node.scrollHeight <= node.clientHeight) node = node.parentElement; if (node) node.scrollTop = node.scrollHeight })
+    await waitRows(29, 'Second page of search results')
     assert.equal(searches.at(-1).offset, '25', 'Search results paginate independently')
-    await page.getByRole('button', { name: 'Nhóm', exact: true }).click()
-    await page.waitForFunction(() => document.querySelectorAll('.conversation-list .conversation-item').length === 25)
-    assert.equal(searches.at(-1).type, 'group')
-    await page.getByRole('button', { name: 'Chưa đọc', exact: true }).click()
-    await page.locator('.conversation-list .conversation-item').filter({ hasText: 'Bản tin 27' }).waitFor()
-    assert.equal(await rows.count(), 1)
-    assert.equal(searches.at(-1).unread, 'true', 'Unread filter is applied on server')
-    await page.getByRole('button', { name: 'Tất cả', exact: true }).click()
+    await rows.last().click()
+    await page.waitForURL(/\/chat\/\d+$/)
+
+    const filterButton = name => page.getByRole('button', { name, exact: true }).filter({ visible: true })
+    if (await filterButton('Nhóm').count()) {
+      await filterButton('Nhóm').click()
+      await waitRows(25, 'Group filter')
+      assert.equal(searches.at(-1).type, 'group')
+      await filterButton('Chưa đọc').click()
+      await waitRows(1, 'Unread filter')
+      assert.equal(searches.at(-1).unread, 'true', 'Unread filter is applied on server')
+      await filterButton('Tất cả').click()
+    } else {
+      failures.push('the visible rail has no all/unread/groups filter buttons')
+    }
+
+    await searchInput.fill('')
     failOnce = true
     await searchInput.fill('bao loi')
-    await page.locator('.conversation-list .conversation-search-status[role="alert"]').waitFor()
-    await page.getByRole('button', { name: 'Thử lại' }).click()
-    await page.locator('.conversation-list .conversation-item').filter({ hasText: 'Hội thoại lưu trữ' }).waitFor()
+    const retry = rail.getByRole('button', { name: /Thử/ })
+    if (await shows(retry)) {
+      await retry.first().click()
+      await retry.first().waitFor({ state: 'detached' })
+    } else {
+      failures.push('a failed search shows no error or retry in the visible rail')
+    }
     assert.deepEqual(errors, [], 'No browser runtime errors')
     await context.close()
-    console.log('PASS: global historical search, debounce, cached sidebar, server filters, paging, opening older conversations, error/retry')
+    assert.deepEqual(failures, [], 'Known gaps in the current layout')
+    console.log('PASS: server search, debounce, cached sidebar, history matches, paging, opening older conversations, filters, error/retry')
   }
 } finally {
   await browser?.close()

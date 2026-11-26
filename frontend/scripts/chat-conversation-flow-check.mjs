@@ -80,7 +80,10 @@ try {
       if (path.endsWith('/read') || path.endsWith('/channel-read')) return reply({})
       return route.abort() // unmocked writes must never leave the browser
     }
-    if (path === '/api/conversations') return reply(conversations)
+    if (path === '/api/conversations') {
+      const id = new URL(request.url()).searchParams.get('id')
+      return reply(id === null ? conversations : conversations.filter(row => String(row.id) === id))
+    }
     if (path === '/api/conversations/1/messages') return reply([message])
     if (path === '/api/conversations/2/messages') return reply([])
     if (path.endsWith('/e2ee/status')) return reply({ mode: 'legacy', epoch: 0, autoEnabled: false })
@@ -98,7 +101,8 @@ try {
   await page.locator('.desktop-conversation-rail-entry').first().waitFor()
 
   // ---- open a direct conversation by username
-  await page.locator('.desktop-conversation-rail-plus').click()
+  await page.getByRole('button', { name: 'Menu hội thoại' }).filter({ visible: true }).click()
+  await page.locator('.conversation-rail-menu-popover:popover-open').getByRole('button', { name: 'Tạo cuộc trò chuyện' }).click()
   await page.getByPlaceholder('Username người muốn chat').fill('  NewFriend ')
   await page.getByRole('button', { name: 'Tạo cuộc trò chuyện', exact: true }).click()
   await until(() => writes.length === 1, 'the create-direct request')
