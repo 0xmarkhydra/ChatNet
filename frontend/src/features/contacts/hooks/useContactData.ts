@@ -3,6 +3,7 @@ import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { AppDataContext } from '../../../shared/types/api'
 import type { FriendConnection } from '../types'
 import { listFriendRequests, listContactMetadata, listFriends } from '../api/contacts'
+import { toContactMetadataIndex } from '../utils/contactMetadata'
 type Options = AppDataContext
 export function useContactData({
   session,
@@ -52,14 +53,9 @@ export function useContactData({
         .then(async (response) => {
           if (!response.ok) return
           const records: unknown = await response.json().catch(() => null)
-          if (isCurrent() && Array.isArray(records)) {
-            setContactMetadata(Object.fromEntries(
-              (records as Array<{ id: number; nickname: string; note: string; favorite: boolean }>)
-                .map((item) => [item.id, {
-                  nickname: item.nickname, note: item.note, favorite: item.favorite,
-                }]),
-            ))
-          }
+          if (!isCurrent()) return
+          const nextMetadata = toContactMetadataIndex(records)
+          if (nextMetadata) setContactMetadata(nextMetadata)
         }).catch(() => undefined)
       const friendsResponse = await listFriends(apiFetch)
       if (!isCurrent()) return
