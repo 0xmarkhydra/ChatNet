@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronUp, Heart, MessageCircle, X } from 'lucide-react'
+import { ChevronUp, MessageCircle, X } from 'lucide-react'
 import type { ApiRequest } from '@/shared/types/api'
 import { userLabel } from '@/shared/utils/userLabel'
+import { reactionLabel } from '@/shared/utils/reactions'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { readStoryLikes, type StoryLiker } from '../api/stories'
 
@@ -15,7 +16,7 @@ type Props = {
   onOpenMessages: () => void
 }
 
-/** Owner view of a story: an activity bar, and a bottom sheet listing who liked it. */
+/** Owner view of a story: an activity bar, and a bottom sheet listing who reacted. */
 export default function StoryActivity({ request, storyId, open, onOpenChange, onOpenMessages }: Props) {
   const [likers, setLikers] = useState<StoryLiker[] | null>(null)
   const [next, setNext] = useState<number | undefined>()
@@ -44,7 +45,9 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
   }, [open])
 
   const count = likers ? `${likers.length}${next ? '+' : ''}` : null
-  const summary = count === null ? (failed ? 'Không tải được' : 'Đang tải…') : count === '0' ? 'Chưa có lượt thả tim' : `${count} lượt thả tim`
+  const summary = count === null ? (failed ? 'Không tải được' : 'Đang tải…') : count === '0' ? 'Chưa có cảm xúc nào' : `${count} cảm xúc`
+  // Hearts from before reaction types, or from a server without them, have no emoji.
+  const kinds = [...new Set(likers?.map(liker => liker.emoji || '❤️'))].join('')
   const retry = () => {
     setFailed(false)
     setRevision(value => value + 1)
@@ -81,7 +84,7 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
           <div className="grid max-h-[70%] w-full grid-rows-[auto_minmax(0,1fr)_auto] rounded-t-ui-xl bg-card text-foreground">
             <header className="flex items-center gap-ui-2 py-ui-2 pr-ui-2 pl-ui-4">
               <h2 id="story-activity-title" className="m-0 flex min-w-0 flex-1 items-center gap-ui-2 text-ui-section font-bold">
-                <Heart size={18} fill="currentColor" aria-hidden="true" className="flex-none text-primary" />
+                {kinds && <span aria-hidden="true" className="flex-none">{kinds}</span>}
                 <span className="truncate">{summary}</span>
               </h2>
               <button type="button" autoFocus aria-label="Đóng hoạt động" onClick={() => onOpenChange(false)}
@@ -91,14 +94,14 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
             </header>
             <div className="min-h-24 overflow-y-auto px-ui-4">
               {likers && likers.length > 0 && (
-                <ul aria-label="Người đã thả tim" className="m-0 list-none p-0">
+                <ul aria-label="Người đã bày tỏ cảm xúc" className="m-0 list-none p-0">
                   {likers.map(liker => {
                     const label = userLabel(liker.displayName, liker.username)
                     return (
                       <li key={liker.id} className="flex min-h-15 items-center gap-ui-3 border-t border-border-subtle">
                         <UserAvatar username={liker.username} name={label} className="avatar box-border size-10! flex-none! rounded-full! shadow-none! text-ui-label font-bold" />
                         <span className="min-w-0 flex-1 truncate text-ui-body font-semibold">{label}</span>
-                        <Heart size={16} fill="currentColor" aria-hidden="true" className="flex-none text-primary" />
+                        <span role="img" aria-label={reactionLabel(liker.emoji || '❤️')} className="flex-none text-xl leading-none">{liker.emoji || '❤️'}</span>
                       </li>
                     )
                   })}
@@ -106,7 +109,7 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
               )}
               {failed && (
                 <div role="alert" className="grid gap-ui-2 py-ui-3">
-                  <p className="m-0 text-ui-body text-muted-foreground">Không thể tải lượt thả tim.</p>
+                  <p className="m-0 text-ui-body text-muted-foreground">Không thể tải cảm xúc.</p>
                   <button type="button" className={wideButton} onClick={retry}>Tải lại</button>
                 </div>
               )}

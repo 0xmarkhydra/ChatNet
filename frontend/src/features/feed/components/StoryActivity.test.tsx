@@ -26,14 +26,16 @@ function Harness({ request, onOpenMessages = () => {} }: { request: ApiRequest; 
 const click = (selector: string) => act(async () => (host.querySelector(selector) as HTMLButtonElement).click())
 
 describe('StoryActivity', () => {
-  it('shows the like count, then lists likers and links to messages in the sheet', async () => {
-    const request = vi.fn(async () => Response.json({ likers: [{ id: 2, username: 'viewer', displayName: 'Người xem' }] }))
+  it('shows the reaction count, then lists who reacted with what and links to messages in the sheet', async () => {
+    const request = vi.fn(async () => Response.json({ likers: [{ id: 2, username: 'viewer', displayName: 'Người xem', emoji: '😂' }] }))
     const onOpenMessages = vi.fn()
     await act(async () => root.render(<Harness request={request} onOpenMessages={onOpenMessages} />))
-    expect(host.textContent).toContain('1 lượt thả tim')
+    expect(host.textContent).toContain('1 cảm xúc')
     expect(host.querySelector('[role="dialog"]')).toBeNull()
     await click('button[aria-haspopup="dialog"]')
-    expect(host.querySelector('ul[aria-label="Người đã thả tim"]')?.textContent).toContain('Người xem')
+    const list = host.querySelector('ul[aria-label="Người đã bày tỏ cảm xúc"]')
+    expect(list?.textContent).toContain('Người xem')
+    expect(list?.querySelector('[role="img"][aria-label="Haha"]')?.textContent).toBe('😂')
     await act(async () => ([...host.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Mở Tin nhắn') as HTMLButtonElement).click())
     expect(onOpenMessages).toHaveBeenCalled()
     await click('button[aria-label="Đóng hoạt động"]')
@@ -43,13 +45,13 @@ describe('StoryActivity', () => {
   it('marks the count as partial when more pages exist', async () => {
     const request = vi.fn(async () => Response.json({ likers: [{ id: 2, username: 'a', displayName: 'A' }], next: 2 }))
     await act(async () => root.render(<Harness request={request} />))
-    expect(host.textContent).toContain('1+ lượt thả tim')
+    expect(host.textContent).toContain('1+ cảm xúc')
   })
 
   it('reports a failed load instead of showing zero likes', async () => {
     const request = vi.fn(async () => new Response(null, { status: 500 }))
     await act(async () => root.render(<Harness request={request} />))
     expect(host.textContent).toContain('Không tải được')
-    expect(host.textContent).not.toContain('Chưa có lượt thả tim')
+    expect(host.textContent).not.toContain('Chưa có cảm xúc nào')
   })
 })

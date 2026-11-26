@@ -14,18 +14,21 @@ export function submitStory(request: ApiRequest, input: TextStoryInput | { attac
   })
 }
 
-export type StoryLiker = { id: number; username: string; displayName: string }
-export type StoryLikesResult = { liked: boolean } | { likers: StoryLiker[]; next?: number }
+export type StoryLiker = { id: number; username: string; displayName: string; emoji?: string }
+export type StoryLikesResult = { liked: boolean; emoji?: string } | { likers: StoryLiker[]; next?: number }
 
 export async function readStoryLikes(request: ApiRequest, storyId: number, signal: AbortSignal, after?: number) {
   const response = await request(`/api/stories/${storyId}/like${after ? `?after=${after}` : ''}`, { signal, cache: 'no-store' })
-  if (!response.ok) throw new Error('Không thể tải lượt thả tim.')
+  if (!response.ok) throw new Error('Không thể tải cảm xúc.')
   return await response.json() as StoryLikesResult
 }
 
-export async function changeStoryLike(request: ApiRequest, storyId: number, liked: boolean) {
-  const response = await request(`/api/stories/${storyId}/like`, { method: liked ? 'PUT' : 'DELETE' })
-  if (!response.ok) throw new Error('Không thể cập nhật lượt thả tim.')
+/** An empty emoji removes the reaction. */
+export async function changeStoryReaction(request: ApiRequest, storyId: number, emoji: string) {
+  const response = await request(`/api/stories/${storyId}/like`, emoji
+    ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emoji }) }
+    : { method: 'DELETE' })
+  if (!response.ok) throw new Error('Không thể cập nhật cảm xúc.')
 }
 
 export type StoryHighlight = import('../types').Story & { title: string }
