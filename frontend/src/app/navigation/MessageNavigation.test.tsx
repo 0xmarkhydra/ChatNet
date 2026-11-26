@@ -37,6 +37,7 @@ describe("Message navigation unread accessibility", () => {
             />
             <BottomNavigation
               tab="feed" unreadTotal={unreadTotal} pushEnabled
+              username="qa" displayName="QA"
               t={(key) => UI_MESSAGES[key]}
               switchTab={onNavigate}
             />

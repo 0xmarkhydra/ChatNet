@@ -1,3 +1,13 @@
+.bottom-navigation .bottom-nav-avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+  box-shadow: none;
+}
+.bottom-navigation > button.active .bottom-nav-avatar {
+  box-shadow: 0 0 0 2px #4338ca;
+}
+
 /* Mobile floating glass bottom navigation: icon-only, content scrolls behind it. */
 @media (max-width: 760px) {
   .modern-shell.app-layout {

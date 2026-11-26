@@ -9,6 +9,8 @@ import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Story } from '../types'
 import type { ApiRequest } from '@/shared/types/api'
 import StoryReactionBar from './StoryReactionBar'
+import { recordStoryView } from '../api/stories'
+import { relativeStoryTime } from '../utils/storyTime'
 import StoryActivity from './StoryActivity'
 import StoryHighlightEditor from './StoryHighlightEditor'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -33,16 +35,6 @@ type Props = {
 })
 
 const STORY_DURATION = 7000
-
-function relativeStoryTime(date: string): string {
-  const elapsed = Math.max(0, Date.now() - Date.parse(date))
-  const minutes = Math.floor(elapsed / 60000)
-  if (!Number.isFinite(minutes)) return ''
-  if (minutes < 1) return 'Vừa đăng'
-  if (minutes < 60) return minutes + ' phút trước'
-  if (minutes < 1440) return Math.floor(minutes / 60) + ' giờ trước'
-  return Math.floor(minutes / 1440) + ' ngày trước'
-}
 
 export default function StoryViewer(props: Props) {
   const { activeStory, stories, setActiveStoryId } = props
@@ -89,6 +81,15 @@ export default function StoryViewer(props: Props) {
   const attachment = activeStory.attachment
   const isVideo = attachment?.kind === 'video'
   const duration = attachment ? STORY_DURATION : 15_000
+
+  const latestRequest = useLatest(request)
+  const countsAsView = Boolean(request && feed && !isOwner)
+  useEffect(() => {
+    const send = latestRequest.current
+    if (!countsAsView || !send) return
+    // Best effort: a view that cannot be recorded must not interrupt watching; reopening retries it.
+    void recordStoryView(send, activeStory.id).catch(() => {})
+  }, [activeStory.id, countsAsView, latestRequest])
 
   useEffect(() => {
     imageElapsedRef.current = 0
@@ -226,7 +227,7 @@ export default function StoryViewer(props: Props) {
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block truncate text-ui-body">{label}</strong>
-                    <small className="block text-ui-caption text-white/70">{relativeStoryTime(latest.createdAt)}</small>
+                    <small className="block text-ui-caption text-white/70">{relativeStoryTime(latest.createdAt, 'Vừa đăng')}</small>
                   </span>
                   {items.length > 1 && <span className="grid min-w-6 flex-none place-items-center rounded-full bg-white/20 px-ui-1 text-ui-caption font-bold">{items.length}</span>}
                 </button>
@@ -290,7 +291,7 @@ export default function StoryViewer(props: Props) {
                   <UserAvatar username={activeStory.author} name={authorLabel} className="avatar size-10 flex-none rounded-full border-2 border-white text-ui-label font-bold" />
                   <span className="min-w-0">
                     <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
-                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt)}</time>
+                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, 'Vừa đăng')}</time>
                   </span>
                 </button>
               ) : (
@@ -298,7 +299,7 @@ export default function StoryViewer(props: Props) {
                   <UserAvatar username={activeStory.author} name={authorLabel} className="avatar size-10 flex-none rounded-full border-2 border-white text-ui-label font-bold" />
                   <span className="min-w-0">
                     <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
-                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt)}</time>
+                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, 'Vừa đăng')}</time>
                   </span>
                 </span>
               )}
