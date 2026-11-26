@@ -10,6 +10,7 @@ export type StoryOverlayProps = {
   deleteStory: (story: Story) => Promise<void>;
   name: string;
   openVisitor: (username: string) => void;
+  openMessages: () => void;
   replyToStory: (story: Story, message: string) => Promise<boolean>;
   reportStory: (story: Story) => Promise<void>;
   setActiveStoryId: Dispatch<SetStateAction<number | null>>;
@@ -24,6 +25,7 @@ export default function StoryOverlay({
   deleteStory,
   name,
   openVisitor,
+  openMessages,
   replyToStory,
   reportStory,
   setActiveStoryId,
@@ -41,6 +43,10 @@ export default function StoryOverlay({
             deleteStory={deleteStory}
             setActiveStoryId={setActiveStoryId}
             onReply={replyToStory}
+            onOpenMessages={() => {
+              setActiveStoryId(null);
+              openMessages();
+            }}
             onProfile={(username) => {
               setActiveStoryId(null);
               openVisitor(username);

@@ -38,12 +38,3 @@ export function groupStories(stories: Story[], seen: ReadonlySet<number>, userna
   return groups.sort((a, b) =>
     Number(b.own) - Number(a.own) || Number(b.hasUnseen) - Number(a.hasUnseen) || time(b.latest) - time(a.latest))
 }
-
-export function relativeStoryTime(date: string, now = Date.now()): string {
-  const minutes = Math.floor(Math.max(0, now - Date.parse(date)) / 60000)
-  if (!Number.isFinite(minutes)) return ''
-  if (minutes < 1) return 'Vừa đăng'
-  if (minutes < 60) return minutes + ' phút trước'
-  if (minutes < 1440) return Math.floor(minutes / 60) + ' giờ trước'
-  return Math.floor(minutes / 1440) + ' ngày trước'
-}
