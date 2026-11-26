@@ -11,6 +11,7 @@ import { GroupActivityMarker } from "./GroupActivities";
 import { messageTextParts, messageLinkHref } from "../lib/messageClipboard";
 import { getMessageGroupPosition } from "../utils/messageGrouping";
 import LinkPreview from "./LinkPreview";
+import { isGiphyMedia } from "../api/giphy";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import type { ChatSectionProps } from "./ChatSectionProps";
 import type { useMessageLongPress } from "../hooks/useMessageLongPress";
@@ -81,7 +82,8 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                       })
                       const groupStart = groupPosition === 'single' || groupPosition === 'start'
                       const groupEnd = groupPosition === 'single' || groupPosition === 'end'
-                      const translatedText = !message.deleted ? translations[message.id] : ''
+                      const giphyUrl = !message.deleted && isGiphyMedia(message.text.trim()) ? message.text.trim() : ''
+                      const translatedText = !message.deleted && !giphyUrl ? translations[message.id] : ''
                       const photoOnly = !message.deleted && !message.text && message.attachments?.length === 1 && message.attachments[0].kind === 'image' && Boolean(message.attachments[0].url)
                       const originalVisible = Boolean(translationOriginals[message.id])
                       const translatedLanguage = languageOptions.find(option => option.value === effectiveTargetLanguage)?.localizedLanguage || effectiveTargetLanguage.toUpperCase()
@@ -96,7 +98,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                       const hasTranslation = Boolean(translatedText?.trim() && translatedText.trim() !== message.text.trim())
                       const longTranslation = hasTranslation && translationEnabled && (activeChatTranslationSettings?.display === 'translated' ||
                         (activeChatTranslationSettings?.display !== 'bilingual' && Array.from(message.text).length > 100))
-                      const isTranslating = Boolean(translationPending[message.id])
+                      const isTranslating = !giphyUrl && Boolean(translationPending[message.id])
                       const translationFailed = Boolean(translationFailures[message.id])
                       const reactionControls = !conversationBlocked ? (
                         <div className="message-reactions">
@@ -190,7 +192,8 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                               {message.forwarded && (
                                 <span className="chat-forwarded-caption">Đã chuyển tiếp 1 tin nhắn</span>
                               )}
-                              {message.text && (
+                              {giphyUrl && <div className="chat-message-media"><img src={giphyUrl} alt="Sticker GIPHY" referrerPolicy="no-referrer" loading="lazy" className="block h-auto max-h-48 w-40 max-w-full object-contain" /></div>}
+                              {message.text && !giphyUrl && (
                                 <div className={`bubble${translationView.mode === 'dual' ? ' chat-translation-dual' : ''}${translationView.mode === 'translated' ? ' translated-bubble translation-flip-bubble' : ''}`}>
                                   <span
                                     key={`${message.id}-${translationView.mode}-${originalVisible ? 'original' : 'translated'}`}
@@ -259,7 +262,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                                   {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt)}</span>}
                                 </div>
                               )}
-                              {!message.text && reactionControls}
+                              {(!message.text || giphyUrl) && reactionControls}
                               {!conversationBlocked && (
                                 <div className="chat-message-hover-toolbar" role="group" aria-label="Thao tác tin nhắn">
                                   <button type="button" title="Trả lời" aria-label="Trả lời tin nhắn"
@@ -270,7 +273,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                                     onClick={() => onForwardMessage(message)}>
                                     <Forward size={18} aria-hidden="true" />
                                   </button>
-                                  {Boolean(message.text.trim()) && (
+                                  {Boolean(message.text.trim()) && !giphyUrl && (
                                     <button type="button" title="Dịch" aria-label="Dịch tin nhắn"
                                       disabled={isTranslating}
                                       onClick={() => void translateMessage(message)}>
@@ -320,7 +323,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                             <strong>{item.replyToSender || 'Trả lời'}</strong><span>{item.replyToText}</span>
                           </div>
                         )}
-                        {item.text && <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>}
+                        {item.text && (isGiphyMedia(item.text.trim()) ? <img src={item.text.trim()} alt="Sticker GIPHY" referrerPolicy="no-referrer" className="block h-auto max-h-48 w-40 max-w-full object-contain" /> : <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>)}
                         <MediaAttachmentsView items={item.attachments} />
                         <div className="chat-outbox-footer">
                           {(item.status === 'failed' || !chatOnline) && (

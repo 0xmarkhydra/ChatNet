@@ -51,12 +51,12 @@
 }
 
 .conversation-pin-entry .conversation-item.is-pinned {
-  background: color-mix(in srgb, var(--chatnet-accent-soft, #eff4ff) 42%, transparent);
+  background: color-mix(in srgb, var(--chatnet-accent-soft) 42%, transparent);
 }
 
 .conversation-pin-indicator {
   flex-shrink: 0;
-  color: var(--chatnet-accent, #2563eb);
+  color: var(--chatnet-accent);
 }
 
 /* Desktop: right-click menu anchored at the pointer; touch: long-press sheet. */
@@ -71,7 +71,7 @@
   position: fixed;
   width: min(244px, calc(100vw - 16px));
   padding: 6px;
-  border: 1px solid var(--chatnet-line, #e6e7e9);
+  border: 1px solid var(--chatnet-line);
   border-radius: 12px;
   background: var(--chatnet-surface, #fff);
   box-shadow: 0 12px 36px rgba(18, 27, 45, .2);
@@ -87,7 +87,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--chatnet-text, #15171a);
+  color: var(--chatnet-text);
   text-align: left;
   font: inherit;
   cursor: pointer;
@@ -95,11 +95,11 @@
 
 .conversation-context-actions button:hover,
 .conversation-context-actions button:focus-visible {
-  background: var(--chatnet-accent-soft, #eff4ff);
+  background: var(--chatnet-accent-soft);
 }
 
 .conversation-context-actions button:disabled { opacity: .55; cursor: wait; }
-.conversation-context-actions button > span { display: grid; place-items: center; color: var(--chatnet-accent, #2563eb); }
+.conversation-context-actions button > span { display: grid; place-items: center; color: var(--chatnet-accent); }
 .conversation-context-actions button > b { font-size: 13px; font-weight: 600; }
 
 .conversation-pin-dialog-title {
@@ -110,19 +110,19 @@
 }
 
 .conversation-pin-dialog-title strong {
-  color: var(--chatnet-text, #15171a);
+  color: var(--chatnet-text);
 }
 
 .conversation-pin-dialog-title span {
-  color: var(--chatnet-muted, #656a61);
+  color: var(--chatnet-muted);
   font-size: 12px;
 }
 
 .chat-pinned-panel {
   min-width: 0;
   flex: 0 0 auto;
-  border-bottom: 1px solid var(--chatnet-line, #e6e7e9);
-  background: var(--chatnet-accent-soft, #eff4ff);
+  border-bottom: 1px solid var(--chatnet-line);
+  background: var(--chatnet-accent-soft);
   padding: 9px 14px;
   max-height: 33dvh;
   overflow-y: auto;
@@ -132,7 +132,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--chatnet-accent-ink, #2859d8);
+  color: var(--chatnet-accent-ink);
   font-size: 12px;
 }
 

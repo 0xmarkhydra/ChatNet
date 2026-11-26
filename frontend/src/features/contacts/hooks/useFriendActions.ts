@@ -1,6 +1,8 @@
 import type { FriendConnection, FriendSearchResult } from "../types";
 import { updateFriendRelationship, removeAcceptedFriend as removeFriendRequest } from "../api/contacts";
 import type { UseContactActionsDeps } from "./contactActionTypes";
+import { contactApiError } from "../utils/contactApiError";
+import { parseFriendMutationResult } from "../utils/friendMutationResult";
 
 type FriendActionsDeps = Pick<UseContactActionsDeps,
   | "apiFetch"
@@ -23,7 +25,7 @@ type FriendActionsDeps = Pick<UseContactActionsDeps,
   openBlockedFriendConversation: (userId: number) => Promise<void>;
 };
 
-export function useFriendActions({
+export function createFriendActions({
   apiFetch,
   friendActionRef,
   friendRelationship,
@@ -71,13 +73,12 @@ export function useFriendActions({
     try {
       const removing = decline || relationship === "outgoing";
       const response = await updateFriendRelationship(apiFetch, friend.id, relationship, removing);
-      const result = (await response.json().catch(() => null)) as
-        | (FriendConnection & { error?: string })
-        | null;
+      const payload: unknown = await response.json().catch(() => null);
+      const result = parseFriendMutationResult(payload, friend.id);
       if (sessionRef.current?.sessionId !== sessionId) return;
       ++friendSyncRequest.current;
       if (!response.ok) {
-        setNotice(result?.error || "Không cập nhật được lời mời kết bạn");
+        setNotice(contactApiError(payload, "Không cập nhật được lời mời kết bạn"));
         await refreshFriendConnections();
         return;
       }
@@ -89,7 +90,7 @@ export function useFriendActions({
         setNotice(
           decline ? "Đã từ chối lời mời kết bạn" : "Đã hủy lời mời kết bạn",
         );
-      } else if (result?.id === friend.id && result.status === "accepted") {
+      } else if (result?.status === "accepted") {
         setFriends((current) => [
           ...current.filter((item) => item.id !== friend.id),
           result,
@@ -98,7 +99,7 @@ export function useFriendActions({
           current.filter((item) => item.id !== friend.id),
         );
         setNotice(`Đã kết bạn với ${label}`);
-      } else if (result?.id === friend.id && result.status === "pending") {
+      } else if (result?.status === "pending") {
         setFriendRequests((current) => [
           ...current.filter((item) => item.id !== friend.id),
           result,
@@ -161,7 +162,7 @@ export function useFriendActions({
       } | null;
       if (sessionRef.current?.sessionId !== sessionId) return;
       if (!response.ok) {
-        setNotice(result?.error || "Không thể hủy kết bạn. Vui lòng thử lại.");
+        setNotice(contactApiError(result, "Không thể hủy kết bạn. Vui lòng thử lại."));
       } else {
         setFriends((current) =>
           current.filter((item) => item.id !== friend.id),

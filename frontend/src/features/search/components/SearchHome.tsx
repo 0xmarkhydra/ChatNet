@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Bell, BookmarkCheck, Clock, FileText, Package, UserRoundCheck, UsersRound, X } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
@@ -6,10 +5,8 @@ import { Skeleton } from '@/shared/ui/skeleton'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import type { ApiRequest } from '../../../shared/types/api'
 import { usePostSearch } from '../../feed'
-import type { SuggestConfig } from '../hooks/useSuggestions'
-import { isPublicPost, type SearchType } from '../lib/searchFilters'
+import { isPublicPost } from '../lib/searchFilters'
 import type { OpenedResult, SavedSearch, SearchHistory } from '../lib/searchHistory'
-import SearchForm from './SearchForm'
 import {
   avatarSmall, card, cardTitle, clamp2, emptyIcon, iconButton, iconTile, inline, link, plainButton, rowCopy, rowMeta, rowTitle,
 } from './ui'
@@ -24,7 +21,6 @@ export type SearchHomeProps = {
   onClearRecent: () => void
   onToggleSaved: (query: string) => void
   onOpenOpened: (item: OpenedResult) => void
-  suggest: SuggestConfig
 }
 
 const SCOPES: { label: string; icon: typeof Package; params: Record<string, string> }[] = [
@@ -93,20 +89,10 @@ function SavedSearchCard({ saved, request, sessionId, onOpen, onRemove }: {
 const OPENED_ICON = { person: UserRoundCheck, post: FileText, community: UsersRound }
 const OPENED_LABEL = { person: 'Trang cá nhân', post: 'Bài viết', community: 'Cộng đồng' }
 
-export default function SearchHome({ history, request, sessionId, suggest, ...actions }: SearchHomeProps) {
-  // Focusing on mobile would open the keyboard over the home content.
-  const [focusField] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
-  const search = (query: string, scope: SearchType) => actions.onSearch(query, scope === 'all' ? undefined : { type: scope })
+export default function SearchHome({ history, request, sessionId, ...actions }: SearchHomeProps) {
 
   return (
     <>
-      <header className="border-b border-border bg-card px-ui-6 py-ui-4 max-lg:px-ui-3">
-        <h1 className="sr-only">Tìm kiếm</h1>
-        <div className="mx-auto max-w-270">
-          <SearchForm initialQuery="" large suggest={suggest} autoFocus={focusField} placeholder="Tìm người, bài viết, cộng đồng, sản phẩm…" onSubmit={search} />
-        </div>
-      </header>
-
       <div className="mx-auto w-full max-w-270 px-ui-6 pt-ui-5 pb-ui-8 max-lg:px-ui-3">
         <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start gap-ui-5 max-lg:grid-cols-1">
           <div className="grid min-w-0 gap-ui-4">

@@ -16,6 +16,9 @@ import { useSession } from "../shared/context/SessionContext";
 import { useApi } from "../shared/context/ApiContext";
 import { useNotice } from "../shared/context/NoticeContext";
 import { useAppRealtime } from "./hooks/useAppRealtime";
+import { createAppLogout } from "./lifecycle/createAppLogout";
+import { createAppTabSwitch } from "./navigation/createAppTabSwitch";
+import { useFeedRouteLifecycle } from "./navigation/useFeedRouteLifecycle";
 import { applyPostLikePreviews } from "./applyPostLikePreviews";
 import { useAppChatSearchState } from "./hooks/useAppChatSearchState";
 import { useFeedRefreshInterval } from "./hooks/useFeedRefreshInterval";
@@ -27,27 +30,23 @@ import { useUnreadDocumentTitle } from "./hooks/useUnreadDocumentTitle";
 import { useDesktopShortcuts } from "./hooks/useDesktopShortcuts";
 import { useDesktopNotifications } from "../features/chat/hooks/useDesktopNotifications";
 import { useConversationData } from "../features/chat/hooks/useConversationData";
-import { revokeConversationMembership, resetConversationMembershipOnLogout, restoreConversationFromNotification } from "../features/chat/lib/conversationMembershipLifecycle";
+import { revokeConversationMembership, restoreConversationFromNotification } from "../features/chat/lib/conversationMembershipLifecycle";
 import { useConversationListSearch } from "../features/chat/hooks/useConversationListSearch";
 import {
   useChatQuickSearch,
 } from "../features/chat/hooks/useChatQuickSearch";
-import ChatQuickSearch from "../features/chat/components/ChatQuickSearch";
 import { useContactData } from "../features/contacts/hooks/useContactData";
+import { selectFriendRelationship } from "../features/contacts/utils/friendRelationship";
 import { useFeedData } from "../features/feed/hooks/useFeedData";
-import { usePostSearch } from "../features/feed/hooks/usePostSearch";
+import { useFeedPagingOrchestration } from "../features/feed/hooks/useFeedPagingOrchestration";
 import { useFollowingPosts } from "../features/feed/hooks/useFollowingPosts";
-import { useFeedInfiniteScroll } from "../features/feed/hooks/useFeedInfiniteScroll";
 
 import { useGroupManagement } from "../features/chat/hooks/useGroupManagement";
 import { API } from "../shared/lib/config";
 import type {
-  ProfileMediaState,
-  ProfileUpdateResponse,
   UserPrivacy,
 } from "../features/profile/types";
 import {
-  attachmentRequestBody,
   type MediaAttachment,
   type PresignedUpload,
 } from "../shared/utils/media";
@@ -63,11 +62,15 @@ import {
   type GroupMember,
   type NewChatMode,
 } from "../features/chat/types";
-import { FEED_PAGE_SIZE, type Post, type Story } from "../features/feed/types";
+import { FEED_PAGE_SIZE, type PendingStoryView, type Post, type Story } from "../features/feed/types";
 import type { Tab } from "../shared/types/navigation";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTE, TAB_PATH, chatConversationIdFromPath, feedPostIdFromPath, feedPostPath } from "./router/routes";
 import { useAppRouteNavigation } from "./router/useAppRouteNavigation";
+import { useGlobalSearchShortcut } from "./navigation/useGlobalSearchShortcut";
+import { resolveDesktopSection } from "./navigation/resolveDesktopSection";
+import { createVisitorNavigation } from "./navigation/createVisitorNavigation";
+import { useMessageSoundPreference } from "./hooks/useMessageSoundPreference";
 import { useChatConversationRoute } from "./router/useChatConversationRoute";
 import { useChatRouteConversation } from "../features/chat/hooks/useChatRouteConversation";
 import type {
@@ -81,7 +84,6 @@ import {
 } from "../shared/utils/toast";
 import { formatTime, attachmentLabel } from "../shared/utils/format";
 import UserAvatar, {
-  avatarRefreshVersions,
   profileAssetUrl,
 } from "../shared/ui/UserAvatar";
 import useSlidingPill from "../shared/ui/useSlidingPill";
@@ -89,8 +91,7 @@ import MediaAttachmentsView from "../shared/ui/MediaAttachmentsView";
 import UiIcon from "../shared/ui/UiIcon";
 import NearbyRadar from "../features/discover/components/NearbyRadar";
 import CommunitySuggestions from "../features/discover/components/CommunitySuggestions";
-import PostComposer from "../features/feed/components/PostComposer";
-import FeedPostCard from "../features/feed/components/FeedPostCard";
+import { createPostComposerPresenter } from "../features/feed/components/createPostComposerPresenter";
 import ReactionParticipantsDialog from "../shared/ui/ReactionParticipantsDialog";
 import SharedPostLinkPicker from "../features/chat/components/SharedPostLinkPicker";
 import MessageForwardPicker from "../features/chat/components/MessageForwardPicker";
@@ -130,7 +131,6 @@ import ProfileEditorPage from "../features/profile/components/ProfileEditorPage"
 import SettingsWorkspace from "../features/settings/components/SettingsWorkspace";
 import SocialFeedComposer from "../features/feed/components/SocialFeedComposer";
 import SocialFeedSidebar from "../features/feed/components/SocialFeedSidebar";
-import SocialFeedStories from "../features/feed/components/SocialFeedStories";
 import StoryComposer from "../features/feed/components/StoryComposer";
 import { parsePostExtras, composePostContent } from "../features/feed/utils/postExtras";
 import CommunicationHub from "../features/chat/components/CommunicationHub";
@@ -148,7 +148,6 @@ import PrivacyControls from "../features/profile/components/PrivacyControls";
 import AccountSessionsPanel from "../features/auth/components/AccountSessionsPanel";
 import BlockedUsersPanel from "../features/contacts/components/BlockedUsersPanel";
 import {
-  FormEvent,
   Fragment,
   lazy,
   Suspense,
@@ -164,11 +163,12 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
-  FeedDiscussion,
   FeedText,
   type FeedComment,
   type DiscussionDraft,
 } from "../features/feed/components/FeedDiscussion";
+import { createFeedDiscussionPresenter } from "../features/feed/components/createFeedDiscussionPresenter";
+import { createFeedPostListPresenter } from "../features/feed/components/createFeedPostListPresenter";
 import FeedModeration from "../features/feed/components/FeedModeration";
 import GroupCreator from "../features/chat/components/GroupCreator";
 import {
@@ -195,12 +195,7 @@ import {
   X,
   Download,
 } from "lucide-react";
-import {
-  IncomingMessageSound,
-  MESSAGE_SOUND_SETTING_KEY,
-  persistMessageSoundEnabled,
-  readMessageSoundEnabled,
-} from "../features/notifications/lib/incomingSound";
+
 import {
   createSessionClient,
   type Session,
@@ -231,10 +226,8 @@ import {
 const ProfileQr = lazy(() => import("../features/profile/components/ProfileQr"));
 import {
   defaultBundle,
-  loadAppLocalePreference,
   loadCachedBundle,
   resolveEffectiveLocale,
-  saveAppLocalePreference,
   saveCachedBundle,
   translateUI,
   UI_BUNDLE_VERSION,
@@ -249,7 +242,6 @@ import {
 import {
   disableOneSignalPush,
   enableOneSignalPush,
-  getOneSignalPushState,
   isPushDisabled,
   setupOneSignal,
   type PushState,
@@ -267,12 +259,11 @@ import AppShellCallManager from "./layouts/AppShellCallManager";
 
 import { notificationRouteTarget } from "./navigation/notificationDeepLink";
 import { inviteRouteTarget } from "./navigation/inviteDeepLink";
-import HeaderSearch from "./header/HeaderSearch";
+import AppQuickSearch from "./header/AppQuickSearch";
 import HeaderActions from "./header/HeaderActions";
 import HeaderAccount from "./header/HeaderAccount";
 import HeaderTitle from "./header/HeaderTitle";
 import HeaderFeedTabs from "./header/HeaderFeedTabs";
-import { searchLabels } from "./header/headerContext";
 import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
 import FeedPostDetail from "../features/feed/components/FeedPostDetail";
@@ -284,11 +275,11 @@ import ProfileOverviewSection from "../features/profile/components/ProfileOvervi
 import ProfileSection from "../features/profile/components/ProfileSection";
 import ChatSection from "../features/chat/components/ChatSection";
 import StoryDraftOverlay from "../features/feed/components/StoryDraftOverlay";
-import FeedComposerOverlay from "../features/feed/components/FeedComposerOverlay";
-import ProfileComposerOverlay from "../features/profile/components/ProfileComposerOverlay";
+import AppComposerOverlays from "./layouts/AppComposerOverlays";
 import { useNearbyDiscovery } from "../features/discover/hooks/useNearbyDiscovery";
 import { useAccountSessions } from "../features/auth/hooks/useAccountSessions";
 import { usePushSettings } from "../features/notifications/hooks/usePushSettings";
+import { requestPushConfig } from "../features/notifications/api/push";
 import { useMessageClipboard } from "../features/chat/hooks/useMessageClipboard";
 import { useMediaUploads } from "../features/chat/hooks/useMediaUploads";
 import { useContactActions } from "../features/contacts/hooks/useContactActions";
@@ -306,6 +297,7 @@ import { useDirectConversations } from "../features/chat/hooks/useDirectConversa
 import { useGroupCreation } from "../features/chat/hooks/useGroupCreation";
 import { usePostSync } from "../features/feed/hooks/usePostSync";
 import { usePostMentions } from "../features/feed/hooks/usePostMentions";
+import { createOpenMentionPost } from "../features/feed/utils/createOpenMentionPost";
 import { usePostRouteLoad } from "../features/feed/hooks/usePostRouteLoad";
 import { useProfilePosts } from "../features/feed/hooks/useProfilePosts";
 import { usePostComposer } from "../features/feed/hooks/usePostComposer";
@@ -319,9 +311,13 @@ import { savePrivacySettings } from "../features/settings/api/privacy";
 import { useNearbyState } from "../features/discover/hooks/useNearbyState";
 import { useBlockedUsers } from "../features/contacts/hooks/useBlockedUsers";
 import { useFriendSearch } from "../features/contacts/hooks/useFriendSearch";
+import { useFriendSearchRequests } from "../features/contacts/hooks/useFriendSearchRequests";
 import { useAppLocaleState } from "../features/i18n/hooks/useAppLocaleState";
+import { useLanguagePreferencesLifecycle } from "../features/i18n/hooks/useLanguagePreferencesLifecycle";
 import { useTranslationState } from "../features/chat/hooks/useTranslationState";
 import { useProfileState } from "../features/profile/hooks/useProfileState";
+import { profileEditDraft } from "../features/profile/utils/profileEditDraft";
+import { useProfileIdentityActions } from "../features/profile/hooks/useProfileIdentityActions";
 import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
 import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
 import { useScopedState } from "../shared/hooks/useScopedState";
@@ -381,16 +377,7 @@ export default function AuthedApp({
   const routeLocation = useLocation();
   const isSearchResultsRoute = routeLocation.pathname === "/search";
   const navigate = useNavigate();
-  useEffect(() => {
-    const openSearch = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        navigate(ROUTE.search);
-      }
-    };
-    window.addEventListener("keydown", openSearch);
-    return () => window.removeEventListener("keydown", openSearch);
-  }, [navigate]);
+  useGlobalSearchShortcut();
   const {
     tab, setTab, contactsScreen, setContactsScreen,
     desktopProfileSettings, setDesktopProfileSettings,
@@ -471,25 +458,21 @@ export default function AuthedApp({
   } = useChatOutboxState({ session, sessionRef, actionLocksRef: actionLocks, setNotice });
   const preferenceRevision = useRef(0);
   const advancePreferenceRevision = useCallback(() => ++preferenceRevision.current, []);
-  function openVisitor(username: string, returnTo?: string) {
-    if (username === sessionRef.current?.user.username) {
+  const { openVisitor, setFriendPreview } = createVisitorNavigation({
+    getOwnUsername: () => sessionRef.current?.user.username,
+    openOwnProfile: () => {
       setTab("profile");
       setProfileTimelineOpen(true);
-      return;
-    }
-    openVisitorProfile(username, returnTo);
-  }
-  function setFriendPreview(friend: FriendSearchResult | null) {
-    if (friend) openVisitor(friend.username);
-    else if (visitorUsername) closeVisitor();
-  }
+    },
+    openVisitorProfile,
+    closeVisitor,
+    visitorUsername,
+  });
   const [qrOpen, setQrOpen] = useState<"mine" | "scan" | null>(null);
   const [desktopSectionState, setDesktopSection] = useState<
     "groups" | "calls" | null
   >(null);
-  const desktopSection = (routeLocation.pathname === ROUTE.calls || routeLocation.pathname.startsWith(`${ROUTE.calls}/`))
-    ? "calls"
-    : desktopSectionState === "calls" ? null : desktopSectionState;
+  const desktopSection = resolveDesktopSection(routeLocation.pathname, desktopSectionState);
   const [translationSettingsConversationId, setTranslationSettingsConversationId] = useState<number | null>(null);
   const [translationSettingsActiveConversationId, setTranslationSettingsActiveConversationId] = useState(activeConversationId);
   // Reset dialog state during render when the selected conversation changes,
@@ -535,19 +518,16 @@ export default function AuthedApp({
     apiFetch,
     onReadError: message => setNotice(message, "error"),
   });
-  // Only entering the feed or changing the search resets its scroll position.
-  useLayoutEffect(() => {
-    if (tab !== "feed") return;
-    if (feedViewRef.current) feedViewRef.current.scrollTop = 0;
-    setSearchHasScrolled(false);
-  }, [tab, globalSearch.trim().toLocaleLowerCase("vi-VN")]);
-  // Router location is authoritative for browser Back/Forward on post URLs.
-  useEffect(() => {
-    if (tab !== "feed") return;
-    const routeId = feedPostIdFromPath(routeLocation.pathname);
-    const id = routeId ?? Number(new URLSearchParams(routeLocation.search).get("post"));
-    setActivePostId(Number.isSafeInteger(id) && id > 0 ? id : null);
-  }, [tab, routeLocation.pathname, routeLocation.search]);
+  useFeedRouteLifecycle({
+    tab,
+    searchKey: globalSearch.trim().toLocaleLowerCase('vi-VN'),
+    feedViewRef,
+    setSearchHasScrolled,
+    pathname: routeLocation.pathname,
+    search: routeLocation.search,
+    getPostIdFromPath: feedPostIdFromPath,
+    setActivePostId,
+  });
   const [mediaUploading, setMediaUploading] = useState<
     "chat" | "feed" | "story" | "profile" | null
   >(null);
@@ -581,33 +561,7 @@ export default function AuthedApp({
   const [pushConfigured, setPushConfigured] = useState(false);
   const [pushAppId, setPushAppId] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [messageSoundEnabled, setMessageSoundEnabled] = useState(
-    readMessageSoundEnabled,
-  );
-  const messageSoundEnabledRef = useLatest(messageSoundEnabled);
-  const messageSound = useRef<IncomingMessageSound | null>(null);
-  if (!messageSound.current) messageSound.current = new IncomingMessageSound();
-  useEffect(() => {
-    // Browsers permit sound only after an interaction. Warm up Web Audio on a
-    // real user gesture, without playing a notification just for opening SocCO.
-    const unlockAudio = () => {
-      if (messageSoundEnabledRef.current) messageSound.current?.unlock();
-    };
-    const syncPreference = (event: StorageEvent) => {
-      if (event.key !== MESSAGE_SOUND_SETTING_KEY && event.key !== null) return;
-      const enabled = readMessageSoundEnabled();
-      messageSoundEnabledRef.current = enabled;
-      setMessageSoundEnabled(enabled);
-    };
-    window.addEventListener("pointerdown", unlockAudio, { passive: true });
-    window.addEventListener("keydown", unlockAudio);
-    window.addEventListener("storage", syncPreference);
-    return () => {
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
-      window.removeEventListener("storage", syncPreference);
-    };
-  }, [messageSoundEnabledRef]);
+  const { messageSoundEnabled, setMessageSoundEnabled, messageSoundEnabledRef, messageSound } = useMessageSoundPreference();
   const [pushBusy, setPushBusy] = useState(false);
   const [pushInitFailed, setPushInitFailed] = useState(false);
   const [pushPrompt, setPushPrompt] = useState(false);
@@ -767,68 +721,25 @@ export default function AuthedApp({
     enabled: tab === "feed" && feedFilter === "following",
     request: apiFetch,
   });
-  const feedSearchActive = tab === "feed" && globalSearch.trim().length > 0;
-  const postSearch = usePostSearch({
-    query: globalSearch,
-    scope: feedFilter,
-    enabled: tab === "feed",
-    sessionId: session?.sessionId,
-    request: apiFetch,
-  });
-  // The selected Feed view must not flash an empty state while its first page loads.
-  const feedInitialLoading = feedSearchActive
-    ? postSearch.loading
-    : feedFilter === "following"
-      ? followingFeed.loading
-      : feedFilter === "saved"
-        ? !savedPostsLoaded && !savedPagingError
-        : false;
-  const feedLoadingMore = feedSearchActive
-    ? postSearch.loadingMore
-    : feedFilter === "saved"
-      ? savedPostsBusy
-      : feedFilter === "following"
-        ? followingFeed.loadingMore
-        : postsLoadingMore;
-  const feedPagingError = feedSearchActive
-    ? Boolean(postSearch.error)
-    : feedFilter === "saved"
-      ? savedPagingError
-      : feedFilter === "following"
-        ? Boolean(followingFeed.error)
-        : postsPagingError;
-  const savedPostsLoader = useLatest(loadSavedPosts);
-  useEffect(() => {
-    if (tab !== "feed" || !session?.sessionId || feedSearchActive) return;
-    if (feedFilter === "saved") {
-      void savedPostsLoader.current();
-      return;
-    }
-    // Warm the first saved page after giving the visible feed a head start.
-    const timer = window.setTimeout(() => void savedPostsLoader.current(), 350);
-    return () => window.clearTimeout(timer);
-  }, [tab, feedFilter, feedSearchActive, session?.sessionId, savedPostsLoader]);
-  const feedInfiniteScrollRef = useFeedInfiniteScroll({
-    enabled: tab === "feed" && (!feedSearchActive || searchHasScrolled),
-    hasMore: feedSearchActive
-      ? postSearch.hasMore
-      : feedFilter === "saved"
-        ? hasMoreSavedPosts
-        : feedFilter === "following"
-          ? followingFeed.hasMore
-          : hasMorePosts,
-    loading:
-      (feedSearchActive && postSearch.loading) ||
-      (feedFilter === "following" && followingFeed.loading) ||
-      feedLoadingMore,
-    error: feedPagingError,
-    onLoadMore: () => {
-      if (feedSearchActive) void postSearch.loadMore();
-      else if (feedFilter === "saved") void loadSavedPosts(true);
-      else if (feedFilter === "following") void followingFeed.loadMore();
-      else void loadMorePosts();
-    },
-  });
+  const { feedSearchActive, postSearch, feedInitialLoading, feedLoadingMore, feedPagingError, feedInfiniteScrollRef } =
+    useFeedPagingOrchestration({
+      tab,
+      sessionId: session?.sessionId,
+      globalSearch,
+      feedFilter,
+      request: apiFetch,
+      followingFeed,
+      savedPostsLoaded,
+      savedPagingError,
+      savedPostsBusy,
+      postsLoadingMore,
+      postsPagingError,
+      searchHasScrolled,
+      hasMoreSavedPosts,
+      hasMorePosts,
+      loadSavedPosts,
+      loadMorePosts,
+    });
 
   const {
     messages,
@@ -1139,151 +1050,26 @@ export default function AuthedApp({
   });
 
 
-  async function loadProfileMedia() {
-    if (!session?.token) return;
-    const sessionId = session.sessionId;
-    const response = await apiFetch("/api/profile");
-    if (!response.ok) return;
-    const profile = (await response.json()) as ProfileMediaState;
-    if (sessionRef.current?.sessionId !== sessionId) return;
-    avatarRefreshVersions.set(profile.username, profile.updatedAt);
-    setProfileMedia(profile);
-    setProfileDisplayNameDraft(profile.displayName);
-    setProfileUsernameDraft(profile.username);
-    setProfileBioDraft(profile.bio ?? "");
-    setProfileCityDraft(profile.city ?? "");
-    setProfilePublicDetailsDraft({ workplace: profile.workplace ?? "", school: profile.school ?? "" });
-  }
-
-  async function saveProfileIdentity(event: FormEvent) {
-    event.preventDefault();
-    if (!session || profileSaving) return;
-
-    const displayName = profileDisplayNameDraft.trim();
-    const username = profileUsernameDraft.trim().toLowerCase();
-    const bio = profileBioDraft.trim();
-    const city = profileCityDraft.trim();
-    const workplace = profilePublicDetailsDraft.workplace.trim();
-    const school = profilePublicDetailsDraft.school.trim();
-    if (!displayName || !username) {
-      setNotice("Tên hiển thị và username không được để trống.", "error");
-      return;
-    }
-
-    setProfileSaving(true);
-    try {
-      const response = await apiFetch("/api/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName, username, bio, city, workplace, school }),
-      });
-      const result = (await response.json().catch(() => null)) as
-        | (ProfileUpdateResponse & { error?: string })
-        | null;
-      if (sessionRef.current?.sessionId !== session.sessionId) return;
-      if (!response.ok || !result?.token) {
-        throw new Error(
-          result?.error || "Không cập nhật được thông tin cá nhân.",
-        );
-      }
-
-      const previousUsername = session.user.username;
-      avatarRefreshVersions.delete(previousUsername);
-      avatarRefreshVersions.set(result.username, result.updatedAt);
-      setProfileMedia({
-        username: result.username,
-        displayName: result.displayName,
-        bio: result.bio ?? "",
-        city: result.city ?? "",
-        workplace: result.workplace ?? "",
-        school: result.school ?? "",
-        avatarSet: result.avatarSet,
-        coverSet: result.coverSet,
-        updatedAt: result.updatedAt,
-      });
-      setProfileDisplayNameDraft(result.displayName);
-      setProfileUsernameDraft(result.username);
-      setProfileBioDraft(result.bio ?? "");
-      setProfileCityDraft(result.city ?? "");
-      setProfilePublicDetailsDraft({ workplace: result.workplace ?? "", school: result.school ?? "" });
-
-      const nextSession: Session = {
-        ...sessionRef.current,
-        token: result.token,
-        user: {
-          ...session.user,
-          username: result.username,
-          displayName: result.displayName,
-        },
-      };
-      saveSession(nextSession);
-      setNotice("Đã lưu thông tin hồ sơ.", "success");
-      if (isProfileDesktop) setProfileEditorOpen(false);
-    } catch (error) {
-      if (sessionRef.current?.sessionId === session.sessionId)
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : "Không cập nhật được thông tin cá nhân.",
-          "error",
-        );
-    } finally {
-      if (sessionRef.current?.sessionId === session.sessionId)
-        setProfileSaving(false);
-    }
-  }
-
-  async function updateProfileImage(kind: "avatar" | "cover", file?: File | null) {
-    if (!session || profileBusy) return false;
-    if (file === undefined) return false;
-    if (file && !file.type.toLowerCase().startsWith("image/")) {
-      setNotice("Chỉ hỗ trợ file ảnh cho ảnh đại diện và ảnh bìa.", "error");
-      return false;
-    }
-    setProfileBusy(kind);
-    try {
-      const [attachment] = file ? await uploadMediaFiles([file], "profile") : [null];
-      if (sessionRef.current?.sessionId !== session.sessionId) return false;
-      if (file && !attachment) throw new Error("Không upload được ảnh.");
-
-      const response = await apiFetch("/api/profile/media", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind,
-          attachment: attachment ? attachmentRequestBody(attachment) : null,
-        }),
-      });
-      const result = (await response.json().catch(() => null)) as
-        | (ProfileMediaState & { error?: string })
-        | null;
-      if (sessionRef.current?.sessionId !== session.sessionId) return false;
-      if (!response.ok || !result) {
-        throw new Error(result?.error || "Không cập nhật được ảnh hồ sơ.");
-      }
-      avatarRefreshVersions.set(result.username, result.updatedAt);
-      setProfileMedia(result);
-      setNotice(
-        kind === "avatar"
-          ? "Đã cập nhật ảnh đại diện."
-          : "Đã cập nhật ảnh bìa.",
-        "success",
-      );
-      return true;
-    } catch (error) {
-      if (sessionRef.current?.sessionId === session.sessionId)
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : "Không cập nhật được ảnh hồ sơ.",
-          "error",
-        );
-      return false;
-    } finally {
-      if (sessionRef.current?.sessionId === session.sessionId)
-        setProfileBusy(null);
-    }
-  }
+  const { loadProfileMedia, saveProfileIdentity, updateProfileImage } = useProfileIdentityActions({
+    session, sessionRef, apiFetch, saveSession, setNotice, uploadMediaFiles,
+    isProfileDesktop,
+    profileSaving,
+    profileBusy,
+    profileDisplayNameDraft,
+    profileUsernameDraft,
+    profileBioDraft,
+    profileCityDraft,
+    profilePublicDetailsDraft,
+    setProfileMedia,
+    setProfileDisplayNameDraft,
+    setProfileUsernameDraft,
+    setProfileBioDraft,
+    setProfileCityDraft,
+    setProfilePublicDetailsDraft,
+    setProfileSaving,
+    setProfileBusy,
+    setProfileEditorOpen,
+  });
 
   useEffect(() => {
     if (!session?.token) {
@@ -1293,119 +1079,15 @@ export default function AuthedApp({
     void loadProfileMedia().catch(() => setStatus("Đang kết nối lại..."));
   }, [session?.sessionId]);
 
-  useEffect(() => {
-    if (!session?.token) {
-      setTranslationPreferencesLoaded(false);
-      setAutoTranslate(true);
-      setTargetLanguage("en");
-      setAppLocale(loadAppLocalePreference());
-      return;
-    }
-
-    let cancelled = false;
-    const revision = preferenceRevision.current;
-    const preferenceKey = `chatnet-preferences:${session.user.id}`;
-    try {
-      const cached = JSON.parse(
-        localStorage.getItem(preferenceKey) || "null",
-      ) as {
-        targetLanguage?: string;
-        autoTranslate?: boolean;
-        appLocale?: string;
-      } | null;
-      if (
-        cached?.targetLanguage &&
-        isSupportedLanguageCode(cached.targetLanguage)
-      ) {
-        setTargetLanguage(cached.targetLanguage);
-      }
-      if (typeof cached?.autoTranslate === "boolean")
-        setAutoTranslate(cached.autoTranslate);
-      if (
-        cached?.appLocale === "auto" ||
-        (cached?.appLocale && isSupportedLanguageCode(cached.appLocale))
-      ) {
-        setAppLocale(cached.appLocale);
-        saveAppLocalePreference(cached.appLocale);
-      }
-    } catch {
-      // Ignore malformed local fallback; server preferences remain authoritative.
-    }
-
-    apiFetch("/api/preferences")
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<{
-          targetLanguage: string;
-          autoTranslate: boolean;
-          appLocale: string;
-        }>;
-      })
-      .then(async (preferences) => {
-        if (cancelled || revision !== preferenceRevision.current || !preferences) return;
-        const nextTarget = isSupportedLanguageCode(preferences.targetLanguage)
-          ? preferences.targetLanguage
-          : "en";
-        const nextAuto = preferences.autoTranslate !== false;
-        const serverLocale =
-          preferences.appLocale === "auto" ||
-          isSupportedLanguageCode(preferences.appLocale)
-            ? preferences.appLocale
-            : "auto";
-
-        // First-use language selection takes priority over the default server value.
-        const setupLocaleKey = `chatnet-setup-locale:${session.user.id}`;
-        const pendingLocale = localStorage.getItem(setupLocaleKey);
-        const validPendingLocale = pendingLocale === "auto" ||
-          (pendingLocale !== null && isSupportedLanguageCode(pendingLocale));
-        const nextLocale = validPendingLocale && pendingLocale ? pendingLocale : serverLocale;
-
-        if (validPendingLocale && pendingLocale) {
-          if (serverLocale === pendingLocale) {
-            localStorage.removeItem(setupLocaleKey);
-          } else {
-            try {
-              const response = await apiFetch("/api/preferences", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  targetLanguage: nextTarget,
-                  autoTranslate: nextAuto,
-                  appLocale: nextLocale,
-                }),
-              });
-              if (!response.ok) throw new Error("preference sync failed");
-              localStorage.removeItem(setupLocaleKey);
-            } catch {
-              // Keep the chosen language locally and retry sync on the next login.
-            }
-          }
-        }
-        if (cancelled || revision !== preferenceRevision.current) return;
-        setTargetLanguage(nextTarget);
-        setAutoTranslate(nextAuto);
-        setAppLocale(nextLocale);
-        saveAppLocalePreference(nextLocale);
-        localStorage.setItem(
-          preferenceKey,
-          JSON.stringify({
-            targetLanguage: nextTarget,
-            autoTranslate: nextAuto,
-            appLocale: nextLocale,
-          }),
-        );
-      })
-      .catch(() => {
-        // Keep local/device preferences when the network is unavailable.
-      })
-      .finally(() => {
-        if (!cancelled) setTranslationPreferencesLoaded(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.sessionId]);
+  useLanguagePreferencesLifecycle({
+    session,
+    apiFetch,
+    preferenceRevision,
+    setTranslationPreferencesLoaded,
+    setAutoTranslate,
+    setTargetLanguage,
+    setAppLocale,
+  });
 
   useEffect(() => {
     document.documentElement.lang = effectiveAppLocale;
@@ -1505,7 +1187,7 @@ export default function AuthedApp({
 
     void (async () => {
       try {
-        const response = await apiFetch("/api/push/config");
+        const response = await requestPushConfig(apiFetch);
         if (!response.ok) {
           if (!cancelled) setPushConfigured(false);
           return;
@@ -1599,11 +1281,7 @@ export default function AuthedApp({
   const contactSearchResults = mergeContactSearchResults(friendQuery, friends, friendRequests, friendResults);
 
   function friendRelationship(userId: number) {
-    if (friends.some((item) => item.id === userId)) return "accepted" as const;
-    const request = friendRequests.find((item) => item.id === userId);
-    if (request?.direction === "incoming") return "incoming" as const;
-    if (request?.direction === "outgoing") return "outgoing" as const;
-    return "none" as const;
+    return selectFriendRelationship(userId, friends, friendRequests);
   }
 
   useEffect(() => {
@@ -1630,75 +1308,19 @@ export default function AuthedApp({
     }
   }, [session?.token, tab, desktopSection, newChatMode, chatFriend?.id]);
 
-  const friendSearchSessionRef = useRef(session?.sessionId);
-  useEffect(() => {
-    const friendSurfaceOpen = newChatMode === "friends" || tab === "contacts";
-    if (friendSearchSessionRef.current !== session?.sessionId) {
-      friendSearchSessionRef.current = session?.sessionId;
-      setFriendResults([]);
-    }
-    if (!session?.token) {
-      setFriendResults([]);
-      setFriendSearching(false);
-      setFriendSearchError(false);
-      return;
-    }
-    if (!friendSurfaceOpen) return;
-
-    const controller = new AbortController();
-    const query = friendQuery.trim();
-    // Keep the last successful suggestions visible while refreshing in the background.
-    if (query) setFriendResults([]);
-    setFriendSearching(true);
-    setFriendSearchError(false);
-
-    if (!query) {
-      apiFetch("/api/users/suggestions", { signal: controller.signal })
-        .then(async (response) => {
-          if (!response.ok) throw new Error("Cannot load suggestions");
-          return response.json() as Promise<FriendSearchResult[]>;
-        })
-        .then((items) => {
-          if (!controller.signal.aborted) setFriendResults(items);
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) {
-            // Retain last-known suggestions on a transient network failure.
-            setFriendSearchError(true);
-          }
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setFriendSearching(false);
-        });
-
-      return () => controller.abort();
-    }
-
-    const timer = window.setTimeout(async () => {
-      setFriendSearching(true);
-      try {
-        const response = await apiFetch(
-          `/api/users/search?q=${encodeURIComponent(query)}`,
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error("Cannot search users");
-        const items = (await response.json()) as FriendSearchResult[];
-        if (!controller.signal.aborted) setFriendResults(items);
-      } catch {
-        if (!controller.signal.aborted) {
-          setFriendResults([]);
-          setFriendSearchError(true);
-        }
-      } finally {
-        if (!controller.signal.aborted) setFriendSearching(false);
-      }
-    }, 250);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [friendQuery, friendSearchRetry, newChatMode, session?.token, session?.sessionId, tab, desktopSection]);
+  useFriendSearchRequests({
+    sessionToken: session?.token,
+    sessionId: session?.sessionId,
+    tab,
+    desktopSection,
+    newChatMode,
+    friendQuery,
+    friendSearchRetry,
+    apiFetch,
+    setFriendResults,
+    setFriendSearching,
+    setFriendSearchError,
+  });
 
   function purgeConversation(id: number) {
     revokeConversationMembership(id, {
@@ -1726,114 +1348,93 @@ export default function AuthedApp({
     requestAnimationFrame(() => profileIdentityRef.current?.focus());
   }
 
-  function logout(revoke = true, clearStorage = true) {
-    if (visitorUsername) navigate(TAB_PATH.chat, { replace: true });
-    const current = sessionRef.current;
-    const currentToken = current?.token;
-    ++nearbyRequest.current;
-    setNearbyUsers([]);
-    setNearbyUntil(0);
-    setNearbyBusy(false);
-    setNearbyScanning(false);
-    if (currentToken) {
-      void fetch(`${API}/api/users/nearby`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${currentToken}` },
-        keepalive: true,
-      }).catch(() => undefined);
-    }
-    void getOneSignalPushState()
-      .then(async (state) => {
-        if (!currentToken || !state.subscriptionId) return;
-        await fetch(`${API}/api/push/subscription`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${currentToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ subscriptionId: state.subscriptionId }),
-        });
-      })
-      .catch(() => undefined);
-
-    chatOutboxRef.current = [];
-    setChatOutbox([]);
-    chatOutboxSession.current = "";
-    sendingClientIDs.current = new Set<string>();
-    pendingSend.current = null;
-    endSession(revoke, clearStorage, setNotice);
-    setConversations([]);
-    resetConversationMembershipOnLogout({
-      revokedConversationIds, membershipSnapshot,
-      membershipSyncSequence, membershipEventSequence,
-    });
-    setHasMoreConversations(false);
-    setConversationLoadingMore(false);
-    conversationOffset.current = 0;
-    conversationPagingBusy.current = false;
-    setActiveConversationId(null);
-    setMessages([]);
-    setHasMoreMessages(false);
-    setMessagesLoadingMore(false);
-    messagesPagingBusy.current = false;
-    setOutgoingMessage(null);
-    setPendingPost(null);
-    setPendingComments({});
-    setLikePreviews({});
-    setReactionPreviews({});
-    actionLocks.current = new Set<string>();
-    pendingRequests.current.clear();
-    mutationRequests.current.clear();
-    messageReceipts.current.clear();
-    messageSound.current?.clearSeen();
-    ++preferenceRevision.current;
-    sendingRef.current = false;
-    setMessageSending(false);
-    setGroupBusy(false);
-    setProfileBusy(null);
-    setProfileSaving(false);
-    setStoryBusy(false);
-    mediaUploadAbort.current?.abort();
-    mediaUploadAbort.current = null;
-    setMediaUploading(null);
-    setMediaUploadProgress(null);
-    friendActionRef.current.clear();
-    setFriendBusyIds(new Set());
-    setFriendActionBusy(null);
-    ++feedRevision.current;
-    setMessageDrafts({});
-    setFriends([]);
-    setFriendRequests([]);
-    setFriendMenuId(null);
-    setFriendPreview(null);
-    setPostText("");
-    setPostTaggedFriends([]);
-    setPostFeelingId("");
-    setEditingPost(null);
-    setPostEditBusy(false);
-    draftBeforeEdit.current = null;
-    setPosts([]);
-    resetSavedPosts();
-    ++profileLoadSequence.current;
-    profilePagingBusy.current = false;
-    setProfileTimelineOpen(false);
-    setProfileComposerOpen(false);
-    setFeedComposerOpen(false);
-    setProfileEditorOpen(false);
-    setPostSubmitError("");
-    setProfilePosts([]);
-    setProfileHasMore(false);
-    setProfilePostsBusy(false);
-    setProfilePostsError("");
-    setHasMorePosts(false);
-    setPostsLoadingMore(false);
-    postsPagingBusy.current = false;
-    setStories([]);
-    setActiveStoryId(null);
-    setCommentEditors({});
-    setPostAttachments([]);
-    setTranslations({});
-  }
+  const logout = createAppLogout({
+    setNearbyUsers,
+    setNearbyUntil,
+    setNearbyBusy,
+    setNearbyScanning,
+    setChatOutbox,
+    setConversations,
+    setHasMoreConversations,
+    setConversationLoadingMore,
+    setActiveConversationId,
+    setMessages,
+    setHasMoreMessages,
+    setMessagesLoadingMore,
+    setOutgoingMessage,
+    setPendingPost,
+    setPendingComments,
+    setLikePreviews,
+    setReactionPreviews,
+    setMessageSending,
+    setGroupBusy,
+    setProfileBusy,
+    setProfileSaving,
+    setStoryBusy,
+    setMediaUploading,
+    setMediaUploadProgress,
+    setFriendBusyIds,
+    setFriendActionBusy,
+    setMessageDrafts,
+    setFriends,
+    setFriendRequests,
+    setFriendMenuId,
+    setFriendPreview,
+    setPostText,
+    setPostTaggedFriends,
+    setPostFeelingId,
+    setEditingPost,
+    setPostEditBusy,
+    setPosts,
+    setProfileTimelineOpen,
+    setProfileComposerOpen,
+    setFeedComposerOpen,
+    setProfileEditorOpen,
+    setPostSubmitError,
+    setProfilePosts,
+    setProfileHasMore,
+    setProfilePostsBusy,
+    setProfilePostsError,
+    setHasMorePosts,
+    setPostsLoadingMore,
+    setStories,
+    setActiveStoryId,
+    setCommentEditors,
+    setPostAttachments,
+    setTranslations,
+    nearbyRequest,
+    chatOutboxRef,
+    chatOutboxSession,
+    sendingClientIDs,
+    pendingSend,
+    conversationOffset,
+    conversationPagingBusy,
+    messagesPagingBusy,
+    actionLocks,
+    pendingRequests,
+    mutationRequests,
+    messageReceipts,
+    messageSound,
+    preferenceRevision,
+    sendingRef,
+    mediaUploadAbort,
+    friendActionRef,
+    feedRevision,
+    draftBeforeEdit,
+    profileLoadSequence,
+    profilePagingBusy,
+    postsPagingBusy,
+    visitorUsername,
+    navigate,
+    sessionRef,
+    endSession,
+    setNotice,
+    resetSavedPosts,
+    revokedConversationIds,
+    membershipSnapshot,
+    membershipSyncSequence,
+    membershipEventSequence,
+  });
   const { fetchAccountSessions, revokeAccountSessions } = useAccountSessions({ logout, managedSessions, sessionRef, sessionsBusy, setManagedSessions, setNotice, setSessionsBusy, setSessionsError, setSessionsOpen });
 
 
@@ -1985,7 +1586,14 @@ export default function AuthedApp({
   const { sendMessage } = useMessageSender({ activeConversationId, canSend, channelDraftKey, draft, messageAttachments, messageText, ownSendScrollConversationRef: ownSendScrollConversation, replyingTo, retryQueuedChatMessages, selectedChannelId, sendingRef, setChannelDrafts, setChatOnline, setMessageDrafts, setReplyingTo, updateChatOutbox });
   const { editOwnMessage, recallOwnMessage } = useMessageEdits({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReplyingTo, setTranslations });
   const { toggleReaction } = useMessageReactions({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReactionPreviews });
-  const { createStory, deleteStory, replyToStory, reportStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraft, storyBusy, updateChatOutbox, uploadMediaFiles });
+  const { cancelStory, createStory, deleteStory, pendingStory, replyToStory, reportStory, retryStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraft, storyBusy, updateChatOutbox, uploadMediaFiles });
+  const pendingStoryView: PendingStoryView | null = pendingStory
+    ? {
+        status: pendingStory.status,
+        percent: mediaUploading === "story" && mediaUploadProgress?.total ? Math.min(99, Math.round((mediaUploadProgress.loaded / mediaUploadProgress.total) * 100)) : null,
+        kind: "text" in pendingStory.input ? "Chữ" : pendingStory.input.file.type.startsWith("video/") ? "Video" : "Ảnh",
+      }
+    : null;
 
   const { actOnFriend, blockContact, changePersonalContact, declineFriendRequest, loadBlockedUsers, openBlockedFriendConversation, removeAcceptedFriend, reportContact, unblockContact } = useContactActions({ apiFetch, blockedBusy, contactMetadata, conversations, friendActionRef, friendBusyIds, friendRelationship, friends, friendSyncRequest, openDirectByUsername, refreshConversations, refreshFriendConnections, session, sessionRef, setActiveConversationId: selectRoutedConversation, setBlockedBusy, setBlockedError, setBlockedOpen, setBlockedUsers, setContactMetadata, setConversations, setDesktopSection, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendPreview, setFriendRequests, setFriendResults, setFriends, setNotice, setTab });
 
@@ -2054,57 +1662,42 @@ export default function AuthedApp({
     setTranslations,
     setTranslationOriginals,
   });
-  async function openMentionPost(mention: PostMentionNotification) {
-    if (!isCurrentMentionVisit()) return;
-    try {
-      const response = await apiFetch(`/api/posts/${mention.postId}`, { cache: "no-store" });
-      if (!response.ok) throw new Error(response.status === 404
-        ? "Bài viết không tồn tại hoặc bạn không còn quyền xem."
-        : "Không mở được bài viết.");
-      const post = await response.json() as Post;
-      if (!isCurrentMentionVisit()) return;
-      setPosts(current => [post, ...current.filter(item => item.id !== post.id)]);
-      setFeedCommunitiesOpen(false);
-      setTab("feed");
-      navigate(feedPostPath(post.id), { state: { postId: post.id } });
-      void readPostMention(mention.id);
-    } catch (error) {
-      if (isCurrentMentionVisit())
-        setNotice(error instanceof Error ? error.message : "Không mở được bài viết.", "error");
-    }
-  }
+  const openMentionPost = createOpenMentionPost({
+    isCurrentMentionVisit,
+    apiFetch,
+    setPosts,
+    setFeedCommunitiesOpen,
+    setTab,
+    navigate,
+    readPostMention,
+    setNotice,
+    feedPostPath,
+  });
 
-  const switchTab = (nextTab: Tab) => {
-    setDesktopSection(null);
-    setFeedCommunitiesOpen(false);
-    setTranslationSettingsConversationId(null);
-
-    if (nextTab === "profile") {
-      // setTab owns the URL; a second Settings setter would push /profile twice.
-      setProfileEditorOpen(false);
-    }
-    if (activePostId !== null) {
-      setActivePostId(null);
-      if (new URLSearchParams(routeLocation.search).has("post")) {
-        navigate({ pathname: routeLocation.pathname, search: "" }, { replace: true });
-      }
-    }
-     setQuickSearchOpen(false);
-    setTab(nextTab);
-    setQuickCreateOpen(false);
-    setGlobalSearch("");
-    if (nextTab !== "chat") setActiveConversationId(null);
-    if (nextTab !== "contacts") setFriendQuery("");
-  };
+  const switchTab = createAppTabSwitch({
+    setDesktopSection,
+    setFeedCommunitiesOpen,
+    setTranslationSettingsConversationId,
+    setProfileEditorOpen,
+    activePostId,
+    setActivePostId,
+    routeLocation,
+    navigate,
+    setQuickSearchOpen,
+    setTab,
+    setQuickCreateOpen,
+    setGlobalSearch,
+    setActiveConversationId,
+    setFriendQuery,
+  });
 
   const discardDesktopProfileEdits = () => {
-    setProfileDisplayNameDraft(
-      profileMedia?.displayName ?? session.user.displayName ?? name,
-    );
-    setProfileUsernameDraft(profileMedia?.username ?? name);
-    setProfileBioDraft(profileMedia?.bio ?? "");
-    setProfileCityDraft(profileMedia?.city ?? "");
-    setProfilePublicDetailsDraft({ workplace: profileMedia?.workplace ?? "", school: profileMedia?.school ?? "" });
+    const draft = profileEditDraft(profileMedia, name, session.user.displayName);
+    setProfileDisplayNameDraft(draft.displayName);
+    setProfileUsernameDraft(draft.username);
+    setProfileBioDraft(draft.bio);
+    setProfileCityDraft(draft.city);
+    setProfilePublicDetailsDraft(draft.publicDetails);
     setProfileEditorOpen(false);
   };
 
@@ -2134,100 +1727,69 @@ export default function AuthedApp({
       changePrivacy={changePrivacy}
     />
   );
-  const postComposer = (
-    <PostComposer
-      name={name}
-      createPost={createPost}
-      editingPost={editingPost}
-      editBusy={postEditBusy}
-      postComposerRef={postComposerRef}
-      postBackground={postBackground}
-      pendingPost={pendingPost}
-      postText={postText}
-      setPostText={setPostText}
-      taggableFriends={friends.filter((friend) => friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther)}
-      taggedFriends={postTaggedFriends}
-      setTaggedFriends={setPostTaggedFriends}
-      feelingId={postFeelingId}
-      setFeelingId={setPostFeelingId}
-      feedAlbumInputRef={feedAlbumInputRef}
-      addFeedFiles={addFeedFiles}
-      postAttachments={postAttachments}
-      setPostAttachments={setPostAttachments}
-      mediaUploading={mediaUploading}
-      showPostBackgrounds={showPostBackgrounds}
-      setShowPostBackgrounds={setShowPostBackgrounds}
-      postVisibility={postVisibility}
-      setPostVisibility={setPostVisibility}
-      setPostBackground={setPostBackground}
-      popup={profileComposerOpen || feedComposerOpen}
-      displayName={
-        profileMedia?.displayName || session.user.displayName || name
-      }
-      submitError={postSubmitError}
-      checkInOpen={feedCheckInOpen}
-      checkInLocation={feedCheckInLocation}
-      setCheckInLocation={setFeedCheckInLocation}
-      setCheckInOpen={setFeedCheckInOpen}
-      uploadProgress={mediaUploadProgress}
-      cancelUpload={() => mediaUploadAbort.current?.abort()}
-    />
-  );
+  const postComposer = createPostComposerPresenter({
+    props: {
+      name,
+      createPost,
+      editingPost,
+      editBusy: postEditBusy,
+      postComposerRef,
+      postBackground,
+      pendingPost,
+      postText,
+      setPostText,
+      taggedFriends: postTaggedFriends,
+      setTaggedFriends: setPostTaggedFriends,
+      feelingId: postFeelingId,
+      setFeelingId: setPostFeelingId,
+      feedAlbumInputRef,
+      addFeedFiles,
+      postAttachments,
+      setPostAttachments,
+      mediaUploading,
+      showPostBackgrounds,
+      setShowPostBackgrounds,
+      postVisibility,
+      setPostVisibility,
+      setPostBackground,
+      submitError: postSubmitError,
+      checkInOpen: feedCheckInOpen,
+      checkInLocation: feedCheckInLocation,
+      setCheckInLocation: setFeedCheckInLocation,
+      setCheckInOpen: setFeedCheckInOpen,
+      uploadProgress: mediaUploadProgress,
+    },
+    friends,
+    profileDisplayName: profileMedia?.displayName,
+    sessionDisplayName: session.user.displayName,
+    profileComposerOpen,
+    feedComposerOpen,
+    cancelUpload: () => mediaUploadAbort.current?.abort(),
+  });
 
   function openPostDetailProfile(username: string) {
     const returnTo = closeFeedPostDetails();
     openVisitor(username, returnTo);
   }
 
-  const renderPostDiscussion = (discussionPost: Post, onAuthorOpen: (username: string) => void, showComments = true) => (
-    <FeedDiscussion
-      key={discussionPost.id}
-      variant="post-page"
-      showComments={showComments}
-      sortOrder={commentSortOrder}
-      pending={pendingComments[discussionPost.id]}
-      comments={discussionPost.comments || []}
-      editor={
-        commentEditors[discussionPost.id] || {
-          replyTo: null,
-          drafts: {},
-        }
-      }
-      updateEditor={(editor) => {
-        if (
-          sessionRef.current?.sessionId === session.sessionId
-        ) {
-          setCommentEditors((current) => ({
-            ...current,
-            [discussionPost.id]: editor,
-          }));
-        }
-      }}
-      api={API}
-      token={session.token}
-      target={
-        translationPreferencesLoaded ? targetLanguage : ""
-      }
-      submit={(content, parentId) =>
-        addComment(discussionPost, content, parentId)
-      }
-      currentUser={name}
-      onEdit={(commentId, content) =>
-        manageFeedComment(
-          discussionPost,
-          commentId,
-          "PATCH",
-          content,
-        )
-      }
-      onDelete={(commentId) =>
-        manageFeedComment(discussionPost, commentId, "DELETE")
-      }
-      onReport={reportFeedComment}
-      onLike={(commentId, liked) => setCommentLike(discussionPost, commentId, liked)}
-      onAuthorOpen={onAuthorOpen}
-    />
-  );
+  const renderPostDiscussion = createFeedDiscussionPresenter({
+    sessionId: session.sessionId,
+    getCurrentSessionId: () => sessionRef.current?.sessionId,
+    sortOrder: commentSortOrder,
+    pendingComments,
+    commentEditors,
+    setCommentEditors,
+    api: API,
+    token: session.token,
+    targetLanguage,
+    translationPreferencesLoaded,
+    currentUser: name,
+    addComment,
+    manageFeedComment,
+    reportFeedComment,
+    setCommentLike,
+  });
+
 
   function refreshAfterRepost() {
     void refreshPosts();
@@ -2236,35 +1798,30 @@ export default function AuthedApp({
     if (tab === 'profile') void loadProfilePosts(false, true);
   }
 
-  const renderPosts = (items: Post[], showSave = false, onOpen: (id: number) => void = openFeedPostDetails) =>
-    items.map((post) => (
-      <FeedPostCard
-        key={post.id}
-        post={post}
-        name={name}
-        onAuthorOpen={openVisitor}
-        ownDisplayName={
-          profileMedia?.displayName || session.user.displayName || name
-        }
-        apiFetch={apiFetch}
-        syncFeedPost={syncFeedPost}
-        removeFeedPost={removeFeedPost}
-        setNotice={setNotice}
-        token={session.token}
-        translationPreferencesLoaded={translationPreferencesLoaded}
-        targetLanguage={targetLanguage}
-        setActivePostId={onOpen}
-        discussion={renderPostDiscussion(post, openVisitor, false)}
-        showSave={showSave}
-        likePreviews={likePreviews}
-        like={like}
-        onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
-        onEditPost={openEditPost}
-        onRepostChanged={refreshAfterRepost}
-        onShareToChat={setPostLinkToSend}
-        taggedNames={friendTaggedNames}
-      />
-    ));
+  const renderPosts = createFeedPostListPresenter({
+    card: {
+      name,
+      onAuthorOpen: openVisitor,
+      ownDisplayName: profileMedia?.displayName || session.user.displayName || name,
+      apiFetch,
+      syncFeedPost,
+      removeFeedPost,
+      setNotice,
+      token: session.token,
+      translationPreferencesLoaded,
+      targetLanguage,
+      likePreviews,
+      like,
+      onEditPost: openEditPost,
+      onRepostChanged: refreshAfterRepost,
+      onShareToChat: setPostLinkToSend,
+      taggedNames: friendTaggedNames,
+    },
+    onOpenPost: openFeedPostDetails,
+    renderDiscussion: post => renderPostDiscussion(post, openVisitor, false),
+    onReactionUsers: post => setReactionTarget({ kind: 'post', id: post.id, reactions: post.reactions }),
+  });
+
 
   const contactsContent = (
     <ContactsView
@@ -2316,62 +1873,31 @@ export default function AuthedApp({
     tab === "feed" ||
     tab === "notifications" ||
     (tab === "chat" && desktopSection === "groups");
-  const searchText = searchLabels(tab);
   const quickSearchControl = (
-    <HeaderSearch
+    <AppQuickSearch
+      tab={tab}
       anchorRef={quickSearchAnchorRef}
-      icon={<UiIcon name="search" size={27} />}
-      value={tab === "contacts" ? friendQuery : globalSearch}
-      maxLength={tab === "feed" || tab === "chat" ? 120 : undefined}
-      placeholder={searchText.placeholder}
-      ariaLabel={searchText.ariaLabel}
-      expanded={tab === "chat" && conversationSearching && quickSearchOpen}
-      controls={tab === "chat" ? "chat-quick-search-results" : undefined}
-      onKeyDown={(event) => {
-        if (tab === "discover" && event.key === "Enter") {
-          event.preventDefault();
-          navigate('/search?q=' + encodeURIComponent(globalSearch.trim()))
-        }
-        if (tab === "chat" && event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          setQuickSearchOpen(false);
-        }
-      }}
-      onFocus={() => {
-        if (tab === "chat" && globalSearch.trim()) setQuickSearchOpen(true);
-      }}
-      onClick={() => {
-        if (tab === "chat" && globalSearch.trim()) setQuickSearchOpen(true);
-      }}
-      onChange={(value) => {
-        if (tab === "contacts") setFriendQuery(value);
-        else if (tab === "profile") {
-          setGlobalSearch(value);
-          setTab("feed");
-        } else {
-          setGlobalSearch(value);
-          if (tab === "chat") setQuickSearchOpen(Boolean(value.trim()));
-        }
-      }}
-      results={
-        tab === "chat" && conversationSearching && quickSearchOpen ? (
-          <ChatQuickSearch
-            results={chatQuickSearch.results}
-            loading={chatQuickSearch.loading}
-            error={chatQuickSearch.error}
-            onRetry={chatQuickSearch.retry}
-            onClose={() => setQuickSearchOpen(false)}
-            onContact={openChatQuickContact}
-            onHit={openChatQuickHit}
-          />
-        ) : undefined
-      }
+      friendQuery={friendQuery}
+      globalSearch={globalSearch}
+      conversationSearching={conversationSearching}
+      quickSearchOpen={quickSearchOpen}
+      setQuickSearchOpen={setQuickSearchOpen}
+      setFriendQuery={setFriendQuery}
+      setGlobalSearch={setGlobalSearch}
+      setTab={setTab}
+      navigate={navigate}
+      results={chatQuickSearch.results}
+      loading={chatQuickSearch.loading}
+      error={chatQuickSearch.error}
+      retry={chatQuickSearch.retry}
+      onContact={openChatQuickContact}
+      onHit={openChatQuickHit}
     />
   );
 
   return (
     <AppLayout
+      activeTab={tab}
       className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""} ${tab === "chat" && !desktopSection && translationSettingsConversationId === null ? "chat-rail-screen" : ""}`}
       sidebar={
         <AppSidebar
@@ -2480,10 +2006,10 @@ export default function AuthedApp({
         </>
       }
       // The search page owns its search field and title, so the shared header is omitted there.
-      header={isSearchResultsRoute || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
+      header={isSearchResultsRoute || tab === "market" || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
         <AppHeader
-          mobileSearchActions={tab === "feed"}
-          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" || tab === "market" ? "mobile-section-header" : ""}`}
+          mobileSearchActions={tab !== "chat"}
+          className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" ? "mobile-section-header" : ""}`}
           start={
             <HeaderTitle
               tab={tab}
@@ -3127,6 +2653,9 @@ export default function AuthedApp({
           setStoryDraft={setStoryDraft}
           stories={stories}
           storyBusy={storyBusy}
+          pendingStory={pendingStoryView}
+          retryStory={retryStory}
+          cancelStory={cancelStory}
           switchTab={switchTab}
         />),
         afterFeed: <>
@@ -3180,6 +2709,7 @@ export default function AuthedApp({
           deleteStory={deleteStory}
           name={name}
           openVisitor={openVisitor}
+          openMessages={() => switchTab("chat")}
           replyToStory={replyToStory}
           reportStory={reportStory}
           setActiveStoryId={setActiveStoryId}
@@ -3202,32 +2732,22 @@ export default function AuthedApp({
           storyDraft={storyDraft}
         />
         )}
-      {feedComposerOpen && tab === "feed" && (
-          <FeedComposerOverlay
-          editingPost={editingPost}
-          mediaUploading={mediaUploading}
-          pendingPost={pendingPost}
-          postComposer={postComposer}
-          postEditBusy={postEditBusy}
-          restoreDraftAfterEdit={restoreDraftAfterEdit}
-          setFeedCheckInOpen={setFeedCheckInOpen}
-          setFeedComposerOpen={setFeedComposerOpen}
-        />
-        )}
-      {profileComposerOpen &&
-        tab === "profile" &&
-        (profileTimelineOpen || desktopProfileOverview) && (
-          <ProfileComposerOverlay
-          editingPost={editingPost}
-          mediaUploading={mediaUploading}
-          pendingPost={pendingPost}
-          postComposer={postComposer}
-          postEditBusy={postEditBusy}
-          restoreDraftAfterEdit={restoreDraftAfterEdit}
-          setProfileComposerOpen={setProfileComposerOpen}
-          setFeedCheckInOpen={setFeedCheckInOpen}
-        />
-        )}
+      <AppComposerOverlays
+        tab={tab}
+        feedComposerOpen={feedComposerOpen}
+        profileComposerOpen={profileComposerOpen}
+        profileTimelineOpen={profileTimelineOpen}
+        desktopProfileOverview={desktopProfileOverview}
+        editingPost={editingPost}
+        mediaUploading={mediaUploading}
+        pendingPost={pendingPost}
+        postComposer={postComposer}
+        postEditBusy={postEditBusy}
+        restoreDraftAfterEdit={restoreDraftAfterEdit}
+        setFeedCheckInOpen={setFeedCheckInOpen}
+        setFeedComposerOpen={setFeedComposerOpen}
+        setProfileComposerOpen={setProfileComposerOpen}
+      />
       {postLinkToSend && (
         <SharedPostLinkPicker
           key={session.sessionId + ":" + postLinkToSend}
@@ -3289,9 +2809,17 @@ export default function AuthedApp({
       <BottomNavigation
         tab={tab}
         t={t}
-        switchTab={switchTab}
+        switchTab={(nextTab) => {
+          switchTab(nextTab);
+          if (nextTab === "profile") setProfileTimelineOpen(true);
+        }}
         unreadTotal={unreadTotal}
-        pushEnabled={pushEnabled}
+        username={session.user.username}
+        displayName={
+          profileMedia?.displayName ||
+          session.user.displayName ||
+          session.user.username
+        }
       />
     </AppLayout>
   );

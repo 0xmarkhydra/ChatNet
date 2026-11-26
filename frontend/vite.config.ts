@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
@@ -7,7 +7,10 @@ import { randomUUID } from 'node:crypto'
 import { chatCopyImageDevProxy } from './dev/chatCopyImageProxy'
 import { chatMediaUploadDevProxy } from './dev/chatMediaUploadProxy'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), ['VITE_GIPHY_API_KEY', 'API_KEY_GIPHY'])
+  return {
+  define: { 'import.meta.env.VITE_GIPHY_API_KEY': JSON.stringify(process.env.VITE_GIPHY_API_KEY || process.env.API_KEY_GIPHY || env.VITE_GIPHY_API_KEY || env.API_KEY_GIPHY || '') },
   // Ignore nested frontend/output snapshots when discovering app dependencies.
   resolve: { dedupe: ['react', 'react-dom'], alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   optimizeDeps: { entries: ['index.html'] },
@@ -39,4 +42,5 @@ export default defineConfig({
       '/api': { target: process.env.VITE_API_URL, changeOrigin: true },
     } : undefined,
   },
+  }
 })

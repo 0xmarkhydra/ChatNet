@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { MapPin, Smile, UserRound, UsersRound } from 'lucide-react'
 import { POST_FEELINGS } from '../utils/feelings'
+import { checkInDisplayName, checkInMapQuery } from '../utils/publicPostLocation'
 import type { PostExtras } from '../utils/postExtras'
 import '../styles/post-extras.css'
 
@@ -28,11 +29,11 @@ export default function PostExtrasView({ extras, onAuthorOpen, taggedNames }: Pr
           <Smile size={14} aria-hidden="true" /> Người đăng đang chia sẻ cảm xúc {feeling.label}.
         </span>}
       </span>}
-      {extras.location && <span className="feed-post-extra-item">
-        <MapPin size={15} aria-hidden="true" />
-        tại <a className="feed-post-extra-link" aria-label={`Xem địa điểm ${extras.location} trên bản đồ`}
-          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(extras.location)}`}
-          target="_blank" rel="noopener noreferrer"><strong>{extras.location}</strong></a>
+      {extras.location && <span className="feed-post-extra-item min-w-0 max-w-full">
+        <MapPin size={15} className="shrink-0 text-neutral-500" aria-hidden="true" />
+        <a className="feed-post-extra-link min-w-0 rounded-md bg-neutral-100 px-1.5 py-0.5 text-neutral-600! hover:bg-neutral-200 [overflow-wrap:anywhere]" aria-label={`Xem địa điểm ${checkInDisplayName(extras.location)} trên bản đồ`}
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(checkInMapQuery(extras.location))}`}
+          target="_blank" rel="noopener noreferrer"><strong>{checkInDisplayName(extras.location)}</strong></a>
       </span>}
       {extras.taggedUsernames.length > 0 && <span className="feed-post-extra-item">
         <UsersRound size={15} aria-hidden="true" />

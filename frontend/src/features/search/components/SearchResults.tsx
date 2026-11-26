@@ -52,10 +52,12 @@ const noJoins: Record<number, JoinState> = {}
 
 const snippet = (text: string, length = 220) => text.length > length ? text.slice(0, length).trimEnd() + '…' : text
 
-function Section({ title, count, onSeeAll, bare, children }: { title: string; count?: number; onSeeAll?: () => void; bare?: boolean; children: ReactNode }) {
+function Section({ title, count, onSeeAll, bare, solo, children }: { title: string; count?: number; onSeeAll?: () => void; bare?: boolean; solo?: boolean; children: ReactNode }) {
+  // A lone section with nothing to expand needs no visible title: the type tab and the search field already say what is shown.
+  const hideTitle = solo && !onSeeAll
   return (
     <section className={bare ? 'grid gap-ui-3' : card} aria-label={title}>
-      <header className={cardHead}>
+      <header className={hideTitle ? 'sr-only' : cardHead}>
         <h2 className={cardTitle}>{title}</h2>
         {onSeeAll && <button type="button" className={link} onClick={onSeeAll}>Xem tất cả{count ? ' (' + count + ')' : ''}</button>}
       </header>
@@ -89,6 +91,13 @@ export default function SearchResults(props: SearchResultsProps) {
   if (show('communities')) sources.push(communities)
   if (show('products')) sources.push(products)
   const settled = sources.every(source => !source.loading)
+  const sectionShown = {
+    people: show('people') && (!all || people.items.length > 0 || people.loading || Boolean(people.error)),
+    posts: show('posts') && (!all || posts.items.length > 0 || posts.hasMore || posts.loading || Boolean(posts.error)),
+    communities: show('communities') && (!all || communities.items.length > 0 || communities.loading || Boolean(communities.error)),
+    products: show('products') && (!all || products.items.length > 0 || products.loading || Boolean(products.error)),
+  }
+  const solo = Object.values(sectionShown).filter(Boolean).length === 1
   const noResults = settled && !(show('posts') && posts.hasMore) && sources.every(source => !source.error && source.items.length === 0)
 
   async function join(community: CommunityResult) {
@@ -147,8 +156,8 @@ export default function SearchResults(props: SearchResultsProps) {
 
   return (
     <div className="flex flex-col gap-ui-3">
-      {show('people') && (!all || people.items.length > 0 || people.loading || Boolean(people.error)) && (
-        <Section title="Mọi người" count={people.items.length} onSeeAll={all && people.items.length > PREVIEW.people ? () => props.onType('people') : undefined}>
+      {sectionShown.people && (
+        <Section solo={solo} title="Mọi người" count={people.items.length} onSeeAll={all && people.items.length > PREVIEW.people ? () => props.onType('people') : undefined}>
           <Status source={people} label="người dùng" />
           <ul className="m-0 grid list-none p-0">
             {limit(people.items, 'people').map(person => (
@@ -168,8 +177,8 @@ export default function SearchResults(props: SearchResultsProps) {
         </Section>
       )}
 
-      {show('posts') && (!all || posts.items.length > 0 || posts.hasMore || posts.loading || Boolean(posts.error)) && (
-        <Section bare title="Bài viết" onSeeAll={all && (posts.items.length > PREVIEW.posts || posts.hasMore) ? () => props.onType('posts') : undefined}>
+      {sectionShown.posts && (
+        <Section bare solo={solo} title="Bài viết" onSeeAll={all && (posts.items.length > PREVIEW.posts || posts.hasMore) ? () => props.onType('posts') : undefined}>
           <Status source={posts} label="bài viết" hasMore={posts.hasMore} />
           <div className="feed zalo-feed grid gap-ui-3">{props.renderPosts(limit(posts.items, 'posts'), openPost)}</div>
           {!all && posts.hasMore && (
@@ -180,8 +189,8 @@ export default function SearchResults(props: SearchResultsProps) {
         </Section>
       )}
 
-      {show('communities') && (!all || communities.items.length > 0 || communities.loading || Boolean(communities.error)) && (
-        <Section title="Cộng đồng" count={communities.items.length}
+      {sectionShown.communities && (
+        <Section solo={solo} title="Cộng đồng" count={communities.items.length}
           onSeeAll={all && communities.items.length > PREVIEW.communities ? () => props.onType('communities') : undefined}>
           <Status source={communities} label="cộng đồng" />
           <ul className="m-0 grid list-none p-0">
@@ -210,8 +219,8 @@ export default function SearchResults(props: SearchResultsProps) {
         </Section>
       )}
 
-      {show('products') && (!all || products.items.length > 0 || products.loading || Boolean(products.error)) && (
-        <Section title="Sản phẩm" count={products.items.length} onSeeAll={all && products.items.length > PREVIEW.products ? () => props.onType('products') : undefined}>
+      {sectionShown.products && (
+        <Section solo={solo} title="Sản phẩm" count={products.items.length} onSeeAll={all && products.items.length > PREVIEW.products ? () => props.onType('products') : undefined}>
           <Status source={products} label="sản phẩm" />
           <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-ui-3 p-0">
             {limit(products.items, 'products').map(product => (

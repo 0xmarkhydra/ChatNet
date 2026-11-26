@@ -2,13 +2,15 @@ import { useId, useLayoutEffect, useRef } from 'react'
 import type { Tab } from '../../shared/types/navigation'
 import { formatUnreadMessageDescription, type UI_MESSAGES } from '../../features/i18n/lib/i18n'
 import UiIcon from '../../shared/ui/UiIcon'
+import UserAvatar from '../../shared/ui/UserAvatar'
 
 type Props = {
   tab: Tab
   t: (key: keyof typeof UI_MESSAGES) => string
   switchTab: (tab: Tab) => void
   unreadTotal: number
-  pushEnabled: boolean
+  username: string
+  displayName: string
 }
 
 export default function BottomNavigation({
@@ -16,7 +18,8 @@ export default function BottomNavigation({
   t,
   switchTab,
   unreadTotal,
-  pushEnabled,
+  username,
+  displayName,
 }: Props) {
   const activeKey = tab
   const unreadDescriptionId = useId()
@@ -155,7 +158,9 @@ export default function BottomNavigation({
         ref={tab === 'profile' ? activeButtonRef : undefined}
         onClick={() => switchTab('profile')}
       >
-        <span className="nav-icon"><UiIcon name="profile" size={25} />{!pushEnabled && <b>!</b>}</span>
+        <span className="nav-icon">
+          <span aria-hidden="true"><UserAvatar username={username} name={displayName} className="bottom-nav-avatar" /></span>
+        </span>
         <span className="nav-label">{t('nav.profile')}</span>
       </button>
       {unreadTotal > 0 && (

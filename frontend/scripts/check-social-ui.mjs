@@ -1274,7 +1274,7 @@ try {
   }
   if (!postHeaderOnly) {
   const socialGeometry = await page.evaluate(() => {
-    const keys = ['.social-feed-stories-card', '.social-feed-launcher', '.social-feed-filter-bar',
+    const keys = ['[data-slot="story-tray"]', '.social-feed-launcher', '.social-feed-filter-bar',
       '.social-feed-center .feed-post-card', '.social-feed-suggestions']
     return Object.fromEntries(keys.map(key => {
       const rect = document.querySelector(key)?.getBoundingClientRect()
@@ -1283,7 +1283,7 @@ try {
   })
   const approx = (actual, expected, tolerance=8) => Math.abs(actual - expected) <= tolerance
   for (const [selector, y] of [
-    ['.social-feed-stories-card', 107],
+    ['[data-slot="story-tray"]', 107],
     ['.social-feed-launcher', 286],
     ['.social-feed-suggestions', 107],
   ]) {
@@ -1301,7 +1301,7 @@ try {
     && firstPostRect.y <= filterRect.y + filterRect.height + 24,
     'Compact single-row composer must retain spacing without overlapping feed: '
       + JSON.stringify(socialGeometry))
-  const centerRect = socialGeometry['.social-feed-stories-card']
+  const centerRect = socialGeometry['[data-slot="story-tray"]']
   const sideRect = socialGeometry['.social-feed-suggestions']
   const centerWidth = centerRect.width
   const sideWidth = sideRect.width
@@ -1339,7 +1339,7 @@ try {
   await page.setViewportSize({ width: 1586, height: 992 })
   if (postHeaderOnly) {
     const inspectRail = () => page.evaluate(() => {
-      const selectors = ['.social-feed', '.social-feed-grid', '.social-feed-side', '.social-feed-search-card', '.social-feed-suggestions', '.social-feed-stories-card']
+      const selectors = ['.social-feed', '.social-feed-grid', '.social-feed-side', '.social-feed-search-card', '.social-feed-suggestions', '[data-slot="story-tray"]']
       return Object.fromEntries(selectors.map(key => {
         const element = document.querySelector(key)
         const rect = element?.getBoundingClientRect()
@@ -1355,7 +1355,7 @@ try {
     await page.waitForTimeout(200)
     const after = await inspectRail()
     assert(before['.social-feed'].scrollTop === 0 && after['.social-feed'].scrollTop >= 200
-      && Math.abs(before['.social-feed-side'].top - before['.social-feed-stories-card'].top) <= 2
+      && Math.abs(before['.social-feed-side'].top - before['[data-slot="story-tray"]'].top) <= 2
       && Math.abs(after['.social-feed-side'].top - before['.social-feed-side'].top) <= 2,
       'Right rail must start aligned with feed and stay pinned while feed scrolls: ' + JSON.stringify({before, after}))
     const searchInput = page.locator('.social-feed-search-field input')
@@ -2150,9 +2150,6 @@ try {
     server.kill()
     process.exit(0)
   }
-  await feed.locator('.social-feed-stories-card').getByRole('button', { name: 'Xem tất cả' }).click()
-  assert(await feed.locator('.social-feed-story-strip.is-expanded').count() === 1, 'View all stories must expand story row')
-  await feed.getByRole('button', { name: 'Thu gọn' }).click()
   await feed.locator('.social-feed-suggestion-row').first().waitFor({ state: 'visible' })
   mkdirSync('output/playwright/layout', { recursive: true })
   await page.screenshot({ path: 'output/playwright/layout/social-feed-desktop-1586.png' })

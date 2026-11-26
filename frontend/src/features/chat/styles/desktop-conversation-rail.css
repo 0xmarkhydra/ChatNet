@@ -37,7 +37,7 @@
     box-sizing: border-box;
     border: 1px solid #e5eaf4;
     border-radius: 18px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 5px 19px rgba(34,59,96,.06);
     overflow: hidden;
   }
@@ -195,7 +195,7 @@
     transition: transform .24s cubic-bezier(.2,.85,.24,1), opacity .2s, visibility .2s;
     border: 1px solid #e3eaf5;
     border-radius: 18px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 10px 8px 32px rgba(35,56,91,.17);
   }
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.avatar-rail-list-open > .conversation-sidebar.social-chat-list {
@@ -260,7 +260,7 @@
     min-height: 0;
     border: 1px solid #e4ebf6;
     border-radius: 18px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 9px 5px 25px rgba(34,57,92,.10);
     visibility: hidden;
     pointer-events: none;

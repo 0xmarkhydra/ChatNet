@@ -14,18 +14,34 @@ export function submitStory(request: ApiRequest, input: TextStoryInput | { attac
   })
 }
 
-export type StoryLiker = { id: number; username: string; displayName: string }
-export type StoryLikesResult = { liked: boolean } | { likers: StoryLiker[]; next?: number }
-
-export async function readStoryLikes(request: ApiRequest, storyId: number, signal: AbortSignal, after?: number) {
-  const response = await request(`/api/stories/${storyId}/like${after ? `?after=${after}` : ''}`, { signal, cache: 'no-store' })
-  if (!response.ok) throw new Error('Không thể tải lượt thả tim.')
-  return await response.json() as StoryLikesResult
+/** The signed-in viewer's own reaction to someone else's story. */
+export async function readStoryReaction(request: ApiRequest, storyId: number, signal: AbortSignal) {
+  const response = await request(`/api/stories/${storyId}/like`, { signal, cache: 'no-store' })
+  if (!response.ok) throw new Error('Không thể tải cảm xúc.')
+  return await response.json() as { liked: boolean; emoji?: string }
 }
 
-export async function changeStoryLike(request: ApiRequest, storyId: number, liked: boolean) {
-  const response = await request(`/api/stories/${storyId}/like`, { method: liked ? 'PUT' : 'DELETE' })
-  if (!response.ok) throw new Error('Không thể cập nhật lượt thả tim.')
+export async function recordStoryView(request: ApiRequest, storyId: number) {
+  const response = await request(`/api/stories/${storyId}/view`, { method: 'PUT' })
+  if (!response.ok) throw new Error('Không thể ghi lượt xem.')
+}
+
+export type StoryViewerEntry = { id: number; username: string; displayName: string; emoji?: string; viewedAt?: string }
+export type StoryViewsResult = { total: number; viewers: StoryViewerEntry[]; next?: number }
+
+/** Owner only: everyone who viewed or reacted. */
+export async function readStoryViews(request: ApiRequest, storyId: number, signal: AbortSignal, after?: number) {
+  const response = await request(`/api/stories/${storyId}/views${after ? `?after=${after}` : ''}`, { signal, cache: 'no-store' })
+  if (!response.ok) throw new Error('Không thể tải lượt xem.')
+  return await response.json() as StoryViewsResult
+}
+
+/** An empty emoji removes the reaction. */
+export async function changeStoryReaction(request: ApiRequest, storyId: number, emoji: string) {
+  const response = await request(`/api/stories/${storyId}/like`, emoji
+    ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emoji }) }
+    : { method: 'DELETE' })
+  if (!response.ok) throw new Error('Không thể cập nhật cảm xúc.')
 }
 
 export type StoryHighlight = import('../types').Story & { title: string }

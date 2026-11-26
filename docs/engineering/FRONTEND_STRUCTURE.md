@@ -88,7 +88,6 @@ src/
 | `features/chat/mediaUpload.ts` | `features/chat/lib/mediaUpload.ts` |
 | `features/chat/messageClipboard.ts` | `features/chat/lib/messageClipboard.ts` |
 | `features/chat/chat-file-transfer.css` | `features/chat/styles/chat-file-transfer.css` |
-| `chat-message-search.css` | `features/chat/styles/chat-message-search.css` |
 | `features/chat/chat-pins.css` | `features/chat/styles/chat-pins.css` |
 | `features/chat/chat-quick-search.css` | `features/chat/styles/chat-quick-search.css` |
 | `styles/chat-translation-settings.css` | `features/chat/styles/chat-translation-settings.css` |

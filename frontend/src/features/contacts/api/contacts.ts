@@ -1,16 +1,24 @@
 /** API request boundary for Contacts. Consumers own response parsing and UI state. */
 export type ContactsRequest = (path: string, init?: RequestInit) => Promise<Response>
 
-export function listFriends(request: ContactsRequest) {
-  return request('/api/friends', { cache: 'no-store' })
+export function listFriends(request: ContactsRequest, signal?: AbortSignal) {
+  return request('/api/friends', { cache: 'no-store', signal })
 }
 
-export function listFriendRequests(request: ContactsRequest) {
-  return request('/api/friends/requests', { cache: 'no-store' })
+export function listFriendRequests(request: ContactsRequest, signal?: AbortSignal) {
+  return request('/api/friends/requests', { cache: 'no-store', signal })
 }
 
-export function listContactMetadata(request: ContactsRequest) {
-  return request('/api/contacts', { cache: 'no-store' })
+export function listContactMetadata(request: ContactsRequest, signal?: AbortSignal) {
+  return request('/api/contacts', { cache: 'no-store', signal })
+}
+
+export function listFriendSuggestions(request: ContactsRequest, signal: AbortSignal) {
+  return request('/api/users/suggestions', { signal })
+}
+
+export function searchFriendUsers(request: ContactsRequest, query: string, signal: AbortSignal) {
+  return request(`/api/users/search?q=${encodeURIComponent(query)}`, { signal })
 }
 
 export function updateContactMetadata(
@@ -57,8 +65,8 @@ export function unblockUser(request: ContactsRequest, id: number) {
   return request(`/api/users/${id}/block`, { method: 'DELETE' })
 }
 
-export function listBlockedUsers(request: ContactsRequest) {
-  return request('/api/users/blocked')
+export function listBlockedUsers(request: ContactsRequest, signal?: AbortSignal) {
+  return request('/api/users/blocked', { signal })
 }
 
 export function reportUser(request: ContactsRequest, id: number, reason: string, details: string) {

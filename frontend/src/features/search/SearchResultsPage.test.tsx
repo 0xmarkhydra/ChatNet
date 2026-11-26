@@ -104,11 +104,11 @@ it('renders every result type from the real APIs and narrows by type and filter'
   expect(text).toContain('Sách thiết kế UI')
   expect(text).toContain('120.000 VND')
 
-  await view.click([...view.host.querySelectorAll('aside[aria-label="Tìm kiếm và bộ lọc"] button')].find(button => button.textContent === 'Mọi người'))
+  await view.click([...view.host.querySelectorAll('aside[aria-label="Bộ lọc tìm kiếm"] button')].find(button => button.textContent === 'Mọi người'))
   expect(view.route()).toBe('?q=thi%E1%BA%BFt&type=people')
   expect(view.host.textContent).toContain('Bob Trần')
 
-  await view.click(view.host.querySelector('aside[aria-label="Tìm kiếm và bộ lọc"] button[aria-expanded]') ?? undefined)
+  await view.click(view.host.querySelector('aside[aria-label="Bộ lọc tìm kiếm"] button[aria-expanded]') ?? undefined)
   await view.click(view.button('Đang hoạt động'))
   expect(view.route()).toContain('status=online')
   expect(view.host.textContent).not.toContain('Bob Trần')
@@ -166,7 +166,7 @@ it('ignores a late response from a previous query', async () => {
     return Promise.resolve(ok([]))
   }) as unknown as ApiRequest
   const view = await mount(request, '/search?q=first&type=people')
-  const input = view.host.querySelector('aside[aria-label="Tìm kiếm và bộ lọc"] input[type="search"]') as HTMLInputElement
+  const input = view.host.querySelector('header input[type="search"]') as HTMLInputElement
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'second')
     input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -193,20 +193,19 @@ it('keeps paging posts when the loaded page is filtered out', async () => {
   expect(view.button('Tải thêm bài viết')).toBeTruthy()
 })
 
-it('starts a scoped search from the home scope select', async () => {
+it('starts a search from the home field with the submit icon button', async () => {
   const view = await mount(routes(), '/search')
-  const select = view.host.querySelector('select[aria-label="Phạm vi tìm kiếm"]') as HTMLSelectElement
-  await act(async () => {
-    select.value = 'posts'
-    select.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+  expect(view.host.querySelector('select[aria-label="Phạm vi tìm kiếm"]')).toBeNull()
   const input = view.host.querySelector('input[type="search"]') as HTMLInputElement
+  const submit = view.host.querySelector('button[type="submit"][aria-label="Tìm kiếm"]') as HTMLButtonElement
+  expect(submit.disabled).toBe(true)
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'figma')
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
+  expect(submit.disabled).toBe(false)
   await act(async () => { input.form?.requestSubmit() })
-  expect(view.route()).toBe('?type=posts&q=figma')
+  expect(view.route()).toBe('?q=figma')
 })
 
 function type(input: HTMLInputElement, value: string) {

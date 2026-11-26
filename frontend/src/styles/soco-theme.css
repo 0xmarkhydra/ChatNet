@@ -66,8 +66,8 @@
   /* Layering for new UI; values match what shared/ui already used. Legacy layers (>= 1000) are migrated per feature. */
   --soco-z-raised: 1;
   --soco-z-dropdown: 20;
-  --soco-z-overlay: 100;
-  --soco-z-modal: 101;
+  --soco-z-overlay: 400;
+  --soco-z-modal: 401;
   --soco-motion-fast: 120ms;
   --soco-motion-normal: 200ms;
   --soco-motion-slow: 320ms;
@@ -449,17 +449,6 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
     radial-gradient(circle at 0% 100%, rgba(37,99,235,.12), transparent 42%),
     #f8faff;
 }
-.auth-copy { text-align: center; }
-.auth-copy h1, .auth-copy p { margin-inline: auto; }
-.auth-copy img { width: 76px; height: 76px; border-radius: 22px; box-shadow: 0 12px 28px rgba(37,99,235,.14); }
-.auth-copy h1 {
-  font-size: 38px;
-  font-weight: 850;
-  letter-spacing: -1.7px;
-  background: var(--soco-gradient);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.auth-copy p { color: #657491; }
 .auth-card {
   width: min(100%, 436px);
   justify-self: center;

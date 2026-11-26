@@ -4,11 +4,6 @@
 [data-story-background="teal"] { background-image: linear-gradient(155deg, #134e62, #11705d); }
 [data-story-background="sunset"] { background-image: linear-gradient(155deg, #8a350b, #9e2956); }
 
-.social-feed-story-cover.story-text-avatar {
-  display: grid;
-  place-items: center;
-}
-
 .story-screen-text {
   display: grid;
   box-sizing: border-box;

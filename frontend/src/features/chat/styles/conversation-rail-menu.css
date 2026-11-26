@@ -125,7 +125,7 @@
   border: 1px solid #dce5f4;
   border-radius: 15px;
   color: #263b55;
-  background: #fff;
+  background: var(--soco-surface);
   box-shadow: 0 14px 35px rgba(27,49,82,.17);
   overflow: auto;
   overscroll-behavior: contain;

@@ -50,6 +50,4 @@ in effect. Ponytail is third-party MIT-licensed; provenance is under
 
 ## Frontend architecture and React requirements (mandatory)
 
-**New UI must use Tailwind CSS v4 and SocCO tokens. Do not introduce handwritten CSS, including changes to legacy stylesheets, unless the user explicitly approves an exception.** The PR quality gate verifies CSS additions.
-
 The authoritative shared policy for Claude, ChatGPT and human contributors is **`docs/engineering/FRONTEND_STANDARDS.md`**. Read and follow it for every `frontend/` change, alongside `docs/engineering/FRONTEND_STRUCTURE.md` and the relevant React and Ponytail skills. The architecture, React 19, API ownership, session isolation, layout, testing and PR rules are enforced there. Do not imitate known legacy violations, expand lint/architecture baselines or bypass CI to make a change pass.

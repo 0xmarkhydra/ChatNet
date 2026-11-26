@@ -96,7 +96,7 @@ func TestStoryActionsIntegration(t *testing.T) {
 	call(1, "PUT", likePath, "", 204)
 	call(1, "PUT", likePath, "", 204)
 	call(0, "PUT", likePath, "", 404)
-	if got := string(call(1, "GET", likePath, "", 200)); strings.TrimSpace(got) != `{"liked":true}` {
+	if got := string(call(1, "GET", likePath, "", 200)); strings.TrimSpace(got) != `{"liked":true,"emoji":"❤️"}` {
 		t.Fatalf("liker state: %s", got)
 	}
 	if got := string(call(2, "GET", likePath, "", 200)); strings.TrimSpace(got) != `{"liked":false}` {
@@ -105,6 +105,12 @@ func TestStoryActionsIntegration(t *testing.T) {
 	var own struct{ Likers []storyLiker }
 	if err := json.Unmarshal(call(0, "GET", likePath, "", 200), &own); err != nil || len(own.Likers) != 1 || own.Likers[0].ID != users[1] {
 		t.Fatalf("owner likes: %+v, %v", own, err)
+	}
+	call(1, "PUT", likePath, `{"emoji":"😂"}`, 204)
+	call(1, "PUT", likePath, `{"emoji":"🔥"}`, 400)
+	call(1, "PUT", likePath, `{"emoji":"😮","extra":1}`, 400)
+	if err := json.Unmarshal(call(0, "GET", likePath, "", 200), &own); err != nil || len(own.Likers) != 1 || own.Likers[0].Emoji != "😂" {
+		t.Fatalf("changed reaction should replace the heart once: %+v, %v", own, err)
 	}
 	call(1, "DELETE", likePath, "", 204)
 	call(1, "DELETE", likePath, "", 204)

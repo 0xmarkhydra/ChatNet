@@ -88,6 +88,10 @@ export function checkTokenContract(theme, tailwind) {
   for (const name of tokenGroups.layers) requireToken(theme, `--soco-z-${name}:`, 'z-index layer token')
   requireToken(theme, 'outline: 3px solid var(--soco-focus-ring)', 'focus ring token usage')
   requireToken(theme, 'input:focus-visible:not([data-slot])', 'legacy focus ring opt-out for shared UI (data-slot)')
+  requireToken(tailwind, '@custom-variant app-desktop (@media (min-width: 761px))', 'app-desktop breakpoint variant')
+  requireToken(tailwind, '@custom-variant app-mobile (@media (max-width: 760px))', 'app-mobile breakpoint variant')
+  requireToken(tailwind, '@custom-variant app-wide (@media (min-width: 1121px))', 'app-wide breakpoint variant')
+  requireToken(tailwind, '@custom-variant app-full (@media (min-width: 1331px))', 'app-full breakpoint variant')
   requireToken(theme, '--soco-border-subtle:', 'subtle border token')
   requireToken(tailwind, '--color-border-subtle: var(--soco-border-subtle)', 'Tailwind subtle border mapping')
   if (!tailwind.includes('Preflight is intentionally disabled')) {

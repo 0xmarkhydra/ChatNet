@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, FileText, MapPin, Search, UsersRound } from 'lucide-react'
+import { ArrowRight, FileText, Lightbulb, MapPin, Search, UserPlus, UsersRound } from 'lucide-react'
 import { ErrorBoundary } from '../../../shared/ui/ErrorBoundary'
 import { AsyncSectionFallback } from '../../../shared/ui/AsyncSectionFallback'
 import type { DiscoverSectionProps } from '../types'
@@ -79,12 +79,31 @@ function ExplorePageContent(props: DiscoverSectionProps) {
     <button type="button" onClick={() => setTab('recent')}><MapPin size={18} aria-hidden="true" /> Quét người gần đây</button>
   </section>
 
-  return <main className="explore-page">
-    <h1 className="explore-visually-hidden">Khám phá</h1>
+  const tips = <section className="explore-tips" aria-labelledby="explore-tips-title">
+    <h2 id="explore-tips-title"><Lightbulb size={18} aria-hidden="true" /> Mẹo để kết nối</h2>
+    <ul>
+      <li>Hoàn thiện hồ sơ để người khác dễ nhận ra bạn.</li>
+      <li>Bật quét gần đây để gặp người ở quanh bạn.</li>
+      <li>Tham gia cộng đồng cùng sở thích để trò chuyện nhanh hơn.</li>
+    </ul>
+  </section>
+
+  const shortcuts: { title: string; desc: string; icon: typeof MapPin; onClick: () => void }[] = [
+    { title: 'Mọi người', desc: 'Gợi ý kết nối mới', icon: UserPlus, onClick: () => setTab('people') },
+    { title: 'Bài viết', desc: 'Bài viết công khai', icon: FileText, onClick: () => navigate('/search?type=posts') },
+    { title: 'Cộng đồng', desc: 'Nhóm cùng sở thích', icon: UsersRound, onClick: () => setTab('communities') },
+    { title: 'Gần đây', desc: 'Người ở gần bạn', icon: MapPin, onClick: () => setTab('recent') },
+  ]
+
+  // Keep navigation outside the scrolling pane on Web and PWA.
+  // It remains visible when the content scrolls or the global header collapses.
+  return <div className="explore-shell">
     <nav className="explore-tabs" aria-label="Danh mục khám phá">
       {tabs.map(item => <button key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined}
         className={tab === item.id ? 'active' : ''} onClick={() => setTab(item.id)}>{item.title}</button>)}
     </nav>
+    <main className="explore-page">
+      <h1 className="explore-visually-hidden">Khám phá</h1>
 
     {tab === 'all' && <>
       <section className="explore-feature" aria-labelledby="explore-feature-title">
@@ -98,6 +117,16 @@ function ExplorePageContent(props: DiscoverSectionProps) {
             <button type="button" className="explore-feature-secondary" onClick={() => setTab('communities')}>Tham gia cộng đồng</button>
             <button type="button" className="explore-feature-secondary" onClick={() => navigate('/search?type=posts')}>Xem bài viết mới</button>
           </div>
+        </div>
+      </section>
+      <section className="explore-shortcuts" aria-labelledby="explore-shortcuts-title">
+        <h2 id="explore-shortcuts-title">Khám phá nhanh</h2>
+        <div className="explore-shortcut-grid">
+          {shortcuts.map(({ title, desc, icon: Icon, onClick }) => <button key={title} type="button" onClick={onClick}>
+            <span className="explore-shortcut-icon" aria-hidden="true"><Icon size={20} /></span>
+            <span className="explore-shortcut-copy"><strong>{title}</strong><small>{desc}</small></span>
+            <ArrowRight size={16} aria-hidden="true" />
+          </button>)}
         </div>
       </section>
       {topics.length > 0 && <section className="explore-topics" aria-labelledby="explore-topics-title">
@@ -156,7 +185,9 @@ function ExplorePageContent(props: DiscoverSectionProps) {
       {tab === 'all' && <aside className="explore-rail" aria-label="Gợi ý khám phá">
         {peopleCount > 0 && people}
         {nearby}
+        {tips}
       </aside>}
     </div>}
-  </main>
+    </main>
+  </div>
 }

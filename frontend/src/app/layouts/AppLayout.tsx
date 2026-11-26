@@ -5,6 +5,7 @@ import { useMobileScrollChrome } from "./useMobileScrollChrome";
 
 type AppLayoutProps = {
   className: string;
+  activeTab?: string;
   sidebar: ReactNode;
   overlays?: ReactNode;
   header: ReactNode;
@@ -13,9 +14,9 @@ type AppLayoutProps = {
   children?: ReactNode;
 };
 
-/** Shared shell: persistent header/sidebar, a route Outlet, then global dialogs. */
-export default function AppLayout({ className, sidebar, overlays, header, beforePage, outletContext, children }: AppLayoutProps) {
-  const shellRef = useMobileScrollChrome();
+/** Shared shell: persistent sidebar, independently collapsing chrome, and route content. */
+export default function AppLayout({ className, activeTab, sidebar, overlays, header, beforePage, outletContext, children }: AppLayoutProps) {
+  const shellRef = useMobileScrollChrome(activeTab);
   return (
     <main className={className} ref={shellRef}>
       {sidebar}

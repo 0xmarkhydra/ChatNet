@@ -20,12 +20,12 @@
 }
 .call-center-sidebar {
   width: 210px; flex: 0 0 210px; display: flex; flex-direction: column;
-  gap: 26px; padding: 20px 13px; background: #fff; border-right: 1px solid #edf0f7;
+  gap: 26px; padding: 20px 13px; background: var(--soco-surface); border-right: 1px solid #edf0f7;
 }
 .call-center-brand { display: flex; align-items: center; gap: 9px; padding: 0 7px; }
 .call-center-logo {
   flex: 0 0 40px; height: 40px; display: grid; place-items: center;
-  background: linear-gradient(130deg, #3565f2, #8958ff); color: #fff; font-size: 22px; font-weight: 800;
+  background: linear-gradient(130deg, #3565f2, #8958ff); color: var(--soco-surface); font-size: 22px; font-weight: 800;
   border-radius: 12px;
 }
 .call-center-brand > span:last-child { min-width: 0; display: grid; gap: 3px; }
@@ -48,7 +48,7 @@
 .call-center-workspace { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .call-center-header {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
-  min-height: 84px; padding: 15px 31px; background: #fff; border-bottom: 1px solid #eef1f6;
+  min-height: 84px; padding: 15px 31px; background: var(--soco-surface); border-bottom: 1px solid #eef1f6;
 }
 .call-center-heading h1 { margin: 0 0 3px; color: #1a2b49; font-weight: 800; font-size: 21px; letter-spacing: -.45px; }
 .call-center-heading p { margin: 0; color: #8391ab; font-size: 11px; }
@@ -104,7 +104,7 @@
 }
 .call-center-stats {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px;
-  background: #fff; border-radius: 18px; padding: 21px 25px; margin-bottom: 17px;
+  background: var(--soco-surface); border-radius: 18px; padding: 21px 25px; margin-bottom: 17px;
 }
 .call-center-stats > div { display: grid; gap: 7px; }
 .call-center-stats strong { color: #2862f2; font-size: 24px; line-height: 1; font-weight: 800; }
@@ -113,14 +113,14 @@
 .call-center-stats span { font-size: 11px; color: #8090ad; }
 .call-center-filters { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 17px; align-items: center; }
 .call-center-filters button {
-  border: 0; border-radius: 10px; padding: 9px 19px; min-width: 90px; background: #fff;
+  border: 0; border-radius: 10px; padding: 9px 19px; min-width: 90px; background: var(--soco-surface);
   color: #7b8eae; font-size: 11px; font-weight: 620;
 }
 .call-center-filters button.active { background: transparent; color: #2a65f5; }
 .call-center-filters .call-filters-active-pill { background: #eaf0ff; border-radius: 10px; }
 .call-center-filters .call-center-refresh { margin-left: auto; min-width: 40px; padding: 9px; display: grid; place-items: center; }
 .call-history-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(275px, .95fr); gap: 16px; align-items: stretch; }
-.call-center-card { background: #fff; border-radius: 18px; padding: 18px 15px; min-width: 0; }
+.call-center-card { background: var(--soco-surface); border-radius: 18px; padding: 18px 15px; min-width: 0; }
 .call-center-card > h2 { margin: 1px 5px 18px; font-size: 15px; font-weight: 770; }
 .call-history-list { min-height: 490px; }
 .call-history-item {
@@ -176,7 +176,7 @@
 .call-detail-actions { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 7px; }
 .call-detail-actions .call-header-actions { justify-content: center; gap: 13px; }
 .call-detail-actions .call-header-actions button {
-  border: 0; border-radius: 12px; background: #2963f0; color: #fff;
+  border: 0; border-radius: 12px; background: #2963f0; color: var(--soco-surface);
   padding: 10px 20px; width: 46%; display: flex; align-items: center; justify-content: center;
 }
 .call-detail-actions > button { background: #edf1ff; color: #315fe8; border: 0; padding: 10px; border-radius: 10px; font-weight: 700; }
@@ -191,24 +191,6 @@
 .call-center-section-intro h2 svg { color: #2866f4; }
 .call-center-section-intro p { color: #8999b4; margin: 0; }
 .call-center-section-intro > button { display: flex; align-items: center; gap: 7px; border: 0; border-radius: 11px; padding: 11px 14px; color: #2862ed; background: #e8efff; }
-.call-people-list { min-height: 450px; }
-.call-person-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-bottom: 1px solid #f0f3f9; border-radius: 11px; transition: background-color .15s ease; }
-.call-person-row:hover, .call-person-row:focus-within { background: #f2f6ff; }
-.call-person-identity {
-  display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0;
-  padding: 7px 5px; border: 0; background: transparent; border-radius: 10px;
-  text-align: left; cursor: pointer; color: #1a2b49;
-}
-.call-person-identity:hover { color: #2563eb; }
-.call-person-identity:focus-visible { outline: 2px solid #2563eb; outline-offset: -1px; }
-.call-person-info { display: grid; flex: 1; min-width: 0; gap: 5px; }
-.call-person-info strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.call-person-info small { color: #8c9bb7; font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.call-person-row .call-header-actions { display: flex; gap: 7px; flex: 0 0 auto; }
-.call-person-row .call-header-actions button {
-  display: grid; place-items: center; width: 39px; height: 39px;
-  border: 0; border-radius: 12px; background: #edf2ff; color: #2a65f4;
-}
 .call-settings-layout { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(275px, 1fr); gap: 17px; }
 .call-settings-form { padding: 23px; }
 .call-settings-form .call-center-section-intro { margin-bottom: 24px; }
@@ -228,12 +210,12 @@
 .call-setting-actions { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #edf1f8; padding-top: 25px; }
 .call-setting-actions button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 10px; font-weight: 700; }
 .call-setting-cancel { background: #edf1ff; color: #3060e9; }
-.call-setting-save { background: #2862ed; color: #fff; }
+.call-setting-save { background: #2862ed; color: var(--soco-surface); }
 .call-setting-feedback { color: #316bc6; line-height: 1.5; }
 .call-settings-aside { display: flex; flex-direction: column; gap: 15px; }
 .call-settings-aside > section { padding: 21px; }
 .call-settings-aside p { margin: -8px 5px 18px; line-height: 1.6; color: #8c9cb7; font-size: 11px; }
-.call-caption-preview { background: #1b2d4e; color: #fff; border-radius: 18px; padding: 18px; display: grid; gap: 12px; min-height: 230px; }
+.call-caption-preview { background: #1b2d4e; color: var(--soco-surface); border-radius: 18px; padding: 18px; display: grid; gap: 12px; min-height: 230px; }
 .call-preview-speaker { display: flex; align-items: center; gap: 10px; }
 .call-preview-avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #526fec; font-weight: 800; }
 .call-preview-speaker > span:last-child { display: grid; gap: 4px; }
@@ -245,7 +227,7 @@
 .call-settings-privacy h2 { display: flex; align-items: center; gap: 9px; }
 .call-settings-privacy h2 svg { color: #2866f4; }
 .call-settings-privacy p { color: #526481; }
-.call-settings-privacy > small { display: block; padding: 13px; background: #fff; border-radius: 10px; color: #8799b9; }
+.call-settings-privacy > small { display: block; padding: 13px; background: var(--soco-surface); border-radius: 10px; color: #8799b9; }
 @media (max-width: 1000px) {
   .call-center-sidebar { width: 178px; flex-basis: 178px; }
   .call-center-header { padding: 15px 18px; }
@@ -314,12 +296,12 @@
 }
 .call-center-directory .fd-call-conversation-row .call-header-actions button {
   display:grid; place-items:center; width:34px; height:34px;
-  border:0; border-radius:9px; background:transparent; color:#2563eb;
+  border:0; border-radius:9px; background:transparent; color:var(--soco-blue);
 }
 .call-center-directory .fd-call-conversation-row .call-header-actions button:hover,
 .call-center-directory .fd-list-only .fd-icon-btn:hover { background:#e1ebff; }
 .call-center-directory .fd-call-conversation-row .fd-person-identity:focus-visible {
-  outline:2px solid #2563eb; outline-offset:2px; border-radius:9px;
+  outline:2px solid var(--soco-blue); outline-offset:2px; border-radius:9px;
 }
 @media (max-width:780px) {
   .call-center.is-embedded .call-center-header { padding:13px 14px; }

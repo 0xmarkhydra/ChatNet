@@ -8,9 +8,11 @@ import { userLabel } from '../../../shared/utils/userLabel'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Story } from '../types'
 import type { ApiRequest } from '@/shared/types/api'
-import StoryLikeControl from './StoryLikeControl'
+import StoryReactionBar from './StoryReactionBar'
+import { recordStoryView } from '../api/stories'
+import { relativeStoryTime } from '../utils/storyTime'
+import StoryActivity from './StoryActivity'
 import StoryHighlightEditor from './StoryHighlightEditor'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/shared/ui/dialog'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/story-text.css'
@@ -29,19 +31,10 @@ type Props = {
   onProfile: (username: string) => void
   onShare: (story: Story) => void
   onReport: (story: Story) => void
+  onOpenMessages: () => void
 })
 
 const STORY_DURATION = 7000
-
-function relativeStoryTime(date: string): string {
-  const elapsed = Math.max(0, Date.now() - Date.parse(date))
-  const minutes = Math.floor(elapsed / 60000)
-  if (!Number.isFinite(minutes)) return ''
-  if (minutes < 1) return 'Vừa đăng'
-  if (minutes < 60) return minutes + ' phút trước'
-  if (minutes < 1440) return Math.floor(minutes / 60) + ' giờ trước'
-  return Math.floor(minutes / 1440) + ' ngày trước'
-}
 
 export default function StoryViewer(props: Props) {
   const { activeStory, stories, setActiveStoryId } = props
@@ -58,6 +51,7 @@ export default function StoryViewer(props: Props) {
   const [highlightOpen, setHighlightOpen] = useScopedState(activeStory.id, false)
   const [highlightSaved, setHighlightSaved] = useScopedState(activeStory.id, false)
   const [menuOpen, setMenuOpen] = useScopedState(activeStory.id, false)
+  const [activityOpen, setActivityOpen] = useScopedState(activeStory.id, false)
   const imageElapsedRef = useRef(0)
   const replySequence = useRef(0)
   const activeStoryId = useLatest(activeStory.id)
@@ -88,13 +82,22 @@ export default function StoryViewer(props: Props) {
   const isVideo = attachment?.kind === 'video'
   const duration = attachment ? STORY_DURATION : 15_000
 
+  const latestRequest = useLatest(request)
+  const countsAsView = Boolean(request && feed && !isOwner)
+  useEffect(() => {
+    const send = latestRequest.current
+    if (!countsAsView || !send) return
+    // Best effort: a view that cannot be recorded must not interrupt watching; reopening retries it.
+    void recordStoryView(send, activeStory.id).catch(() => {})
+  }, [activeStory.id, countsAsView, latestRequest])
+
   useEffect(() => {
     imageElapsedRef.current = 0
     ++replySequence.current
   }, [activeStory.id])
 
   useEffect(() => {
-    if (isVideo || paused || menuOpen || replySending) return
+    if (isVideo || paused || menuOpen || replySending || activityOpen) return
     const started = performance.now()
     const timer = window.setInterval(() => {
       const elapsed = Math.min(duration, imageElapsedRef.current + performance.now() - started)
@@ -108,13 +111,13 @@ export default function StoryViewer(props: Props) {
       window.clearInterval(timer)
       imageElapsedRef.current = Math.min(duration, imageElapsedRef.current + performance.now() - started)
     }
-  }, [activeStory.id, duration, isVideo, paused, menuOpen, replySending, nextId, setActiveStoryId, setImageProgress])
+  }, [activeStory.id, duration, isVideo, paused, menuOpen, replySending, activityOpen, nextId, setActiveStoryId, setImageProgress])
 
   useEffect(() => {
     if (!isVideo || !videoRef.current) return
-    if (paused || menuOpen || replySending) videoRef.current.pause()
+    if (paused || menuOpen || replySending || activityOpen) videoRef.current.pause()
     else void videoRef.current.play().catch(() => setPaused(true))
-  }, [activeStory.id, isVideo, paused, menuOpen, replySending, setPaused])
+  }, [activeStory.id, isVideo, paused, menuOpen, replySending, activityOpen, setPaused])
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null
@@ -124,7 +127,21 @@ export default function StoryViewer(props: Props) {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (highlightOpen) return
+      if (activityOpen) {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          setActivityOpen(false)
+        }
+        return
+      }
+      if (highlightOpen) {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          setHighlightOpen(false)
+          optionsButtonRef.current?.focus()
+        }
+        return
+      }
       if (event.key === 'Escape') {
         event.preventDefault()
         if (menuOpen) setMenuOpen(false)
@@ -149,7 +166,7 @@ export default function StoryViewer(props: Props) {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [highlightOpen, menuOpen, nextId, previousId, setActiveStoryId, setMenuOpen, setPaused])
+  }, [activityOpen, setActivityOpen, highlightOpen, menuOpen, nextId, previousId, setActiveStoryId, setHighlightOpen, setMenuOpen, setPaused])
 
   async function submitReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -165,9 +182,18 @@ export default function StoryViewer(props: Props) {
     }
   }
 
+  const closeHighlight = () => {
+    setHighlightOpen(false)
+    optionsButtonRef.current?.focus()
+  }
+  const iconButton = 'grid size-control-touch flex-none cursor-pointer place-items-center rounded-full border-0 bg-transparent p-0 text-white hover:bg-white/15 aria-expanded:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50'
+  const menuItem = 'flex min-h-control-touch w-full cursor-pointer items-center gap-ui-2 rounded-ui-sm border-0 bg-transparent px-ui-3 text-left text-ui-body font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50'
+  const panelButton = 'flex min-h-control-touch w-full cursor-pointer items-center gap-ui-3 rounded-ui-md border-0 bg-white/8 px-ui-3 text-left text-ui-body font-semibold text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50'
+
   return (
     <div
-      className="story-screen-backdrop"
+      data-slot="story-viewer"
+      className="fixed inset-0 z-350 bg-[#0b1220] text-white"
       role="dialog"
       aria-modal="true"
       aria-label={'Khoảnh khắc của ' + authorLabel}
@@ -177,51 +203,48 @@ export default function StoryViewer(props: Props) {
         if (event.target === event.currentTarget) setActiveStoryId(null)
       }}
     >
-      <div className="story-screen">
-        <div className="story-screen-topbar">
-          <div className="story-screen-brand">
-            <strong>SocCo</strong>
-            <span>{highlight ? 'Tin nổi bật' : 'Khoảnh khắc'}</span>
-          </div>
-          <button className="story-screen-close" type="button" onClick={() => setActiveStoryId(null)}>
-            <X size={19} aria-hidden="true" /> Đóng
-          </button>
-        </div>
-
-        <aside className="story-screen-people" aria-label="Danh sách người đăng Story">
-          <header>
-            <h2>{highlight ? 'Tin nổi bật' : 'Khoảnh khắc mới'}</h2>
-            <p>{highlight ? stories.length + ' tin trên hồ sơ' : groups.length + ' người vừa đăng tin'}</p>
+      <div className="mx-auto grid h-dvh w-full max-w-396 lg:grid-cols-[320px_minmax(0,1fr)_300px] lg:gap-ui-6 lg:p-ui-6"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setActiveStoryId(null)
+        }}>
+        <aside className="hidden min-h-0 flex-col gap-ui-3 rounded-ui-lg bg-white/6 p-ui-3 lg:flex" aria-label="Danh sách người đăng Story">
+          <header className="px-ui-2">
+            <h2 className="m-0 text-ui-section font-bold">{highlight ? 'Tin nổi bật' : 'Khoảnh khắc mới'}</h2>
+            <p className="m-0 mt-ui-1 text-ui-label text-white/70">{highlight ? stories.length + ' tin trên hồ sơ' : groups.length + ' người vừa đăng tin'}</p>
           </header>
-          <div className="story-screen-people-list">
+          <div className="grid min-h-0 content-start gap-ui-1 overflow-y-auto">
             {groups.map((items) => {
               const latest = items[items.length - 1]
               const active = items[0].author === activeStory.author
               const label = userLabel(latest.authorDisplayName, latest.author)
               return (
-                <button key={latest.author} type="button" className={'story-screen-person' + (active ? ' active' : '')}
+                <button key={latest.author} type="button"
+                  className={'flex min-h-control-touch w-full cursor-pointer items-center gap-ui-3 rounded-ui-md border-0 p-ui-2 text-left text-white ' + (active ? 'bg-white/15' : 'bg-transparent hover:bg-white/8')}
                   aria-current={active ? 'true' : undefined}
                   onClick={() => setActiveStoryId(active ? activeStory.id : items[0].id)}>
-                  <UserAvatar username={latest.author} name={label} className="story-screen-person-avatar" />
-                  <span className="story-screen-person-text">
-                    <strong>{label}</strong>
-                    <small>{relativeStoryTime(latest.createdAt)}</small>
+                  <span className={'grid size-12 flex-none place-items-center overflow-hidden rounded-full p-0.75 ' + (active ? 'bg-(image:--soco-gradient)' : 'bg-white/30')}>
+                    <UserAvatar username={latest.author} name={label} className="avatar box-border size-full! rounded-full! shadow-none! border-2 border-[#0b1220] text-ui-label font-bold" />
                   </span>
-                  {items.length > 1 && <span className="story-screen-person-count">{items.length}</span>}
+                  <span className="min-w-0 flex-1">
+                    <strong className="block truncate text-ui-body">{label}</strong>
+                    <small className="block text-ui-caption text-white/70">{relativeStoryTime(latest.createdAt, 'Vừa đăng')}</small>
+                  </span>
+                  {items.length > 1 && <span className="grid min-w-6 flex-none place-items-center rounded-full bg-white/20 px-ui-1 text-ui-caption font-bold">{items.length}</span>}
                 </button>
               )
             })}
           </div>
         </aside>
 
-        <section className="story-screen-stage" aria-label={'Đang xem Story của ' + authorLabel}>
-          <div className="story-screen-media">
+        <section className="relative isolate mx-auto h-dvh w-full overflow-hidden bg-black lg:aspect-9/16 lg:h-full lg:w-auto lg:max-w-full lg:rounded-ui-xl"
+          aria-label={'Đang xem Story của ' + authorLabel}>
+          <div data-slot="story-media" className="absolute inset-0 z-0 grid place-items-center">
             {!attachment ? (
               <div className="story-screen-text" data-story-background={activeStory.background ?? 'berry'}>
                 <p tabIndex={0} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>{activeStory.text}</p>
               </div>
             ) : isVideo ? (
-              <video key={activeStory.id} ref={videoRef} src={attachment.url}
+              <video key={activeStory.id} ref={videoRef} src={attachment.url} className="size-full object-contain"
                 autoPlay muted={muted} playsInline
                 onEnded={() => setActiveStoryId(nextId)}
                 onTimeUpdate={(event) => {
@@ -232,154 +255,175 @@ export default function StoryViewer(props: Props) {
                 aria-label={attachment.name}
               />
             ) : (
-              <img key={activeStory.id} src={attachment.url} alt={attachment.name} />
+              <img key={activeStory.id} src={attachment.url} alt={attachment.name} className="size-full object-contain" />
             )}
           </div>
-
-          <div className="story-screen-stage-header">
-            <div className="story-screen-progress" aria-label={'Tin ' + (authorIndex + 1) + ' trên ' + authorStories.length}>
-              {authorStories.map((story, index) => (
-                <span key={story.id} className="story-screen-progress-track">
-                  <span
-                    className={index < authorIndex ? 'complete' : ''}
-                    style={index === authorIndex
-                      ? { width: (isVideo ? videoProgress : imageProgress) + '%' }
-                      : index > authorIndex ? { width: 0 } : undefined}
-                  />
-                </span>
-              ))}
-            </div>
-            <div className="story-screen-author">
-              {feed ? (
-                <button type="button" className="story-screen-author-profile" onClick={() => feed.onProfile(activeStory.author)}
-                  title={'Xem hồ sơ ' + authorLabel}>
-                  <UserAvatar username={activeStory.author} name={authorLabel} className="story-screen-author-avatar" />
-                  <strong>{authorLabel}</strong>
-                </button>
-              ) : (
-                <span className="story-screen-author-profile">
-                  <UserAvatar username={activeStory.author} name={authorLabel} className="story-screen-author-avatar" />
-                  <strong>{authorLabel}</strong>
-                </span>
-              )}
-              <time dateTime={activeStory.createdAt}>{relativeStoryTime(activeStory.createdAt)}</time>
-              <div className="story-screen-author-controls">
-                {request && <StoryLikeControl key={activeStory.id} request={request} storyId={activeStory.id} owner={isOwner} onInspect={() => setPaused(true)} />}
-                <button type="button" className="story-screen-icon-button" title={paused ? 'Tiếp tục' : 'Tạm dừng'}
-                  aria-label={paused ? 'Tiếp tục Story' : 'Tạm dừng Story'} onClick={() => setPaused((v) => !v)}>
-                  {paused ? <Play size={19} /> : <Pause size={19} />}
-                </button>
-                {isVideo && (
-                  <button type="button" className="story-screen-icon-button" aria-label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
-                    onClick={() => setMuted((v) => !v)}>
-                    {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
-                  </button>
-                )}
-                {feed && <div className="story-screen-options">
-                  <button ref={optionsButtonRef} type="button" className="story-screen-icon-button" aria-label="Tùy chọn Story"
-                    aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>
-                    <MoreHorizontal size={22} />
-                  </button>
-                  {menuOpen && (
-                    <div className="story-screen-options-menu">
-                      {isOwner ? (
-                        <button type="button" disabled={feed.storyBusy} onClick={() => {
-                          setMenuOpen(false)
-                          void feed.deleteStory(activeStory)
-                        }}><Trash2 size={17} /> Xóa Story</button>
-                      ) : (
-                        <button type="button" onClick={() => {
-                          setMenuOpen(false)
-                          feed.onReport(activeStory)
-                        }}><Flag size={17} /> Báo cáo Story</button>
-                      )}
-                      {request && isOwner && (
-                        <button type="button" onClick={() => {
-                          setMenuOpen(false)
-                          setPaused(true)
-                          setHighlightOpen(true)
-                        }}><BookmarkPlus size={17} aria-hidden="true" /> Thêm vào Tin nổi bật</button>
-                      )}
-                      <button type="button" onClick={() => {
-                        setMenuOpen(false)
-                        feed.onShare(activeStory)
-                      }}><Share2 size={17} /> Chia sẻ</button>
-                    </div>
-                  )}
-                </div>}
-              </div>
-            </div>
-          </div>
+          <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-1 h-32 bg-linear-to-b from-black/55 to-transparent" />
+          <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-1 h-40 bg-linear-to-t from-black/60 to-transparent" />
 
           {previousId !== null && (
-            <button type="button" className="story-screen-navigation previous"
-              aria-label="Story trước" onClick={() => setActiveStoryId(previousId)}>
-              <ChevronLeft size={28} />
+            <button type="button" aria-label="Story trước" onClick={() => setActiveStoryId(previousId)}
+              className="group absolute inset-y-24 left-0 z-2 flex w-1/3 cursor-pointer items-center justify-start border-0 bg-transparent pl-ui-3 text-white">
+              <ChevronLeft size={32} aria-hidden="true" className="hidden rounded-full bg-black/40 p-ui-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 lg:block" />
             </button>
           )}
           {nextId !== null && (
-            <button type="button" className="story-screen-navigation next"
-              aria-label="Story tiếp theo" onClick={() => setActiveStoryId(nextId)}>
-              <ChevronRight size={28} />
+            <button type="button" aria-label="Story tiếp theo" onClick={() => setActiveStoryId(nextId)}
+              className="group absolute inset-y-24 right-0 z-2 flex w-1/3 cursor-pointer items-center justify-end border-0 bg-transparent pr-ui-3 text-white">
+              <ChevronRight size={32} aria-hidden="true" className="hidden rounded-full bg-black/40 p-ui-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 lg:block" />
             </button>
           )}
 
-          {feed && !isOwner && (
-            <form className="story-screen-reply" onSubmit={submitReply}>
-              <input ref={replyInputRef} value={reply}
-                onChange={(event) => setReply(event.target.value)}
-                onFocus={() => setPaused(true)}
-                onBlur={() => setPaused(false)}
-                placeholder={'Trả lời ' + authorLabel + '...'}
-                aria-label={'Trả lời Story của ' + authorLabel} maxLength={2000} />
-              <button type="submit" title="Gửi trả lời Story" aria-label="Trả lời Story" disabled={!reply.trim() || replySending}>
-                <Send size={20} />
+          <div className="absolute inset-x-0 top-0 z-3 px-ui-2 pt-ui-3">
+            <div className="flex gap-1 px-ui-1" role="progressbar" aria-valuemin={0} aria-valuemax={authorStories.length} aria-valuenow={authorIndex + 1}
+              aria-label={'Tin ' + (authorIndex + 1) + ' trên ' + authorStories.length}>
+              {authorStories.map((story, index) => (
+                <span key={story.id} className="h-0.75 flex-1 overflow-hidden rounded-full bg-white/40">
+                  <span className="block h-full bg-white"
+                    style={{ width: index < authorIndex ? '100%' : index === authorIndex ? (isVideo ? videoProgress : imageProgress) + '%' : '0%' }} />
+                </span>
+              ))}
+            </div>
+            <div className="mt-ui-2 flex items-center gap-ui-2 px-ui-1">
+              {feed ? (
+                <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-ui-2 border-0 bg-transparent p-0 text-left text-white"
+                  onClick={() => feed.onProfile(activeStory.author)} title={'Xem hồ sơ ' + authorLabel}>
+                  <UserAvatar username={activeStory.author} name={authorLabel} className="avatar size-10 flex-none rounded-full border-2 border-white text-ui-label font-bold" />
+                  <span className="min-w-0">
+                    <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
+                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, 'Vừa đăng')}</time>
+                  </span>
+                </button>
+              ) : (
+                <span className="flex min-w-0 flex-1 items-center gap-ui-2">
+                  <UserAvatar username={activeStory.author} name={authorLabel} className="avatar size-10 flex-none rounded-full border-2 border-white text-ui-label font-bold" />
+                  <span className="min-w-0">
+                    <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
+                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, 'Vừa đăng')}</time>
+                  </span>
+                </span>
+              )}
+              <button type="button" className={iconButton} title={paused ? 'Tiếp tục' : 'Tạm dừng'}
+                aria-label={paused ? 'Tiếp tục Story' : 'Tạm dừng Story'} onClick={() => setPaused((v) => !v)}>
+                {paused ? <Play size={20} aria-hidden="true" /> : <Pause size={20} aria-hidden="true" />}
               </button>
-            </form>
+              {isVideo && (
+                <button type="button" className={iconButton} aria-label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'} onClick={() => setMuted((v) => !v)}>
+                  {muted ? <VolumeX size={20} aria-hidden="true" /> : <Volume2 size={20} aria-hidden="true" />}
+                </button>
+              )}
+              {feed && (
+                <div className="relative">
+                  <button ref={optionsButtonRef} type="button" className={iconButton} aria-label="Tùy chọn Story" aria-expanded={menuOpen}
+                    onClick={() => setMenuOpen((v) => !v)}>
+                    <MoreHorizontal size={22} aria-hidden="true" />
+                  </button>
+                  {menuOpen && (
+                    <div className="absolute top-full right-0 z-5 mt-ui-1 grid w-56 gap-ui-1 rounded-ui-md bg-[#18233a] p-ui-1 shadow-ui-overlay">
+                      {isOwner ? (
+                        <button type="button" className={menuItem} disabled={feed.storyBusy} onClick={() => {
+                          setMenuOpen(false)
+                          void feed.deleteStory(activeStory)
+                        }}><Trash2 size={18} aria-hidden="true" /> Xóa Story</button>
+                      ) : (
+                        <button type="button" className={menuItem} onClick={() => {
+                          setMenuOpen(false)
+                          feed.onReport(activeStory)
+                        }}><Flag size={18} aria-hidden="true" /> Báo cáo Story</button>
+                      )}
+                      {request && isOwner && (
+                        <button type="button" className={menuItem} onClick={() => {
+                          setMenuOpen(false)
+                          setPaused(true)
+                          setHighlightOpen(true)
+                        }}><BookmarkPlus size={18} aria-hidden="true" /> Thêm vào Tin nổi bật</button>
+                      )}
+                      <button type="button" className={menuItem} onClick={() => {
+                        setMenuOpen(false)
+                        feed.onShare(activeStory)
+                      }}><Share2 size={18} aria-hidden="true" /> Chia sẻ</button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <button type="button" className={iconButton} onClick={() => setActiveStoryId(null)}>
+                <X size={24} aria-hidden="true" /><span className="sr-only">Đóng</span>
+              </button>
+            </div>
+          </div>
+
+          {request && feed && isOwner ? (
+            <StoryActivity key={activeStory.id} request={request} storyId={activeStory.id}
+              open={activityOpen} onOpenChange={setActivityOpen} onOpenMessages={feed.onOpenMessages} />
+          ) : (
+            <div className="absolute inset-x-0 bottom-0 z-3 px-ui-3 pb-[max(var(--soco-space-4,16px),env(safe-area-inset-bottom))]">
+              {request && feed && <StoryReactionBar key={activeStory.id} request={request} storyId={activeStory.id} />}
+              <div className="mt-ui-2 flex items-center gap-ui-2">
+                {feed && !isOwner ? (
+                  <form className="flex min-w-0 flex-1 items-center gap-ui-2" onSubmit={submitReply}>
+                    <input ref={replyInputRef} value={reply}
+                      onChange={(event) => setReply(event.target.value)}
+                      onFocus={() => setPaused(true)}
+                      onBlur={() => setPaused(false)}
+                      placeholder={'Trả lời ' + authorLabel + '...'}
+                      aria-label={'Trả lời Story của ' + authorLabel} maxLength={2000}
+                      className="h-12 min-w-0 flex-1 rounded-full border border-white/70 bg-black/30 px-ui-4 text-[length:var(--soco-type-subtitle)] text-white outline-none placeholder:text-white/75 focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/40" />
+                    <button type="submit" title="Gửi trả lời Story" aria-label="Trả lời Story" disabled={!reply.trim() || replySending}
+                      className={iconButton + ' size-12'}>
+                      <Send size={22} aria-hidden="true" />
+                    </button>
+                  </form>
+                ) : <span className="flex-1" />}
+              </div>
+            </div>
+          )}
+
+          {highlightSaved && <p role="status" className="absolute bottom-24 left-ui-3 z-5 m-0 rounded-ui-md bg-card px-ui-3 py-ui-2 text-ui-label text-foreground">Đã thêm vào Tin nổi bật.</p>}
+          {request && isOwner && highlightOpen && (
+            <div role="dialog" aria-modal="true" aria-labelledby="story-highlight-title" aria-describedby="story-highlight-desc"
+              className="absolute inset-0 z-6 grid place-items-end bg-black/55"
+              onMouseDown={(event) => { if (event.target === event.currentTarget) closeHighlight() }}>
+              <div className="grid w-full gap-ui-3 rounded-t-ui-xl bg-card p-ui-4 pb-[max(var(--soco-space-4,16px),env(safe-area-inset-bottom))] text-foreground">
+                <h2 id="story-highlight-title" className="m-0 text-ui-section font-bold">Thêm vào Tin nổi bật</h2>
+                <p id="story-highlight-desc" className="m-0 text-ui-body text-muted-foreground">Giữ Story này trên hồ sơ sau khi hết 24 giờ.</p>
+                <StoryHighlightEditor key={activeStory.id} request={request} storyId={activeStory.id} onSaved={() => {
+                  setHighlightOpen(false)
+                  setHighlightSaved(true)
+                }} />
+                <button type="button" onClick={closeHighlight}
+                  className="min-h-control-touch cursor-pointer rounded-ui-md border-0 bg-muted px-ui-3 text-ui-body font-semibold text-foreground">Hủy</button>
+              </div>
+            </div>
           )}
         </section>
 
-        <aside className="story-screen-insights" aria-label="Thông tin Story">
-          <h2>{highlight ? 'Tin nổi bật' : 'Thông tin Story'}</h2>
-          {highlight && <p className="story-screen-expiry">{highlight.title}</p>}
+        <aside className="hidden min-h-0 flex-col gap-ui-3 overflow-y-auto rounded-ui-lg bg-white/6 p-ui-4 lg:flex" aria-label="Thông tin Story">
+          <h2 className="m-0 text-ui-section font-bold">{highlight ? 'Tin nổi bật' : 'Thông tin Story'}</h2>
+          {highlight && <p className="m-0 text-ui-label text-white/75">{highlight.title}</p>}
           {feed && <>
-            <p className="story-screen-expiry">Khả dụng trong 24 giờ</p>
-            <div className="story-screen-insights-divider" />
-            <p className="story-screen-action-label">Những hành động có thể làm</p>
-            <div className="story-screen-actions">
-              <button type="button" disabled={isOwner} onClick={() => replyInputRef.current?.focus()}>
-                <MessageCircle size={22} aria-hidden="true" /> Trả lời
+            <p className="m-0 text-ui-label text-white/75">Khả dụng trong 24 giờ</p>
+            <div className="h-px bg-white/15" />
+            <p className="m-0 text-ui-label font-semibold text-white/70">Những hành động có thể làm</p>
+            <div className="grid gap-ui-2">
+              <button type="button" className={panelButton} disabled={isOwner} onClick={() => replyInputRef.current?.focus()}>
+                <MessageCircle size={20} aria-hidden="true" /> Trả lời
               </button>
-              <button type="button" onClick={() => feed.onProfile(activeStory.author)}>
-                <UserRound size={22} aria-hidden="true" /> Xem hồ sơ
+              <button type="button" className={panelButton} onClick={() => feed.onProfile(activeStory.author)}>
+                <UserRound size={20} aria-hidden="true" /> Xem hồ sơ
               </button>
-              <button type="button" onClick={() => feed.onShare(activeStory)}>
-                <Share2 size={22} aria-hidden="true" /> Chia sẻ
+              <button type="button" className={panelButton} onClick={() => feed.onShare(activeStory)}>
+                <Share2 size={20} aria-hidden="true" /> Chia sẻ
               </button>
-              <button type="button" disabled={isOwner} onClick={() => feed.onReport(activeStory)}>
-                <Flag size={22} aria-hidden="true" /> Báo cáo
+              <button type="button" className={panelButton} disabled={isOwner} onClick={() => feed.onReport(activeStory)}>
+                <Flag size={20} aria-hidden="true" /> Báo cáo
               </button>
             </div>
-            <div className="story-screen-privacy">
-              <div><LockKeyhole size={21} aria-hidden="true" /> <strong>Quyền xem tin</strong></div>
-              <p>Hiển thị theo quyền riêng tư của tác giả.</p>
+            <div className="mt-ui-2 rounded-ui-md bg-white/6 p-ui-3">
+              <div className="flex items-center gap-ui-2 text-ui-body font-bold"><LockKeyhole size={20} aria-hidden="true" /> Quyền xem tin</div>
+              <p className="m-0 mt-ui-1 text-ui-label text-white/75">Hiển thị theo quyền riêng tư của tác giả.</p>
             </div>
           </>}
         </aside>
-        {highlightSaved && <p role="status" className="absolute bottom-4 left-4 rounded-lg bg-card p-2 text-foreground">Đã thêm vào Tin nổi bật.</p>}
-        {request && isOwner && <Dialog open={highlightOpen} onOpenChange={setHighlightOpen}>
-          <DialogContent className="story-highlight-dialog z-[352]" onCloseAutoFocus={event => {
-            event.preventDefault()
-            optionsButtonRef.current?.focus()
-          }}>
-            <DialogTitle>Thêm vào Tin nổi bật</DialogTitle>
-            <DialogDescription>Giữ Story này trên hồ sơ sau khi hết 24 giờ.</DialogDescription>
-            <StoryHighlightEditor key={activeStory.id} request={request} storyId={activeStory.id} onSaved={() => {
-              setHighlightOpen(false)
-              setHighlightSaved(true)
-            }} />
-          </DialogContent>
-        </Dialog>}
       </div>
     </div>
   )

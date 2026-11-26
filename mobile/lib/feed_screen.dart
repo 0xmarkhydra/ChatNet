@@ -10,6 +10,8 @@ import 'package:share_plus/share_plus.dart';
 
 import 'api.dart';
 import 'feed_post_detail.dart';
+import 'public_post_location.dart';
+import 'post_map_picker.dart';
 import 'feed_story_create_sheet.dart';
 import 'feed_post_links.dart';
 import 'feed_post_share_sheet.dart';
@@ -382,12 +384,16 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     });
   }
 
-  Future<Json?> _pickAndUpload(String scope, {bool multiple = false, PlatformFile? selectedFile}) async {
+  Future<Json?> _pickAndUpload(
+    String scope, {
+    bool multiple = false,
+    PlatformFile? selectedFile,
+  }) async {
     final picked = selectedFile != null
         ? <PlatformFile>[selectedFile]
         : multiple
-            ? await FilePicker.pickFiles(type: FileType.media)
-            : <PlatformFile>[];
+        ? await FilePicker.pickFiles(type: FileType.media)
+        : <PlatformFile>[];
     if (!multiple && selectedFile == null) {
       final file = await FilePicker.pickFile(type: FileType.media);
       if (file != null) picked.add(file);
@@ -432,14 +438,20 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       _show('Nội dung bài viết vượt quá 5.000 ký tự.');
       return false;
     }
+    final visibility = postVisibility;
     setState(() => posting = true);
     try {
+      final location = visibility == 'public'
+          ? await capturePublicPostLocation()
+          : null;
+      if (!mounted) return false;
       final post = object(
         await widget.api.request('POST', '/api/posts', {
           'content': content,
           'attachments': attachments,
-          'visibility': postVisibility,
+          'visibility': visibility,
           'background': postBackground,
+          'publishLocation': ?location,
         }),
       );
       if (!mounted) return false;
@@ -1080,8 +1092,16 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         }
         return;
       case 'edit':
+        var editCheckIn = namedPostCheckIn(post);
+        final rawContent = post['content']?.toString() ?? '';
         final editor = TextEditingController(
-          text: post['content']?.toString() ?? '',
+          text: editCheckIn.isEmpty
+              ? rawContent
+              : rawContent
+                    .replaceAll('\r\n', '\n')
+                    .split('\n')
+                    .skip(1)
+                    .join('\n'),
         );
         var visibility = post['visibility']?.toString() ?? 'public';
         var background = post['background']?.toString() ?? '';
@@ -1162,6 +1182,30 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                           ),
                       ],
                     ),
+                    if (visibility != 'public')
+                      OutlinedButton.icon(
+                        onPressed: busy
+                            ? null
+                            : () async {
+                                final result = await choosePostMapLocation(
+                                  ctx,
+                                  editCheckIn,
+                                );
+                                if (result != null && ctx.mounted) {
+                                  setSheetState(() => editCheckIn = result);
+                                }
+                              },
+                        icon: const Icon(Icons.location_on_outlined),
+                        label: Text(
+                          editCheckIn.isEmpty
+                              ? 'Chọn vị trí trên bản đồ'
+                              : checkInDisplayName(editCheckIn),
+                        ),
+                      ),
+                    if (visibility == 'public' &&
+                        post['visibility'] != null &&
+                        post['visibility'] != 'public')
+                      const Text(publicPostLocationNotice),
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: busy
@@ -1169,13 +1213,29 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                           : () async {
                               setSheetState(() => busy = true);
                               try {
+                                final location =
+                                    visibility == 'public' &&
+                                        post['visibility'] != null &&
+                                        post['visibility'] != 'public'
+                                    ? await capturePublicPostLocation()
+                                    : null;
+                                if (!ctx.mounted) return;
                                 final updated = object(
-                                  await widget.api
-                                      .request('PATCH', '/api/posts/$id', {
-                                        'content': editor.text.trim(),
-                                        'visibility': visibility,
-                                        'background': background,
-                                      }),
+                                  await widget.api.request(
+                                    'PATCH',
+                                    '/api/posts/$id',
+                                    {
+                                      'content': [
+                                        if (editCheckIn.isNotEmpty)
+                                          '📍 $editCheckIn',
+                                        if (editor.text.trim().isNotEmpty)
+                                          editor.text.trim(),
+                                      ].join('\n'),
+                                      'visibility': visibility,
+                                      'background': background,
+                                      'publishLocation': ?location,
+                                    },
+                                  ),
                                 );
                                 _applyUpdatedPost(updated);
                                 if (ctx.mounted) Navigator.pop(ctx);
@@ -1314,15 +1374,36 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   }
 
   Future<void> _chooseCheckIn(StateSetter refreshSheet) async {
-    final controller = TextEditingController(text: checkInLocation);
+    if (postVisibility != 'public') {
+      final result = await choosePostMapLocation(context, checkInLocation);
+      if (result != null && mounted) {
+        setState(() => checkInLocation = result);
+        refreshSheet(() {});
+      }
+      return;
+    }
+    final controller = TextEditingController(
+      text: checkInDisplayName(checkInLocation),
+    );
     final location = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Check-in địa điểm'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Nhập địa điểm'),
+        title: const Text('Gắn thẻ vị trí'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 120,
+              decoration: const InputDecoration(hintText: 'Nhập tên địa điểm'),
+            ),
+            Text(
+              postVisibility == 'public'
+                  ? 'Bài công khai luôn có vị trí GPS. Địa điểm nhập thêm là check-in tùy chọn.'
+                  : 'Không bắt buộc. Chỉ người có quyền xem bài viết mới thấy vị trí này.',
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -1438,6 +1519,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                             ),
                           ],
                         ),
+                        if (postVisibility == 'public')
+                          const Text(
+                            publicPostLocationNotice,
+                            style: TextStyle(fontSize: 12),
+                          ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: postController,
@@ -1479,8 +1565,19 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                           ),
                         if (checkInLocation.isNotEmpty)
                           Chip(
-                            avatar: const Icon(Icons.place_outlined, size: 17),
-                            label: Text(checkInLocation),
+                            backgroundColor: Colors.grey.shade100,
+                            side: BorderSide.none,
+                            avatar: Icon(
+                              Icons.place_outlined,
+                              size: 17,
+                              color: Colors.grey.shade600,
+                            ),
+                            label: Text(
+                              checkInDisplayName(checkInLocation),
+                              style: TextStyle(color: Colors.grey.shade700),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             onDeleted: () {
                               setState(() => checkInLocation = '');
                               refreshSheet(() {});
@@ -1531,7 +1628,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                 Icons.place_outlined,
                                 color: Color(0xFFDB7436),
                               ),
-                              label: const Text('Check-in'),
+                              label: const Text('Vị trí'),
                               onPressed: () => _chooseCheckIn(refreshSheet),
                             ),
                             ActionChip(
@@ -1895,6 +1992,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                   },
                                 ),
                               ),
+                              if (postVisibility == 'public')
+                                const Text(
+                                  publicPostLocationNotice,
+                                  style: TextStyle(fontSize: 12),
+                                ),
                               GridView.count(
                                 crossAxisCount: 2,
                                 shrinkWrap: true,
@@ -2191,6 +2293,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                       }}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    PublicPostLocationLink(post: post),
                   ],
                 ),
               ),
@@ -2202,7 +2305,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               ),
             ],
           ),
-          if (post['content']?.toString().isNotEmpty == true) ...[
+          if (postContentWithoutLocation(post).isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -2213,7 +2316,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 post['background']?.toString() ?? '',
               ),
               child: Text(
-                post['content'].toString(),
+                postContentWithoutLocation(post),
                 textAlign: (post['background']?.toString().isNotEmpty ?? false)
                     ? TextAlign.center
                     : TextAlign.start,

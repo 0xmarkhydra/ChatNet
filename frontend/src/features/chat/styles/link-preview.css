@@ -16,7 +16,7 @@
   overflow: hidden;
   border: 1px solid rgba(115, 136, 174, 0.22);
   border-radius: 12px;
-  background: #fff;
+  background: var(--soco-surface);
   color: #1e2d45;
   text-align: left;
   text-decoration: none;

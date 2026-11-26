@@ -3,7 +3,10 @@ import type { MediaAttachment } from '../../shared/utils/media'
 
 export const FEED_PAGE_SIZE = 15
 
+export type PublishLocation = { latitude: number; longitude: number; accuracy: number; capturedAt: string; placeName?: string }
+
 export type Post = {
+  publishLocation?: PublishLocation
   id: number
   author: string
   authorDisplayName?: string
@@ -30,6 +33,8 @@ export type StoryBackground = 'berry' | 'indigo' | 'teal' | 'sunset'
 export type TextStoryInput = { text: string; background: StoryBackground }
 
 export type StoryDraft = { kind: 'choose' } | { kind: 'media'; file: File } | { kind: 'text' }
+
+export type PendingStoryView = { status: "posting" | "failed"; percent: number | null; kind: "Ảnh" | "Video" | "Chữ" }
 
 export type Story = {
   id: number

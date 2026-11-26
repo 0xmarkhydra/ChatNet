@@ -86,3 +86,16 @@ The values equal what `shared/ui` already used, so adopting a token changes noth
 - `npm run design-debt:report` lists the most repeated hex values and the token with exactly that value. Many values are fallbacks inside `var(--chatnet-accent, #2859d8)`; those are already tokenised and need no change.
 - Several near-identical light-blue tints (`#edf2ff`, `#eff3ff`, `#edf3ff`, `#eaf0ff`, `#eef2ff`, `#f1f5ff`, ...) play one role (hover/selected tint) and map to `secondary`/`accent`. They differ slightly from `--soco-soft-blue`, so each feature decides during its own migration whether the small shift is acceptable. Do not add a token per tint.
 - The global keyboard focus ring uses `--soco-focus-ring`. Inputs with their own ring must disable the legacy outline with `outline-none!` to avoid a double ring.
+
+## App breakpoints
+
+Use the named variants from `tailwind.css` instead of arbitrary `min-[761px]:` / `max-[760px]:`:
+
+| Variant | Media query | Use |
+| --- | --- | --- |
+| `app-mobile:` | `max-width: 760px` | Phone layout |
+| `app-desktop:` | `min-width: 761px` | Desktop layout |
+| `app-wide:` | `min-width: 1121px` | Wide desktop (feed side column, wider gaps) |
+| `app-full:` | `min-width: 1331px` | Extra wide feed layout |
+
+Custom variants are emitted after every built-in variant (`hover:`, `min-[...]`, `max-[...]`, `sm:`). On one element, do not mix `app-*` with an unconverted `min-[1121px]:`-style variant that sets the same property: the `app-*` rule would win at every width. Convert the other breakpoints on that element together, and check widths 760, 761 and just above/below any other breakpoint. `max-[760px]` used to mean `width < 760px`; `app-mobile` is `<= 760px`, matching the legacy `max-width: 760px` CSS.

@@ -21,6 +21,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
     super.key,
     required this.api,
     this.refreshRequest = 0,
+    this.settingsRequest = 0,
     required this.onLogout,
     required this.onConnect,
     required this.onLocaleChanged,
@@ -33,6 +34,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
   final Api api;
   final int refreshRequest;
+  final int settingsRequest;
   final Future<void> Function() onLogout;
   final ValueChanged<String> onConnect;
   final ValueChanged<String> onLocaleChanged;
@@ -77,6 +79,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   void didUpdateWidget(covariant ProfileScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.settingsRequest != oldWidget.settingsRequest) {
+      setState(() => section = 'settings');
+    }
     if (widget.refreshRequest != oldWidget.refreshRequest && section == 'overview') {
       ref.invalidate(profileProvider);
       unawaited(_load());

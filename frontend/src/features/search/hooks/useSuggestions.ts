@@ -32,15 +32,15 @@ function wait(ms: number, signal: AbortSignal) {
  * Suggestions for a draft: the draft itself, the user's own matching past searches, and (after a short
  * pause) matching people and public communities. Remote lookups only run while `enabled`.
  */
-export function useSuggestions(config: SuggestConfig, draft: string, enabled: boolean): Suggestion[] {
+export function useSuggestions(config: SuggestConfig | undefined, draft: string, enabled: boolean): Suggestion[] {
   const term = draft.trim()
-  const remote = enabled && term.length >= MIN_REMOTE_LENGTH
-  const people = useRemoteList(remote ? JSON.stringify([config.sessionId, 'suggest-people', term]) : '',
-    async signal => { await wait(DEBOUNCE_MS, signal); return (await searchPeople(config.request, term, signal)).slice(0, 3) }, 'people')
-  const communities = useRemoteList(remote ? JSON.stringify([config.sessionId, 'suggest-communities', term]) : '',
-    async signal => { await wait(DEBOUNCE_MS, signal); return (await searchCommunities(config.request, term, signal)).slice(0, 2) }, 'communities')
+  const remote = Boolean(config) && enabled && term.length >= MIN_REMOTE_LENGTH
+  const people = useRemoteList(remote ? JSON.stringify([config?.sessionId, 'suggest-people', term]) : '',
+    async signal => { await wait(DEBOUNCE_MS, signal); return (await searchPeople(config!.request, term, signal)).slice(0, 3) }, 'people')
+  const communities = useRemoteList(remote ? JSON.stringify([config?.sessionId, 'suggest-communities', term]) : '',
+    async signal => { await wait(DEBOUNCE_MS, signal); return (await searchCommunities(config!.request, term, signal)).slice(0, 2) }, 'communities')
 
-  if (!enabled || !term) return []
+  if (!config || !enabled || !term) return []
   const folded = foldText(term)
   const seen = new Set([folded])
   const past: string[] = []

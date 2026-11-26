@@ -415,7 +415,7 @@
     padding: 6px;
     border: 1px solid #e0e8f7;
     border-radius: 12px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 10px 25px rgba(34, 58, 99, .13);
   }
   .modern-shell.app-layout .desktop-conversation-rail-divider { width: 100%; background: #ecf1f9; }
@@ -434,9 +434,9 @@
     box-sizing: border-box;
     width: 16px;
     height: 16px;
-    color: #fff;
+    color: var(--soco-surface);
     background: #316dde;
-    border: 2px solid #fff;
+    border: 2px solid var(--soco-surface);
     border-radius: 50%;
     box-shadow: 0 1px 4px rgba(34, 79, 157, .28);
     pointer-events: none;
@@ -560,7 +560,7 @@
     padding: 6px;
     border: 1px solid #e0e8f7;
     border-radius: 12px;
-    background: #fff;
+    background: var(--soco-surface);
     box-shadow: 0 10px 25px rgba(34, 58, 99, .13);
   }
   .modern-shell.app-layout .conversation-avatar-rail-divider { width: 100%; background: #ecf1f9; }
@@ -579,9 +579,9 @@
     box-sizing: border-box;
     width: 16px;
     height: 16px;
-    color: #fff;
+    color: var(--soco-surface);
     background: #316dde;
-    border: 2px solid #fff;
+    border: 2px solid var(--soco-surface);
     border-radius: 50%;
     box-shadow: 0 1px 4px rgba(34, 79, 157, .28);
     pointer-events: none;

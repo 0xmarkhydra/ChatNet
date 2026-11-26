@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -19,6 +22,25 @@ type storyLiker struct {
 	ID          int64  `json:"id"`
 	Username    string `json:"username"`
 	DisplayName string `json:"displayName"`
+	Emoji       string `json:"emoji"`
+}
+
+// A PUT without a body is the original heart-only client.
+func storyReaction(w http.ResponseWriter, r *http.Request) (string, bool) {
+	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 256))
+	if err == nil && len(bytes.TrimSpace(raw)) == 0 {
+		return "❤️", true
+	}
+	var body struct {
+		Emoji string `json:"emoji"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err != nil || decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF || !validPostReaction(body.Emoji) {
+		httpx.Error(w, http.StatusBadRequest, "unsupported reaction")
+		return "", false
+	}
+	return body.Emoji, true
 }
 
 func storyID(w http.ResponseWriter, r *http.Request) (int64, bool) {
@@ -46,10 +68,11 @@ func (s *server) getStoryLikes(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ctx := r.Context()
-	var owner, liked bool
+	var owner bool
+	var emoji string
 	err := s.db.QueryRow(ctx, `SELECT s.user_id=$2,
-		EXISTS (SELECT 1 FROM story_likes l WHERE l.story_id=s.id AND l.user_id=$2)
-		FROM stories s WHERE s.id=$1 AND s.expires_at>NOW() AND `+storyNotBlockedSQL, id, claims.UserID).Scan(&owner, &liked)
+		COALESCE((SELECT l.emoji FROM story_likes l WHERE l.story_id=s.id AND l.user_id=$2),'')
+		FROM stories s WHERE s.id=$1 AND s.expires_at>NOW() AND `+storyNotBlockedSQL, id, claims.UserID).Scan(&owner, &emoji)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, http.StatusNotFound, "story not found")
 		return
@@ -60,12 +83,15 @@ func (s *server) getStoryLikes(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	if !owner {
-		httpx.JSON(w, http.StatusOK, map[string]bool{"liked": liked})
+		httpx.JSON(w, http.StatusOK, struct {
+			Liked bool   `json:"liked"`
+			Emoji string `json:"emoji,omitempty"`
+		}{emoji != "", emoji})
 		return
 	}
 
 	const pageSize = 50
-	rows, err := s.db.Query(ctx, `SELECT u.id,u.username,u.display_name FROM story_likes l
+	rows, err := s.db.Query(ctx, `SELECT u.id,u.username,u.display_name,l.emoji FROM story_likes l
 		JOIN stories s ON s.id=l.story_id
 		JOIN users u ON u.id=l.user_id
 		WHERE s.id=$1 AND s.user_id=$2 AND s.expires_at>NOW() AND u.id>$3
@@ -79,7 +105,7 @@ func (s *server) getStoryLikes(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	likers, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (storyLiker, error) {
 		var liker storyLiker
-		err := row.Scan(&liker.ID, &liker.Username, &liker.DisplayName)
+		err := row.Scan(&liker.ID, &liker.Username, &liker.DisplayName, &liker.Emoji)
 		return liker, err
 	})
 	if err != nil {
@@ -109,9 +135,16 @@ func (s *server) changeStoryLike(w http.ResponseWriter, r *http.Request) {
 	const allowed = `SELECT s.id FROM stories s
 		WHERE s.id=$1 AND s.user_id<>$2 AND s.expires_at>NOW() AND ` + storyNotBlockedSQL
 	var query string
+	args := []any{id, claims.UserID}
 	if r.Method == http.MethodPut {
+		emoji, ok := storyReaction(w, r)
+		if !ok {
+			return
+		}
+		args = append(args, emoji)
 		query = `WITH visible AS (` + allowed + `), changed AS (
-			INSERT INTO story_likes(story_id,user_id) SELECT id,$2 FROM visible ON CONFLICT DO NOTHING
+			INSERT INTO story_likes(story_id,user_id,emoji) SELECT id,$2,$3 FROM visible
+			ON CONFLICT (story_id,user_id) DO UPDATE SET emoji=EXCLUDED.emoji
 		) SELECT EXISTS (SELECT 1 FROM visible)`
 	} else {
 		query = `WITH visible AS (` + allowed + `), changed AS (
@@ -119,7 +152,7 @@ func (s *server) changeStoryLike(w http.ResponseWriter, r *http.Request) {
 		) SELECT EXISTS (SELECT 1 FROM visible)`
 	}
 	var visible bool
-	if err := s.db.QueryRow(r.Context(), query, id, claims.UserID).Scan(&visible); err != nil {
+	if err := s.db.QueryRow(r.Context(), query, args...).Scan(&visible); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot update story like")
 		return
 	}

@@ -1,7 +1,7 @@
 .connection-dialog {
   width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 32px);
   padding: 20px; border: 1px solid #dbe2de; border-radius: 8px;
-  background: #fff; color: #172b24; overflow: auto; box-sizing: border-box;
+  background: var(--soco-surface); color: #172b24; overflow: auto; box-sizing: border-box;
   box-shadow: 0 16px 60px #102d2333;
 }
 .connection-dialog::backdrop { background: #14231c80; }
@@ -13,7 +13,7 @@
 .connection-dialog button:disabled { opacity: .5; cursor: wait; }
 .connection-segments { display: flex; gap: 4px; background: #edf2ef; padding: 4px; border-radius: 6px; margin-bottom: 20px; }
 .connection-segments button { flex: 1; border: 0; border-radius: 4px; background: transparent; font-weight: 600; }
-.connection-segments button[aria-pressed="true"] { background: #fff; color: #08683f; box-shadow: 0 1px 4px #172b2420; }
+.connection-segments button[aria-pressed="true"] { background: var(--soco-surface); color: #08683f; box-shadow: 0 1px 4px #172b2420; }
 .qr-identity { text-align: center; display: grid; gap: 6px; }
 .qr-identity > strong { font-size: 20px; overflow-wrap: anywhere; }
 .qr-identity > span { color: #61726a; overflow-wrap: anywhere; }
@@ -45,7 +45,7 @@
 .chat-friend-bar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 8px 16px; padding: 8px 16px; flex: 0 0 auto; border-bottom: 1px solid #dce4df;
-  background: #fff; color: #54635b; font-size: 13px; letter-spacing: 0;
+  background: var(--soco-surface); color: #54635b; font-size: 13px; letter-spacing: 0;
 }
 .chat-friend-bar > span { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
 .chat-friend-bar svg { flex-shrink: 0; }
@@ -61,32 +61,6 @@
 
 .chat-friend-bar button:disabled { opacity: .5; cursor: wait; }
 .chat-friend-bar button:focus-visible { outline: 2px solid #08764b; outline-offset: 2px; }
-.chat-options-anchor { position: relative; flex: 0 0 auto; }
-.chat-options-trigger {
-  display: grid; place-items: center; width: 42px; height: 42px; padding: 0;
-  border: 1px solid #e2e8f0; border-radius: 12px;
-  background: #f1f5ff; color: #475569; cursor: pointer;
-}
-.chat-options-trigger:hover, .chat-options-trigger[aria-expanded="true"] {
-  background: #e5eaff; color: #4338ca;
-}
-.chat-options-trigger:focus-visible, .chat-options-menu button:focus-visible {
-  outline: 2px solid #4f46e5; outline-offset: 2px;
-}
-.chat-options-menu {
-  position: absolute; z-index: 30; top: calc(100% + 6px); right: 0;
-  width: 206px; max-width: calc(100vw - 20px); padding: 6px;
-  border: 1px solid #e2e8f0; border-radius: 14px;
-  background: #fff; box-shadow: 0 14px 34px rgba(15, 23, 42, .16);
-}
-.chat-options-menu button {
-  display: block; width: 100%; min-height: 44px; padding: 10px 12px;
-  border: 0; border-radius: 9px; background: transparent;
-  color: #334155; font: inherit; font-size: 13px; text-align: left; cursor: pointer;
-}
-.chat-options-menu button:hover { background: #f1f5ff; }
-.chat-options-menu button.chat-options-danger { color: #be123c; }
-.chat-options-menu button:disabled { opacity: .5; cursor: wait; }
 
 /* Keep the QR preview flexible so the actions fit within the dialog height. */
 .qr-dialog[open] { display: flex; flex-direction: column; }
