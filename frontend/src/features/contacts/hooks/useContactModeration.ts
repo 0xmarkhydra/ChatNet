@@ -3,6 +3,7 @@ import type { FriendConnection, FriendSearchResult } from "../types";
 import { blockUser, unblockUser, listBlockedUsers, reportUser } from "../api/contacts";
 import type { UseContactActionsDeps } from "./contactActionTypes";
 import { parseBlockedUsers } from "../utils/blockedUsers";
+import { contactApiError } from "../utils/contactApiError";
 import { parseContactReportReason, parseContactReportDetails } from "../utils/contactReportInput";
 
 type UseContactModerationDeps = Pick<UseContactActionsDeps,
@@ -71,7 +72,7 @@ export function useContactModeration({
       } | null;
       if (sessionRef.current?.sessionId !== sid) return;
       if (!response.ok) {
-        setNotice(result?.error || "Không thể chặn người dùng.", "error");
+        setNotice(contactApiError(result, "Không thể chặn người dùng."), "error");
         return;
       }
       // Blocking a contact must not remove an accepted friend from the directory.
@@ -142,7 +143,7 @@ export function useContactModeration({
       setNotice(
         response.ok
           ? "Đã gửi báo cáo. Cảm ơn bạn."
-          : result?.error || "Không thể gửi báo cáo.",
+          : contactApiError(result, "Không thể gửi báo cáo."),
         response.ok ? "success" : "error",
       );
     } catch {

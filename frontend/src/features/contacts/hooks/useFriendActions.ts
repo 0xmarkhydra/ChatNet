@@ -1,6 +1,7 @@
 import type { FriendConnection, FriendSearchResult } from "../types";
 import { updateFriendRelationship, removeAcceptedFriend as removeFriendRequest } from "../api/contacts";
 import type { UseContactActionsDeps } from "./contactActionTypes";
+import { contactApiError } from "../utils/contactApiError";
 
 type FriendActionsDeps = Pick<UseContactActionsDeps,
   | "apiFetch"
@@ -77,7 +78,7 @@ export function useFriendActions({
       if (sessionRef.current?.sessionId !== sessionId) return;
       ++friendSyncRequest.current;
       if (!response.ok) {
-        setNotice(result?.error || "Không cập nhật được lời mời kết bạn");
+        setNotice(contactApiError(result, "Không cập nhật được lời mời kết bạn"));
         await refreshFriendConnections();
         return;
       }
@@ -161,7 +162,7 @@ export function useFriendActions({
       } | null;
       if (sessionRef.current?.sessionId !== sessionId) return;
       if (!response.ok) {
-        setNotice(result?.error || "Không thể hủy kết bạn. Vui lòng thử lại.");
+        setNotice(contactApiError(result, "Không thể hủy kết bạn. Vui lòng thử lại."));
       } else {
         setFriends((current) =>
           current.filter((item) => item.id !== friend.id),
