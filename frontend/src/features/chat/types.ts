@@ -24,6 +24,8 @@ export type Message = {
   deleted?: boolean
   reactions?: MessageReaction[]
   readByUserIds?: number[]
+  /** Viewer-specific snapshot from history (zero means no unread messages). */
+  firstUnreadMessageId?: number
   translatedText?: string
   translationLanguage?: string
   attachments?: MediaAttachment[]
