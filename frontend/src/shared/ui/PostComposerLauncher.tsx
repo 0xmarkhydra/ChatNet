@@ -12,6 +12,8 @@ type Props = {
   onCheckIn: () => void
   pending?: boolean
   storyBusy?: boolean
+  /** Edge-to-edge on mobile: no corner radius or side borders. */
+  flushOnMobile?: boolean
 }
 
 const shortcutClass = 'inline-grid size-10 shrink-0 place-items-center rounded-xl border border-transparent transition-[background-color,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-blue-400 disabled:cursor-not-allowed! disabled:opacity-45! app-mobile:size-[36px]'
@@ -19,13 +21,13 @@ const shortcutClass = 'inline-grid size-10 shrink-0 place-items-center rounded-x
 /** One Tailwind-owned launcher for Feed and Profile. Parent page CSS must not style its internals. */
 export default function PostComposerLauncher({
   username, displayName, prompt, onCreatePost, onCreateMediaPost, onCreateStory, onCheckIn,
-  pending = false, storyBusy = false,
+  pending = false, storyBusy = false, flushOnMobile = false,
 }: Props) {
   const quickMediaInput = useRef<HTMLInputElement>(null)
 
   return (
     <section aria-label="Tạo nội dung mới"
-      className="box-border flex w-full min-w-0 flex-col rounded-2xl border border-[#e5eaf2] bg-white p-3 px-4 shadow-[0_3px_16px_rgba(30,51,96,0.035)] app-mobile:rounded-[14px] app-mobile:p-3">
+      className={`box-border flex w-full min-w-0 flex-col rounded-2xl border border-[#e5eaf2] bg-white p-3 px-4 shadow-[0_3px_16px_rgba(30,51,96,0.035)] app-mobile:p-3 ${flushOnMobile ? 'app-mobile:rounded-none app-mobile:border-x-0' : 'app-mobile:rounded-[14px]'}`}>
       <div className="flex w-full min-w-0 items-center gap-[11px] app-mobile:gap-2">
         <PostStatusPrompt
           username={username}
