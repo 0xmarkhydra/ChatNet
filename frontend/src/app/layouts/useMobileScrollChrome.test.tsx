@@ -466,13 +466,54 @@ scroll(0);      scroll(419); // Collapsing at the very end would clamp scrollTop
 
       scroll(0);
       scroll(100);
-      scroll(200);
       expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
-      expect(scroller.scrollTop).toBe(268);
+      expect(scroller.scrollTop).toBe(32);
 
-      scroll(280);
+      // A finger drag keeps firing small events while hidden: none of them may be pulled back.
+      for (const top of [72, 112, 200, 240, 280]) {
+        scroll(top);
+        expect(scroller.scrollTop).toBe(top);
+      }
       scroll(100); // Quick flick up reveals the bars again.
       expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+      expect(scroller.scrollTop).toBe(168);
+
+      scroll(300);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
+      scroll(0); // At the very top the returning header must not cover the first rows.
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+      expect(scroller.scrollTop).toBe(0);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it("waits until the list has scrolled past the header height before collapsing", () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
+    vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() => root.render(<MemoryRouter><ScrollShell activeTab="feed" /></MemoryRouter>));
+      const shell = host.querySelector("main")!;
+      const scroller = host.querySelector("section")!;
+      Object.defineProperty(host.querySelector("header")!, "offsetHeight", { value: 68 });
+      Object.defineProperty(scroller, "scrollHeight", { value: 1000 });
+      Object.defineProperty(scroller, "clientHeight", { value: 800 });
+      const scroll = (top: number) => {
+        scroller.scrollTop = top;
+        act(() => scroller.dispatchEvent(scrollEvent()));
+      };
+
+      scroll(0);
+      scroll(65);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(false);
+      expect(scroller.scrollTop).toBe(65);
+      scroll(100);
+      expect(shell.classList.contains("mobile-chrome-hidden")).toBe(true);
       expect(scroller.scrollTop).toBe(32);
     } finally {
       act(() => root.unmount());
