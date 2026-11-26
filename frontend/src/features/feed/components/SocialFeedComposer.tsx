@@ -19,6 +19,7 @@ export default function SocialFeedComposer({
 }: Props) {
   return (
     <PostComposerLauncher
+      flushOnMobile
       username={username}
       displayName={displayName}
       prompt={draft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}

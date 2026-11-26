@@ -2,6 +2,8 @@ import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { ApiRequest } from '../../../shared/types/api'
 import type { Tab } from '../../../shared/types/navigation'
 import type { FriendSearchResult } from '../types'
+import { listFriendSuggestions, searchFriendUsers } from '../api/contacts'
+import { parseFriendSearchResults } from '../utils/friendSearchResults'
 
 type Options = {
   sessionToken?: string
@@ -37,7 +39,10 @@ export function useFriendSearchRequests({
       setFriendSearchError(false);
       return;
     }
-    if (!friendSurfaceOpen) return;
+    if (!friendSurfaceOpen) {
+      setFriendSearching(false);
+      return;
+    }
 
     const controller = new AbortController();
     // Keep the last successful suggestions visible while refreshing in the background.
@@ -46,10 +51,13 @@ export function useFriendSearchRequests({
     setFriendSearchError(false);
 
     if (!query) {
-      apiFetch("/api/users/suggestions", { signal: controller.signal })
+      listFriendSuggestions(apiFetch, controller.signal)
         .then(async (response) => {
           if (!response.ok) throw new Error("Cannot load suggestions");
-          return response.json() as Promise<FriendSearchResult[]>;
+          const data: unknown = await response.json();
+          const items = parseFriendSearchResults(data);
+          if (!items) throw new Error("Invalid suggestions response");
+          return items;
         })
         .then((items) => {
           if (!controller.signal.aborted) setFriendResults(items);
@@ -70,12 +78,11 @@ export function useFriendSearchRequests({
     const timer = window.setTimeout(async () => {
       setFriendSearching(true);
       try {
-        const response = await apiFetch(
-          `/api/users/search?q=${encodeURIComponent(query)}`,
-          { signal: controller.signal },
-        );
+        const response = await searchFriendUsers(apiFetch, query, controller.signal);
         if (!response.ok) throw new Error("Cannot search users");
-        const items = (await response.json()) as FriendSearchResult[];
+        const data: unknown = await response.json();
+        const items = parseFriendSearchResults(data);
+        if (!items) throw new Error("Invalid user search response");
         if (!controller.signal.aborted) setFriendResults(items);
       } catch {
         if (!controller.signal.aborted) {

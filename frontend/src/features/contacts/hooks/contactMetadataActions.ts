@@ -1,4 +1,5 @@
 import { updateContactMetadata } from "../api/contacts";
+import { contactApiError } from "../utils/contactApiError";
 import type { FriendConnection } from "../types";
 import type { UseContactActionsDeps } from "./contactActionTypes";
 
@@ -52,7 +53,7 @@ export function createContactMetadataActions({
       } | null;
       if (sessionRef.current?.sessionId !== sid) return;
       if (!response.ok || !result || result.id !== friend.id) {
-        setNotice(result?.error || "Không lưu được liên hệ.", "error");
+        setNotice(contactApiError(result, "Không lưu được liên hệ."), "error");
         return;
       }
       setContactMetadata((old) => ({ ...old, [friend.id]: next }));

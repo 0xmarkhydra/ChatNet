@@ -70,3 +70,12 @@ it("preserves the blocked contact when no existing conversation is found", async
   expect(state.setActiveConversationId).not.toHaveBeenCalled();
   expect(state.setNotice).toHaveBeenCalledWith("Chưa tìm thấy hội thoại cũ để mở.", "warning");
 });
+it("does not navigate on malformed conversation responses", async () => {
+  for (const payload of [{ items: [direct] }, null, [null, false, { id: "bad", type: "direct", otherUserId: 19 }]]) {
+    const state = setup({ apiFetch: async () => Response.json(payload) });
+    await state.actions.openBlockedFriendConversation(19);
+    expect(state.setConversations).not.toHaveBeenCalled();
+    expect(state.setActiveConversationId).not.toHaveBeenCalled();
+    expect(state.setNotice).toHaveBeenCalledWith("Chưa tìm thấy hội thoại cũ để mở.", "warning");
+  }
+});
