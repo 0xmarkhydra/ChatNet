@@ -131,7 +131,6 @@ import ProfileEditorPage from "../features/profile/components/ProfileEditorPage"
 import SettingsWorkspace from "../features/settings/components/SettingsWorkspace";
 import SocialFeedComposer from "../features/feed/components/SocialFeedComposer";
 import SocialFeedSidebar from "../features/feed/components/SocialFeedSidebar";
-import SocialFeedStories from "../features/feed/components/SocialFeedStories";
 import StoryComposer from "../features/feed/components/StoryComposer";
 import { parsePostExtras, composePostContent } from "../features/feed/utils/postExtras";
 import CommunicationHub from "../features/chat/components/CommunicationHub";

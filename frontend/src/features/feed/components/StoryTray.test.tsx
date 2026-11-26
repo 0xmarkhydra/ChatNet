@@ -62,4 +62,15 @@ describe('StoryTray', () => {
     expect(onRetry).toHaveBeenCalled()
     expect(onCancel).toHaveBeenCalled()
   })
+
+  it('drops focus after a pointer open but keeps it for the keyboard', async () => {
+    await render(new Set())
+    const card = host.querySelector('button[aria-label^="Xem Story của binh"]') as HTMLButtonElement
+    card.focus()
+    await act(async () => { card.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })) })
+    expect(document.activeElement).not.toBe(card)
+    card.focus()
+    await act(async () => card.click())
+    expect(document.activeElement).toBe(card)
+  })
 })
