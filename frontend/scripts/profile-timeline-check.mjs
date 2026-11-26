@@ -113,6 +113,8 @@ try {
       continue
     }
     await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('button', { name: 'Cá nhân' }).click()
+    await page.locator('.profile-mobile-full-hero h1').waitFor()
+    await page.getByRole('button', { name: 'Cài đặt', exact: true }).click()
     async function checkMobileProfileColors() {
       const colors = await page.evaluate(() => {
         const avatar = document.querySelector('.profile-view > :is(.profile-page-hero, .profile-mobile-full-hero) .profile-hero-avatar')
