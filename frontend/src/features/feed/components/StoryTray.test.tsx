@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Story } from '../types'
+import type { PendingStoryView, Story } from '../types'
 import StoryTray from './StoryTray'
 
 let root: Root
@@ -21,9 +21,9 @@ beforeEach(() => {
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove() })
 
-function render(seen: Set<number>, handlers: { onOpen?: (id: number) => void; onSeeAll?: () => void; onCreate?: () => void } = {}) {
+function render(seen: Set<number>, handlers: { pending?: PendingStoryView; onRetry?: () => void; onCancel?: () => void; onOpen?: (id: number) => void; onSeeAll?: () => void; onCreate?: () => void } = {}) {
   return act(async () => root.render(
-    <StoryTray username="me" displayName="Tôi" stories={stories} seen={seen} busy={false}
+    <StoryTray username="me" displayName="Tôi" stories={stories} seen={seen} busy={false} pending={handlers.pending} onRetry={handlers.onRetry} onCancel={handlers.onCancel}
       onCreate={handlers.onCreate ?? (() => {})} onOpen={handlers.onOpen ?? (() => {})} onSeeAll={handlers.onSeeAll ?? (() => {})} />,
   ))
 }
@@ -47,5 +47,21 @@ describe('StoryTray', () => {
     expect(onCreate).toHaveBeenCalled()
     await act(async () => ([...host.querySelectorAll('button')].find(b => b.textContent === 'Xem tất cả') as HTMLButtonElement).click())
     expect(onSeeAll).toHaveBeenCalled()
+  })
+
+  it('shows upload progress in place of the create card while posting', async () => {
+    await render(new Set(), { pending: { status: 'posting', percent: 62, kind: 'Ảnh' } })
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Đang đăng 62%')
+    expect(host.querySelector('button[aria-label="Tạo Story mới"]')).toBeNull()
+  })
+
+  it('offers retry and cancel when posting failed', async () => {
+    const onRetry = vi.fn(), onCancel = vi.fn()
+    await render(new Set(), { pending: { status: 'failed', percent: null, kind: 'Chữ' }, onRetry, onCancel })
+    const button = (text: string) => [...host.querySelectorAll('button')].find(b => b.textContent === text) as HTMLButtonElement
+    await act(async () => button('Thử lại').click())
+    await act(async () => button('Hủy').click())
+    expect(onRetry).toHaveBeenCalled()
+    expect(onCancel).toHaveBeenCalled()
   })
 })

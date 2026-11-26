@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { AlertCircle, Loader2, Plus } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/shared/ui/dialog'
 import { cn } from '@/shared/lib/utils'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import type { Story } from '../types'
+import type { PendingStoryView, Story } from '../types'
 import { groupStories, relativeStoryTime, type StoryGroup } from '../utils/storyGroups'
 import StoryPreview from './StoryPreview'
 
@@ -15,6 +15,9 @@ type Props = {
   stories: Story[]
   seen: ReadonlySet<number>
   busy: boolean
+  pending?: PendingStoryView | null
+  onRetry?: () => void
+  onCancel?: () => void
   onCreate: () => void
   onOpen: (id: number) => void
 }
@@ -39,7 +42,7 @@ function StoryRow({ group, unseen, onOpen }: { group: StoryGroup; unseen: boolea
 }
 
 /** Full list of stories: own stories, then new (unseen) and seen people. */
-export default function StoryListSheet({ open, onOpenChange, username, displayName, stories, seen, busy, onCreate, onOpen }: Props) {
+export default function StoryListSheet({ open, onOpenChange, username, displayName, stories, seen, busy, pending, onRetry, onCancel, onCreate, onOpen }: Props) {
   const [tab, setTab] = useState<'all' | 'unseen'>('all')
   const groups = groupStories(stories, seen, username)
   const own = groups.find(group => group.own)
@@ -80,6 +83,25 @@ export default function StoryListSheet({ open, onOpenChange, username, displayNa
                 <Plus size={14} strokeWidth={3} aria-hidden="true" />Tạo tin
               </button>
             </div>
+            {pending && (
+              <div role={pending.status === 'failed' ? 'alert' : 'status'} className="flex min-h-18 items-center gap-ui-3 border-t border-border">
+                <span className={cn('grid size-13 flex-none place-items-center rounded-full bg-(image:--soco-gradient) text-white', pending.status === 'failed' && 'ring-2 ring-destructive')}>
+                  {pending.status === 'failed' ? <AlertCircle size={22} aria-hidden="true" /> : <Loader2 size={22} aria-hidden="true" className="animate-spin" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className={cn('text-ui-subtitle font-semibold', pending.status === 'failed' ? 'text-destructive' : 'text-foreground')}>
+                    {pending.status === 'failed' ? 'Không đăng được' : pending.percent === null ? 'Đang đăng...' : `Đang đăng... ${pending.percent}%`}
+                  </div>
+                  <div className="text-ui-label text-muted-foreground">{pending.kind}{pending.status === 'failed' ? ' · tệp vẫn được giữ lại' : ''}</div>
+                </div>
+                {pending.status === 'failed' && (
+                  <>
+                    <button type="button" onClick={onCancel} className="min-h-control-touch cursor-pointer border-0 bg-transparent px-ui-2 text-ui-label font-semibold text-muted-foreground">Hủy</button>
+                    <button type="button" onClick={onRetry} className="min-h-control-touch cursor-pointer rounded-full border-0 bg-primary px-ui-4 text-ui-label font-bold text-primary-foreground">Thử lại</button>
+                  </>
+                )}
+              </div>
+            )}
           </section>
           {fresh.length > 0 && (
             <section aria-labelledby="story-new" className="rounded-ui-lg bg-card px-ui-3 pt-ui-3">

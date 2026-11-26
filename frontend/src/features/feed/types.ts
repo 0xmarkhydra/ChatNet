@@ -34,6 +34,8 @@ export type TextStoryInput = { text: string; background: StoryBackground }
 
 export type StoryDraft = { kind: 'choose' } | { kind: 'media'; file: File } | { kind: 'text' }
 
+export type PendingStoryView = { status: "posting" | "failed"; percent: number | null; kind: "Ảnh" | "Video" | "Chữ" }
+
 export type Story = {
   id: number
   author: string

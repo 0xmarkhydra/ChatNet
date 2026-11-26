@@ -8,8 +8,10 @@ import { type Conversation } from "../../chat";
 import { useSession } from "../../../shared/context/SessionContext";
 import { useApi } from "../../../shared/context/ApiContext";
 import { useNotice } from "../../../shared/context/NoticeContext";
-import { type SetStateAction } from "react";
+import { type SetStateAction, useState } from "react";
 import type { Dispatch, RefObject } from "react";
+
+export type PendingStory = { input: { file: File } | TextStoryInput; status: "posting" | "failed" };
 
 export type UseStoryActionsDeps = {
   mediaUploading: "chat" | "feed" | "story" | "profile" | null;
@@ -45,13 +47,10 @@ export function useStoryActions({
   const { session, sessionRef } = useSession();
   const { apiFetch } = useApi();
   const { setNotice } = useNotice();
-  async function createStory(input: { file: File } | TextStoryInput) {
+  const [pendingStory, setPendingStory] = useState<PendingStory | null>(null);
+  async function publishStory(input: { file: File } | TextStoryInput) {
     const sessionId = session?.sessionId;
-    if (!sessionId || storyBusy || ("file" in input && mediaUploading)) return false;
-    if ("text" in input) {
-      const length = storyTextLength(input.text);
-      if (!length || length > STORY_TEXT_LIMIT) return false;
-    }
+    if (!sessionId) return;
     setStoryBusy(true);
     try {
       let body: Parameters<typeof submitStory>[1];
@@ -62,31 +61,49 @@ export function useStoryActions({
       } else {
         body = { ...input, text: input.text.trim() };
       }
-      if (sessionRef.current?.sessionId !== sessionId) return false;
+      if (sessionRef.current?.sessionId !== sessionId) return;
       const response = await submitStory(apiFetch, body);
       const result = (await response.json().catch(() => null)) as
         | (Story & { error?: string })
         | null;
-      if (sessionRef.current?.sessionId !== sessionId) return false;
+      if (sessionRef.current?.sessionId !== sessionId) return;
       if (!response.ok || !result?.id || ("attachment" in body ? !result.attachment : !result.text || !result.background))
         throw new Error("text" in body ? "Không đăng được tin văn bản. Vui lòng thử lại." : result?.error || "Không đăng được Story");
       setStories((current) => [
         result,
         ...current.filter((item) => item.id !== result.id),
       ]);
-      setActiveStoryId(result.id);
-      setStoryDraft(null);
+      setPendingStory(null);
       setNotice("Đã đăng Story.", "success");
-      return true;
     } catch (error) {
-      if (sessionRef.current?.sessionId === sessionId)
+      if (sessionRef.current?.sessionId === sessionId) {
+        setPendingStory({ input, status: "failed" });
         setNotice(
           error instanceof Error ? error.message : "Không đăng được Story",
         );
-      return false;
+      }
     } finally {
       if (sessionRef.current?.sessionId === sessionId) setStoryBusy(false);
     }
+  }
+  async function createStory(input: { file: File } | TextStoryInput) {
+    if (!session?.sessionId || storyBusy || ("file" in input && mediaUploading)) return false;
+    if ("text" in input) {
+      const length = storyTextLength(input.text);
+      if (!length || length > STORY_TEXT_LIMIT) return false;
+    }
+    setStoryDraft(null);
+    setPendingStory({ input, status: "posting" });
+    void publishStory(input);
+    return true;
+  }
+  function retryStory() {
+    if (!pendingStory || pendingStory.status !== "failed" || storyBusy || mediaUploading) return;
+    setPendingStory({ ...pendingStory, status: "posting" });
+    void publishStory(pendingStory.input);
+  }
+  function cancelStory() {
+    if (pendingStory?.status === "failed") setPendingStory(null);
   }
   async function deleteStory(story: Story) {
     if (story.author !== name || storyBusy || !window.confirm("Xóa Story này?"))
@@ -191,6 +208,9 @@ export function useStoryActions({
 
   return {
     createStory,
+    pendingStory,
+    retryStory,
+    cancelStory,
     deleteStory,
     replyToStory,
     reportStory,
