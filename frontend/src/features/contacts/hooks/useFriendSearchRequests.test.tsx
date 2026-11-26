@@ -46,6 +46,9 @@ describe('useFriendSearchRequests', () => {
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
       expect(calls).toContain('/api/users/search?q=hello')
       expect(host.textContent).toContain('searched')
+      await act(async () => root.render(<Probe id="A" query=" hello " />))
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
+      expect(calls.filter(path => path.startsWith('/api/users/search'))).toHaveLength(1)
       await act(async () => root.render(<Probe id={undefined} />))
       expect(host.textContent).toContain('|idle|ok')
       expect(host.textContent).not.toContain('searched')
@@ -55,4 +58,72 @@ describe('useFriendSearchRequests', () => {
       restore()
     }
   })
+  it('does not refetch contacts when unrelated desktop panels or chat modes change', async () => {
+    const restore = setActEnvironment()
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    const request = vi.fn(async () => Response.json([{ id: 1, username: 'suggested' }]))
+    function Probe({ section, mode }: { section: 'calls' | 'groups' | null; mode: string }) {
+      const [results, setResults] = useState<FriendSearchResult[]>([])
+      const [, setSearching] = useState(false)
+      const [, setError] = useState(false)
+      useFriendSearchRequests({
+        sessionToken: 'token', sessionId: 'session',
+        tab: 'contacts', desktopSection: section, newChatMode: mode,
+        friendQuery: '', friendSearchRetry: 0, apiFetch: request,
+        setFriendResults: setResults, setFriendSearching: setSearching, setFriendSearchError: setError,
+      })
+      return <span>{results.length}</span>
+    }
+    try {
+      await act(async () => root.render(<Probe section={null} mode="friends" />))
+      expect(request).toHaveBeenCalledTimes(1)
+      await act(async () => root.render(<Probe section="calls" mode="group" />))
+      await act(async () => root.render(<Probe section="groups" mode="friends" />))
+      expect(request).toHaveBeenCalledTimes(1)
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+      restore()
+    }
+  })
+
+  it('aborts an in-flight suggestion request after the friend surface closes', async () => {
+    const restore = setActEnvironment()
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    let finish!: (value: Response) => void
+    let signal: AbortSignal | undefined
+    const request: ApiRequest = async (_path, options) => {
+      signal = options?.signal ?? undefined
+      return new Promise(resolve => { finish = resolve })
+    }
+    function Probe({ tab }: { tab: 'contacts' | 'feed' }) {
+      const [results, setResults] = useState<FriendSearchResult[]>([])
+      const [, setSearching] = useState(false)
+      const [, setError] = useState(false)
+      useFriendSearchRequests({
+        sessionToken: 'token', sessionId: 'session',
+        tab, desktopSection: null, newChatMode: '',
+        friendQuery: '', friendSearchRetry: 0, apiFetch: request,
+        setFriendResults: setResults, setFriendSearching: setSearching, setFriendSearchError: setError,
+      })
+      return <span>{results.map(item => item.username).join(',')}</span>
+    }
+    try {
+      await act(async () => root.render(<Probe tab="contacts" />))
+      expect(signal?.aborted).toBe(false)
+      await act(async () => root.render(<Probe tab="feed" />))
+      expect(signal?.aborted).toBe(true)
+      await act(async () => finish(Response.json([{ id: 4, username: 'stale' }])))
+      expect(host.textContent).not.toContain('stale')
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+      restore()
+    }
+  })
+
 })

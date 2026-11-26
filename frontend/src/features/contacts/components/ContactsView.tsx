@@ -55,6 +55,7 @@ type Props = {
 }
 
 const personName = (friend: FriendSearchResult) => friend.displayName || friend.username
+const EMPTY_CALL_CONVERSATIONS: Conversation[] = []
 
 export default function ContactsView({
   screen, onScreenChange, friendQuery, setFriendQuery, friendSearching, friendSearchError,
@@ -62,7 +63,7 @@ export default function ContactsView({
   setFriendMenuId, friendMenuId, blockContact, unblockContact, onOpenBlockedChat, reportContact, friendRequests, declineFriendRequest,
   friends, friendsLoading, friendsError, onRetryFriends, contactMetadata, openDirectByUsername, setFriendPreview, changePersonalContact,
   removeAcceptedFriend, connectionUrl, onScanQr, suggestions, suggestionsLoading, suggestionsError, onRetrySuggestions, onSettings, embeddedInCalls = false,
-  callConversations = [], onOpenCallChat,
+  callConversations = EMPTY_CALL_CONVERSATIONS, onOpenCallChat,
 }: Props) {
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
   const { hostRef: filterHostRef, pillRef: filterPillRef, activeRef: filterActiveRef } = useSlidingPill<HTMLDivElement>(directoryFilter)
