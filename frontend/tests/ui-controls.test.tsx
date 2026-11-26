@@ -70,6 +70,43 @@ describe("SocCO shared form controls", () => {
     }
   });
 
+  it("opens the shared mobile SearchForm and navigates only after submitting", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const onMobileSearchSubmit = vi.fn();
+    const previous = (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    try {
+      await act(async () => root.render(
+        <HeaderSearch anchorRef={{ current: null }} icon={<span aria-hidden="true">⌕</span>}
+          value="" placeholder="Tìm kiếm" ariaLabel="Tìm kiếm"
+          onChange={vi.fn()} onMobileSearchSubmit={onMobileSearchSubmit} />,
+      ));
+      const trigger = host.querySelector<HTMLButtonElement>('button[aria-label="Mở tìm kiếm"]');
+      expect(host.querySelector('form[role="search"]')).toBeNull();
+      await act(async () => trigger?.click());
+      const form = host.querySelector<HTMLFormElement>('form[role="search"]');
+      const input = form?.querySelector<HTMLInputElement>('input[data-slot="search-field-input"]');
+      expect(form).not.toBeNull();
+      expect(input).not.toBeNull();
+      expect(trigger?.getAttribute("aria-expanded")).toBe("true");
+      expect(onMobileSearchSubmit).not.toHaveBeenCalled();
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        setter?.call(input, "xin chào");
+        input?.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await act(async () => form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+      expect(onMobileSearchSubmit).toHaveBeenCalledExactlyOnceWith("xin chào");
+      expect(host.querySelector(".mobile-search-expanded")).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = previous;
+    }
+  });
+
   it("provides accessible dialog title and description when opened", async () => {
     const host = document.createElement("div");
     document.body.append(host);

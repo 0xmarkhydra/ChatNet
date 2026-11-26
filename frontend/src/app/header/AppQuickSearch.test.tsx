@@ -29,6 +29,7 @@ function setup(tab: 'chat' | 'feed' | 'profile' | 'contacts' | 'discover', query
   />)
   const props = mocks.header.mock.lastCall?.[0] as {
     value: string; maxLength?: number; controls?: string;
+    onMobileSearchSubmit?: (query: string) => void;
     onChange: (value: string) => void;
     onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   }
@@ -36,6 +37,16 @@ function setup(tab: 'chat' | 'feed' | 'profile' | 'contacts' | 'discover', query
 }
 
 describe('AppQuickSearch navigation and presentation', () => {
+  it('opens results only when the shared mobile SearchForm submits a query', () => {
+    for (const tab of ['feed', 'profile', 'contacts', 'discover'] as const) {
+      const t = setup(tab)
+      expect(t.props.onMobileSearchSubmit).toBeTypeOf('function')
+      expect(t.navigate).not.toHaveBeenCalled()
+      t.props.onMobileSearchSubmit?.('xin chào & bạn')
+      expect(t.navigate).toHaveBeenCalledExactlyOnceWith('/search?q=' + encodeURIComponent('xin chào & bạn'))
+    }
+    expect(setup('chat').props.onMobileSearchSubmit).toBeUndefined()
+  })
   it('keeps contact search scoped to Contacts', () => {
     const t = setup('contacts', 'global')
     expect(t.props.value).toBe('anna')
