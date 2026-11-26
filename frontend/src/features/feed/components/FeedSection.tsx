@@ -1,6 +1,5 @@
 import { collapseQuickReposts } from "../utils/feedRequestState";
 import FeedModeration from "./FeedModeration";
-import SocialFeedStories from "./SocialFeedStories";
 import { userLabel } from "../../../shared/utils/userLabel";
 import StoryTray from "./StoryTray";
 import { markStorySeen, useSeenStories } from "../utils/storySeen";
@@ -187,32 +186,18 @@ export default function FeedSection({
             <div className="social-feed-grid flex w-full min-w-0 flex-col gap-0 p-0 app-desktop:mx-auto app-desktop:grid app-desktop:max-w-[700px] app-desktop:grid-cols-[minmax(0,1fr)] app-desktop:items-start app-desktop:justify-center app-desktop:gap-[22px] app-desktop:px-[18px] app-desktop:pt-[17px] app-desktop:pb-9 app-wide:max-w-[1040px] app-wide:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] app-wide:gap-[18px] app-full:grid-cols-[minmax(0,620px)_minmax(260px,320px)] app-full:gap-[22px] app-full:px-6 app-full:pt-5">
               <div className="social-feed-center flex min-w-0 flex-col gap-0 app-desktop:gap-[15px] app-desktop:[&>*]:box-border app-desktop:[&>*]:w-full app-desktop:[&>*]:min-w-0">
                 {!feedCommunitiesOpen && (<>
-                {isProfileDesktop ? (
-                  <SocialFeedStories
-                    username={name}
-                    displayName={userLabel(
-                      profileMedia?.displayName || session.user.displayName,
-                      name,
-                    )}
-                    stories={stories}
-                    busy={storyBusy || mediaUploading === "story"}
-                    onCreate={() => setStoryDraft({ kind: "choose" })}
-                    onOpen={setActiveStoryId}
-                  />
-                ) : (
-                  <StoryTray
-                    username={name}
-                    displayName={storyDisplayName}
-                    stories={stories}
-                    seen={seenStories}
-                    busy={storyBusy || mediaUploading === "story"}
-                    pending={pendingStory}
-                    onRetry={retryStory}
-                    onCancel={cancelStory}
-                    onCreate={() => setStoryDraft({ kind: "choose" })}
-                    onOpen={setActiveStoryId}
-                  />
-                )}
+                <StoryTray
+                  username={name}
+                  displayName={storyDisplayName}
+                  stories={stories}
+                  seen={seenStories}
+                  busy={storyBusy || mediaUploading === "story"}
+                  pending={pendingStory}
+                  onRetry={retryStory}
+                  onCancel={cancelStory}
+                  onCreate={() => setStoryDraft({ kind: "choose" })}
+                  onOpen={setActiveStoryId}
+                />
 
                 <SocialFeedComposer
                     username={name}

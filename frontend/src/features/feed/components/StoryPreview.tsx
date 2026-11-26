@@ -1,5 +1,6 @@
 import type { Story } from '../types'
 import { cn } from '@/shared/lib/utils'
+import '../styles/story-text.css'
 
 /** Fills its (relative) parent with the story's media, or the text story on its palette. */
 export default function StoryPreview({ story, className }: { story: Story; className?: string }) {
