@@ -100,3 +100,32 @@ describe("embedded Calls route navigation", () => {
     expect(app.route()).toBe("/calls/history");
   });
 });
+
+describe("call history reload", () => {
+  it("replaces a load error with loading state on retry, then clears loading on success", async () => {
+    let finish: ((items: never) => void) | undefined;
+    historyMock
+      .mockImplementationOnce(() => Promise.reject(new Error("Mất kết nối")))
+      .mockImplementationOnce(() => new Promise<never>(resolve => { finish = resolve; }));
+    const app = mount("/calls/history");
+    await act(async () => undefined);
+    const refresh = () => app.host.querySelector<HTMLButtonElement>(".call-center-refresh")!;
+    expect(app.host.querySelector('[role="alert"]')?.textContent).toContain("Mất kết nối");
+    expect(refresh().disabled).toBe(false);
+
+    app.click("Thử lại");
+    expect(historyMock).toHaveBeenCalledTimes(2);
+    expect(app.host.querySelector('[role="alert"]')).toBeNull();
+    expect(app.host.textContent).not.toContain("Chưa có cuộc gọi nào");
+    expect(refresh().disabled).toBe(true);
+
+    await act(async () => finish!([] as never));
+    expect(refresh().disabled).toBe(false);
+    expect(app.host.querySelector('[role="alert"]')).toBeNull();
+    expect(app.host.textContent).toContain("Chưa có cuộc gọi nào");
+
+    app.click("Tải lại lịch sử");
+    expect(historyMock).toHaveBeenCalledTimes(3);
+    expect(refresh().disabled).toBe(true);
+  });
+});

@@ -43,7 +43,8 @@ export function useFollowingPosts({
   useEffect(() => {
     if (!enabled || !sessionId) return
     let cancelled = false
-    const id = ++revision.current
+    const generation = revision
+    const id = ++generation.current
     busy.current = false
     pagingAbort.current?.abort()
     pagingAbort.current = null
@@ -72,7 +73,7 @@ export function useFollowingPosts({
       abort.abort()
       pagingAbort.current?.abort()
       pagingAbort.current = null
-      ++revision.current
+      ++generation.current
       busy.current = false
     }
   }, [enabled, sessionId, refreshVersion, requestRef, setState])

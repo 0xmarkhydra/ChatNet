@@ -34,6 +34,7 @@ type SecureCallRoomProps = {
   onError: (message: string) => void
 }
 
+/** Mount with key={call.id}: all state, including the AI voice grant, belongs to one call. */
 export default function SecureCallRoom({
   call, autoPublish, isGroup, title, apiBase, request, userId, sourceLanguage, targetLanguage, canEnd, onClosed, onError,
 }: SecureCallRoomProps) {
@@ -45,8 +46,9 @@ export default function SecureCallRoom({
   const [cameraOn, setCameraOn] = useState(call.mediaType === 'video')
   const [screenOn, setScreenOn] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
-  const [translationOn, setTranslationOn] = useState(() => localStorage.getItem('chatnet.call.translation.autostart.v1') === 'true')
-  const [translationSheetOpen, setTranslationSheetOpen] = useState(() => localStorage.getItem('chatnet.call.translation.autostart.v1') === 'true')
+  // Translation always starts off. The saved autostart setting is not applied here yet.
+  const [translationOn, setTranslationOn] = useState(false)
+  const [translationSheetOpen, setTranslationSheetOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [participantsSheetOpen, setParticipantsSheetOpen] = useState(true)
   const moreRef = useRef<HTMLDivElement>(null)
@@ -69,17 +71,6 @@ export default function SecureCallRoom({
 
   useCallOverlayDismiss(moreOpen, translationSheetOpen, moreRef, setMoreOpen, setTranslationSheetOpen)
 
-  // Consent is scoped to the current call. Never carry an AI voice grant to a new room.
-  useEffect(() => {
-    setAllowMyVoice(false)
-    setConsentError('')
-    setRemoteConsent({})
-    setConsentRequested(false)
-    setTranslationOn(false)
-    setTranslationSheetOpen(false)
-    setMoreOpen(false)
-    setMediaPermissionError('')
-  }, [call.id])
   useCallRoomLifecycle({
     call, request, userId, autoPublish, onError, onClosed,
     setPhase, setDetail, setRuntime, setRevision, setMicOn, setCameraOn,
@@ -109,14 +100,6 @@ export default function SecureCallRoom({
     setCaptions, setTranslationError, setTranslatingIds,
   })
 
-  useEffect(() => {
-    if (!translationOn) {
-      setCaptions([])
-      setTranslationError('')
-      setTranslationSheetOpen(false)
-    }
-  }, [translationOn])
-
   const { requestCallMediaPermission, toggleMic, toggleCamera, toggleScreen, toggleSound } = useCallMediaControls({
     room, mediaType: call.mediaType, ending, permissionRetrying, micOn, cameraOn, screenOn, soundOn,
     setPermissionRetrying, setMicOn, setCameraOn, setScreenOn, setSoundOn, setMediaPermissionError, onError,
@@ -143,6 +126,9 @@ export default function SecureCallRoom({
     setMoreOpen(false)
     if (translationOn) {
       setTranslationOn(false)
+      setCaptions([])
+      setTranslationError('')
+      setTranslationSheetOpen(false)
     } else {
       setTranslationOn(true)
       setTranslationSheetOpen(true)

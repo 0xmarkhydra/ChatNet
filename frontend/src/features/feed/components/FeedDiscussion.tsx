@@ -1,10 +1,11 @@
 import { userLabel } from '../../../shared/utils/userLabel'
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
 import { CommentComposerTarget } from './commentComposerTarget'
 import { createPortal } from 'react-dom'
 import { Ellipsis, Heart, SendHorizontal } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 
 export type FeedComment = {
   id: number
@@ -38,12 +39,14 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
 }) {
   const host = useRef<HTMLDivElement>(null)
   const key = JSON.stringify([api, token, target, text])
-  const [result, setResult] = useState({ key: '', text: '' })
-  const translated = result.key === key ? result.text : ''
-  const [original, setOriginal] = useState(false)
-  const [expanded, setExpanded] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [fetched, setFetched] = useScopedState(key, '')
+  const [original, setOriginal] = useScopedState(key, false)
+  const [expanded, setExpanded] = useScopedState(key, false)
+  const [failed, setFailed] = useScopedState(key, false)
   const [visible, setVisible] = useState(false)
+  const wanted = visible && Boolean(text.trim()) && Boolean(target)
+  const cached = useMemo(() => wanted ? translationCache.get(key) : undefined, [wanted, key])
+  const translated = fetched || cached || ''
 
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
@@ -57,20 +60,18 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
   }, [])
 
   useEffect(() => {
-    setResult({ key, text: '' })
-    setOriginal(false)
-    setExpanded(false)
-    setFailed(false)
-    if (!visible || !text.trim() || !target) return
-    const cached = translationCache.get(key)
-    if (cached) {
-      setResult({ key, text: cached })
-      return
-    }
+    if (!wanted || cached) return
     const controller = new AbortController()
     let retry: ReturnType<typeof setTimeout> | undefined
     async function translate(attempt = 0) {
       try {
+        // Another instance with the same text may have filled the cache since this render.
+        const hit = translationCache.get(key)
+        if (hit) {
+          await Promise.resolve()
+          if (!controller.signal.aborted) setFetched(hit)
+          return
+        }
         const response = await fetch(`${api}/api/translate`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -83,7 +84,7 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
         if (controller.signal.aborted) return
         if (translationCache.size >= 200) translationCache.delete(translationCache.keys().next().value!)
         translationCache.set(key, result.translatedText)
-        setResult({ key, text: result.translatedText })
+        setFetched(result.translatedText)
       } catch {
         if (controller.signal.aborted) return
         if (attempt < 2) retry = setTimeout(() => void translate(attempt + 1), 2000 * (attempt + 1))
@@ -95,7 +96,7 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
       controller.abort()
       clearTimeout(retry)
     }
-  }, [api, token, target, text, visible, key])
+  }, [api, token, target, text, wanted, cached, key, setFetched, setFailed])
 
   const visibleText = translated && !original ? translated : text
   const isLong = Boolean(maxLines && (
