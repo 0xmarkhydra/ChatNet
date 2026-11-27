@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ClipboardList, Pencil, Trash2, X } from 'lucide-react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Textarea } from '@/shared/ui/textarea'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
 import '../styles/chat-mentions.css'
 import type { ApiRequest } from '@/shared/types/api'
 
@@ -16,6 +16,7 @@ export default function QuickReplyPanel({ request, query, managing, onClose, onS
   const [key, setKey] = useState('')
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
+  const returnFocus = useRef<HTMLElement | null>(null)
   const opened = managing || query !== null
   // Both reset on every opening. loadError is null while loading, then '' or the message.
   const opening = opened ? 'open' : null
@@ -48,7 +49,6 @@ export default function QuickReplyPanel({ request, query, managing, onClose, onS
     } catch (e) { setSaveError(e instanceof Error ? e.message : 'Không cập nhật được tin nhắn nhanh.') }
     finally { setSaving(false) }
   }
-  if (!opened) return null
   const matches = items.filter(item => managing || item.key.startsWith(query?.toLowerCase() ?? ''))
   const status = <>
     {busy && <p className="text-sm text-muted-foreground" role="status">Đang tải…</p>}
@@ -56,13 +56,13 @@ export default function QuickReplyPanel({ request, query, managing, onClose, onS
     {!busy && !error && matches.length === 0 && <p className="text-sm text-muted-foreground">Chưa có mẫu phù hợp. Tạo mẫu trong menu +.</p>}
   </>
   const select = (item: Reply) => { onSelect(item.text); onClose() }
-  if (managing) return (
-    <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-      <DialogContent showCloseButton={false}>
+  return <>
+    <Dialog open={managing} onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent showCloseButton={false} onOpenAutoFocus={() => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }} onCloseAutoFocus={event => { event.preventDefault(); returnFocus.current?.focus({ preventScroll: true }) }}>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2">
             <DialogTitle>Tin nhắn nhanh</DialogTitle>
-            <Button variant="ghost" size="icon" aria-label="Đóng tin nhắn nhanh" title="Đóng" onClick={onClose}><X size={18}/></Button>
+            <DialogClose asChild><Button variant="ghost" size="icon" aria-label="Đóng tin nhắn nhanh" title="Đóng"><X size={18}/></Button></DialogClose>
           </div>
           <DialogDescription>Tạo mẫu nội dung để chèn vào ô soạn tin bằng /từ khóa.</DialogDescription>
         </DialogHeader>
@@ -82,14 +82,13 @@ export default function QuickReplyPanel({ request, query, managing, onClose, onS
           <label className="grid gap-1 text-sm">Từ khóa<Input aria-label="Từ khóa" value={key} placeholder="Ví dụ: camon" maxLength={32} disabled={busy} onChange={e => setKey(e.target.value.toLowerCase())}/></label>
           <label className="grid gap-1 text-sm">Nội dung<Textarea aria-label="Nội dung tin nhắn nhanh" rows={2} value={text} maxLength={4000} disabled={busy} onChange={e => setText(e.target.value)}/></label>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>Đóng</Button>
+            <DialogClose asChild><Button variant="outline">Đóng</Button></DialogClose>
             <Button disabled={busy || !/^[a-z0-9_-]{1,32}$/.test(key) || !text.trim()} onClick={() => void mutate(false, key)}>Lưu mẫu</Button>
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  )
-  return <div className="composer-pending grid max-h-[min(240px,35dvh)] min-w-0 gap-1 overflow-y-auto p-2" aria-label="Gợi ý tin nhắn nhanh">
+  {!managing && query !== null && <div className="composer-pending grid max-h-[min(240px,35dvh)] min-w-0 gap-1 overflow-y-auto p-2" aria-label="Gợi ý tin nhắn nhanh">
     <div className="flex items-center justify-between gap-2">
       <strong className="text-sm">Tin nhắn nhanh</strong>
       <Button variant="ghost" size="icon" aria-label="Đóng tin nhắn nhanh" title="Đóng" onClick={onClose}><X size={18}/></Button>
@@ -99,5 +98,6 @@ export default function QuickReplyPanel({ request, query, managing, onClose, onS
       <span className="chat-mention-avatar" aria-hidden="true"><ClipboardList size={18}/></span>
       <span className="chat-mention-name"><strong>/{item.key}</strong><small className="truncate">{item.text}</small></span>
     </button>)}
-  </div>
+  </div>}
+  </>
 }
