@@ -18,18 +18,18 @@ export type NotificationItem = {
 }
 
 export function filterNotificationItems(
-  items: readonly NotificationItem[], filter: NotificationFilter, search: string, readKeys: ReadonlySet<string>,
+  items: readonly NotificationItem[], filter: NotificationFilter, search: string,
 ): NotificationItem[] {
   const term = search.toLocaleLowerCase('vi-VN').trim()
   return items.filter(item => {
     if (filter === 'mentions' && item.kind !== 'mention') return false
-    if (filter === 'unread' && (item.mention ? Boolean(item.mention.readAt) : readKeys.has(item.key))) return false
+    if (filter === 'unread' && (Boolean(item.mention?.readAt))) return false
     return !term || (item.name + ' ' + item.subtitle).toLocaleLowerCase('vi-VN').includes(term)
   })
 }
 
-export function countUnreadNotificationItems(items: readonly NotificationItem[], readKeys: ReadonlySet<string>): number {
-  return items.filter(item => item.mention ? !item.mention.readAt : !readKeys.has(item.key)).length
+export function countUnreadNotificationItems(items: readonly NotificationItem[]): number {
+  return items.filter(item => !item.mention?.readAt).length
 }
 
 export function buildNotificationItems(
@@ -54,5 +54,5 @@ export function buildNotificationItems(
       mention.kind === 'quote' ? 'đã trích dẫn bài viết của bạn' : 'đã gắn thẻ bạn trong một bài viết',
     date: mention.createdAt, username: mention.author, mention,
   }))
-  return [...pending, ...unreadChats, ...taggedPosts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  return [...new Map([...pending, ...unreadChats, ...taggedPosts].map(item => [item.key, item])).values()].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 }

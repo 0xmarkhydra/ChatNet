@@ -2,9 +2,46 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/app.dart';
 import 'package:soco/demo.dart';
+import 'package:soco/api.dart';
+import 'package:soco/presentation/notification_store.dart';
 import 'package:soco/presentation/notification_presenter.dart';
 
+class _OlderNotificationApi extends DemoApi {
+  bool failChats = false;
+  @override
+  Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (path == '/api/conversations?unread=true') {
+      if (failChats) throw const ApiError('offline');
+      return List.generate(
+        105,
+        (index) => {
+          'id': 1000 + index,
+          'name': 'Chat $index',
+          'unreadCount': 7,
+        },
+      );
+    }
+    return super.request(method, path, body);
+  }
+}
+
 void main() {
+  test(
+    'shared notification store includes old unread chats and retains confirmed data on failure',
+    () async {
+      final api = _OlderNotificationApi();
+      final store = NotificationStore(api);
+      await store.refresh();
+      expect(store.items.where((item) => item.kind == 'message').length, 105);
+      expect(store.unread, 107);
+      api.failChats = true;
+      await store.refresh();
+      expect(store.unread, 107);
+      expect(store.error, contains('tin nhắn'));
+      store.dispose();
+    },
+  );
+
   test(
     'notifications aggregate actual incoming, unread and mention sources',
     () {
@@ -69,8 +106,14 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(SocoApp(api: api));
     await tester.pumpAndSettle();
+    final badge = find.byKey(const ValueKey('header-notification-badge'));
+    expect(
+      find.descendant(of: badge, matching: find.text('3')),
+      findsOneWidget,
+    );
     await tester.tap(find.byTooltip('Thông báo'));
     await tester.pumpAndSettle();
+    expect(find.text('3 thông báo chưa đọc'), findsOneWidget);
 
     expect(find.byKey(const ValueKey('notification-chat:2')), findsOneWidget);
     expect(find.byKey(const ValueKey('notification-friend:5')), findsOneWidget);
@@ -128,6 +171,7 @@ void main() {
     await tester.tap(accept);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('notification-friend:5')), findsNothing);
+    expect(find.text('2 thông báo chưa đọc'), findsOneWidget);
     expect(
       api.friends.any(
         (friend) => friend['id'] == 5 && friend['status'] == 'accepted',

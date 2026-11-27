@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,6 +12,8 @@ import 'contacts_screen.dart';
 import 'explore_screen.dart';
 import 'feed_screen.dart';
 import 'notification_sheet.dart';
+import 'presentation/notification_store.dart';
+import 'state/app_providers.dart';
 import 'profile_qr.dart';
 import 'profile_screen.dart';
 import 'theme.dart';
@@ -36,6 +39,29 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   SocoTab get tab => ref.read(mobileShellProvider).tab;
   bool get conversationOpen => ref.read(mobileShellProvider).conversationOpen;
   int get unreadTotal => ref.read(mobileShellProvider).unreadTotal;
+  late NotificationStore notificationStore;
+  Timer? notificationPoll;
+  Timer? notificationRefresh;
+  @override
+  void initState() {
+    super.initState();
+    notificationStore = NotificationStore(widget.api);
+    unawaited(notificationStore.refresh());
+    if (!widget.api.isDemo) {
+      notificationPoll = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => _scheduleNotificationRefresh(),
+      );
+    }
+  }
+
+  void _scheduleNotificationRefresh() {
+    notificationRefresh?.cancel();
+    notificationRefresh = Timer(const Duration(milliseconds: 150), () {
+      if (mounted) unawaited(notificationStore.refresh());
+    });
+  }
+
   String search = '';
   Json? requestedConversation;
   int openConversationRequest = 0;
@@ -145,6 +171,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     showNotificationSheet(
       context,
       widget.api,
+      store: notificationStore,
       onOpenConversation: _openChat,
       onOpenPost: _openFeedPost,
       onOpenInvitations: _openInvitations,
@@ -180,7 +207,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             resetRequest: chatHomeRequest,
             onUnreadChanged: (count) {
               if (mounted) {
+                final changed = unreadTotal != count;
                 ref.read(mobileShellProvider.notifier).setUnreadTotal(count);
+                if (changed) _scheduleNotificationRefresh();
               }
             },
             onConversationChanged: (value) {
@@ -337,7 +366,20 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       tooltip: 'Thông báo',
       style: style,
       onPressed: _showNotifications,
-      icon: const SocoIcon(SocoIconType.bell, size: 20),
+      icon: ListenableBuilder(
+        listenable: notificationStore,
+        builder: (context, _) => Badge(
+          key: const ValueKey('header-notification-badge'),
+          isLabelVisible: notificationStore.unread > 0,
+          label: Text(
+            notificationStore.unread > 99
+                ? '99+'
+                : '${notificationStore.unread}',
+          ),
+          backgroundColor: socoBlue,
+          child: const SocoIcon(SocoIconType.bell, size: 20),
+        ),
+      ),
     );
     if (tab == SocoTab.feed) {
       return [
@@ -490,6 +532,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   void dispose() {
+    notificationPoll?.cancel();
+    notificationRefresh?.cancel();
+    notificationStore.dispose();
     searchController.dispose();
     super.dispose();
   }
@@ -497,6 +542,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     ref.watch(mobileShellProvider);
+    ref.listen(realtimeRevisionProvider, (previous, next) {
+      if (next.hasValue && next.value != previous?.value) {
+        _scheduleNotificationRefresh();
+      }
+    });
     if (_lastChromeTab != tab || _lastConversationOpen != conversationOpen) {
       _lastChromeTab = tab;
       _lastConversationOpen = conversationOpen;

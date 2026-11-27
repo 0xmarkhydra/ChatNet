@@ -65,7 +65,7 @@ export type Conversation = {
 
 export type RealtimeEvent = {
   categoryId?: number | null
-  type: 'category.updated' | 'privacy.updated' | 'message' | 'message.updated' | 'pins.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated' | 'group.activity'
+  type: 'category.updated' | 'privacy.updated' | 'message' | 'message.updated' | 'pins.updated' | 'conversation.created' | 'conversation.updated' | 'conversation.removed' | 'conversation.read' | 'friend.updated' | 'group.activity' | 'feed.notification.updated'
   conversationId: number
   message?: Message
   conversation?: Conversation

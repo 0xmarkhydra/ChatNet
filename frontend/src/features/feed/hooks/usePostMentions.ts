@@ -19,6 +19,7 @@ export function usePostMentions({ sessionId, notificationsTab, apiFetch, onReadE
   const visit = useMemo(() => ({ sessionId }), [sessionId])
   const visitRef = useLatest(visit)
   const mounted = useRef(false)
+  const mutationRevision = useRef(0)
   useEffect(() => {
     mounted.current = true
     return () => { mounted.current = false }
@@ -29,17 +30,20 @@ export function usePostMentions({ sessionId, notificationsTab, apiFetch, onReadE
     if (!sessionId) return
     let active = true
     let refreshing = false
+    let queued = false
     const controller = new AbortController()
     const refresh = async () => {
-      if (!active || refreshing) return
+      if (!active) return
+      if (refreshing) { queued = true; return }
       refreshing = true
+      const revision = mutationRevision.current
       try {
         const response = await requestRef.current('/api/feed/mentions', {
           signal: controller.signal, cache: 'no-store',
         })
         if (!response.ok) return
         const items: unknown = await response.json()
-        if (!active || !Array.isArray(items)) return
+        if (!active || !Array.isArray(items) || revision !== mutationRevision.current) return
         setMentions(items.filter((item): item is PostMentionNotification =>
           item && Number.isSafeInteger(item.id) && Number.isSafeInteger(item.postId)
           && typeof item.author === 'string' && typeof item.createdAt === 'string'))
@@ -47,6 +51,7 @@ export function usePostMentions({ sessionId, notificationsTab, apiFetch, onReadE
         // Network failures should not erase a previously received mention list.
       } finally {
         refreshing = false
+        if (active && queued) { queued = false; void refresh() }
       }
     }
     const onVisible = () => {
@@ -55,11 +60,17 @@ export function usePostMentions({ sessionId, notificationsTab, apiFetch, onReadE
     void refresh()
     const timer = window.setInterval(() => void refresh(), notificationsTab ? 12_000 : 30_000)
     document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('chatnet:sse-reconnected', refresh)
+    window.addEventListener('chatnet:privacy-updated', refresh)
+    window.addEventListener('chatnet:feed-notification-updated', refresh)
     return () => {
       active = false
       controller.abort()
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('chatnet:sse-reconnected', refresh)
+      window.removeEventListener('chatnet:privacy-updated', refresh)
+      window.removeEventListener('chatnet:feed-notification-updated', refresh)
     }
   }, [sessionId, notificationsTab, setMentions, requestRef])
 
@@ -71,6 +82,7 @@ export function usePostMentions({ sessionId, notificationsTab, apiFetch, onReadE
       const response = await apiFetch(`/api/feed/mentions/${id}/read`, { method: 'POST' })
       if (!response.ok) throw new Error('Không đánh dấu được thông báo.')
       if (!isCurrentVisit()) return
+      mutationRevision.current++
       setMentions(current => current.map(item => item.id === id
         ? { ...item, readAt: new Date().toISOString() } : item))
     } catch {
