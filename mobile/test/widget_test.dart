@@ -175,8 +175,12 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('conversation-day-divider')),
-      findsOneWidget,
+      find.byWidgetPredicate((widget) {
+        final key = widget.key;
+        return key is ValueKey<String> &&
+            key.value.startsWith('conversation-day-divider-');
+      }),
+      findsWidgets,
     );
     await tester.tap(find.byKey(const ValueKey('chat-translation-action')));
     await tester.pumpAndSettle();
