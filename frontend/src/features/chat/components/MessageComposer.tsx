@@ -1,10 +1,11 @@
-import { Images } from "lucide-react";
+import { Images, X } from "lucide-react";
 import ChatComposerPlusMenu from "./ChatComposerPlusMenu";
 import ScheduledMessageQueue from "./ScheduledMessageQueue";
 import type { ApiRequest } from "@/shared/types/api";
 import UiIcon from "../../../shared/ui/UiIcon";
 import { userLabel } from "../../../shared/utils/userLabel";
 import { attachmentLabel } from "../../../shared/utils/format";
+import { replyPreview, stickerPreviewUrl } from "../utils/conversationPreview";
 import { chatFilesFromClipboard } from "../utils/chatFileTransfer";
 import { GroupActivityComposerMenu } from "./GroupActivities";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
@@ -42,7 +43,7 @@ export default function MessageComposer({ activeConversation, activeConversation
 
   function composerMenu(onSchedule?: () => void) {
     return <ChatComposerPlusMenu
-      key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
+      key={`menu:${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
       disabled={Boolean(mediaUploading) || messageSending}
       onAttachFile={() => openAttachmentPicker(false)}
       onAttachMedia={() => openAttachmentPicker(true)}
@@ -54,6 +55,8 @@ export default function MessageComposer({ activeConversation, activeConversation
       onGroupActivity={activeConversation.type === 'group' ? setGroupActivityCreateKind : undefined}
     />
   }
+
+  const replySticker = replyingTo && !replyingTo.deleted ? stickerPreviewUrl(replyingTo.text) : "";
 
   return (
     <form className="composer media-composer compact-chat-composer" onSubmit={(event) => {
@@ -74,11 +77,12 @@ export default function MessageComposer({ activeConversation, activeConversation
                     />
                     {replyingTo && (
                       <div className="composer-reply-preview">
-                        <div>
+                        {replySticker && <img src={replySticker} alt="" referrerPolicy="no-referrer" className="size-10 shrink-0 object-contain" />}
+                        <div className="min-w-0 flex-1">
                           <strong>Đang trả lời {userLabel(replyingTo.senderDisplayName, replyingTo.sender)}</strong>
-                          <span>{replyingTo.deleted ? 'Tin nhắn đã thu hồi' : (replyingTo.text || attachmentLabel(replyingTo.attachments))}</span>
+                          <span>{replyingTo.deleted ? 'Tin nhắn đã thu hồi' : (replyPreview(replyingTo.text) || attachmentLabel(replyingTo.attachments))}</span>
                         </div>
-                        <button type="button" onClick={() => setReplyingTo(null)} aria-label="Hủy trả lời">×</button>
+                        <button type="button" className="ghost-action flex! size-8! shrink-0 items-center justify-center self-center m-0! p-0! border-0! bg-transparent! shadow-none!" onClick={() => setReplyingTo(null)} aria-label="Hủy trả lời" title="Hủy trả lời"><X size={18} aria-hidden="true" /></button>
                       </div>
                     )}
                     {messageAttachments.length > 0 && (

@@ -30,27 +30,28 @@ import (
 )
 
 type message struct {
-	ID                  int64               `json:"id"`
-	ClientID            string              `json:"clientId,omitempty"`
-	ConversationID      int64               `json:"conversationId"`
-	ChannelID           int64               `json:"channelId,omitempty"`
-	SenderID            int64               `json:"senderId"`
-	Sender              string              `json:"sender"`
-	SenderDisplayName   string              `json:"senderDisplayName,omitempty"`
-	Text                string              `json:"text"`
-	Forwarded           bool                `json:"forwarded,omitempty"`
-	ReplyToMessageID    *int64              `json:"replyToMessageId,omitempty"`
-	ReplyToSender       string              `json:"replyToSender,omitempty"`
-	ReplyToDisplayName  string              `json:"replyToDisplayName,omitempty"`
-	ReplyToText         string              `json:"replyToText,omitempty"`
-	EditedAt            *time.Time          `json:"editedAt,omitempty"`
-	Deleted             bool                `json:"deleted,omitempty"`
-	Reactions           []messageReaction   `json:"reactions,omitempty"`
-	ReadByUserIDs       []int64             `json:"readByUserIds,omitempty"`
-	TranslatedText      string              `json:"translatedText,omitempty"`
-	TranslationLanguage string              `json:"translationLanguage,omitempty"`
-	Attachments         []mediax.Attachment `json:"attachments,omitempty"`
-	CreatedAt           time.Time           `json:"createdAt"`
+	ID                   int64               `json:"id"`
+	ClientID             string              `json:"clientId,omitempty"`
+	ConversationID       int64               `json:"conversationId"`
+	ChannelID            int64               `json:"channelId,omitempty"`
+	SenderID             int64               `json:"senderId"`
+	Sender               string              `json:"sender"`
+	SenderDisplayName    string              `json:"senderDisplayName,omitempty"`
+	Text                 string              `json:"text"`
+	Forwarded            bool                `json:"forwarded,omitempty"`
+	ReplyToMessageID     *int64              `json:"replyToMessageId,omitempty"`
+	ReplyToSender        string              `json:"replyToSender,omitempty"`
+	ReplyToDisplayName   string              `json:"replyToDisplayName,omitempty"`
+	ReplyToText          string              `json:"replyToText,omitempty"`
+	EditedAt             *time.Time          `json:"editedAt,omitempty"`
+	Deleted              bool                `json:"deleted,omitempty"`
+	Reactions            []messageReaction   `json:"reactions,omitempty"`
+	ReadByUserIDs        []int64             `json:"readByUserIds,omitempty"`
+	FirstUnreadMessageID *int64              `json:"firstUnreadMessageId,omitempty"`
+	TranslatedText       string              `json:"translatedText,omitempty"`
+	TranslationLanguage  string              `json:"translationLanguage,omitempty"`
+	Attachments          []mediax.Attachment `json:"attachments,omitempty"`
+	CreatedAt            time.Time           `json:"createdAt"`
 }
 
 type messageReaction struct {
@@ -1038,6 +1039,17 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		before = n
 	}
 
+	after := int64(-1)
+	order := "DESC"
+	if raw := r.URL.Query().Get("after"); raw != "" {
+		n, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || n < 0 || before != 0 {
+			httpx.Error(w, http.StatusBadRequest, "invalid after cursor")
+			return
+		}
+		after, order = n, "ASC"
+	}
+
 	keyword := strings.TrimSpace(r.URL.Query().Get("search"))
 	sender := strings.TrimSpace(r.URL.Query().Get("sender"))
 	if len([]rune(keyword)) > 200 || len([]rune(sender)) > 100 {
@@ -1093,7 +1105,19 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		               (b.blocker_id=$5 AND b.blocked_id=cmr.user_id) OR (b.blocked_id=$5 AND b.blocker_id=cmr.user_id))
 		           ORDER BY cmr.user_id
 		       ),
-		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at
+		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at,
+               (SELECT COALESCE(MIN(um.id),0) FROM messages um
+                JOIN conversations uc ON uc.id=um.conversation_id
+                JOIN conversation_members uv ON uv.conversation_id=uc.id AND uv.user_id=$5
+                WHERE um.conversation_id=$1 AND COALESCE(um.channel_id,0)=$10
+                  AND um.user_id<>$5 AND um.id>GREATEST(uv.cleared_through_message_id,
+                    CASE WHEN uc.type='group' THEN COALESCE((
+                      SELECT gcr.last_read_message_id FROM group_channel_reads gcr
+                      WHERE gcr.conversation_id=$1 AND gcr.user_id=$5 AND gcr.channel_id=$10
+                    ),uv.last_read_message_id) ELSE uv.last_read_message_id END)
+                  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+                    (b.blocker_id=$5 AND b.blocked_id=um.user_id) OR
+                    (b.blocked_id=$5 AND b.blocker_id=um.user_id)))
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
 		JOIN conversation_members viewer ON viewer.conversation_id=m.conversation_id AND viewer.user_id=$5
@@ -1104,7 +1128,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
-		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id AND COALESCE(m.channel_id,0)=$10 AND ($3::bigint=0 OR m.id<$3)
+		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id AND COALESCE(m.channel_id,0)=$10 AND ($3::bigint=0 OR m.id<$3) AND ($11::bigint<0 OR m.id>$11)
 		  AND (EXISTS(SELECT 1 FROM conversations dc WHERE dc.id=m.conversation_id AND dc.type='direct')
 		    OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		      (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id)))
@@ -1112,7 +1136,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		  AND ($7::text='' OR lower(u.username)=lower($7))
 		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)
 		  AND ($9::timestamptz IS NULL OR m.created_at < $9)
-		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to), channelID)
+		ORDER BY m.id `+order+` LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to), channelID, after)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return
@@ -1126,7 +1150,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 			&m.ID, &m.ConversationID, &m.ChannelID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 			&m.Forwarded, &m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
-			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
+			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt, &m.FirstUnreadMessageID,
 		) == nil {
 			if m.Deleted {
 				m.Text = ""
@@ -1135,7 +1159,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 			items = append(items, m)
 		}
 	}
-	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
+	for i, j := 0, len(items)-1; after < 0 && i < j; i, j = i+1, j-1 {
 		items[i], items[j] = items[j], items[i]
 	}
 	if err := s.attachMessageMedia(r.Context(), items, claims.UserID); err != nil {

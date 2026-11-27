@@ -261,18 +261,15 @@ try {
         return {w:r.width,h:r.height,right:r.right}
       }))
     const directActions = await mobileActions()
-    assert.equal(directActions.length, 3, width+'px: voice, video and more actions remain visible')
-    assert.ok(directActions.every(action=>action.w>=43.5 && action.h>=43.5 && action.right<=width+1),
-      width+'px: all three header actions fit with 44px touch targets: '+JSON.stringify(directActions))
+    assert.equal(directActions.length, 5, width+'px: voice, video, search, translation and info share the group header')
+    assert.ok(directActions.every(action=>action.w>0 && action.h>0 && action.right<=width+1),
+      width+'px: all five header actions fit: '+JSON.stringify(directActions))
     assert.ok(await panel.locator('.compact-room-actions')
       .getByRole('button', {name:'Gọi video', exact:true}).isVisible(),
       width+'px: video call remains a primary action without initiating a real call in fixture QA')
-    const more = panel.getByRole('button', {name:'Tùy chọn hội thoại'})
-    await more.click()
-    for (const label of ['Tìm tin nhắn', 'Dịch AI', 'Thông tin hội thoại']) {
-      await page.getByRole('menuitem', {name:label, exact:true}).waitFor()
-    }
-    await page.keyboard.press('Escape')
+    const mobileHeader = panel.locator('.compact-room-actions')
+    await mobileHeader.getByRole('button', {name:'Tìm tin nhắn trong cuộc trò chuyện'}).waitFor({state:'visible'})
+    await mobileHeader.getByRole('button', {name:/Cài đặt dịch AI/}).waitFor({state:'visible'})
     const composerActions = async () => panel.locator('.media-composer').evaluate(form =>
       [...form.querySelectorAll(':scope > .attach-button, :scope > .voice-record-trigger, :scope > .send-button')]
         .map(btn => {const r=btn.getBoundingClientRect();return {w:r.width,h:r.height}}))
@@ -321,6 +318,14 @@ try {
       width+'px cached messages must already be visible before the delayed second response arrives')
     assert.ok(messageHistoryFetches.get(101) >= 1,
       width+'px initial visit must still fetch authorized chat history')
+    const more = mobileHeader.getByRole('button', {name:'Thông tin hội thoại', exact:true})
+    await more.click()
+    const directInfo = page.locator('#conversation-details-panel')
+    await directInfo.waitFor({state:'visible'})
+    assert.equal(await page.getByRole('menuitem',{name:'Thông tin hội thoại',exact:true}).count(),0,
+      width+'px: direct info opens without an intermediate dropdown')
+    await page.getByRole('button',{name:'Đóng thông tin hội thoại'}).click()
+    await directInfo.waitFor({state:'hidden'})
     await panel.getByRole('button',{name:'Quay lại danh sách'}).click()
     await rail.waitFor({state:'visible'})
     await page.waitForTimeout(180)

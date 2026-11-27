@@ -101,6 +101,7 @@ export type ChatSectionProps = {
   messageSending: boolean;
   messagesLoadingMore: boolean;
   messageHistoryLoading: boolean;
+  unreadMessageId?: number | null;
   messageHistoryError: boolean;
   retryMessageHistory: () => void;
   messagesScrollRef: RefObject<HTMLDivElement | null>;

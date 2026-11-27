@@ -5,6 +5,7 @@ import type { GroupActivityKind } from '../types/groupActivities'
 import type { GroupManagementSection } from './GroupSettingsPanel'
 import GroupChannelControls from './GroupChannelControls'
 import GroupChannelCreateForm from './GroupChannelCreateForm'
+import ConversationManagementSection from './ConversationManagementSection'
 
 type Props = {
   conversation: Conversation
@@ -39,8 +40,7 @@ export default function ConversationGroupManagementMenu({
 }: Props) {
   const isChannel = selectedChannelId !== 0
   return (
-<div className="conversation-info-group-menu" aria-label={isChannel ? 'Quản lý kênh' : 'Quản lý nhóm'}>
-          <strong className="conversation-info-group-menu-heading">{isChannel ? 'Quản lý kênh' : 'Quản lý nhóm'}</strong>
+<ConversationManagementSection title={isChannel ? 'Quản lý kênh' : 'Quản lý nhóm'}>
             {!isChannel && <>
               <button type="button" onClick={() => onGroupManagement('members')}><Users size={18} />Thành viên</button>
               <button type="button" onClick={() => onGroupManagement('details')}><MoreHorizontal size={18} />Thông tin cộng đồng</button>
@@ -69,6 +69,6 @@ export default function ConversationGroupManagementMenu({
               request={request} notify={notify} onGroupRenamed={onGroupRenamed}
               onChannelsChanged={onChannelsChanged} onChannelDeleted={onChannelDeleted}
               onLeftGroup={onLeftGroup} />
-        </div>
+        </ConversationManagementSection>
   )
 }

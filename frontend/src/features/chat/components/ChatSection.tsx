@@ -151,6 +151,7 @@ export default function ChatSection({
   messageSending,
   messagesLoadingMore,
   messageHistoryLoading,
+  unreadMessageId,
   messageHistoryError,
   retryMessageHistory,
   messagesScrollRef,
@@ -950,6 +951,8 @@ export default function ChatSection({
                     </div>
                   )}
                   <MessageTimeline
+                     key={`${session.sessionId}:${activeConversationId}:${selectedChannelId}`}
+                     unreadMessageId={messageSearchOpen ? null : unreadMessageId}
                     activeChatTranslationSettings={activeChatTranslationSettings}
                     activeConversation={activeConversation}
                     activeConversationId={activeConversationId}
@@ -980,6 +983,7 @@ export default function ChatSection({
                     moveMessageLongPress={moveMessageLongPress}
                     openMessageActions={openMessageActions}
                     openMessageReactions={openMessageReactions}
+                    toggleReaction={toggleReaction}
                     onReactionUsers={onReactionUsers}
                     onForwardMessage={onForwardMessage}
                     reactionPreviews={reactionPreviews}

@@ -21,7 +21,7 @@ function mountScroll() {
     restore: { current: { top: number; height: number } | null };
   };
 
-  function Probe({ id, channel, messages }: { id: number; channel: number; messages: Message[] }) {
+  function Probe({ id, channel, messages, unread, loading }: { id: number; channel: number; messages: Message[]; unread?: number; loading?: boolean }) {
     const messagesScrollRef = useRef<HTMLDivElement>(null);
     const messageScrollAtBottom = useRef(true);
     const ownSendScrollConversation = useRef<number | null>(null);
@@ -29,6 +29,8 @@ function mountScroll() {
     useChatScrollCoordinator({
       activeConversationId: id,
       selectedChannelId: channel,
+      unreadMessageId: unread,
+      messageHistoryLoading: loading,
       messages,
       outgoingMessage: null,
       chatOutbox: [] as QueuedChatMessage[],
@@ -43,16 +45,33 @@ function mountScroll() {
       pendingSend: ownSendScrollConversation,
       restore: pendingMessageScrollRestore,
     };
-    return <div ref={messagesScrollRef} />;
+    return <div ref={messagesScrollRef}>{unread && <div data-unread-message-id={unread} />}</div>;
   }
-  const render = (id: number, channel: number, messages: Message[]) =>
-    act(() => root.render(<Probe id={id} channel={channel} messages={messages} />));
+  const render = (id: number, channel: number, messages: Message[], unread?: number, loading?: boolean) =>
+    act(() => root.render(<Probe id={id} channel={channel} messages={messages} unread={unread} loading={loading} />));
   cleanups.push(() => { act(() => root.unmount()); host.remove(); });
   return { render, get state() { return state; }, get element() { return host.firstElementChild as HTMLDivElement; } };
 }
 
 const msg = (id: number) => ({ id }) as Message;
 describe("useChatScrollCoordinator", () => {
+  it("positions at the unread divider once and does not jump on new messages", () => {
+    const app = mountScroll();
+    app.render(1, 0, [], 2, true);
+    const element = app.element;
+    Object.defineProperty(element, "scrollHeight", { configurable: true, value: 1200 });
+    Object.defineProperty(element, "clientHeight", { configurable: true, value: 400 });
+    const marker = element.querySelector<HTMLElement>('[data-unread-message-id="2"]')!;
+    marker.getBoundingClientRect = () => ({ top: 220 } as DOMRect);
+    element.getBoundingClientRect = () => ({ top: 20 } as DOMRect);
+    app.render(1, 0, [msg(1), msg(2), msg(3)], 2, false);
+    expect(element.scrollTop).toBe(188);
+    expect(app.state.follow.current).toBe(false);
+    element.scrollTop = 250;
+    app.render(1, 0, [msg(1), msg(2), msg(3), msg(4)], 2, false);
+    expect(element.scrollTop).toBe(250);
+  });
+
   it("follows incoming messages only when reader is at the bottom", () => {
     const app = mountScroll();
     app.render(1, 0, []);

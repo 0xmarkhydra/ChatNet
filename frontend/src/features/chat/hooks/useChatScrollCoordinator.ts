@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, type RefObject } from "react";
+import { useLayoutEffect, useRef, type RefObject } from "react";
 import { useLatest } from "../../../shared/hooks/useLatest";
-import { reconcileChatScroll, resetChatFollowBottom } from "../lib/chatScrollPosition";
+import { positionAtUnread, reconcileChatScroll, resetChatFollowBottom } from "../lib/chatScrollPosition";
 import type { Message } from "../types";
 import type { QueuedChatMessage } from "../lib/chatOutbox";
 
@@ -8,6 +8,8 @@ import type { QueuedChatMessage } from "../lib/chatOutbox";
 export function useChatScrollCoordinator({
   activeConversationId,
   selectedChannelId,
+  unreadMessageId,
+  messageHistoryLoading = false,
   messages,
   outgoingMessage,
   chatOutbox,
@@ -18,6 +20,8 @@ export function useChatScrollCoordinator({
 }: {
   activeConversationId: number | null;
   selectedChannelId: number;
+  unreadMessageId?: number | null;
+  messageHistoryLoading?: boolean;
   messages: readonly Message[];
   outgoingMessage: Message | null;
   chatOutbox: readonly QueuedChatMessage[];
@@ -30,12 +34,21 @@ export function useChatScrollCoordinator({
     activeConversationId, messagesScrollRef, messageScrollAtBottom,
     ownSendScrollConversation, pendingMessageScrollRestore,
   });
-  useEffect(() => {
+  const entered = useRef(false);
+  useLayoutEffect(() => {
+    entered.current = false;
     resetChatFollowBottom(latest.current);
-  }, [selectedChannelId, latest]);
+  }, [activeConversationId, selectedChannelId, latest]);
 
   useLayoutEffect(() => {
-    reconcileChatScroll(latest.current.activeConversationId, latest.current);
-  // Preserve original data-only triggers so unrelated App Shell updates do not move the reader.
-  }, [messages, outgoingMessage, chatOutbox, latest]);
+    const refs = latest.current;
+    const container = refs.messagesScrollRef.current;
+    if (!container || !activeConversationId) return;
+    if (!entered.current) {
+      if (messageHistoryLoading) return;
+      entered.current = true;
+      if (positionAtUnread(unreadMessageId, refs)) return;
+    }
+    reconcileChatScroll(activeConversationId, refs);
+  }, [activeConversationId, selectedChannelId, unreadMessageId, messageHistoryLoading, messages, outgoingMessage, chatOutbox, latest]);
 }

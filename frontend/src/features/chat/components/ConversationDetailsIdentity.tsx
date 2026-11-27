@@ -9,13 +9,14 @@ type Props = {
   conversation: Conversation
   channel: GroupChannel
   selectedChannelId: number
+  compactDirect?: boolean
   canEditGroupPhotos: boolean
   photoBusy: boolean
   onEditPhoto: (target: GroupPhotoTarget) => void
 }
 
 export default function ConversationDetailsIdentity({
-  conversation, channel, selectedChannelId, canEditGroupPhotos, photoBusy, onEditPhoto,
+  conversation, channel, selectedChannelId, canEditGroupPhotos, photoBusy, onEditPhoto, compactDirect = false,
 }: Props) {
   const isGroup = conversation.type === 'group'
   const isChannel = isGroup && selectedChannelId !== 0
@@ -25,13 +26,13 @@ export default function ConversationDetailsIdentity({
 
   return (
 <div className="conversation-info-panel-identity social-chat-details-identity">
-        {isGroup ? (
+        {isGroup || compactDirect ? (
           <div className="group-photo-avatar-wrap">
             {isChannel
               ? <UserAvatar name={displayName} className="conversation-info-panel-avatar social-chat-details-avatar" group imageUrl={displayAvatar} />
               : <ConversationAvatar conversation={conversation} className="conversation-info-panel-avatar social-chat-details-avatar" />}
 
-            {canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
+            {isGroup && canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
               aria-label={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'} title={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'}
               onClick={() => onEditPhoto({ name: displayName, avatarUrl: displayAvatar,
                 kind: isChannel ? 'channel' : 'group', channelId: isChannel ? selectedChannelId : undefined })}>

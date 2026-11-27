@@ -1,3 +1,4 @@
+import { conversationPreview } from '../utils/conversationPreview'
 import { useMemo, useState } from 'react'
 import { ArrowRight, MessageCircle, Phone, Plus, Search, Users, Video } from 'lucide-react'
 import type { Conversation } from '../types'
@@ -69,7 +70,7 @@ export default function CommunicationHub({
                   <span>{conversation.type === 'group'
                     ? `${conversation.memberCount} thành viên`
                     : conversation.online ? 'Đang hoạt động' : 'Chat riêng'}</span>
-                  {groups && conversation.lastMessage && <small>{conversation.lastMessage}</small>}
+                  {groups && conversation.lastMessage && <small>{conversationPreview(conversation.lastMessage)}</small>}
                 </div>
                 {groups ? (
                   <button type="button" className="communication-hub-open" onClick={() => onOpenChat(conversation.id)}>

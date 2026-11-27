@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { useLatest } from '../../../shared/hooks/useLatest'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { Session } from '../../../shared/types/session'
 import { listPins, setConversationPinned, setMessagePinned } from '../api/pins'
 import type { Conversation, Message, PinnedMessage } from '../types'
@@ -20,10 +22,19 @@ export function useChatPins({
 }: Options) {
   const [pinnedMessages, setPinnedMessages] = useState<PinnedMessage[]>([])
   const [pinScope, setPinScope] = useState<number | null>(null)
-  const [pinBusy, setPinBusy] = useState(false)
   const pending = useRef(new Set<string>())
   // Discard older responses when SSE and local writes refresh the same conversation.
   const refreshSequence = useRef(0)
+
+  const viewKey = JSON.stringify([session?.sessionId ?? null, activeConversationId])
+  // Scoped, so a request finishing for an earlier view can never leave the new view busy.
+  const [pinBusy, setPinBusy] = useScopedState(viewKey, false)
+  const [previousViewKey, setPreviousViewKey] = useState(viewKey)
+  if (viewKey !== previousViewKey) {
+    setPreviousViewKey(viewKey)
+    setPinnedMessages([])
+    setPinScope(null)
+  }
 
   async function refreshPinnedMessages(conversationId: number) {
     const sessionId = sessionRef.current?.sessionId
@@ -52,15 +63,14 @@ export function useChatPins({
     }
   }
 
+  const latest = useLatest({ token: session?.token, refreshPinnedMessages })
+
   useEffect(() => {
     // Use a fresh lock set so completions from another session cannot unlock new writes.
     pending.current = new Set()
-    setPinBusy(false)
     refreshSequence.current += 1
-    setPinnedMessages([])
-    setPinScope(null)
-    if (session?.token && activeConversationId) void refreshPinnedMessages(activeConversationId)
-  }, [session?.sessionId, activeConversationId])
+    if (latest.current.token && activeConversationId) void latest.current.refreshPinnedMessages(activeConversationId)
+  }, [session?.sessionId, activeConversationId, latest])
 
   async function toggleMessagePin(message: Message) {
     const conversationId = message.conversationId
