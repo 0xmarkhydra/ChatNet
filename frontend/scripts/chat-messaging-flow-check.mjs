@@ -158,8 +158,13 @@ try {
   assert.ok(writes.some(w => w.method === 'DELETE' && w.path === '/api/messages/8'), 'recall sends DELETE /api/messages/8')
 
   // ---- react
-  await page.locator('[data-message-id="9"] .reaction-add').dispatchEvent('click')
-  await page.getByRole('dialog', { name: 'Chọn cảm xúc' }).getByRole('button', { name: /❤️/ }).first().click()
+  await page.locator('[data-message-id="9"] .bubble').hover()
+  await page.locator('[data-message-id="9"] .reaction-add').hover()
+  const quickReactions = page.getByRole('group', { name: 'Cảm xúc nhanh' })
+  await quickReactions.waitFor()
+  assert.equal(await page.getByRole('dialog', { name: 'Chọn cảm xúc' }).count(), 0, 'hover does not open the reaction dialog')
+  await quickReactions.getByRole('button', { name: 'Love', exact: true }).click()
+  await quickReactions.waitFor({ state: 'hidden' })
   await until(() => writes.some(w => w.path === '/api/messages/9/reactions'), 'the reaction request')
   await page.waitForFunction(() => document.querySelector('[data-message-id="9"]')?.innerText.includes('❤️'))
   const reaction = writes.find(w => w.path === '/api/messages/9/reactions')
