@@ -44,11 +44,13 @@ try {
       {id:104,type:'direct',name:'Phương Linh',otherUserId:4,otherUsername:'phuong',memberCount:2,lastMessage:'Cảm ơn nhé!',lastMessageAt:today,unreadCount:0,online:false,createdAt:today},
     ]
     const photo = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="700" height="420"><rect width="700" height="420" fill="#c0d3ba"/><circle cx="360" cy="210" r="95" fill="#77543b"/></svg>')
+    const portrait = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="420" height="900"><rect width="420" height="900" fill="#c0d3ba"/></svg>')
     const messages = [
       {id:1,conversationId:101,senderId:2,sender:'linhanh',senderDisplayName:'Linh Anh',text:'Chào bạn! Lâu rồi chúng ta chưa\nđi uống cà phê với nhau ☕',createdAt:today,attachments:[],readByUserIds:[]},
       {id:2,conversationId:101,senderId:1,sender:'viewer',senderDisplayName:'Người xem',text:'Đúng rồi, thứ Bảy đi nhé!\nMình cũng muốn gặp mọi người.',createdAt:today,attachments:[],readByUserIds:[2]},
       {id:3,conversationId:101,senderId:2,sender:'linhanh',senderDisplayName:'Linh Anh',text:'That sounds wonderful!',translatedText:'Nghe tuyệt đấy!',translationLanguage:'en',createdAt:today,attachments:[],readByUserIds:[]},
       {id:4,conversationId:101,senderId:2,sender:'linhanh',senderDisplayName:'Linh Anh',text:'',createdAt:today,attachments:[{kind:'image',storageRef:'preview',name:'coffee.svg',url:photo,sizeBytes:1234}],readByUserIds:[]},
+      {id:5,conversationId:101,senderId:2,sender:'linhanh',senderDisplayName:'Linh Anh',text:'',createdAt:today,attachments:[{kind:'image',storageRef:'portrait',name:'portrait.svg',url:portrait,sizeBytes:1234}],readByUserIds:[]},
     ]
     for (const width of [1586, 1200, 768, 390]) {
       const ctx = await browser.newContext({viewport:{width,height:992},serviceWorkers:'block'})
@@ -266,6 +268,25 @@ try {
           rects.photo.height >= 120 && rects.photo.height <= 150,
         'Photo must retain a readable size when the translation banner is removed')
         assert.ok(rects.photoTime, 'photo time chip visible')
+        const portraitMessage = page.locator('[data-message-id="5"]')
+        await portraitMessage.scrollIntoViewIfNeeded()
+        const portraitGeometry = await portraitMessage.evaluate(async message => {
+          const img = message.querySelector('.chat-message-photo img')
+          await img.decode()
+          const image = img.getBoundingClientRect()
+          const photo = message.querySelector('.chat-message-photo').getBoundingClientRect()
+          const content = message.querySelector('.message-content').getBoundingClientRect()
+          const reactions = message.querySelector('.message-reactions').getBoundingClientRect()
+          return { image: image.width, photo: photo.width, content: content.width,
+            reactionOffset: Math.abs(reactions.right - image.right), height: image.height,
+            ratio: image.width / image.height, naturalRatio: img.naturalWidth / img.naturalHeight }
+        })
+        assert.ok(portraitGeometry.image < 150 && portraitGeometry.height <= 221 &&
+          Math.abs(portraitGeometry.ratio - portraitGeometry.naturalRatio) < .01 &&
+          Math.abs(portraitGeometry.photo - portraitGeometry.image) < 2 &&
+          Math.abs(portraitGeometry.content - portraitGeometry.image) < 2 &&
+          portraitGeometry.reactionOffset < 2,
+          'Portrait photo and reaction row must share the visible image width: ' + JSON.stringify(portraitGeometry))
       } else console.log(`${width}px:`, JSON.stringify(rects))
       if (width > 760) {
         const headerButtons = page.locator('.chat-head .translate-controls button:visible')

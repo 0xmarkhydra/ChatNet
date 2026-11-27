@@ -725,11 +725,12 @@
     .social-chat-layout
     .messages
     .message:has(.chat-message-photo) {
-    width: min(220px, calc(100% - 46px));
+    width: fit-content;
+    max-width: min(220px, calc(100% - 46px));
   }
   .modern-shell.app-layout .social-chat-layout .chat-message-photo {
     position: relative;
-    width: 220px;
+    width: fit-content;
     max-width: 100%;
   }
   .modern-shell.app-layout
@@ -743,7 +744,8 @@
     .media-item
     > .media-image-button {
     display: block;
-    width: 100%;
+    width: fit-content;
+    max-width: 100%;
   }
   .modern-shell.app-layout
     .social-chat-layout
@@ -751,7 +753,8 @@
     .media-item
     img {
     display: block;
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     height: auto;
     max-height: 220px;
     min-height: 0;
