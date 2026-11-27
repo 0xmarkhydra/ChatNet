@@ -274,6 +274,8 @@ import MessageActionDialog from "../features/chat/components/MessageActionDialog
 import StoryOverlay from "../features/feed/components/StoryOverlay";
 import ProfileOverviewSection from "../features/profile/components/ProfileOverviewSection";
 import ProfileSection from "../features/profile/components/ProfileSection";
+import { confirmMobileProfileExit, mobileProfileDirty } from "../features/profile/components/MobileProfileEditor";
+import { isMobileProfileEdit, type MobileProfileSettingsView } from "../features/profile/components/MobileProfileSettings";
 import ChatSection from "../features/chat/components/ChatSection";
 import StoryDraftOverlay from "../features/feed/components/StoryDraftOverlay";
 import AppComposerOverlays from "./layouts/AppComposerOverlays";
@@ -483,6 +485,8 @@ export default function AuthedApp({
     setTranslationSettingsConversationId(null);
   }
   const desktopProfileOverview = isProfileDesktop && !desktopProfileSettings;
+  const mobileSettingsScope = tab === "profile" && profileTimelineOpen && !isProfileDesktop ? session?.sessionId ?? null : null;
+  const [mobileSettingsView, setMobileSettingsView] = useScopedState<MobileProfileSettingsView>(mobileSettingsScope, null);
   useEffect(() => {
     if (
       tab !== "profile" ||
@@ -1678,7 +1682,7 @@ export default function AuthedApp({
     feedPostPath,
   });
 
-  const switchTab = createAppTabSwitch({
+  const navigateTab = createAppTabSwitch({
     setDesktopSection,
     setFeedCommunitiesOpen,
     setTranslationSettingsConversationId,
@@ -1703,6 +1707,37 @@ export default function AuthedApp({
     setProfileCityDraft(draft.city);
     setProfilePublicDetailsDraft(draft.publicDetails);
     setProfileEditorOpen(false);
+  };
+
+  const mobileEditor = {
+    profile: profileMedia,
+    username: name,
+    displayName: profileMedia?.displayName || session.user.displayName || name,
+    hasEmail: Boolean(session.user.email),
+    displayNameDraft: profileDisplayNameDraft,
+    setDisplayNameDraft: setProfileDisplayNameDraft,
+    usernameDraft: profileUsernameDraft,
+    setUsernameDraft: setProfileUsernameDraft,
+    bioDraft: profileBioDraft,
+    setBioDraft: setProfileBioDraft,
+    cityDraft: profileCityDraft,
+    setCityDraft: setProfileCityDraft,
+    publicDetailsDraft: profilePublicDetailsDraft,
+    setPublicDetailsDraft: setProfilePublicDetailsDraft,
+    saving: profileSaving,
+    mediaBusy: profileBusy !== null || mediaUploading === "profile",
+    onSave: saveProfileIdentity,
+    onDiscard: discardDesktopProfileEdits,
+  };
+  const switchTab = (nextTab: Tab) => {
+    if (mobileSettingsScope && mobileSettingsView) {
+      if (isMobileProfileEdit(mobileSettingsView)) {
+        if (profileSaving || !confirmMobileProfileExit(mobileProfileDirty(mobileEditor))) return;
+        discardDesktopProfileEdits();
+      }
+      setMobileSettingsView(null);
+    }
+    navigateTab(nextTab);
   };
 
   const profileIdentityForm = (
@@ -1971,8 +2006,8 @@ export default function AuthedApp({
       )}
         </>
       }
-      // The search page owns its search field and title, so the shared header is omitted there.
-      header={visitorUsername || isSearchResultsRoute || tab === "market" || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
+      // Search and mobile profile settings own their headers.
+      header={visitorUsername || isSearchResultsRoute || tab === "market" || Boolean(mobileSettingsScope && mobileSettingsView) || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
         <AppHeader
           mobileSearchActions={tab !== "chat"}
           className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" ? "mobile-section-header" : ""}`}
@@ -2295,6 +2330,11 @@ export default function AuthedApp({
           profileHeadingRef={profileHeadingRef}
           friendCount={friends.filter(friend => friend.status === "accepted").length}
           profileIdentityForm={profileIdentityForm}
+          mobileEditor={mobileEditor}
+          settingsView={mobileSettingsView}
+          setSettingsView={setMobileSettingsView}
+          onProfileQr={() => setQrOpen("mine")}
+          onSavedPosts={() => { switchTab("feed"); setFeedFilter("saved"); }}
           profileIdentityRef={profileIdentityRef}
           profileMedia={profileMedia}
           profilePosts={profilePosts}

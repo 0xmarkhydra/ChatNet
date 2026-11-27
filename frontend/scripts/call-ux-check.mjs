@@ -19,15 +19,15 @@ const required = [
   'call-caption-overlay', 'call-open-translation',
 ]
 for (const marker of required) assert.ok(ui.includes(marker), 'missing UI: ' + marker)
-assert.ok(ui.includes("}, [call.id])"), 'new calls must reset permission scope')
-assert.ok(ui.includes('setAllowMyVoice(false)'), 'call translation voice consent must default to denied')
+assert.ok(/<SecureCallRoom\s+key=\{active\.id\}/.test(ui), 'new calls must reset permission scope by mounting a fresh room')
+assert.ok(ui.includes('const [allowMyVoice, setAllowMyVoice] = useState(false)'), 'call translation voice consent must default to denied')
 assert.ok(ui.includes('requestCallMediaPermission'), 'retry button missing for browser media consent')
 assert.ok(ui.includes('ParticipantConnected, onJoined'), 'translation request must reach new participants')
 assert.ok(ui.includes('ParticipantDisconnected, onLeft'), 'consent must be cleared when member exits')
 assert.ok(!ui.includes('type="checkbox"'), 'no consent checkboxes in call UI')
 assert.ok(css.includes('prefers-reduced-motion'), 'reduced motion support missing')
 assert.ok(ui.includes("source.addEventListener('update', onCallEvent)"), 'incoming calls must listen for the named update SSE event')
-assert.ok(ui.includes('source.onopen = () => void refresh()'), 'reconnecting SSE must recover missed calls')
+assert.ok(ui.includes('source.onopen = () => refresh()'), 'reconnecting SSE must recover missed calls')
 assert.ok(ui.includes('await joinExistingCall(existing)'), 'call button must join an existing conversation call')
 assert.ok(ui.includes("document.visibilityState === 'visible'"), 'incoming calls must recover after missed SSE events')
 

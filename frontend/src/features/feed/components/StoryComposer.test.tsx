@@ -44,4 +44,45 @@ describe('Story media preview and publishing', () => {
       URL.revokeObjectURL = originalRevoke
     }
   })
+
+  it('revokes each preview URL when the file changes and on unmount', async () => {
+    const originalCreate = URL.createObjectURL
+    const originalRevoke = URL.revokeObjectURL
+    let created = 0
+    const create = vi.fn(() => `blob:preview-${++created}`)
+    const revoke = vi.fn()
+    URL.createObjectURL = create
+    URL.revokeObjectURL = revoke
+    const host = document.createElement('div')
+    const root = createRoot(host)
+    const photo = new File(['a'], 'photo.jpg', { type: 'image/jpeg' })
+    const render = (file: File, busy = false) => act(async () => root.render(
+      <StoryComposer file={file} busy={busy} onPublish={async () => true}
+        onBack={() => {}} onChangeFile={() => {}} />,
+    ))
+
+    try {
+      await render(photo)
+      await render(photo, true)
+      expect(create).toHaveBeenCalledTimes(1)
+      expect(revoke).not.toHaveBeenCalled()
+
+      await render(new File(['b'], 'clip.mp4', { type: 'video/mp4' }))
+      expect(revoke.mock.calls).toEqual([['blob:preview-1']])
+      expect(host.querySelector('img')).toBeNull()
+      expect(host.querySelector('video')?.getAttribute('src')).toBe('blob:preview-2')
+
+      await render(new File(['c'], 'next.mp4', { type: 'video/mp4' }))
+      expect(revoke.mock.calls).toEqual([['blob:preview-1'], ['blob:preview-2']])
+      expect(host.querySelector('video')?.getAttribute('src')).toBe('blob:preview-3')
+
+      await act(async () => root.unmount())
+      expect(revoke.mock.calls).toEqual([['blob:preview-1'], ['blob:preview-2'], ['blob:preview-3']])
+      expect(create).toHaveBeenCalledTimes(3)
+    } finally {
+      await act(async () => root.unmount())
+      URL.createObjectURL = originalCreate
+      URL.revokeObjectURL = originalRevoke
+    }
+  })
 })

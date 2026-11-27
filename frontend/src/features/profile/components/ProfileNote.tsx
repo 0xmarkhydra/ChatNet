@@ -1,13 +1,17 @@
 import BubbleTextarea from '../../../shared/ui/BubbleTextarea'
 import UserAvatar from '../../../shared/ui/UserAvatar'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageCircle, Plus, Trash2, X, LockKeyhole, Users, Globe, RefreshCw } from 'lucide-react'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import '../styles/profile-note.css'
 import { loadProfileNote, saveProfileNote, deleteProfileNote } from '../api/profile'
 type Note = { content: string; visibility: 'friends'|'public'|'private'; version: string; createdAt: string; expiresAt: string }
 type Props = { username: string; displayName?: string; owner?: boolean; refreshKey?: string; request: (path: string, init?: RequestInit) => Promise<Response> }
-export default function ProfileNote({ username, displayName = username, owner = false, refreshKey, request }: Props) {
+// Keyed so a note, its draft and pending requests never carry over to another profile or relation.
+export default function ProfileNote(props: Props) {
+ return <ProfileNoteSession key={JSON.stringify([props.username, props.owner ?? false, props.refreshKey])} {...props} />
+}
+function ProfileNoteSession({ username, displayName = username, owner = false, request }: Props) {
  const [note,setNote] = useState<Note|null>(null)
  const [loaded,setLoaded] = useState(false)
  const [error,setError] = useState('')
@@ -17,7 +21,7 @@ export default function ProfileNote({ username, displayName = username, owner = 
  const [confirm,setConfirm] = useState(false)
  const dialog = useRef<HTMLDialogElement>(null)
  const trigger = useRef<HTMLButtonElement>(null)
- const api = useLatest(request)
+ const apiRef = useLatest(request)
  const alive = useRef(false)
  const seq = useRef(0)
  const writing = useRef(false)
@@ -29,35 +33,35 @@ export default function ProfileNote({ username, displayName = username, owner = 
  },[])
  const currentNote = note && Date.parse(note.expiresAt)>now ? note : null
  const count = Array.from(draft.trim()).length
- async function load(force=false) {
+ const load=useCallback((force=false)=>{
   const version=++seq.current
-  try {
-   const response=await loadProfileNote(api.current, username, owner, force)
+  return loadProfileNote(apiRef.current, username, owner, force).then(async response=>{
    if(!response.ok)throw new Error('Không tải được ghi chú.')
    const data=await response.json() as {note:Note|null}
    if(!alive.current||version!==seq.current)return
    setNote(data.note);setLoaded(true);setError('')
-  }catch(e){if(alive.current&&version===seq.current){setNote(null);setLoaded(true);setError(e instanceof Error?e.message:'Không tải được ghi chú.')}}
- }
+  }).catch(e=>{if(alive.current&&version===seq.current){setNote(null);setLoaded(true);setError(e instanceof Error?e.message:'Không tải được ghi chú.')}})
+ },[apiRef,username,owner])
  useEffect(()=>{
-  ++mutationRevision.current
-  alive.current=true;writing.current=false;setBusy(false);setNote(null);setLoaded(false);setError('');setDraft('');setConfirm(false)
+  const reads=seq
+  alive.current=true // set in the effect so StrictMode's second setup restores it
   void load()
   const visible=()=>{if(document.visibilityState==='visible'&&!writing.current)void load()}
   document.addEventListener('visibilitychange',visible)
-  return()=>{alive.current=false;++seq.current;document.removeEventListener('visibilitychange',visible)}
- },[username,owner,refreshKey])
+  return()=>{alive.current=false;++reads.current;document.removeEventListener('visibilitychange',visible)}
+ },[load])
+ const expiresAt=note?.expiresAt
  useEffect(()=>{
-  if(!note)return
-  const timer=window.setTimeout(()=>setNote(null),Math.max(0,Date.parse(note.expiresAt)-Date.now()))
+  if(!expiresAt)return
+  const timer=window.setTimeout(()=>setNote(null),Math.max(0,Date.parse(expiresAt)-Date.now()))
   return()=>window.clearTimeout(timer)
- },[note?.expiresAt])
+ },[expiresAt])
  async function publishOrDelete(remove=false) {
   if(writing.current||(!remove&&(count<1||count>60)))return
   const revision=++mutationRevision.current
   writing.current=true;setBusy(true);setError('');++seq.current
   try {
-   const response=await (remove ? deleteProfileNote(api.current, currentNote?.version) : saveProfileNote(api.current, draft.trim(), visibility))
+   const response=await (remove ? deleteProfileNote(apiRef.current, currentNote?.version) : saveProfileNote(apiRef.current, draft.trim(), visibility))
    const data=await response.json() as {note:Note|null;error?:string}
    if(!alive.current||revision!==mutationRevision.current)return
    if(!response.ok)throw new Error(data.error||'Chưa lưu được ghi chú. Hãy tải lại để kiểm tra.')

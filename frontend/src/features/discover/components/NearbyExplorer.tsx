@@ -3,6 +3,7 @@ import { MapPin, Users, Search, RefreshCw, Navigation, List, Map as MapIcon, Shi
 const NearbyMap = lazy(() => import('./NearbyMap'))
 import { loadNearbyPlaces, type NearbyPlace, type NearbyPlaceCategory } from '../lib/nearbyPlaces'
 import { getCurrentPositionSmart, geolocationErrorMessage } from '../lib/geolocation'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { ErrorBoundary } from '../../../shared/ui/ErrorBoundary'
 
 export type NearbyUser = {
@@ -38,6 +39,7 @@ const categories: { id: NearbyPlaceCategory; label: string }[] = [
   { id: 'services', label: 'Dịch vụ' }, { id: 'stay', label: 'Lưu trú' }, { id: 'health', label: 'Y tế' },
   { id: 'education', label: 'Giáo dục' }, { id: 'shopping', label: 'Mua sắm' },
 ]
+const noPlaces: NearbyPlace[] = []
 function distance(value?: number) {
   if (value === undefined || !Number.isFinite(value)) return 'Chưa rõ khoảng cách'
   return value < 1 ? `${Math.max(1, Math.round(value * 100)) * 10} m` : `${value.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`
@@ -64,12 +66,16 @@ export default function NearbyExplorer({
   const locatingFlight = useRef(false)
   useEffect(() => () => { ++locationRevision.current; locatingFlight.current = false }, [])
   const [locationError, setLocationError] = useState('')
-  const [places, setPlaces] = useState<NearbyPlace[]>([])
-  const lastPlaceCriteria = useRef<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [reload, setReload] = useState(0)
-  const [selected, setSelected] = useState<string | null>(null)
+  // Results belong to one set of search criteria; a retry with the same criteria keeps them on screen.
+  const criteria = location ? `${location.latitude}:${location.longitude}:${radius}:${category}` : null
+  const [places, setPlaces] = useScopedState<NearbyPlace[]>(criteria, noPlaces)
+  const [selected, setSelected] = useScopedState<string | null>(criteria, null)
+  // null while the current request is in flight, then '' or its error message.
+  const requestKey = mode === 'places' && location ? `${criteria}:${reload}` : null
+  const [result, setResult] = useScopedState<string | null>(requestKey, null)
+  const loading = requestKey !== null && result === null
+  const error = result ?? ''
   const normalized = query.trim().replace(/^@/, '').toLocaleLowerCase('vi-VN')
   const visibleUsers = useMemo(() => users.filter((user) =>
     `${user.displayName} ${user.username}`.toLocaleLowerCase('vi-VN').includes(normalized))
@@ -83,17 +89,11 @@ export default function NearbyExplorer({
   useEffect(() => {
     if (mode !== 'places' || !location) return
     const controller = new AbortController()
-    const criteria = `${location.latitude}:${location.longitude}:${radius}:${category}`
-    const changedCriteria = lastPlaceCriteria.current !== criteria
-    lastPlaceCriteria.current = criteria
-    setLoading(true); setError('')
-    if (changedCriteria) { setPlaces([]); setSelected(null) }
     loadNearbyPlaces({ ...location, radiusKm: radius, category, signal: controller.signal })
-      .then((items) => { if (!controller.signal.aborted) setPlaces(items) })
-      .catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Không tải được địa điểm.') })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+      .then((items) => { if (!controller.signal.aborted) { setPlaces(items); setResult('') } })
+      .catch((reason) => { if (!controller.signal.aborted) setResult(reason instanceof Error ? reason.message : 'Không tải được địa điểm.') })
     return () => controller.abort()
-  }, [location, category, radius, reload, mode])
+  }, [location, category, radius, reload, mode, setPlaces, setResult])
 
   async function locate() {
     if (locatingFlight.current) return

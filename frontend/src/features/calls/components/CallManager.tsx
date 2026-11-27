@@ -9,6 +9,7 @@ import { isDesktopBuild } from '../../../platform/desktop'
 import { requireDesktopMedia } from '../../../platform/desktopMedia'
 import IncomingCallDialog from './IncomingCallDialog'
 import SecureCallRoom from './SecureCallRoom'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import type { CallLaunchDetail } from './CallHeaderActions'
 import { notifyDesktopCall, dismissDesktopCall } from '../../notifications'
 import { friendlyCallError } from '../lib/callErrors'
@@ -44,37 +45,40 @@ export default function CallManager({
   requestRef.current = request
   const callRequest = useCallback<CallRequest>((path, init) => requestRef.current(path, init), [])
 
+  // Every poll returns a new object for the same call, so only a new call id may notify again.
+  const latestIncoming = useLatest(incoming)
+  const incomingId = incoming?.id
   useEffect(() => {
-    if (!isDesktopBuild || !sessionId || !incoming) return
+    const call = latestIncoming.current
+    if (!isDesktopBuild || !sessionId || !incomingId || !call) return
     // Defer one tick so StrictMode setup/cleanup cannot consume dedupe before the live effect.
-    const timer = window.setTimeout(() => notifyDesktopCall(sessionId, incoming), 0)
-    return () => { window.clearTimeout(timer); dismissDesktopCall(sessionId, incoming.id) }
-  }, [incoming?.id, sessionId])
+    const timer = window.setTimeout(() => notifyDesktopCall(sessionId, call), 0)
+    return () => { window.clearTimeout(timer); dismissDesktopCall(sessionId, incomingId) }
+  }, [incomingId, latestIncoming, sessionId])
 
   const conversationMap = useMemo(
     () => new Map(conversations.map((item) => [item.id, item])),
     [conversations],
   )
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(() => {
     if (!token) return
     const generation = refreshGeneration.current
     const sequence = ++refreshSequence.current
-    try {
-      const calls = await getCurrentCalls(callRequest)
+    getCurrentCalls(callRequest).then((calls) => {
       // An older response must not undo a newer SSE refresh or a session change.
       if (generation !== refreshGeneration.current || sequence !== refreshSequence.current) return
       const current = calls.find((item) => item.joined && (item.status === 'ringing' || item.status === 'active'))
       const ringing = calls.find((item) => item.incoming && (item.status === 'ringing' || item.status === 'active'))
       if (!active && current) setActive(current)
       setIncoming(active ? null : ringing || null)
-    } catch {
+    }).catch(() => {
       // Realtime reconnects are best effort; the next SSE event/refresh will recover state.
-    }
+    })
   }, [active, callRequest, token])
 
   useEffect(() => {
     if (!token) return
-    void refresh()
+    refresh()
     const source = new EventSource(`${apiBase}/api/events?token=${encodeURIComponent(token)}`)
     const onCallEvent = (event: MessageEvent) => {
       try {
@@ -85,7 +89,7 @@ export default function CallManager({
           if (payload.callId === active?.id) setActive(null)
           return
         }
-        if (payload.type === 'call.created' || payload.type === 'call.updated') void refresh()
+        if (payload.type === 'call.created' || payload.type === 'call.updated') refresh()
       } catch {
         // Ignore unrelated SSE payloads.
       }
@@ -93,12 +97,12 @@ export default function CallManager({
     // Chat sends named "update" events, not default "message" events.
     source.addEventListener('update', onCallEvent)
     source.onmessage = onCallEvent
-    source.onopen = () => void refresh()
+    source.onopen = () => refresh()
     // Recover missed ringing calls after SSE disconnects or background-tab suspension.
     const poll = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void refresh()
+      if (document.visibilityState === 'visible') refresh()
     }, 10000)
-    const onFocus = () => void refresh()
+    const onFocus = () => refresh()
     window.addEventListener('focus', onFocus)
     return () => {
       refreshGeneration.current += 1
@@ -236,6 +240,7 @@ export default function CallManager({
 
       {active && (
         <SecureCallRoom
+          key={active.id}
           call={active}
           isGroup={conversationMap.get(active.conversationId)?.type === 'group'}
           autoPublish={!isDesktopBuild || userActivatedCall.current === active.id}
@@ -246,7 +251,7 @@ export default function CallManager({
           sourceLanguage={sourceLanguage}
           targetLanguage={targetLanguage}
           canEnd={'canEnd' in active ? active.canEnd : active.createdBy === userId}
-          onClosed={() => { setActive(null); setIncoming(null); void refresh() }}
+          onClosed={() => { setActive(null); setIncoming(null); refresh() }}
           onError={setError}
         />
       )}

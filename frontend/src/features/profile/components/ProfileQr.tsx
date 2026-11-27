@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import QrScanner from 'qr-scanner'
 import { X, Share2, Download } from 'lucide-react'
@@ -36,9 +36,10 @@ export default function ProfileQr({ username, displayName, url, initialMode, onC
   const fileRead = useRef(0)
 
   useEffect(() => {
+    const reads = fileRead
     alive.current = true
     dialog.current?.showModal()
-    return () => { alive.current = false; fileRead.current++; scanner.current?.destroy() }
+    return () => { alive.current = false; reads.current++; scanner.current?.destroy() }
   }, [])
 
   useEffect(() => {
@@ -49,7 +50,7 @@ export default function ProfileQr({ username, displayName, url, initialMode, onC
     return () => { cancelled = true }
   }, [url])
 
-  function read(value: string) {
+  const read = useCallback((value: string) => {
     try {
       const found = profileFromQr(value, window.location.origin)
       if (found.toLowerCase() === username.toLowerCase()) throw new Error('Đây là mã QR của bạn.')
@@ -59,7 +60,7 @@ export default function ProfileQr({ username, displayName, url, initialMode, onC
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Mã QR không hợp lệ.')
     }
-  }
+  }, [username])
 
   useEffect(() => {
     if (!camera || mode !== 'scan' || !video.current) return
@@ -78,7 +79,7 @@ export default function ProfileQr({ username, displayName, url, initialMode, onC
       instance.destroy()
       scanner.current = null
     }
-  }, [camera, mode, username])
+  }, [camera, mode, read])
 
   async function readFile(file?: File) {
     if (!file) return

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { ClipboardList, Info, PackageSearch, Plus, PlusCircle, ShoppingBag, ShoppingCart } from 'lucide-react'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import { cn } from '../../../shared/lib/utils'
@@ -36,7 +36,22 @@ const stepCls = 'size-9 cursor-pointer rounded-full border-0 bg-white text-ui-se
 const primaryCls = 'min-h-control-touch w-full cursor-pointer rounded-ui-md border-0 bg-primary px-4.5 font-semibold text-white hover:bg-primary/90'
 const chipCls = (active: boolean) => cn('min-h-control-sm flex-none cursor-pointer rounded-full border px-3.5 text-ui-label font-semibold', active ? 'border-primary bg-secondary text-primary' : 'border-border bg-card text-foreground')
 
-export default function Marketplace({ userId, searchQuery = '', request, }: Props) {
+async function callApi<T>(request: Props['request'], path: string, init: RequestInit = {}): Promise<T> {
+  const response = await request(path, init)
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    throw new Error(typeof body?.error === 'string' ? body.error : 'Yêu cầu không thành công')
+  }
+  if (response.status === 204) return undefined as T
+  return response.json() as Promise<T>
+}
+
+// Keyed by account: catalog, cart, drafts and pending requests never carry over to another user.
+export default function Marketplace(props: Props) {
+  return <MarketplaceSession key={props.userId} {...props} />
+}
+
+function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
   const apiRef = useLatest(request)
   const revision = useRef(0)
   const readRevision = useRef(0)
@@ -64,25 +79,19 @@ export default function Marketplace({ userId, searchQuery = '', request, }: Prop
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
 
-  async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await apiRef.current(path, init)
-    if (!response.ok) {
-      const body = await response.json().catch(() => null)
-      throw new Error(typeof body?.error === 'string' ? body.error : 'Yêu cầu không thành công')
-    }
-    if (response.status === 204) return undefined as T
-    return response.json() as Promise<T>
+  function api<T>(path: string, init: RequestInit = {}) {
+    return callApi<T>(apiRef.current, path, init)
   }
-  async function refresh(version = revision.current) {
+  const refresh = useCallback((version: number) => {
     const read = ++readRevision.current
     const isCurrent = () => version === revision.current && read === readRevision.current
-    try {
-      const [catalog, basket, history, owned] = await Promise.all([
-        api<{ products: Product[] }>('/api/marketplace/products'),
-        api<{ items: CartItem[] }>('/api/marketplace/cart'),
-        api<{ orders: Order[] }>('/api/marketplace/orders'),
-        api<{ products: Product[] }>('/api/marketplace/products/mine'),
-      ])
+    const get = <T,>(path: string) => callApi<T>(apiRef.current, path)
+    return Promise.all([
+      get<{ products: Product[] }>('/api/marketplace/products'),
+      get<{ items: CartItem[] }>('/api/marketplace/cart'),
+      get<{ orders: Order[] }>('/api/marketplace/orders'),
+      get<{ products: Product[] }>('/api/marketplace/products/mine'),
+    ]).then(([catalog, basket, history, owned]) => {
       if (!isCurrent()) return
       setProducts(catalog.products)
       setCart(basket.items)
@@ -90,24 +99,17 @@ export default function Marketplace({ userId, searchQuery = '', request, }: Prop
       setMine(owned.products)
       setLoaded(true)
       setError('')
-    } catch (e) {
+    }).catch((e) => {
       if (isCurrent()) setError(e instanceof Error ? e.message : 'Không tải được sàn')
-    } finally {
+    }).finally(() => {
       if (isCurrent()) setLoading(false)
-    }
-  }
+    })
+  }, [apiRef])
   useEffect(() => {
     const requestRevision = revision
-    const version = ++requestRevision.current
-    setProducts([]); setCart([]); setOrders([]); setMine([])
-    mutationFlight.current = null
-    retryFlight.current = null
-    setView('products')
-    setTitle(''); setDescription(''); setPrice(''); setUnit(''); setStock('1')
-    setError(''); setMessage(''); setLoading(true); setLoaded(false); setBusy(false); setRefreshing(false)
-    void refresh(version)
+    void refresh(++requestRevision.current)
     return () => { ++requestRevision.current }
-  }, [userId])
+  }, [refresh])
 
   function retryRead() {
     if (retryFlight.current) return

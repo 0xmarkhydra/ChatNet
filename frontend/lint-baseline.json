@@ -1,30 +1,13 @@
 {
-  "total": 38,
+  "total": 14,
   "byRule": {
-    "react-hooks/exhaustive-deps": 26,
-    "react-hooks/set-state-in-effect": 12
+    "react-hooks/exhaustive-deps": 12,
+    "react-hooks/set-state-in-effect": 2
   },
   "counts": {
     "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 10,
     "src/app/AuthedApp.tsx|react-hooks/set-state-in-effect": 2,
     "src/app/hooks/useAppRealtime.ts|react-hooks/exhaustive-deps": 1,
-    "src/features/calls/components/CallCenter.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/calls/components/CallManager.tsx|react-hooks/exhaustive-deps": 1,
-    "src/features/calls/components/CallManager.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/calls/components/SecureCallRoom.tsx|react-hooks/set-state-in-effect": 2,
-    "src/features/calls/hooks/useCallRoomLifecycle.ts|react-hooks/exhaustive-deps": 1,
-    "src/features/discover/components/Marketplace.tsx|react-hooks/exhaustive-deps": 1,
-    "src/features/discover/components/Marketplace.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/discover/components/NearbyExplorer.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/feed/components/FeedDiscussion.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/feed/components/FeedModeration.tsx|react-hooks/exhaustive-deps": 1,
-    "src/features/feed/components/FeedModeration.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/feed/components/StoryComposer.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/feed/hooks/useFollowingPosts.ts|react-hooks/exhaustive-deps": 1,
-    "src/features/profile/components/ProfileNote.tsx|react-hooks/exhaustive-deps": 3,
-    "src/features/profile/components/ProfileNote.tsx|react-hooks/set-state-in-effect": 1,
-    "src/features/profile/components/ProfileQr.tsx|react-hooks/exhaustive-deps": 2,
-    "src/features/profile/components/VisitorProfile.tsx|react-hooks/exhaustive-deps": 4,
     "src/platform/DesktopScreenPicker.tsx|react-hooks/exhaustive-deps": 1
   }
 }
