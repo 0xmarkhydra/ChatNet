@@ -10,6 +10,8 @@ type Props = {
   email?: string
   bio?: string
   city?: string
+  workplace?: string
+  school?: string
   friends: FriendConnection[]
   media: ProfileMediaItem[]
   highlights?: ReactNode
@@ -20,7 +22,7 @@ type Props = {
   onOpenPost: (postId: number) => void
 }
 
-export default function ProfileSidebar({ username, email, bio, city, friends, media, highlights, onEditProfile, onShowMedia, onShowFriends, onViewFriend, onOpenPost }: Props) {
+export default function ProfileSidebar({ username, email, bio, city, workplace, school, friends, media, highlights, onEditProfile, onShowMedia, onShowFriends, onViewFriend, onOpenPost }: Props) {
   const aside = useRef<HTMLElement>(null)
   const [stickyTop, setStickyTop] = useState(16)
   useEffect(() => {
@@ -36,7 +38,7 @@ export default function ProfileSidebar({ username, email, bio, city, friends, me
   }, [])
   return (
         <aside ref={aside} className="profile-page-aside" style={{ '--profile-aside-top': `${stickyTop}px` } as CSSProperties} aria-label="Thông tin, ảnh và bạn bè">
-          <ProfileDetailsCard username={username} bio={bio} city={city} friendCount={friends.length}
+          <ProfileDetailsCard username={username} bio={bio} city={city} workplace={workplace} school={school} grouped friendCount={friends.length}
             hasPrivateEmail={Boolean(email)} onEdit={onEditProfile} />
           {highlights}
           <section className="profile-page-recent">

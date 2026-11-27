@@ -1,7 +1,9 @@
 import type { ApiRequest } from "@/shared/types/api";
 import StoryViewer from "./StoryViewer";
 import { type Story } from "../types";
-import { type SetStateAction } from "react";
+import { useContext, useEffect, type SetStateAction } from "react";
+import { SessionContext } from "../../../shared/context/SessionContext";
+import { markStorySeen } from "../utils/storySeen";
 import type { Dispatch } from "react";
 
 export type StoryOverlayProps = {
@@ -33,6 +35,10 @@ export default function StoryOverlay({
   stories,
   storyBusy,
 }: StoryOverlayProps) {
+  const scope = useContext(SessionContext)?.session.sessionId;
+  useEffect(() => {
+    if (scope) markStorySeen(scope, activeStory.id);
+  }, [scope, activeStory.id]);
   return (
       <StoryViewer
             activeStory={activeStory}

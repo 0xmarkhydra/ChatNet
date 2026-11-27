@@ -3,12 +3,14 @@ import { useScopedState } from '../../../shared/hooks/useScopedState'
 import type { AppDataContext } from '../../../shared/types/api'
 import type { Story } from '../types'
 import { listStories } from '../api/stories'
+import { useAvatarStoryStatuses } from './useAvatarStoryStatuses'
 
 export function useFeedStories({ session, sessionRef, apiFetch, setStatus }: AppDataContext) {
   // Reset before paint on session changes, including A → B → A. Old async setters
   // are tied to the previous visit and cannot repopulate the next account.
   const [stories, setStories] = useScopedState<Story[]>(session?.sessionId ?? null, [])
   const refreshSequence = useRef(0)
+  useAvatarStoryStatuses(session?.sessionId ?? '', stories)
 
   async function refreshStories() {
     const request = ++refreshSequence.current

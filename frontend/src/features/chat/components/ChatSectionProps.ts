@@ -56,7 +56,7 @@ export type ChatSectionProps = {
   conversationLoadingMore: boolean;
   conversationListError: string;
   refreshConversations: () => Promise<void>;
-  onContactSaved?: (id: number, metadata: import('../../contacts/utils/contactMetadata').PersonalContactMetadata) => void;
+  onContactSaved?: (id: number, metadata: import('../../contacts').PersonalContactMetadata) => void;
   copyInviteLink: () => Promise<void>;
   createDirect: (event: FormEvent) => Promise<void>;
   createGroupChannel: (name: string, description: string) => Promise<boolean>;

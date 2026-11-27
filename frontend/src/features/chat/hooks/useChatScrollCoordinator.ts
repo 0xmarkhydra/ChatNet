@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
 import { useLatest } from "../../../shared/hooks/useLatest";
-import { positionAtUnread, reconcileChatScroll, resetChatFollowBottom } from "../lib/chatScrollPosition";
+import { positionAtUnread, reconcileChatScroll, resetChatFollowBottom, resetChatScrollRestore } from "../lib/chatScrollPosition";
 import type { Message } from "../types";
 import type { QueuedChatMessage } from "../lib/chatOutbox";
 
@@ -40,7 +40,7 @@ export function useChatScrollCoordinator({
   useLayoutEffect(() => {
     entered.current = false;
     positionedCachedHistory.current = false;
-    latest.current.pendingMessageScrollRestore.current = null;
+    resetChatScrollRestore(latest.current);
     resetChatFollowBottom(latest.current);
   }, [activeConversationId, selectedChannelId, latest]);
 

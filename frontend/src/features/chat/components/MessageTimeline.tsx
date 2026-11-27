@@ -262,7 +262,7 @@ type RowProps = {
 };
 
 // Bubble-local state stays mounted when unrelated draft, rail, or receipt updates render the parent.
-const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isGroup, groupPosition, groupReaderIds, groupMembers, messageReaderMembers, deliveryStatus, sessionId, conversationBlocked, effectiveAutoTranslate, translationDisplay, translatedLanguage, translation, originalVisible, manualTranslation, translationBusy, translationFailed, reactionBusy, messageInputRef, suppressMessageClick, actions }: RowProps) {
+const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isGroup, groupPosition, groupReaderIds, groupMembers, messageReaderMembers, deliveryStatus, sessionId, conversationBlocked, effectiveAutoTranslate, translationDisplay, translatedLanguage, translation, originalVisible, manualTranslation, translationBusy, translationFailed, reactionBusy, messageInputRef, suppressMessageClick: suppressMessageClickRef, actions }: RowProps) {
   const { apiFetch, beginMessageLongPress, cancelMessageLongPress, moveMessageLongPress, openMessageActions, openMessageReactions, onReactionUsers, onForwardMessage, toggleReaction, setManuallyTranslated, setReplyingTo, setTranslationOriginals, translateMessage, onProfile, setReadersTarget } = actions;
   const groupStart = groupPosition === 'single' || groupPosition === 'start'
   const groupEnd = groupPosition === 'single' || groupPosition === 'end'
@@ -307,7 +307,7 @@ const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isG
       className={'message message-press-target min-w-0 animate-none!' + (mine ? ' mine' : '') + (isGroup ? ' channel-message' : '') + (groupPosition !== 'single' ? ` message-group-${groupPosition}` : '')}
       title={!groupEnd ? formatTime(message.createdAt) + (message.editedAt && !message.deleted ? ' · đã sửa' : '') : undefined}
       onPointerDown={(event) => {
-        suppressMessageClick.current = null
+        suppressMessageClickRef.current = null
         if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.pointerType, event.target)
       }}
       onPointerMove={(event) => moveMessageLongPress(event.clientX, event.clientY)}
@@ -315,10 +315,10 @@ const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isG
       onPointerCancel={cancelMessageLongPress}
       onPointerLeave={cancelMessageLongPress}
       onClickCapture={(event) => {
-        if (suppressMessageClick.current !== message.id) return
+        if (suppressMessageClickRef.current !== message.id) return
         event.preventDefault()
         event.stopPropagation()
-        suppressMessageClick.current = null
+        suppressMessageClickRef.current = null
       }}
       onContextMenu={(event) => {
         if (message.deleted || conversationBlocked) return

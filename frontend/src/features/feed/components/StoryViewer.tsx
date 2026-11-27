@@ -229,7 +229,7 @@ export default function StoryViewer(props: Props) {
                   aria-current={active ? 'true' : undefined}
                   onClick={() => setActiveStoryId(active ? activeStory.id : items[0].id)}>
                   <span className={'grid size-12 flex-none place-items-center overflow-hidden rounded-full p-0.75 ' + (active ? 'bg-(image:--soco-gradient)' : 'bg-white/30')}>
-                    <UserAvatar username={latest.author} name={label} className="box-border size-full border-2 border-story-canvas text-ui-label font-black" />
+                    <UserAvatar storyStatus="none" username={latest.author} name={label} className="box-border size-full border-2 border-story-canvas text-ui-label font-black" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block truncate text-ui-body">{label}</strong>
@@ -294,7 +294,7 @@ export default function StoryViewer(props: Props) {
               {feed ? (
                 <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-ui-2 border-0 bg-transparent p-0 text-left text-white"
                   onClick={() => feed.onProfile(activeStory.author)} title={'Xem hồ sơ ' + authorLabel}>
-                  <UserAvatar username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
+                  <UserAvatar storyStatus="none" username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
                   <span className="min-w-0">
                     <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
                     <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, 'Vừa đăng')}</time>
@@ -302,7 +302,7 @@ export default function StoryViewer(props: Props) {
                 </button>
               ) : (
                 <span className="flex min-w-0 flex-1 items-center gap-ui-2">
-                  <UserAvatar username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
+                  <UserAvatar storyStatus="none" username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
                   <span className="min-w-0">
                     <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
                     <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, 'Vừa đăng')}</time>

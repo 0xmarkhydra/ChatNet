@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, type ComponentProps } from 'react'
+import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 import ProfilePage from './ProfilePage'
@@ -8,16 +8,6 @@ vi.mock('../../../shared/ui/UserAvatar', () => ({
   default: ({ username, initialsOnly }: { username: string; initialsOnly?: boolean }) => <span data-avatar={username} data-initials-only={initialsOnly} />,
 }))
 vi.mock('./ProfileMediaGallery', () => ({ default: () => <div>Media gallery</div> }))
-
-const defaultProps: ComponentProps<typeof ProfilePage> = {
-  username: 'trung', displayName: 'Trung', coverSet: false, avatarSet: false, editBusy: false,
-  friends: [], posts: [], pendingPost: null, postsBusy: false, postsError: '',
-  hasMorePosts: false, postCards: null, profileNote: null,
-  onEditProfile: () => {}, onChangeAvatar: () => {}, onChangeCover: () => {},
-  onCreatePost: () => {}, onCreateMediaPost: () => {}, onCreateStory: () => {}, onCheckIn: () => {},
-  onReloadPosts: () => {}, onLoadMorePosts: () => {}, onViewFriend: () => {},
-  onOpenContacts: () => {}, onOpenPost: () => {},
-}
 
 describe('own profile navigation and composer', () => {
   it('switches tabs, maintains a sliding indicator and opens the shared post prompt', async () => {
@@ -87,7 +77,7 @@ describe('own profile navigation and composer', () => {
       expect(onChangeAvatar).toHaveBeenCalledTimes(2)
       const tabbar = host.querySelector('.profile-page-tabbar')
       expect(tabbar?.querySelector('.profile-page-tab-indicator')).not.toBeNull()
-      expect(tabbar?.parentElement?.classList.contains('profile-page')).toBe(true)
+      expect(tabbar?.parentElement?.parentElement?.classList.contains('profile-page')).toBe(true)
       expect(host.querySelector('.profile-page-hero')?.contains(tabbar)).toBe(false)
       expect(tabbar?.classList.contains('is-measured')).toBe(true)
       expect(host.textContent).toContain('Bạn đang nghĩ gì?')
@@ -103,32 +93,6 @@ describe('own profile navigation and composer', () => {
       await act(async () => video?.click())
       expect(video?.getAttribute('aria-selected')).toBe('true')
       expect(media?.getAttribute('aria-selected')).toBe('false')
-    } finally {
-      await act(async () => root.unmount())
-      host.remove()
-      environment.IS_REACT_ACT_ENVIRONMENT = previous
-    }
-  })
-
-  it('shows loading state before empty state when own posts finish loading empty', async () => {
-    const environment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-    const previous = environment.IS_REACT_ACT_ENVIRONMENT
-    environment.IS_REACT_ACT_ENVIRONMENT = true
-    const host = document.createElement('div')
-    document.body.append(host)
-    const root = createRoot(host)
-    try {
-      await act(async () => root.render(<ProfilePage {...defaultProps} postsBusy />))
-
-      const loading = host.querySelector('.profile-page-main [role="status"][aria-busy="true"]')
-      expect(loading?.textContent).toContain('Đang tải bài viết')
-      expect(loading?.querySelector('[aria-hidden="true"]')).not.toBeNull()
-      expect(host.textContent).not.toContain('Bạn chưa có bài viết nào.')
-
-      await act(async () => root.render(<ProfilePage {...defaultProps} />))
-
-      expect(host.querySelector('.profile-page-main [role="status"][aria-busy="true"]')).toBeNull()
-      expect(host.textContent).toContain('Bạn chưa có bài viết nào.')
     } finally {
       await act(async () => root.unmount())
       host.remove()

@@ -9,12 +9,38 @@ type Props = {
   workplace?: string
   school?: string
   iconEdit?: boolean
+  grouped?: boolean
   friendCount?: number
   hasPrivateEmail?: boolean
   onEdit?: () => void
 }
 
-export default function ProfileDetailsCard({ username, bio, city, workplace, school, iconEdit, friendCount, hasPrivateEmail, onEdit }: Props) {
+export default function ProfileDetailsCard({ username, bio, city, workplace, school, iconEdit, grouped, friendCount, hasPrivateEmail, onEdit }: Props) {
+  if (grouped) {
+    const groups = [
+      { title: "Công việc", value: workplace, Icon: BriefcaseBusiness },
+      { title: "Giáo dục", value: school, Icon: GraduationCap },
+    ];
+    const edit = (label: string) => onEdit && <button type="button" aria-label={label} onClick={onEdit} className="grid size-control-touch shrink-0 place-items-center rounded-full border-0 bg-transparent text-muted-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"><PencilLine size={20} aria-hidden="true" /></button>;
+    return (
+      <section className="profile-page-about grid gap-ui-3 rounded-ui-lg border border-solid border-border-subtle bg-card p-ui-4 text-sm leading-relaxed font-medium text-foreground shadow-sm">
+        <div className="grid gap-ui-1.5">
+          <header className="flex items-center justify-between gap-ui-2"><h2 className="m-0 text-base! font-semibold! text-foreground!">Thông tin cá nhân</h2>{edit("Chỉnh sửa thông tin")}</header>
+          {bio && <p className="m-0 wrap-anywhere text-sm! font-normal!">{bio}</p>}
+          {city && <div className="flex items-center gap-ui-3 py-ui-1"><MapPin size={22} className="shrink-0" aria-hidden="true" /><span>Sống tại <strong className="font-semibold">{city}</strong></span></div>}
+          <div className="flex items-center gap-ui-3 py-ui-1"><AtSign size={22} className="shrink-0" aria-hidden="true" /><span>@{username}</span></div>
+          {friendCount !== undefined && <div className="flex items-center gap-ui-3 py-ui-1"><Users size={22} className="shrink-0" aria-hidden="true" /><span>{friendCount.toLocaleString("vi-VN")} bạn bè</span></div>}
+          {hasPrivateEmail && <div className="flex items-center gap-ui-3 py-ui-1"><LockKeyhole size={20} className="shrink-0" aria-hidden="true" /><span>Email chỉ hiển thị với bạn</span></div>}
+        </div>
+        {groups.map(({ title, value, Icon }) => (
+          <div key={title} className="grid gap-ui-1.5">
+            <header className="flex items-center justify-between gap-ui-2"><h2 className="m-0 text-base! font-semibold! text-foreground!">{title}</h2>{edit("Chỉnh sửa " + title.toLowerCase())}</header>
+            {value?.trim() ? <div className="flex min-w-0 items-center gap-ui-3 py-ui-1"><span className="grid size-control-touch shrink-0 place-items-center rounded-full bg-secondary"><Icon size={23} aria-hidden="true" /></span><span className="min-w-0 wrap-anywhere text-sm! font-medium!">{value}</span></div> : <p className="m-0 text-sm font-medium text-muted-foreground">Chưa cập nhật</p>}
+          </div>
+        ))}
+      </section>
+    );
+  }
   const rowClasses = iconEdit ? "flex min-w-0 items-start gap-ui-3 text-[15px] leading-normal text-foreground [&>svg]:size-6 [&>svg]:shrink-0 [&>span]:min-w-0 [&>span]:wrap-anywhere" : detailRowClasses
   return (
     <section className={iconEdit ? "grid gap-ui-4 bg-card px-ui-1 pb-ui-2" : "profile-page-about"}>
