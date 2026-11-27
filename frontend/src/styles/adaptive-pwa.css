@@ -742,30 +742,3 @@
     animation: none;
   }
 }
-
-/* Hide both mobile chrome bars when scrolling into content; reveal on upward scroll. */
-@media (max-width: 760px) {
-  .modern-shell.app-layout > .chatnet-appbar,
-  .modern-shell.app-layout > .bottom-navigation {
-    transition: transform 230ms ease, margin 230ms ease, opacity 230ms ease;
-    will-change: transform;
-  }
-  .modern-shell.app-layout.mobile-chrome-hidden > .chatnet-appbar:not(.mobile-section-header) {
-    transform: translateY(-100%);
-    margin-top: calc(-1 * var(--mobile-header-height, 0px));
-    opacity: 0;
-    pointer-events: none;
-  }
-  .modern-shell.app-layout.mobile-chrome-hidden > .bottom-navigation {
-    transform: translateY(100%);
-    margin-bottom: calc(-1 * var(--mobile-nav-height, 0px));
-    opacity: 0;
-    pointer-events: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .modern-shell.app-layout > .chatnet-appbar,
-  .modern-shell.app-layout > .bottom-navigation {
-    transition: none;
-  }
-}

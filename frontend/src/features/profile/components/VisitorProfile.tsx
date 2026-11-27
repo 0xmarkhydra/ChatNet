@@ -1,10 +1,11 @@
 import { StoryHighlights } from '../../feed'
 import VisitorProfileHero, { type VisitorProfileData } from './VisitorProfileHero'
 import ProfileTabs from './ProfileTabs'
+import { Button } from '@/shared/ui/button'
 import ProfileDetailsCard from './ProfileDetailsCard'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
-import { ArrowLeft, RefreshCw, MapPin } from 'lucide-react'
+import { MapPin } from 'lucide-react'
 import { FeedPostCard } from '../../feed'
 import type { Post } from '../../feed'
 import type { FriendSearchResult } from '../../contacts'
@@ -14,6 +15,7 @@ import { useLatest } from '../../../shared/hooks/useLatest'
 
 type Props = {
  username: string
+ mobile?: boolean
  friendOnline?: boolean
  request: (path: string, init?: RequestInit) => Promise<Response>
  currentUser: string
@@ -24,7 +26,6 @@ type Props = {
  onFriend: (user: FriendSearchResult) => Promise<void>
  onRemoveFriend: (user: FriendSearchResult) => Promise<void>
  onMessage: (username: string) => Promise<void>
- onClose: () => void
  onOpenOriginal?: (id: number) => void
  onShareToChat?: (url: string) => void
  onRepostChanged?: () => void
@@ -38,7 +39,7 @@ type Props = {
  onDeleted: (id: number) => void
  feedback: (message: string, kind?: 'success' | 'error' | 'warning' | 'info') => void
 }
-export default function VisitorProfile({ username, friendOnline, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onClose, onPostOpen, onOpenOriginal, onRepostChanged, onShareToChat, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
+export default function VisitorProfile({ username, mobile = false, friendOnline, request, currentUser, token, targetLanguage, relationship, friendBusy, onFriend, onRemoveFriend, onMessage, onPostOpen, onOpenOriginal, onRepostChanged, onShareToChat, onReactionUsers, onUserOpen, onEditPost, taggedNames, onUpdated, updates, onDeleted, feedback }: Props) {
  const scope=JSON.stringify([username,token])
  const [profile,setProfile]=useScopedState<VisitorProfileData|null>(scope,null)
  const [posts,setPosts]=useScopedState<Post[]>(scope,[])
@@ -54,19 +55,12 @@ export default function VisitorProfile({ username, friendOnline, request, curren
  const alive=useRef(true)
  const latestToken=useLatest(token)
  const latestRequest=useLatest(request)
- const latestClose=useLatest(onClose)
  const paging=useRef(false)
  const sequence=useRef(0)
  const previousUpdates=useRef(updates)
- const surface=useRef<HTMLElement>(null)
- const back=useRef<HTMLButtonElement>(null)
  useEffect(()=>{
   alive.current=true
-  const previous=document.activeElement instanceof HTMLElement?document.activeElement:null
-  back.current?.focus()
-  const escape=(event:KeyboardEvent)=>{if(event.key==='Escape' && !document.querySelector('dialog[open]'))latestClose.current()}
-  document.addEventListener('keydown',escape)
-  return ()=>{alive.current=false;sequence.current++;document.removeEventListener('keydown',escape);previous?.focus()}
+  return ()=>{alive.current=false;sequence.current++}
  },[])
  useEffect(()=>{
   if(previousUpdates.current===updates)return
@@ -145,7 +139,7 @@ export default function VisitorProfile({ username, friendOnline, request, curren
  },[relation,profile?.username])
  const action=relation==='accepted'?'Bạn bè':relation==='incoming'?'Chấp nhận kết bạn':relation==='outgoing'?'Hủy lời mời':'Kết bạn'
  const media=posts.flatMap(post=>(post.attachments||[]).filter(attachment=>(attachment.kind==='image'||attachment.kind==='video')&&Boolean(attachment.url)).map(attachment=>({...attachment,postId:post.id})))
- const tabs=[{id:'posts',label:'Bài viết'},...(media.length?[{id:'media',label:'Ảnh & video'}]:[]),...(profile?.bio||profile?.city?[{id:'about',label:'Giới thiệu'}]:[])]
+ const tabs=mobile ? [{id:'posts',label:'Tất cả'}, {id:'media',label:'Ảnh & video'}] : [{id:'posts',label:'Bài viết'},...(media.length?[{id:'media',label:'Ảnh & video'}]:[]),...(profile?.bio||profile?.city?[{id:'about',label:'Giới thiệu'}]:[])]
  const visibleTab=tabs.some(tab=>tab.id===activeTab)?activeTab:'posts'
  useEffect(()=>{
   const element=sidebar.current
@@ -158,19 +152,12 @@ export default function VisitorProfile({ username, friendOnline, request, curren
   measure()
   return()=>observer.disconnect()
  },[profile?.username,visibleTab])
- return <section ref={surface} onKeyDown={event=>{
-  if(event.key!=='Tab'||document.querySelector('dialog[open]'))return
-  const controls=Array.from(surface.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')||[])
-   .filter(control => control.tabIndex >= 0)
-  const first=controls[0],last=controls[controls.length-1]
-  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
-  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}
- }} className="visitor-profile" role="dialog" aria-modal="true" aria-label="Trang cá nhân người dùng">
-  <header className="visitor-toolbar profile-page-toolbar"><button ref={back} type="button" onClick={onClose} aria-label="Quay lại"><ArrowLeft size={21}/></button><strong>Trang cá nhân</strong><button type="button" onClick={()=>setRetry(n=>n+1)} disabled={loading} aria-label="Tải lại hồ sơ"><RefreshCw size={19}/></button></header>
-  <div className="visitor-scroll" ref={scroller}><div className="visitor-content">
+ return <section className={mobile ? "visitor-profile relative! inset-auto! z-auto! flex-1 min-h-0 min-w-0 bg-card! font-sans text-foreground" : "visitor-profile relative! inset-auto! z-auto! flex-1 min-h-0 min-w-0"} aria-label="Trang cá nhân người dùng">
+  <div className={mobile ? "visitor-scroll [scrollbar-gutter:auto]!" : "visitor-scroll"} ref={scroller}><div className={mobile ? "visitor-content px-0! pb-[96px]!" : "visitor-content"}>
    {profile&&<>
     <VisitorProfileHero
       profile={profile}
+      mobile={mobile}
       online={friendOnline}
       relation={relation}
       friendBusy={friendBusy}
@@ -194,23 +181,25 @@ export default function VisitorProfile({ username, friendOnline, request, curren
         })
       }}
     />
-    <ProfileTabs idPrefix="visitor-profile" tabs={tabs} active={visibleTab} onChange={setActiveTab} />
-    <div className="profile-page-columns">
-      <aside ref={sidebar} className="profile-page-aside" style={{'--profile-aside-top':sidebarTop+'px'} as CSSProperties}>
-        <ProfileDetailsCard username={profile.username} bio={profile.bio} city={profile.city} />
-        <StoryHighlights key={profile.username} request={request} username={profile.username} className="profile-page-about" />
-        {media.some(item=>item.kind==='image')&&<section className="profile-page-recent"><div className="profile-page-recent-heading"><h2>Ảnh</h2><button type="button" onClick={()=>setActiveTab('media')}>Xem tất cả</button></div><div className="profile-page-recent-grid">{media.filter(item=>item.kind==='image').slice(0,5).map((item,index)=><button type="button" key={item.storageRef+'-'+index} aria-label="Xem ảnh bài viết" onClick={()=>setActiveTab('media')}><img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/></button>)}</div></section>}
-      </aside>
-      <section id="visitor-profile-tab-content" className="profile-page-main profile-page-panel" role="tabpanel"
-        aria-labelledby={`visitor-profile-tab-${visibleTab}`}>
-    {visibleTab==='media' && <section className="profile-page-subsection" aria-label="Ảnh và video"><h2>Ảnh & video</h2><div className="profile-page-media-grid visitor-media-grid">{media.map((item,index)=><button type="button" className="profile-page-media-item" key={item.storageRef+'-'+index} onClick={()=>{const post=posts.find(post=>post.id===item.postId);if(post)onPostOpen(post)}} aria-label={'Mở bài viết chứa '+(item.kind==='video'?'video':'ảnh')}>
+    {mobile ? <div className="flex w-full box-border gap-ui-2 px-ui-4 py-ui-2" role="group" aria-label="Nội dung trang cá nhân">
+      {tabs.map(tab => <Button key={tab.id} size="lg" variant={visibleTab===tab.id?'secondary':'ghost'} className="min-h-control-touch rounded-full! text-[14px]! font-semibold! text-foreground! aria-pressed:bg-[#e2ecff]! aria-pressed:font-bold! aria-pressed:text-primary!" aria-pressed={visibleTab===tab.id} onClick={()=>setActiveTab(tab.id)}>{tab.label}</Button>)}
+    </div> : <ProfileTabs idPrefix="visitor-profile" tabs={tabs} active={visibleTab} onChange={setActiveTab} />}
+    <div className={mobile ? "grid min-w-0 gap-ui-4 px-ui-4" : "profile-page-columns"}>
+      {(!mobile || visibleTab==='posts') && <aside ref={sidebar} className={mobile ? "grid min-w-0 gap-ui-6 py-ui-2" : "profile-page-aside"} style={{'--profile-aside-top':sidebarTop+'px'} as CSSProperties}>
+        <ProfileDetailsCard username={profile.username} bio={mobile ? undefined : profile.bio} city={profile.city} workplace={mobile ? profile.workplace : undefined} school={mobile ? profile.school : undefined} iconEdit={mobile} />
+        <StoryHighlights key={profile.username} request={request} username={profile.username} className={mobile ? undefined : "profile-page-about"} mobileProfile={mobile} />
+        {!mobile && media.some(item=>item.kind==='image')&&<section className="profile-page-recent"><div className="profile-page-recent-heading"><h2>Ảnh</h2><button type="button" onClick={()=>setActiveTab('media')}>Xem tất cả</button></div><div className="profile-page-recent-grid">{media.filter(item=>item.kind==='image').slice(0,5).map((item,index)=><button type="button" key={item.storageRef+'-'+index} aria-label="Xem ảnh bài viết" onClick={()=>setActiveTab('media')}><img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/></button>)}</div></section>}
+      </aside>}
+      <section id="visitor-profile-tab-content" className={mobile ? "min-w-0" : "profile-page-main profile-page-panel"} role={mobile ? "region" : "tabpanel"}
+        aria-label={mobile ? tabs.find(tab=>tab.id===visibleTab)?.label : undefined} aria-labelledby={mobile ? undefined : `visitor-profile-tab-${visibleTab}`}>
+    {visibleTab==='media' && <section className="profile-page-subsection" aria-label="Ảnh và video">{!mobile && <h2>Ảnh & video</h2>}{mobile && !loading && !media.length && <p className="text-ui-body text-muted-foreground">Chưa có ảnh hoặc video được chia sẻ với bạn.</p>}<div className="profile-page-media-grid visitor-media-grid">{media.map((item,index)=><button type="button" className="profile-page-media-item" key={item.storageRef+'-'+index} onClick={()=>{const post=posts.find(post=>post.id===item.postId);if(post)onPostOpen(post)}} aria-label={'Mở bài viết chứa '+(item.kind==='video'?'video':'ảnh')}>
       {item.kind==='image'?<img src={item.url} alt={item.name||'Ảnh bài viết'} loading="lazy"/>:<video src={item.url} preload="metadata" aria-label={item.name||'Video bài viết'}/>}
     </button>)}</div></section>}
     {visibleTab==='about' && <section className="profile-page-subsection"><h2>Giới thiệu</h2>{profile.bio&&<p>{profile.bio}</p>}{profile.city&&<p><MapPin size={18} aria-hidden="true"/>Sống tại {profile.city}</p>}<small>Chỉ thông tin công khai được hiển thị.</small></section>}
         {visibleTab==='posts' && <>
 
-      <div className="profile-page-about profile-page-timeline-heading"><h2>Bài viết</h2></div>
-    <div className="profile-page-post-feed feed zalo-feed app-mobile:-mx-3! app-mobile:w-[calc(100%+24px)]!">{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={(id)=>{if(id===post.id)onPostOpen(post);else onOpenOriginal?.(id)}} onRepostChanged={onRepostChanged} onShareToChat={onShareToChat} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
+      {!mobile && <div className="profile-page-about profile-page-timeline-heading"><h2>Bài viết</h2></div>}
+    <div className={mobile ? "feed zalo-feed -mx-4! w-[calc(100%+32px)]! border-t-8 border-solid border-background border-x-0 border-b-0" : "profile-page-post-feed feed zalo-feed app-mobile:-mx-3! app-mobile:w-[calc(100%+24px)]!"}>{posts.map(post=><FeedPostCard key={post.id} post={post} name={currentUser} onAuthorOpen={onUserOpen} onEditPost={onEditPost} taggedNames={taggedNames} apiFetch={request} syncFeedPost={update} removeFeedPost={id=>{setPosts(current=>current.filter(post=>post.id!==id));onDeleted(id)}} setNotice={feedback} token={token} translationPreferencesLoaded targetLanguage={targetLanguage} setActivePostId={(id)=>{if(id===post.id)onPostOpen(post);else onOpenOriginal?.(id)}} onRepostChanged={onRepostChanged} onShareToChat={onShareToChat} likePreviews={likeBusy} like={like} onReactionUsers={onReactionUsers}/>)}</div>
     {!loading&&!error&&posts.length===0&&<div className="profile-page-blank"><strong>Chưa có bài viết để hiển thị</strong><p>Người này chưa đăng bài hoặc chưa chia sẻ bài viết với bạn.</p></div>}
     {more&&<button type="button" className="profile-page-more-posts" disabled={loading} onClick={()=>void loadMore()}>Xem bài viết cũ hơn</button>}
         </>}

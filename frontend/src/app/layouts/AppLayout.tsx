@@ -14,7 +14,7 @@ type AppLayoutProps = {
   children?: ReactNode;
 };
 
-/** Shared shell: persistent sidebar, independently collapsing chrome, and route content. */
+/** Shared shell: persistent sidebar, stable mobile chrome, and route content. */
 export default function AppLayout({ className, activeTab, sidebar, overlays, header, beforePage, outletContext, children }: AppLayoutProps) {
   const shellRef = useMobileScrollChrome(activeTab);
   return (

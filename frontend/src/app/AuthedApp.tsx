@@ -1961,44 +1961,6 @@ export default function AuthedApp({
             progress={mediaUploading ? mediaUploadProgress : null}
             onCancel={() => mediaUploadAbort.current?.abort()}
           />
-          {visitorUsername && (
-        <VisitorProfile
-          key={session.sessionId + ":" + visitorUsername}
-          username={visitorUsername}
-          friendOnline={friends.some((friend) => friend.username === visitorUsername.toLowerCase()
-            && friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther && friend.online)}
-          request={apiFetch}
-          currentUser={name}
-          token={session.token}
-          targetLanguage={translationPreferencesLoaded ? targetLanguage : ""}
-          relationship={friendRelationship}
-          friendBusy={friendActionBusy}
-          onFriend={actOnFriend}
-          onRemoveFriend={(friend) => removeAcceptedFriend(friend, { keepProfileOpen: true })}
-          onMessage={async (username) => {
-            await openDirectByUsername(username);
-          }}
-          onClose={closeVisitor}
-          onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
-          onOpenOriginal={openFeedPostDetails}
-          onRepostChanged={refreshAfterRepost}
-          onShareToChat={setPostLinkToSend}
-          onPostOpen={(post) => {
-            setPosts((current) => [
-              post,
-              ...current.filter((item) => item.id !== post.id),
-            ]);
-            setActivePostId(post.id);
-          }}
-          onUpdated={syncFeedPost}
-          onUserOpen={openVisitor}
-          onEditPost={openEditPost}
-          taggedNames={friendTaggedNames}
-          updates={posts}
-          onDeleted={removeFeedPost}
-          feedback={setNotice}
-        />
-      )}
           {newChatMode === "group" && (
         <GroupCreator
           ownerId={session.user.id}
@@ -2017,7 +1979,7 @@ export default function AuthedApp({
         </>
       }
       // The search page owns its search field and title, so the shared header is omitted there.
-      header={isSearchResultsRoute || tab === "market" || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
+      header={visitorUsername || isSearchResultsRoute || tab === "market" || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
         <AppHeader
           mobileSearchActions={tab !== "chat"}
           className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" ? "mobile-section-header" : ""}`}
@@ -2202,7 +2164,42 @@ export default function AuthedApp({
             switchTab,
           },
         }),
-        profile: <>
+        profile: visitorUsername ? (<VisitorProfile
+          key={session.sessionId + ":" + visitorUsername}
+          username={visitorUsername}
+          mobile={!isProfileDesktop}
+          friendOnline={friends.some((friend) => friend.username === visitorUsername.toLowerCase()
+            && friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther && friend.online)}
+          request={apiFetch}
+          currentUser={name}
+          token={session.token}
+          targetLanguage={translationPreferencesLoaded ? targetLanguage : ""}
+          relationship={friendRelationship}
+          friendBusy={friendActionBusy}
+          onFriend={actOnFriend}
+          onRemoveFriend={(friend) => removeAcceptedFriend(friend, { keepProfileOpen: true })}
+          onMessage={async (username) => {
+            await openDirectByUsername(username);
+          }}
+          onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
+          onOpenOriginal={openFeedPostDetails}
+          onRepostChanged={refreshAfterRepost}
+          onShareToChat={setPostLinkToSend}
+          onPostOpen={(post) => {
+            setPosts((current) => [
+              post,
+              ...current.filter((item) => item.id !== post.id),
+            ]);
+            setActivePostId(post.id);
+          }}
+          onUpdated={syncFeedPost}
+          onUserOpen={openVisitor}
+          onEditPost={openEditPost}
+          taggedNames={friendTaggedNames}
+          updates={posts}
+          onDeleted={removeFeedPost}
+          feedback={setNotice}
+        />) : <>
         {desktopProfileOverview && (
           <ProfileOverviewSection
           apiFetch={apiFetch}
@@ -2631,8 +2628,7 @@ export default function AuthedApp({
           mediaUploading={mediaUploading}
           name={name}
           normalizedSearch={normalizedSearch}
-          searchQuery={globalSearch}
-          onSearchChange={setGlobalSearch}
+          onSearchSubmit={query => navigate(ROUTE.search + '?q=' + encodeURIComponent(query))}
           communityCard={<CommunitySuggestions
             title="Cộng đồng của bạn"
             joinedItems={conversations.filter(group => group.type === "group").slice(0, 3).map(group => ({

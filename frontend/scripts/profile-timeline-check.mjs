@@ -43,6 +43,7 @@ let privacy = { searchableByUsername: true, searchableByName: true, searchableBy
 let privacyWrites = 0
 const errors = []
 const avatarOnly = process.argv.includes('--avatar-navigation')
+const visitorOnly = process.argv.includes('--visitor')
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'Authorization, Content-Type', 'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS' }
 try {
   for (let i = 0; i < 60; i++) {
@@ -69,6 +70,9 @@ try {
       if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
       if (u.pathname === '/api/events') return route.fulfill({ headers: cors, contentType: 'text/event-stream', body: ': connected\n\n' })
       if (u.pathname === '/api/friends') return json(Array.from({ length: 5 }, (_, i) => ({ id: i + 2, username: 'friend' + i, displayName: 'Bạn ' + i, online: false, status: 'accepted', updatedAt: new Date().toISOString() })))
+      if (u.pathname === '/api/users/friend0/profile') return json({ id: 2, username: 'friend0', displayName: 'Bạn kiểm thử', allowFriendRequests: true, avatarSet: false, coverSet: false, bio: 'Tiểu sử công khai', city: 'Hà Nội', updatedAt: new Date().toISOString() })
+      if (u.pathname === '/api/users/friend0/note') return json({ note: null })
+      if (u.pathname === '/api/posts' && u.searchParams.get('author') === 'friend0') return json([{ ...posts[0], id: 201, author: 'friend0', content: 'Bài viết công khai' }])
       if (u.pathname === '/api/profile') return json({ ...session.user, avatarSet: false, coverSet: false, bio: 'Cà phê sáng', updatedAt: new Date().toISOString() })
       if (u.pathname === '/api/profile/note') return json({ note: { content: 'N'.repeat(60), visibility: 'friends', version: '1', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() } })
       if (u.pathname === '/api/stories/highlights') return json([{ id: 52, author: 'tester', title: 'Du lịch', text: 'Một ngày đẹp', background: 'indigo', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() }])
@@ -102,6 +106,36 @@ try {
       }
       return json([])
     })
+    if (visitorOnly) {
+      await page.goto(origin + '/users/friend0')
+      const visitor = page.getByRole('region', { name: 'Trang cá nhân người dùng' })
+      await visitor.getByRole('heading', { name: 'Bạn kiểm thử' }).waitFor()
+      await visitor.locator('.feed-post-card').first().waitFor()
+      check(await visitor.getByRole('button', { name: 'Nhắn tin' }).isVisible(), 'Visitor message missing')
+      check(await visitor.locator('header.visitor-toolbar').count() === 0, 'Visitor header must be removed')
+      check(await page.locator('.chatnet-appbar').count() === 0, 'Shared header must be omitted on visitor')
+      check(await visitor.evaluate(node => !!node.closest('[data-route-page="profile"]')), 'Visitor must be in route outlet')
+      check(await visitor.getByRole('button', { name: 'Chỉnh sửa hồ sơ' }).count() === 0, 'Visitor has owner control')
+      if (width <= 760) {
+        const cover = await visitor.locator('.profile-mobile-full-hero .has-account-cover').boundingBox()
+        const avatar = await visitor.locator('[data-profile-avatar-wrap]').boundingBox()
+        check(cover && cover.width === width && cover.height === 250 && avatar?.width === 180, 'Visitor cover/avatar dimensions: ' + JSON.stringify({cover,avatar}))
+        const feed = await visitor.locator('.feed.zalo-feed').boundingBox()
+        check(feed && Math.abs(feed.width-width)<=1, 'Visitor feed width: '+JSON.stringify(feed))
+        check(await visitor.getByRole('heading',{name:'Xem nhanh'}).isVisible(), 'Visitor quick details missing')
+        await visitor.getByRole('button',{name:'Ảnh & video',exact:true}).click()
+        await visitor.getByText('Chưa có ảnh hoặc video được chia sẻ với bạn.').waitFor()
+        await visitor.getByRole('button',{name:'Tất cả',exact:true}).click()
+        await visitor.getByText('Bài viết công khai').waitFor()
+        check(await visitor.locator('.visitor-scroll').evaluate(node => node.scrollWidth <= node.clientWidth + 1), 'Visitor horizontal overflow')
+      } else check(await visitor.locator('.profile-mobile-full-hero').count() === 0, 'Desktop visitor changed')
+      await page.screenshot({path:'output/playwright/layout/visitor-profile-'+width+'.png'})
+      if (width <= 760) await page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button',{name:'Cá nhân'}).click()
+      else { const sidebar = page.locator('.app-sidebar'); check(await sidebar.isVisible(), 'Desktop sidebar missing'); await sidebar.locator('.app-sidebar-account').click() }
+      await visitor.waitFor({state:'detached'})
+      await context.close()
+      continue
+    }
     await page.goto(origin)
     if (width > 760) {
       await page.locator('.app-sidebar-account').click()
@@ -283,7 +317,7 @@ try {
     posts = posts.filter(post => post.id !== 100).map(post => ({ ...post, liked: false, likes: 0, myReaction: '' }))
   }
   check(errors.length === 0, errors.join('\n'))
-  console.log(avatarOnly ? 'PASS: mobile profile colors, avatar navigation, compact overview and centered timeline'
+  console.log(visitorOnly ? 'PASS: visitor mobile layout, media tab, full-width posts and navigation; desktop sidebar and navigation' : avatarOnly ? 'PASS: mobile profile colors, avatar navigation, compact overview and centered timeline'
     : 'PASS: profile timeline, pagination, publishing, privacy input, failed drafts, likes, recovery and responsive widths')
 } finally {
   await browser?.close()

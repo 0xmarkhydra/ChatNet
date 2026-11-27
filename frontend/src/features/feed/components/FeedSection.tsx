@@ -49,8 +49,7 @@ export type FeedSectionProps = {
   mediaUploading: "chat" | "feed" | "profile" | "story" | null;
   name: string;
   normalizedSearch: string;
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
+  onSearchSubmit: (query: string) => void;
   communityCard: ReactNode;
   openVisitor: (username: string) => void;
   pendingPost: Post | null;
@@ -113,8 +112,7 @@ export default function FeedSection({
   mediaUploading,
   name,
   normalizedSearch,
-  searchQuery,
-  onSearchChange,
+  onSearchSubmit,
   communityCard,
   openVisitor,
   pendingPost,
@@ -353,8 +351,7 @@ export default function FeedSection({
                   }}
                   onViewUser={openVisitor}
                   onViewContacts={() => switchTab("contacts")}
-                  searchQuery={searchQuery}
-                  onSearchChange={onSearchChange}
+                  onSearchSubmit={onSearchSubmit}
                   communityCard={communityCard}
                 />
               )}
