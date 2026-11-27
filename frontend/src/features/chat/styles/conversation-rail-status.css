@@ -213,3 +213,41 @@
 .modern-shell.app-layout .conversation-avatar-rail.is-expanded .conversation-rail-compact-status {
   display: none;
 }
+/* The split rail retains full intrinsic row width. Anchor the compact count
+   to the avatar, never to the clipped-out right edge of its row. */
+.modern-shell.app-layout .conversation-rail-avatar-anchor {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  overflow: visible;
+}
+.modern-shell.app-layout .conversation-rail-compact-unread {
+  display: none;
+  position: absolute;
+  z-index: 7;
+  top: -3px;
+  left: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--soco-surface, white);
+  border-radius: 10px;
+  background: #4278f0;
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  place-items: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.modern-shell.app-layout .social-chat-layout:not(.group-channel-workspace) > :is(.desktop-conversation-rail,.conversation-avatar-rail)[data-expanded="false"] .conversation-rail-compact-unread,
+.modern-shell.app-layout .social-chat-layout.group-channel-workspace[data-split-expanded="false"] > :is(.desktop-conversation-rail,.conversation-avatar-rail) .conversation-rail-compact-unread {
+  display: grid;
+}
+.modern-shell.app-layout .social-chat-layout:not(.group-channel-workspace) > :is(.desktop-conversation-rail,.conversation-avatar-rail)[data-expanded="false"] :is(.desktop-conversation-rail-unread,.conversation-avatar-rail-count),
+.modern-shell.app-layout .social-chat-layout.group-channel-workspace[data-split-expanded="false"] > :is(.desktop-conversation-rail,.conversation-avatar-rail) :is(.desktop-conversation-rail-unread,.conversation-avatar-rail-count) {
+  visibility: hidden;
+}

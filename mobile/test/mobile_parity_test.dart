@@ -18,6 +18,53 @@ Future<void> openDirectChat(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'collapsed avatar rail keeps unread badges inside compact viewport',
+    (tester) async {
+      final api = DemoApi();
+      api.rooms[1]['unreadCount'] = 125;
+      api.rooms[2]['manualUnread'] = true;
+      api.rooms[2]['unreadCount'] = 0;
+      await openMobile(tester, api);
+      await tester.tap(find.text('SocCO Design Team').first);
+      await tester.pumpAndSettle();
+      final rail = find.byKey(const ValueKey('mobile-avatar-viewport'));
+      final seam =
+          tester.getTopLeft(rail).dx +
+          tester
+              .widget<ClipRect>(rail)
+              .clipper!
+              .getClip(tester.getSize(rail))
+              .width;
+      for (final id in [2, 3]) {
+        final badge = find.byKey(ValueKey('rail-unread-$id'));
+        expect(badge, findsOneWidget);
+        expect(tester.getRect(badge).right, lessThanOrEqualTo(seam));
+        expect(
+          tester.getRect(badge).left,
+          greaterThanOrEqualTo(tester.getTopLeft(rail).dx),
+        );
+      }
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('rail-unread-2')),
+          matching: find.text('99+'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('rail-unread-3')),
+          matching: find.text('•'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('rail-unread-1')), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('mobile tabs initialize on first visit and retain their state', (
     tester,
   ) async {
