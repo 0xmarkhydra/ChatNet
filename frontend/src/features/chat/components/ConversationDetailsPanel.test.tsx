@@ -24,6 +24,7 @@ const unmounts: Array<() => void> = []
 afterEach(() => {
   while (unmounts.length) unmounts.pop()!()
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
 })
 
 const group = (id: number): Conversation => ({
@@ -131,4 +132,42 @@ describe('ConversationDetailsPanel scoped UI state', () => {
     expect(page.defaults.onClearHistory).toHaveBeenCalledOnce()
   })
 
+  it('uses the group management layout on phones while preserving direct-only actions', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    })))
+    const page = mount()
+    const groupSection = page.host.querySelector('section[aria-label="Quản lý nhóm"]')
+    expect(groupSection?.classList.contains('conversation-info-group-menu')).toBe(true)
+    const direct = { ...group(80), type: 'direct' as const, name: 'Bạn A', memberCount: 2,
+      otherUserId: 90, blockedByMe: false, blockedByOther: false }
+    page.render({ conversation: direct, channel: general(80) })
+    const section = page.host.querySelector('section[aria-label="Quản lý hội thoại"]')
+    expect(section?.className).toBe(groupSection?.className)
+    expect(section?.contains(page.button('Hồ sơ'))).toBe(true)
+    expect(section?.contains(page.button('Tắt thông báo hội thoại'))).toBe(true)
+    expect(section?.contains(page.button('Chặn tin nhắn và cuộc gọi'))).toBe(true)
+    expect(page.host.querySelector('.group-photo-avatar-wrap .social-chat-details-avatar')).not.toBeNull()
+    expect(page.host.querySelector('.group-photo-trigger')).toBeNull()
+    expect(page.host.textContent).not.toContain('Quản lý nhóm')
+    act(() => page.button('Tắt thông báo hội thoại').click())
+    expect(page.defaults.onToggleNotifications).toHaveBeenCalledOnce()
+    page.render({ conversation: { ...direct, muted: true, blockedByMe: true } })
+    expect(page.button('Bật thông báo hội thoại').getAttribute('aria-pressed')).toBe('true')
+    act(() => page.button('Bỏ chặn người dùng').click())
+    expect(page.defaults.onUnblock).toHaveBeenCalledOnce()
+    page.render({ conversation: { ...direct, blockedByOther: true } })
+    expect(page.host.textContent).not.toContain('Chặn tin nhắn và cuộc gọi')
+  })
+
+  it('keeps the original direct conversation layout on desktop', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    })))
+    const page = mount()
+    page.render({ conversation: { ...group(80), type: 'direct' as const, otherUserId: 90 } })
+    expect(page.host.querySelector('[aria-label="Quản lý hội thoại"]')).toBeNull()
+    expect(page.host.querySelector('.group-photo-avatar-wrap')).toBeNull()
+    expect(page.button('Hồ sơ').querySelector('span')?.textContent).toBe('Hồ sơ')
+  })
 })
