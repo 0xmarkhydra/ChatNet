@@ -4,12 +4,15 @@ import { useNotice } from "../../../shared/context/NoticeContext";
 import { useSession } from "../../../shared/context/SessionContext";
 import { attachmentRequestBody, type MediaAttachment } from "../../../shared/utils/media";
 import { type QueuedChatMessage, enqueueChatMessage } from "../lib/chatOutbox";
+import { isGiphyMedia } from "../api/giphy";
 import { getConversationEncryptionStatus } from "../api/messages";
 import type { Message, MessageDraft } from "../types";
 
 export type UseMessageSenderDeps = {
   activeConversationId: number | null;
   canSend: boolean;
+  canSendSticker: boolean;
+  uploadMediaFiles: (files: File[], scope: 'chat') => Promise<MediaAttachment[]>;
   canSendLike?: boolean;
   channelDraftKey: string;
   draft: MessageDraft;
@@ -31,6 +34,8 @@ export type UseMessageSenderDeps = {
 export function useMessageSender({
   activeConversationId,
   canSend,
+  canSendSticker,
+  uploadMediaFiles,
   canSendLike = false,
   channelDraftKey,
   draft,
@@ -51,13 +56,15 @@ export function useMessageSender({
   const { apiFetch } = useApi();
   const { session, sessionRef } = useSession();
   const activeAttempt = useRef<object | null>(null);
-  async function sendMessage(event: FormEvent) {
-    event.preventDefault();
-    await queueMessage(false);
+  async function sendMessage(event: FormEvent | null, sticker?: string | File) {
+    event?.preventDefault();
+    await queueMessage(false, sticker);
   }
   async function sendLike() { await queueMessage(true); }
-  async function queueMessage(quickLike: boolean) {
-    if (!(quickLike ? canSendLike : canSend) || !activeConversationId || sendingRef.current || !session ||
+  async function queueMessage(quickLike: boolean, sticker?: string | File) {
+    const immediate = sticker !== undefined;
+    if (typeof sticker === 'string' && (!isGiphyMedia(sticker) || /\s/.test(sticker))) return;
+    if (!(quickLike ? canSendLike : immediate ? canSendSticker : canSend) || !activeConversationId || sendingRef.current || !session ||
         sessionRef.current !== session)
       return;
     sendingRef.current = true;
@@ -77,12 +84,29 @@ export function useMessageSender({
     const draftKey = channelDraftKey;
     const submittedDraft = draft;
     const reply = quickLike ? null : replyingTo;
+    let attachments = immediate || quickLike ? [] : messageAttachments.map(attachmentRequestBody);
+    if (sticker && typeof sticker !== 'string') {
+      let uploaded: MediaAttachment[];
+      try {
+        uploaded = await uploadMediaFiles([sticker], 'chat');
+      } catch (error) {
+        if (sessionRef.current === session) setNotice(error instanceof Error ? error.message : 'Không thể gửi sticker.', 'error');
+        return;
+      }
+      try {
+        if (sessionRef.current !== session) return;
+        attachments = uploaded.map(attachmentRequestBody);
+      } finally {
+        for (const media of uploaded) if (media.url?.startsWith('blob:')) URL.revokeObjectURL(media.url);
+      }
+      if (!attachments.length) return;
+    }
     const item: QueuedChatMessage = {
       ...(channelId > 0 ? { channelId } : {}),
       clientId: crypto.randomUUID(),
       conversationId,
-      text: quickLike ? '👍' : messageText.trim(),
-      attachments: quickLike ? [] : messageAttachments.map(attachmentRequestBody),
+      text: quickLike ? '👍' : immediate ? (typeof sticker === 'string' ? sticker : '') : messageText.trim(),
+      attachments,
       ...(reply
         ? {
             replyToMessageId: reply.id,
@@ -96,21 +120,21 @@ export function useMessageSender({
     const next = updateChatOutbox((items) => enqueueChatMessage(items, item));
     if (!next.some((pending) => pending.clientId === item.clientId)) {
       setNotice(
-        "Hàng đợi tin nhắn đã đầy. Nội dung vẫn ở ô nhập; hãy thử lại sau.",
+        quickLike ? "Hàng đợi tin nhắn đã đầy. Hãy thử lại sau." : immediate ? "Hàng đợi tin nhắn đã đầy. Hãy chọn lại sticker sau." : "Hàng đợi tin nhắn đã đầy. Nội dung vẫn ở ô nhập; hãy thử lại sau.",
         "warning",
       );
       return;
     }
     ownSendScrollConversationRef.current = conversationId;
     if (!quickLike) {
-    if (channelId > 0) {
+    if (!immediate && channelId > 0) {
       setChannelDrafts(current => {
         if (current[draftKey] !== submittedDraft) return current;
         const next = { ...current };
         delete next[draftKey];
         return next;
       });
-    } else {
+    } else if (!immediate) {
       setMessageDrafts((current) => {
         if (current[conversationId] !== submittedDraft) return current;
         const updated = { ...current };

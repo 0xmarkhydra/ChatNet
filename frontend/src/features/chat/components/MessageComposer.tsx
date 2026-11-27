@@ -51,8 +51,8 @@ export default function MessageComposer({ activeConversation, activeConversation
       onAttachMedia={() => openAttachmentPicker(true)}
       onInsertEmoji={insertEmoji}
       userId={session.user.id}
-      onSelectGiphy={url => setMessageText([messageText, url].filter(Boolean).join('\n'))}
-      onSelectSticker={file => { void addChatFiles([file]) }}
+      onSelectGiphy={url => { void sendMessage(null, url) }}
+      onSelectSticker={file => { void sendMessage(null, file) }}
       onSchedule={onSchedule}
       onQuickReplies={quickReplies.open}
       onGroupActivity={activeConversation.type === 'group' ? setGroupActivityCreateKind : undefined}
