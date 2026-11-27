@@ -11,6 +11,8 @@ type Props = {
   email?: string
   bio?: string
   city?: string
+  workplace?: string
+  school?: string
   friends: FriendConnection[]
   media: ProfileMediaItem[]
   highlights?: ReactNode
@@ -21,9 +23,8 @@ type Props = {
   onOpenPost: (postId: number) => void
 }
 
-export default function ProfileSidebar({ username, email, bio, city, friends, media, highlights, onEditProfile, onShowMedia, onShowFriends, onViewFriend, onOpenPost }: Props) {
+export default function ProfileSidebar({ username, email, bio, city, workplace, school, friends, media, highlights, onEditProfile, onShowMedia, onShowFriends, onViewFriend, onOpenPost }: Props) {
   const trUi = useUiTranslation()
-
   const aside = useRef<HTMLElement>(null)
   const [stickyTop, setStickyTop] = useState(16)
   useEffect(() => {
@@ -39,12 +40,12 @@ export default function ProfileSidebar({ username, email, bio, city, friends, me
   }, [])
   return (
         <aside ref={aside} className="profile-page-aside" style={{ '--profile-aside-top': `${stickyTop}px` } as CSSProperties} aria-label={trUi("common.ui.profileInfoPhotosFriends")}>
-          <ProfileDetailsCard username={username} bio={bio} city={city} friendCount={friends.length}
+          <ProfileDetailsCard username={username} bio={bio} city={city} workplace={workplace} school={school} grouped friendCount={friends.length}
             hasPrivateEmail={Boolean(email)} onEdit={onEditProfile} />
           {highlights}
           <section className="profile-page-recent">
             <div className="profile-page-recent-heading"><h2>{trUi("common.photos")}</h2>
-              <button type="button" onClick={onShowMedia}>Xem tất cả ảnh</button>
+              <button type="button" onClick={onShowMedia}>{trUi('profile.allPhotos')}</button>
             </div>
             {media.length > 0
               ? <div className="profile-page-recent-grid">
@@ -54,14 +55,14 @@ export default function ProfileSidebar({ username, email, bio, city, friends, me
                       <><video src={attachment.url} muted preload="metadata" playsInline /><Video size={19} aria-hidden="true" /></>}
                   </button>)}
               </div>
-              : <div className="profile-page-recent-empty"><ImageIcon size={24} aria-hidden="true" /><span>Chưa có ảnh trong bài viết đã tải</span></div>}
+              : <div className="profile-page-recent-empty"><ImageIcon size={24} aria-hidden="true" /><span>{trUi('profile.noLoadedPhotos')}</span></div>}
           </section>
           {friends.length > 0 && (
             <section className="profile-page-recent profile-page-friends-card">
               <div className="profile-page-recent-heading"><h2>{trUi("contacts.friends")}</h2>
-                <button type="button" onClick={onShowFriends}>Xem tất cả bạn bè</button>
+                <button type="button" onClick={onShowFriends}>{trUi('profile.allFriends')}</button>
               </div>
-              <p className="profile-page-friends-count">{friends.length.toLocaleString('vi-VN')} bạn bè</p>
+              <p className="profile-page-friends-count">{trUi('profile.friendCount', { count: friends.length })}</p>
               <div className="profile-page-friend-tiles">
                 {friends.slice(0, 9).map(friend => {
                   const label = friend.displayName || friend.username

@@ -90,13 +90,16 @@ it('localizes the shared launcher prompt and shortcuts while retaining the draft
     for (const locale of ['vi', 'en', 'zh', 'ja', 'ko']) {
       const t = createUiTranslator(locale)
       for (const hasDraft of [false, true]) {
+      for (const layout of ['inline', 'stacked'] as const) {
         act(() => root.render(<UiLocaleContext.Provider value={{ locale }}>
-          <PostComposerLauncher username="trung" displayName="Trung" hasDraft={hasDraft}
+          <PostComposerLauncher username="trung" displayName="Trung" hasDraft={hasDraft} layout={layout}
             onCreatePost={onCreatePost} onCreateMediaPost={() => {}} onCreateStory={() => {}} onCheckIn={() => {}} />
         </UiLocaleContext.Provider>))
         expect(container.querySelector('button:not([aria-label])')?.textContent).toBe(t(hasDraft ? 'profile.continuePost' : 'feed.whatThinking'))
         expect(Array.from(container.querySelectorAll('button[aria-label]'), el => el.getAttribute('aria-label'))).toEqual([t('common.photoSlashVideo'), t('feed.createStory'), t('common.ui.addCheckin')])
         expect(container.querySelector('[data-avatar]')?.getAttribute('data-avatar')).toBe('trung')
+        if (layout === 'stacked') expect(Array.from(container.querySelectorAll('button[aria-label]'), el => el.textContent)).toEqual([t('common.photoSlashVideo'), t('profile.storyShort'), t('profile.checkinShort')])
+      }
       }
     }
     expect(onCreatePost).not.toHaveBeenCalled()

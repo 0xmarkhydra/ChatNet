@@ -15,6 +15,7 @@ type Props = {
   storyBusy?: boolean
   /** Edge-to-edge on mobile: no corner radius or side borders. */
   flushOnMobile?: boolean
+  layout?: "inline" | "stacked"
 }
 
 const shortcutClass = 'inline-grid size-10 shrink-0 place-items-center rounded-xl border border-transparent transition-[background-color,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-blue-400 disabled:cursor-not-allowed! disabled:opacity-45! app-mobile:size-[36px]'
@@ -22,16 +23,16 @@ const shortcutClass = 'inline-grid size-10 shrink-0 place-items-center rounded-x
 /** One Tailwind-owned launcher for Feed and Profile. Parent page CSS must not style its internals. */
 export default function PostComposerLauncher({
   username, displayName, hasDraft = false, onCreatePost, onCreateMediaPost, onCreateStory, onCheckIn,
-  pending = false, storyBusy = false, flushOnMobile = false,
+  pending = false, storyBusy = false, flushOnMobile = false, layout = "inline",
 }: Props) {
   const trUi = useUiTranslation()
-
+  const stacked = layout === "stacked";
   const quickMediaInput = useRef<HTMLInputElement>(null)
 
   return (
     <section aria-label={trUi("common.ui.createContent")}
-      className={`box-border flex w-full min-w-0 flex-col rounded-2xl border border-[#e5eaf2] bg-white p-3 px-4 shadow-[0_3px_16px_rgba(30,51,96,0.035)] app-mobile:p-3 ${flushOnMobile ? 'app-mobile:rounded-none app-mobile:border-x-0' : 'app-mobile:rounded-[14px]'}`}>
-      <div className="flex w-full min-w-0 items-center gap-[11px] app-mobile:gap-2">
+      className={`box-border flex w-full min-w-0 flex-col rounded-2xl border border-solid border-border-subtle bg-card p-3 px-4 shadow-sm app-mobile:p-3 ${flushOnMobile ? 'app-mobile:rounded-none app-mobile:border-x-0' : 'app-mobile:rounded-[14px]'}`}>
+      <div className={`flex w-full min-w-0 items-center gap-ui-2 ${stacked ? "flex-wrap" : ""}`}>
         <PostStatusPrompt
           username={username}
           displayName={displayName}
@@ -41,7 +42,7 @@ export default function PostComposerLauncher({
           onCreatePost={onCreatePost}
           pending={pending}
         />
-        <div className="flex shrink-0 items-center justify-end gap-1.5 app-mobile:gap-1" role="group" aria-label={trUi("common.ui.quickCreateContent")}>
+        <div className={`flex shrink-0 items-center gap-1.5 ${stacked ? "w-full justify-between border-0 border-t border-solid border-border-subtle pt-ui-2" : "justify-end app-mobile:gap-1"}`} role="group" aria-label={trUi("common.ui.quickCreateContent")}>
           <input ref={quickMediaInput} className="sr-only" type="file" accept="image/*,video/*" multiple
             aria-label={trUi("common.ui.chooseMediaPost")}
             onChange={event => {
@@ -50,19 +51,19 @@ export default function PostComposerLauncher({
               if (files.length) onCreateMediaPost(files)
             }} />
           <button type="button" aria-label={trUi("common.photoSlashVideo")} title={trUi("feed.addMedia")} disabled={pending}
-            className={`${shortcutClass} border-[#e0f0e6] bg-[#e9f8ef] text-[#168658]`}
+            className={stacked ? "flex min-w-0 flex-1 items-center justify-center gap-ui-2 whitespace-normal rounded-ui-md border-0 bg-transparent py-ui-2 text-ui-body font-medium text-muted-foreground hover:bg-accent" : `${shortcutClass} border-[#e0f0e6] bg-[#e9f8ef] text-[#168658]`}
             onClick={() => quickMediaInput.current?.click()}>
-            <ImagePlus size={21} aria-hidden="true" />
+            <ImagePlus size={21} className={stacked ? "text-[#168658] shrink-0" : undefined} aria-hidden="true" />{stacked && <span>{trUi('common.photoSlashVideo')}</span>}
           </button>
           <button type="button" aria-label={trUi("feed.createStory")} title={trUi("feed.createStory")} disabled={pending || storyBusy}
-            className={`${shortcutClass} border-[#ebe1fc] bg-[#f3edfe] text-[#8250cb]`}
+            className={stacked ? "flex min-w-0 flex-1 items-center justify-center gap-ui-2 whitespace-normal rounded-ui-md border-0 bg-transparent py-ui-2 text-ui-body font-medium text-muted-foreground hover:bg-accent" : `${shortcutClass} border-[#ebe1fc] bg-[#f3edfe] text-[#8250cb]`}
             onClick={onCreateStory}>
-            <Clapperboard size={21} aria-hidden="true" />
+            <Clapperboard size={21} className={stacked ? "text-primary shrink-0" : undefined} aria-hidden="true" />{stacked && <span>{trUi('profile.storyShort')}</span>}
           </button>
           <button type="button" aria-label={trUi("common.ui.addCheckin")} title={trUi("common.ui.addCheckin")} disabled={pending}
-            className={`${shortcutClass} border-[#f9e7d3] bg-[#fff3e6] text-[#d47a26]`}
+            className={stacked ? "flex min-w-0 flex-1 items-center justify-center gap-ui-2 whitespace-normal rounded-ui-md border-0 bg-transparent py-ui-2 text-ui-body font-medium text-muted-foreground hover:bg-accent" : `${shortcutClass} border-[#f9e7d3] bg-[#fff3e6] text-[#d47a26]`}
             onClick={onCheckIn}>
-            <MapPin size={21} aria-hidden="true" />
+            <MapPin size={21} className={stacked ? "text-[#d47a26] shrink-0" : undefined} aria-hidden="true" />{stacked && <span>{trUi('profile.checkinShort')}</span>}
           </button>
         </div>
       </div>
