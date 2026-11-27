@@ -68,7 +68,7 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
             <span aria-hidden="true" className="flex flex-none -space-x-2">
               {viewers.slice(0, 3).map(viewer => (
                 <UserAvatar key={viewer.id} username={viewer.username} name={userLabel(viewer.displayName, viewer.username)}
-                  className="avatar box-border size-8! flex-none! rounded-full! border-2 border-white shadow-none! text-ui-caption font-bold" />
+                  className="box-border size-8 flex-none border-2 border-white text-ui-caption font-black" />
               ))}
             </span>
           )}
@@ -100,7 +100,7 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
                     const label = userLabel(viewer.displayName, viewer.username)
                     return (
                       <li key={viewer.id} className="flex min-h-15 items-center gap-ui-3 border-t border-border-subtle">
-                        <UserAvatar username={viewer.username} name={label} className="avatar box-border size-10! flex-none! rounded-full! shadow-none! text-ui-label font-bold" />
+                        <UserAvatar username={viewer.username} name={label} className="box-border size-10 flex-none text-ui-label font-black" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-ui-body font-semibold">{label}</span>
                           {viewer.viewedAt && <time dateTime={viewer.viewedAt} className="block text-ui-caption text-muted-foreground">{relativeStoryTime(viewer.viewedAt, 'Vừa xong')}</time>}

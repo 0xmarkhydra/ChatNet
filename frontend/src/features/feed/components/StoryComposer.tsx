@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ImagePlus, Send } from 'lucide-react'
 import { STORY_MEDIA_ACCEPT } from '../utils/storyMedia'
 
+const action = 'inline-flex min-h-10.25 cursor-pointer items-center justify-center gap-1.75 rounded-[0.625rem] border border-solid px-3.5 py-2.25 disabled:cursor-not-allowed disabled:opacity-50 app-mobile:flex-[1_1_7.8125rem]'
+const secondaryAction = 'smart-story-change border-story-action-border bg-story-action text-story-action-foreground ' + action
+const note = 'm-0 text-xs leading-normal text-story-note'
+
 type Props = {
   file: File
   busy: boolean
@@ -22,29 +26,30 @@ export default function StoryComposer({ file, busy, onPublish, onBack, onChangeF
 
   const isVideo = /\.(mp4|mov|m4v|webm)$/i.test(file.name)
   return (
-    <section className="smart-story-composer" aria-label="Xem trước Story">
+    <section className="grid w-full min-w-0 gap-3.75" aria-label="Xem trước Story">
       <input ref={fileInputRef} className="hidden-media-input" type="file" accept={STORY_MEDIA_ACCEPT}
         aria-label="Chọn tệp Story khác" onChange={event => {
           const selected = event.currentTarget.files?.[0]
           event.currentTarget.value = ''
           if (selected) { setPublishFailed(false); onChangeFile(selected) }
         }} />
-      <div className="smart-story-frame">
+      <div className="smart-story-frame grid max-h-[min(62dvh,32.5rem)] min-h-55 w-full place-items-center overflow-hidden rounded-[0.8125rem] bg-story-frame">
         {preview && (isVideo
-          ? <video src={preview} controls playsInline preload="metadata" aria-label="Video Story đã chọn" />
-          : <img src={preview} alt="Xem trước ảnh Story đã chọn" />)}
+          ? <video className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" src={preview} controls playsInline preload="metadata" aria-label="Video Story đã chọn" />
+          : <img className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" src={preview} alt="Xem trước ảnh Story đã chọn" />)}
       </div>
-      <p className="smart-story-note break-all">{file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB</p>
-      <p className="smart-story-note">Story sẽ hiển thị trong 24 giờ. Kiểm tra ảnh hoặc video trước khi đăng.</p>
+      <p className={note + ' break-all'}>{file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB</p>
+      <p className={note}>Story sẽ hiển thị trong 24 giờ. Kiểm tra ảnh hoặc video trước khi đăng.</p>
       {publishFailed && <p role="alert" className="mt-2 text-sm text-destructive">Không đăng được Story. Tệp đã chọn vẫn được giữ lại.</p>}
-      <div className="smart-story-actions">
-        <button type="button" className="smart-story-change" onClick={onBack} disabled={busy}>
+      {/* Font size and weight sit here because buttons inherit them from the legacy global rule. */}
+      <div className="flex flex-wrap justify-end gap-2.5 text-[0.8125rem] font-[660]">
+        <button type="button" className={secondaryAction} onClick={onBack} disabled={busy}>
           <ArrowLeft size={18} aria-hidden="true" /> Quay lại
         </button>
-        <button type="button" className="smart-story-change" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+        <button type="button" className={secondaryAction} onClick={() => fileInputRef.current?.click()} disabled={busy}>
           <ImagePlus size={18} aria-hidden="true" /> Chọn tệp khác
         </button>
-        <button type="button" className="smart-story-publish" onClick={async () => {
+        <button type="button" className={'smart-story-publish border-primary bg-primary text-primary-foreground ' + action} onClick={async () => {
           setPublishFailed(false)
           if (!await onPublish()) setPublishFailed(true)
         }} disabled={busy}>

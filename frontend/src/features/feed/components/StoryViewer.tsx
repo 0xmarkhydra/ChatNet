@@ -15,7 +15,6 @@ import StoryActivity from './StoryActivity'
 import StoryHighlightEditor from './StoryHighlightEditor'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
-import '../styles/story-text.css'
 
 type Props = {
   activeStory: Story
@@ -193,7 +192,7 @@ export default function StoryViewer(props: Props) {
   return (
     <div
       data-slot="story-viewer"
-      className="fixed inset-0 z-350 bg-[#0b1220] text-white"
+      className="fixed inset-0 z-350 bg-story-canvas text-white"
       role="dialog"
       aria-modal="true"
       aria-label={'Khoảnh khắc của ' + authorLabel}
@@ -223,7 +222,7 @@ export default function StoryViewer(props: Props) {
                   aria-current={active ? 'true' : undefined}
                   onClick={() => setActiveStoryId(active ? activeStory.id : items[0].id)}>
                   <span className={'grid size-12 flex-none place-items-center overflow-hidden rounded-full p-0.75 ' + (active ? 'bg-(image:--soco-gradient)' : 'bg-white/30')}>
-                    <UserAvatar username={latest.author} name={label} className="avatar box-border size-full! rounded-full! shadow-none! border-2 border-[#0b1220] text-ui-label font-bold" />
+                    <UserAvatar username={latest.author} name={label} className="box-border size-full border-2 border-story-canvas text-ui-label font-black" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block truncate text-ui-body">{label}</strong>
@@ -240,8 +239,9 @@ export default function StoryViewer(props: Props) {
           aria-label={'Đang xem Story của ' + authorLabel}>
           <div data-slot="story-media" className="absolute inset-0 z-0 grid place-items-center">
             {!attachment ? (
-              <div className="story-screen-text" data-story-background={activeStory.background ?? 'berry'}>
-                <p tabIndex={0} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>{activeStory.text}</p>
+              <div className="story-screen-text box-border grid size-full place-items-center px-[clamp(3rem,12%,5rem)] py-[clamp(3.75rem,16dvh,7rem)] text-center text-[length:clamp(1.15rem,3vw,1.9rem)] leading-[1.35] font-bold text-white story-narrow:px-[3.1rem] story-narrow:py-[clamp(3.75rem,13dvh,5.5rem)]"
+                data-story-background={activeStory.background ?? 'berry'}>
+                <p className="m-0 max-h-full min-h-0 w-full overflow-auto wrap-anywhere whitespace-pre-wrap" tabIndex={0} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>{activeStory.text}</p>
               </div>
             ) : isVideo ? (
               <video key={activeStory.id} ref={videoRef} src={attachment.url} className="size-full object-contain"
@@ -288,7 +288,7 @@ export default function StoryViewer(props: Props) {
               {feed ? (
                 <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-ui-2 border-0 bg-transparent p-0 text-left text-white"
                   onClick={() => feed.onProfile(activeStory.author)} title={'Xem hồ sơ ' + authorLabel}>
-                  <UserAvatar username={activeStory.author} name={authorLabel} className="avatar size-10 flex-none rounded-full border-2 border-white text-ui-label font-bold" />
+                  <UserAvatar username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
                   <span className="min-w-0">
                     <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
                     <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, 'Vừa đăng')}</time>
@@ -296,7 +296,7 @@ export default function StoryViewer(props: Props) {
                 </button>
               ) : (
                 <span className="flex min-w-0 flex-1 items-center gap-ui-2">
-                  <UserAvatar username={activeStory.author} name={authorLabel} className="avatar size-10 flex-none rounded-full border-2 border-white text-ui-label font-bold" />
+                  <UserAvatar username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
                   <span className="min-w-0">
                     <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
                     <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, 'Vừa đăng')}</time>
@@ -319,7 +319,7 @@ export default function StoryViewer(props: Props) {
                     <MoreHorizontal size={22} aria-hidden="true" />
                   </button>
                   {menuOpen && (
-                    <div className="absolute top-full right-0 z-5 mt-ui-1 grid w-56 gap-ui-1 rounded-ui-md bg-[#18233a] p-ui-1 shadow-ui-overlay">
+                    <div className="absolute top-full right-0 z-5 mt-ui-1 grid w-56 gap-ui-1 rounded-ui-md bg-story-surface p-ui-1 shadow-ui-overlay">
                       {isOwner ? (
                         <button type="button" className={menuItem} disabled={feed.storyBusy} onClick={() => {
                           setMenuOpen(false)
