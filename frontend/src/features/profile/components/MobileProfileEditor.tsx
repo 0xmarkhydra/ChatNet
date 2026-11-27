@@ -81,7 +81,7 @@ export default function MobileProfileEditor(props: MobileProfileEditorProps) {
     </section>
     <section className={card}>
       <h3 className={heading}>Tiểu sử</h3>
-      <label className="grid min-w-0 gap-ui-1"><span className="sr-only">Tiểu sử</span><textarea className={input + ' min-h-24 resize-y'} name="bio" maxLength={160} disabled={saving} value={bioDraft} onChange={event => setBioDraft(event.target.value)} placeholder="Giới thiệu ngắn về bạn" /><small className="text-right text-ui-caption text-foreground/75">{bioDraft.length}/160</small></label>
+      <label className="relative grid min-w-0"><span className="sr-only">Tiểu sử</span><textarea className={input + ' min-h-28 resize-none pb-ui-6'} name="bio" maxLength={160} disabled={saving} value={bioDraft} onChange={event => setBioDraft(event.target.value)} placeholder="Giới thiệu ngắn về bạn" /><small className="pointer-events-none absolute right-ui-3 bottom-ui-2 text-ui-caption text-foreground/75">{bioDraft.length}/160</small></label>
     </section>
     <section className={card}>
       <h3 className={heading}>Chi tiết</h3>
@@ -90,8 +90,8 @@ export default function MobileProfileEditor(props: MobileProfileEditorProps) {
       {hasEmail && <p className="m-0 text-ui-label text-foreground/75">Email chỉ hiển thị với bạn.</p>}
     </section>
     <div role="group" aria-label="Thao tác chỉnh sửa hồ sơ" className="sticky bottom-[var(--bottom-nav-space,84px)] z-10 -mx-3 grid grid-cols-[1fr_1.6fr] gap-ui-2 border-0 border-t border-solid border-border bg-card p-ui-3">
-      <Button type="button" size="lg" variant="secondary" className="text-primary" disabled={saving || mediaBusy || !dirty} onClick={onDiscard}>Hủy</Button>
-      <Button type="submit" size="lg" disabled={saving || mediaBusy || !dirty || !valid}>{saving ? 'Đang lưu…' : 'Lưu thay đổi'}</Button>
+      <Button type="button" size="lg" variant="secondary" className="rounded-ui-md bg-secondary text-primary" disabled={saving || mediaBusy || !dirty} onClick={onDiscard}>Hủy</Button>
+      <Button type="submit" size="lg" className="rounded-ui-md" disabled={saving || mediaBusy || !dirty || !valid}>{saving ? 'Đang lưu…' : 'Lưu thay đổi'}</Button>
     </div>
   </form>
 }
