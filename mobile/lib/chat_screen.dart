@@ -93,8 +93,119 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   DateTime? lastGroupPrefetch;
   bool groupPrefetchBusy = false;
   List<Json> messages = [];
+  // In-memory, session-bound history for very recent revisits only.
+  final recentHistory = <String, ({DateTime at, List<Json> rows})>{};
+  int historyCacheRevision = 0;
+  String _historyKey(Json room, int channel, String language) =>
+      '${widget.api.generation}:${widget.api.user['id']}:${room['id']}:$channel:$language';
+  void _rememberHistory(
+    Json room,
+    int channel,
+    String language,
+    List<Json> rows,
+  ) {
+    final key = _historyKey(room, channel, language);
+    recentHistory.remove(key);
+    recentHistory[key] = (
+      at: DateTime.now(),
+      rows: rows.reversed
+          .take(200)
+          .toList()
+          .reversed
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(),
+    );
+    while (recentHistory.length > 6) {
+      recentHistory.remove(recentHistory.keys.first);
+    }
+  }
+
+  List<Json>? _warmHistory(Json room, int channel) {
+    if (room['blockedByMe'] == true ||
+        room['blockedByOther'] == true ||
+        ((room['unreadCount'] as num?)?.toInt() ?? 0) > 0) {
+      return null;
+    }
+    final cached = recentHistory.remove(
+      _historyKey(room, channel, targetLanguage),
+    );
+    if (cached == null ||
+        DateTime.now().difference(cached.at) > const Duration(seconds: 5)) {
+      return null;
+    }
+    return cached.rows.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
   List<Json> pendingAttachments = [];
   List<Json> channels = [];
+  final channelWarm = <String, ({DateTime at, List<Json> rows})>{};
+  final channelRequests = <String, Future<List<Json>>>{};
+  int channelCacheRevision = 0;
+  String _channelKey(dynamic roomId) =>
+      '${widget.api.generation}:${widget.api.user['id']}:$roomId';
+  void _invalidateChannelWarm() {
+    channelCacheRevision++;
+    channelWarm.clear();
+    channelRequests.clear();
+  }
+
+  List<Json>? _takeWarmChannels(dynamic roomId) {
+    final value = channelWarm.remove(_channelKey(roomId));
+    if (value == null ||
+        DateTime.now().difference(value.at) > const Duration(seconds: 3)) {
+      return null;
+    }
+    return value.rows;
+  }
+
+  Future<List<Json>> _requestChannels(
+    dynamic roomId, {
+    bool warm = false,
+  }) async {
+    final key = _channelKey(roomId);
+    final pending = channelRequests[key];
+    if (pending != null) return pending;
+    final revision = channelCacheRevision;
+    final future = widget.api
+        .request('GET', '/api/conversations/$roomId/channels')
+        .then(objects);
+    channelRequests[key] = future;
+    try {
+      final rows = await future;
+      if (mounted &&
+          warm &&
+          revision == channelCacheRevision &&
+          key == _channelKey(roomId) &&
+          pickerGroup?['id'] != roomId) {
+        channelWarm[key] = (at: DateTime.now(), rows: rows);
+        while (channelWarm.length > 4) {
+          channelWarm.remove(channelWarm.keys.first);
+        }
+      }
+      return rows;
+    } finally {
+      if (identical(channelRequests[key], future)) channelRequests.remove(key);
+    }
+  }
+
+  Future<void> _warmRecentGroup() async {
+    if (active != null ||
+        pickerGroup != null ||
+        channelRequests.isNotEmpty ||
+        channelWarm.isNotEmpty) {
+      return;
+    }
+    final group = conversations
+        .where((room) => room['type'] == 'group')
+        .firstOrNull;
+    if (group == null) return;
+    try {
+      await _requestChannels(group['id'], warm: true);
+    } catch (_) {
+      /* best effort */
+    }
+  }
+
   Json? generalChannel;
   List<Json> pinnedMessages = [];
   bool pinBusy = false;
@@ -139,8 +250,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     railSplitController = AnimationController(
       vsync: this,
       value: 1,
-      duration: const Duration(milliseconds: 380),
-      reverseDuration: const Duration(milliseconds: 380),
+      duration: const Duration(milliseconds: 220),
+      reverseDuration: const Duration(milliseconds: 260),
     );
     _refresh();
     scrollController.addListener(_syncMessageScroll);
@@ -151,6 +262,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void didUpdateWidget(covariant ChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.api, widget.api)) {
+      recentHistory.clear();
+      _invalidateChannelWarm();
+    }
     final requested = widget.requestedConversation;
     if (requested != null &&
         (widget.openConversationRequest != oldWidget.openConversationRequest ||
@@ -167,6 +282,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       });
     }
     if (widget.resetRequest != oldWidget.resetRequest) {
+      _cancelGroupSwitch();
       railNavigationGeneration++;
       railExpandedTarget = true;
       railSplitController.value = 1;
@@ -220,6 +336,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ),
       );
       unawaited(_prefetchOlderGroups());
+      unawaited(_warmRecentGroup());
       if (active != null) {
         final replacement = conversations.where(
           (item) => item['id'] == active!['id'],
@@ -324,6 +441,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Future<void> _reconcile() async {
+    // Realtime can change visibility, receipts, or message content.
+    historyCacheRevision++;
+    recentHistory.clear();
+    _invalidateChannelWarm();
     await _refresh();
     if (active != null) {
       final room = active!;
@@ -336,19 +457,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final changedConversation =
         active?['id'] != conversation['id'] || selectedChannelId != channelId;
     final generation = ++messageLoadGeneration;
+    final cacheRevision = historyCacheRevision;
+    final accountGeneration = widget.api.generation;
     final wasAtLatest = !showLatest.value;
     bool current() =>
         mounted &&
         generation == messageLoadGeneration &&
+        accountGeneration == widget.api.generation &&
         active?['id'] == conversation['id'] &&
         selectedChannelId == channelId;
+    final warm = changedConversation
+        ? _warmHistory(conversation, channelId)
+        : null;
     if (changedConversation) showLatest.value = false;
     setState(() {
       active = conversation;
       selectedChannelId = channelId;
       if (conversation['type'] == 'group') pickerGroup = conversation;
       if (changedConversation) {
-        messages = [];
+        messages = warm ?? [];
         unreadMessageId = null;
         initialTimelinePending = true;
         messageGapBefore = null;
@@ -371,7 +498,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         searchLoading = false;
       }
       gapLoading = false;
-      loading = changedConversation || messages.isEmpty;
+      loading = messages.isEmpty;
+      if (changedConversation) error = '';
       if (changedConversation) replyingTo = null;
       if (changedConversation) {
         friendConnection = null;
@@ -391,6 +519,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       var target = targetLanguage;
       var shouldAutoTranslate = autoTranslate;
       var locale = appLocale;
+      final initialTarget = target;
+      String historyPath(String language) =>
+          '/api/conversations/${conversation['id']}/messages'
+          '?target=${Uri.encodeQueryComponent(language)}&channelId=$channelId';
+      // Start both independent reads immediately; only use speculative history
+      // if the confirmed translation preference still matches its language.
+      final historyRequest = widget.api
+          .request('GET', '${historyPath(initialTarget)}&limit=200')
+          .then(
+            (value) => (data: value, failure: null as Object?),
+            onError: (Object error) => (data: null, failure: error),
+          );
       try {
         final preferences = object(
           await widget.api.request('GET', '/api/preferences'),
@@ -403,12 +543,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       } catch (_) {
         // Keep last known preferences when only the preference request fails.
       }
-      final path =
-          '/api/conversations/${conversation['id']}/messages'
-          '?target=${Uri.encodeQueryComponent(target)}&channelId=$channelId';
-      final recent = objects(
-        await widget.api.request('GET', '$path&limit=200'),
-      );
+      if (!current()) return;
+      final path = historyPath(target);
+      final result = target == initialTarget
+          ? await historyRequest
+          : (
+              data: await widget.api.request('GET', '$path&limit=200'),
+              failure: null,
+            );
+      if (result.failure != null) throw result.failure!;
+      final recent = objects(result.data);
       if (!current()) return;
       final opening = initialTimelinePending;
       final snapshot = opening
@@ -441,6 +585,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         }
       }
       if (!current()) return;
+      if (cacheRevision == historyCacheRevision &&
+          anchor == null &&
+          gap == null &&
+          conversation['blockedByMe'] != true &&
+          conversation['blockedByOther'] != true) {
+        _rememberHistory(conversation, channelId, target, data);
+      }
       setState(() {
         messages = data;
         unreadMessageId = anchor;
@@ -474,20 +625,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         unawaited(_refreshPins(conversation));
       }
       if (shouldAutoTranslate) {
-        final userId = widget.api.user['id'];
-        await Future.wait([
-          for (final message in data)
-            if (message['senderId'] != userId &&
-                (message['text']?.toString().trim().isNotEmpty ?? false) &&
-                (message['translatedText']?.toString().isEmpty ?? true))
-              _translate(message, target: target, silent: true),
-        ]);
+        await _translateHistoryInBatches(data, target, current);
       }
     } catch (value) {
       if (current()) {
         setState(() {
           error = value.toString();
           loading = false;
+          if (warm != null ||
+              (value is ApiError && [401, 403, 404].contains(value.status))) {
+            messages = [];
+          }
         });
       }
     }
@@ -747,27 +895,89 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   bool railExpandedTarget = true;
+  Json? _pendingGroupSwitch;
+  int _groupSwitchRevision = 0;
+  void _cancelGroupSwitch() {
+    _groupSwitchRevision++;
+    _pendingGroupSwitch = null;
+  }
+
+  static const _railCurve = Cubic(.22, 1, .36, 1);
+  Future<void> _animateRail(bool expanded) async {
+    railExpandedTarget = expanded;
+    final target = expanded ? 1.0 : 0.0;
+    final remaining = (target - railSplitController.value).abs();
+    final ms = ((expanded ? 220 : 260) * remaining).round();
+    if (ms == 0 || MediaQuery.maybeOf(context)?.disableAnimations == true) {
+      railSplitController.value = target;
+      return;
+    }
+    // animateTo starts at the live value, even when reversing midway.
+    try {
+      await railSplitController
+          .animateTo(
+            target,
+            duration: Duration(milliseconds: ms),
+            curve: _railCurve,
+          )
+          .orCancel;
+    } on TickerCanceled {
+      /* a newer target owns the controller */
+    }
+  }
 
   void _toggleAvatarSplit() {
     if (pickerGroup == null || active != null) return;
-    railExpandedTarget = !railExpandedTarget;
-    if (railExpandedTarget) {
-      railSplitController.forward();
-    } else {
-      railSplitController.reverse();
-    }
+    _cancelGroupSwitch();
+    unawaited(_animateRail(!railExpandedTarget));
   }
 
   /// The picker shares one animated seam with the avatar dock, matching PWA.
   /// Keep both rails mounted and retain their scroll state while it moves.
+  Future<void> _prefetchSwitchChannels(Json room) async {
+    try {
+      await _requestChannels(room['id'], warm: true);
+    } catch (_) {
+      /* foreground load handles errors */
+    }
+  }
+
   Future<void> _openRoom(Json room) async {
+    if (_pendingGroupSwitch != null) {
+      if (room['id'] == pickerGroup?['id']) {
+        _cancelGroupSwitch();
+        unawaited(_animateRail(false));
+        return;
+      }
+      if (room['type'] == 'group') {
+        _pendingGroupSwitch = room;
+        unawaited(_prefetchSwitchChannels(room));
+        return;
+      }
+      _cancelGroupSwitch();
+    }
+    // Reversing the same picker must not invalidate its pending API result.
+    if (room['type'] == 'group' &&
+        pickerGroup?['id'] == room['id'] &&
+        active == null) {
+      _toggleAvatarSplit();
+      return;
+    }
+    if (room['type'] == 'group' && pickerGroup != null && active == null) {
+      _pendingGroupSwitch = room;
+      final revision = ++_groupSwitchRevision;
+      unawaited(_prefetchSwitchChannels(room));
+      // Retract the old pane from its current position, then reveal the new
+      // group. The API request proceeds concurrently with the animation.
+      await _animateRail(true);
+      if (!mounted || revision != _groupSwitchRevision) return;
+      final next = _pendingGroupSwitch;
+      _pendingGroupSwitch = null;
+      if (next == null) return;
+      room = next;
+    }
     final navigation = ++railNavigationGeneration;
     if (room['type'] != 'group') {
-      if (pickerGroup != null && active == null && !railExpandedTarget) {
-        railExpandedTarget = true;
-        await railSplitController.forward();
-        if (!mounted || navigation != railNavigationGeneration) return;
-      }
       setState(() {
         pickerGroup = null;
         channels = [];
@@ -780,39 +990,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       return;
     }
 
-    if (pickerGroup?['id'] == room['id'] && active == null) {
-      _toggleAvatarSplit();
-      return;
-    }
-
-    if (pickerGroup != null && active == null && !railExpandedTarget) {
-      railExpandedTarget = true;
-      await railSplitController.forward();
-      if (!mounted || navigation != railNavigationGeneration) return;
-    }
+    // The outgoing pane has retracted; reveal the new group immediately.
+    if (pickerGroup == null || active != null) railSplitController.value = 1;
     railExpandedTarget = false;
+    final cachedChannels = _takeWarmChannels(room['id']);
     setState(() {
       active = null;
+      messageLoadGeneration++;
       pickerGroup = room;
-      channels = [];
-      generalChannel = null;
+      channels = (cachedChannels ?? <Json>[])
+          .where((item) => (item['id'] as num?)?.toInt() != 0)
+          .toList();
+      generalChannel = cachedChannels
+          ?.where((item) => (item['id'] as num?)?.toInt() == 0)
+          .firstOrNull;
       channelSearchController.clear();
-      channelsLoading = true;
+      channelsLoading = cachedChannels == null;
     });
     widget.onConversationChanged(false);
     // The fixed-width channel pane is already mounted when the seam starts.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && pickerGroup?['id'] == room['id'] && !railExpandedTarget) {
-        railSplitController.reverse();
+        unawaited(_animateRail(false));
       }
     });
     try {
-      final data = objects(
-        await widget.api.request(
-          'GET',
-          '/api/conversations/${room['id']}/channels',
-        ),
-      );
+      final data = await _requestChannels(room['id']);
       if (!mounted ||
           navigation != railNavigationGeneration ||
           pickerGroup?['id'] != room['id']) {
@@ -1250,6 +1453,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ),
       );
       if (!mounted) return;
+      recentHistory.clear();
       if (active?['id'] == roomId && selectedChannelId == channelId) {
         setState(() {
           messages = [...messages, result];
@@ -1263,7 +1467,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       // Scroll after the new bubble has been laid out, not against the old
       // maxScrollExtent. Otherwise freshly sent mentions can sit under the composer.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _scrollToBottom();
+        if (mounted &&
+            active?['id'] == roomId &&
+            selectedChannelId == channelId) {
+          _scrollToBottom();
+        }
       });
       await _refresh();
     } catch (value) {
@@ -1318,12 +1526,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
+  Future<void> _translateHistoryInBatches(
+    List<Json> rows,
+    String target,
+    bool Function() current,
+  ) async {
+    final candidates = rows.reversed
+        .where(
+          (message) =>
+              message['senderId'] != widget.api.user['id'] &&
+              (message['text']?.toString().trim().isNotEmpty ?? false) &&
+              (message['translatedText']?.toString().isEmpty ?? true),
+        )
+        .toList();
+    // Prioritize recent messages; avoid starting hundreds of translations at once.
+    for (var offset = 0; offset < candidates.length && current(); offset += 4) {
+      await Future.wait(
+        candidates
+            .skip(offset)
+            .take(4)
+            .map(
+              (message) => _translate(message, target: target, silent: true),
+            ),
+      );
+    }
+  }
+
   Future<void> _translate(
     Json message, {
     String? target,
     bool silent = false,
   }) async {
     final language = target ?? targetLanguage;
+    final visit = messageLoadGeneration;
     try {
       final result = object(
         await widget.api.request('POST', '/api/translate', {
@@ -1332,7 +1567,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           'messageId': message['id'],
         }),
       );
-      if (!mounted) return;
+      if (!mounted ||
+          visit != messageLoadGeneration ||
+          language != targetLanguage) {
+        return;
+      }
       setState(() {
         message['translatedText'] = result['translatedText'];
         message['translationLanguage'] = language;
@@ -1365,14 +1604,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           }
         }
       });
+      recentHistory.clear();
       if (autoTranslate) {
-        await Future.wait([
-          for (final message in messages)
-            if (message['senderId'] != widget.api.user['id'] &&
-                (message['text']?.toString().trim().isNotEmpty ?? false) &&
-                (message['translatedText']?.toString().isEmpty ?? true))
-              _translate(message, target: targetLanguage, silent: true),
-        ]);
+        final visit = messageLoadGeneration;
+        final language = targetLanguage;
+        await _translateHistoryInBatches(
+          messages,
+          language,
+          () =>
+              mounted &&
+              visit == messageLoadGeneration &&
+              language == targetLanguage &&
+              autoTranslate,
+        );
       }
     } catch (value) {
       _show(value.toString());
@@ -1955,8 +2199,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Future<void> _focusConversationSearch() async {
     // Keep the group picker mounted while the shared avatar boundary expands.
     if (pickerGroup != null && active == null && !railExpandedTarget) {
-      railExpandedTarget = true;
-      await railSplitController.forward();
+      await _animateRail(true);
     }
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2054,6 +2297,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   );
 
   Future<void> _reloadGroupChannels(int roomId) async {
+    _invalidateChannelWarm();
     final data = objects(
       await widget.api.request('GET', '/api/conversations/$roomId/channels'),
     );
@@ -2282,6 +2526,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
     if (confirmed != true || !mounted) return;
     try {
+      recentHistory.clear();
       await widget.api.request('DELETE', '/api/conversations/$roomId/history');
       if (!mounted) return;
       if (active?['id'] == roomId) {
@@ -2592,6 +2837,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Future<void> _openGroupSettings(Json room) async {
     final left = await showGroupSettings(context, widget.api, room);
     if (left) {
+      _cancelGroupSwitch();
+      _invalidateChannelWarm();
       railNavigationGeneration++;
       railExpandedTarget = true;
       railSplitController.value = 1;

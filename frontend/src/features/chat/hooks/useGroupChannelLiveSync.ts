@@ -42,12 +42,12 @@ export function useGroupChannelLiveSync({
     if (!id || !sessionToken) return;
 
     let activeRequest: AbortController | null = null;
-    const reload = async () => {
+    const reload = async (initial = false) => {
       activeRequest?.abort();
       const controller = new AbortController();
       activeRequest = controller;
       try {
-        const response = await handlers.current.request(`/api/conversations/${id}/channels`, {
+        const response = await handlers.current.request(`/api/conversations/${id}/channels`, initial ? undefined : {
           signal: controller.signal,
         });
         if (!response.ok) throw new Error("Không tải được kênh hội thoại.");
@@ -80,7 +80,7 @@ export function useGroupChannelLiveSync({
       }
     };
 
-    void reload();
+    void reload(true);
     const onUpdate = (event: Event) => {
       const detail = (event as CustomEvent<{ conversationId: number }>).detail;
       if (detail?.conversationId === id) void reload();

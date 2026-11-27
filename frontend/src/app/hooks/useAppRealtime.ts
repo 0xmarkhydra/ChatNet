@@ -226,6 +226,8 @@ export function useAppRealtime({
         return
       }
 
+      if (update.type === 'conversation.read') responseCache.current.invalidateWarm(['messages'])
+
       if (update.type === 'pins.updated') {
         if (activeConversationIdRef.current === update.conversationId) {
           void handlers.current.refreshPinnedMessages(update.conversationId)

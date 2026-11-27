@@ -24,7 +24,7 @@ export function useApiRequest({
   const latestVisit = useLatest(visit)
   useLayoutEffect(() => { mutationRequests.current.clear() }, [visit])
 
-  async function apiFetch(path: string, init: RequestInit = {}) {
+  async function apiFetch(path: string, init: RequestInit = {}, warm = false) {
     const sessionId = session?.sessionId
     const belongsToVisit = () => latestVisit.current === visit &&
       sessionRef.current?.sessionId === sessionId && sessionRef.current?.user.id === session?.user.id
@@ -44,7 +44,7 @@ export function useApiRequest({
     if (write) responseCache.current.invalidate(mutationTags(path))
     const method = (init.method || 'GET').toUpperCase()
     const operation = method === 'GET' && !init.signal && !init.headers && init.cache !== 'no-store'
-      ? responseCache.current.read(cacheScope, path, performRequest, init.cache === 'reload' || init.cache === 'no-cache')
+      ? responseCache.current.read(cacheScope, path, performRequest, init.cache === 'reload' || init.cache === 'no-cache', warm)
       : performRequest()
     if (write) mutationRequests.current.set(key, operation)
     try {
@@ -86,6 +86,7 @@ export function useApiRequest({
 
   return {
     apiFetch,
+    prefetchChat: (path: string) => apiFetch(path, {}, true),
     pendingRequests,
     mutationRequests,
   }

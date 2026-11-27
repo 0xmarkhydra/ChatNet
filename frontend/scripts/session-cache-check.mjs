@@ -87,3 +87,25 @@ await categoriesCache.read('owner','/api/conversation-categories',categoryLoader
 assert.equal(categoryReads,2,'Category CRUD invalidates category definitions')
 
 console.log('PASS: session isolation, deduplication, independent bodies, TTL, forced refresh, selective invalidation, stale-request protection and error recovery')
+// Explicit read-ahead must be one-shot, isolated, and invalidated like regular data.
+const warmed = new SessionResponseCache()
+const historyPath = '/api/conversations/42/messages?channelId=0&limit=80&target=vi'
+let warmedReads = 0
+const readWarm = async () => Response.json({ n: ++warmedReads })
+await warmed.read('a', historyPath, readWarm, false, true)
+assert.deepEqual(await (await warmed.read('a', historyPath, readWarm)).json(), { n: 1 })
+assert.deepEqual(await (await warmed.read('a', historyPath, readWarm)).json(), { n: 2 })
+await warmed.read('a', historyPath, readWarm, false, true)
+warmed.invalidate(['messages'])
+assert.deepEqual(await (await warmed.read('a', historyPath, readWarm)).json(), { n: 4 })
+await warmed.read('a', historyPath, readWarm, false, true)
+assert.deepEqual(await (await warmed.read('b', historyPath, readWarm)).json(), { n: 6 })
+console.log('PASS: short-lived one-shot chat prefetch, invalidation and isolation')
+let warmedRelease
+const pendingWarm = warmed.read('b', historyPath, () => new Promise(resolve => { warmedRelease = resolve }), false, true)
+const foreground = warmed.read('b', historyPath, readWarm)
+warmedRelease(Response.json({ n: 99 }))
+await pendingWarm
+assert.deepEqual(await (await foreground).json(), { n: 99 })
+assert.deepEqual(await (await warmed.read('b', historyPath, readWarm)).json(), { n: 7 })
+console.log('PASS: foreground joins in-flight prefetch without retaining stale response')

@@ -4,6 +4,8 @@ import type { ApiRequest } from '../types/api'
 export type ApiContextValue = {
   /** Authenticated request helper bound to the current session. */
   apiFetch: ApiRequest
+  /** Optional bounded read-ahead using the same authenticated response cache. */
+  prefetchChat?: ApiRequest
   pendingRequests: RefObject<Set<symbol>>
   mutationRequests: RefObject<Map<string, Promise<Response>>>
 }

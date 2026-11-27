@@ -41,6 +41,7 @@ export type ChatSectionProps = {
   chatFriend: { id: number; username: string; displayName: string; online: boolean; } | null;
   chatFriendRelationship: "accepted" | "incoming" | "outgoing" | "none";
   chatListConversations: Conversation[];
+  prefetchConversation?: (conversation: Conversation) => void;
   allChatConversations: Conversation[];
   chatListFilter: "all" | "unread" | "groups";
   chatListQuery: string;
@@ -109,6 +110,8 @@ export type ChatSectionProps = {
   messageHistoryError: boolean;
   retryMessageHistory: () => void;
   messagesScrollRef: RefObject<HTMLDivElement | null>;
+  chatScrollRefs: import('../lib/chatScrollPosition').ChatScrollRefs;
+  outgoingMessage: Message | null;
   messageText: string;
   newChatMode: NewChatMode;
   openConnectSurface: (query?: string) => void;

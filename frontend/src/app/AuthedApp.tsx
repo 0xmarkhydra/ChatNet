@@ -323,8 +323,8 @@ import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
 import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
 import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
+import { useChatPrefetch } from "../features/chat/hooks/useChatPrefetch";
 import { useChatDraftState } from "../features/chat/hooks/useChatDraftState";
-import { useChatScrollCoordinator } from "../features/chat/hooks/useChatScrollCoordinator";
 import { useConversationViewReset } from "../features/chat/hooks/useConversationViewReset";
 import { useIncomingMessageAutoTranslation } from "../features/chat/hooks/useIncomingMessageAutoTranslation";
 import { useChatOutboxState } from "../features/chat/hooks/useChatOutboxState";
@@ -355,7 +355,7 @@ export default function AuthedApp({
   setInstallPrompt,
 }: AuthedAppProps) {
   const { session, sessionRef } = useSession();
-  const { apiFetch, pendingRequests, mutationRequests } = useApi();
+  const { apiFetch, prefetchChat, pendingRequests, mutationRequests } = useApi();
   const { notice, setNotice, dismissNotice } = useNotice();
   const screenshot = useDesktopScreenshot(setNotice);
   const { chatCreateError, directUsername, groupCreateStep, groupWorkspaceMode, newChatMode, quickCreateOpen, setChatCreateError, setDirectUsername, setGroupCreateStep, setGroupWorkspaceMode, setNewChatMode, setQuickCreateOpen } = useGroupWorkspaceState({  });
@@ -783,6 +783,11 @@ export default function AuthedApp({
     purgeConversation,
     jumpToMessage: chatSearchJump,
   });
+  const prefetchConversation = useChatPrefetch({
+    request: prefetchChat, sessionId: session?.sessionId, enabled: tab === 'chat' && translationPreferencesLoaded,
+    conversations, activeConversationId, targetLanguage, overrides: conversationTranslationOverrides,
+  });
+
 
   const {
     groupSettingsOpen,
@@ -912,7 +917,7 @@ export default function AuthedApp({
         .map((activity) => ({ type: 'activity' as const, pinnedAt: activity.pinnedAt!, activity }))
       : []),
   ].sort((a, b) => Date.parse(b.pinnedAt) - Date.parse(a.pinnedAt));
-  const sortedGroupActivityEvents = groupActivities.events.slice().reverse();
+  const sortedGroupActivityEvents = useMemo(() => groupActivities.events.slice().reverse(), [groupActivities.events]);
   const viewedGroupActivity = groupActivities.activities.find(activity => activity.id === groupActivityViewedId) || null;
   const chatFriend =
     activeConversation?.type === "direct" &&
@@ -940,7 +945,7 @@ export default function AuthedApp({
     [posts, likePreviews],
   );
   const visibleMessages = useMemo(
-    () => messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
+    () => messages.filter(message => message.conversationId === activeConversationId && (message.channelId || 0) === selectedChannelId).map((message) =>
       reactionPreviews[message.id]
         ? {
             ...message,
@@ -948,7 +953,7 @@ export default function AuthedApp({
           }
         : message,
     ),
-    [messages, selectedChannelId, reactionPreviews],
+    [messages, activeConversationId, selectedChannelId, reactionPreviews],
   );
   const visibleProfilePosts = useMemo(
     () => applyPostLikePreviews(profilePosts, likePreviews),
@@ -1547,20 +1552,6 @@ export default function AuthedApp({
     sessionToken: session?.token ?? null,
     refreshPosts,
     refreshStories,
-  });
-
-  useChatScrollCoordinator({
-    activeConversationId,
-    selectedChannelId,
-    unreadMessageId,
-    messageHistoryLoading,
-    messages,
-    outgoingMessage,
-    chatOutbox,
-    messagesScrollRef,
-    messageScrollAtBottom,
-    ownSendScrollConversation,
-    pendingMessageScrollRestore,
   });
 
   useIncomingMessageAutoTranslation({
@@ -2380,6 +2371,7 @@ export default function AuthedApp({
           chatCreateError={chatCreateError}
           chatFriend={chatFriend}
           chatFriendRelationship={chatFriendRelationship}
+          prefetchConversation={prefetchConversation}
           allChatConversations={displayConversations}
           chatListConversations={chatListConversations}
           chatListFilter={chatListFilter}
@@ -2448,6 +2440,8 @@ export default function AuthedApp({
           messageHistoryError={messageHistoryError}
           retryMessageHistory={retryMessageHistory}
           messagesScrollRef={messagesScrollRef}
+          chatScrollRefs={{ messagesScrollRef, messageScrollAtBottom, ownSendScrollConversation, pendingMessageScrollRestore }}
+          outgoingMessage={outgoingMessage}
           messageText={messageText}
           newChatMode={newChatMode}
           openConnectSurface={openConnectSurface}
