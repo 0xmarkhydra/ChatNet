@@ -96,12 +96,19 @@ export function useGroupChannels({
   async function refreshGroupChannels() {
     if (activeConversation?.type !== 'group') return;
     const groupId = activeConversation.id;
+    const sessionId = sessionRef.current?.sessionId;
     const response = await listChannels(apiFetch, groupId);
     if (!response.ok) throw new Error('Không tải lại được danh sách kênh.');
     const items = validGroupChannels(await response.json() as unknown, groupId);
+    if (sessionRef.current?.sessionId !== sessionId || activeConversationRef.current?.id !== groupId) return;
     setGroupChannelState({ conversationId: groupId, channels: items });
-    if (!items.some(item => item.id === activeChannelIdRef.current)) selectGroupChannel(0);
+    if (!items.some(item => item.id === activeChannelIdRef.current)) setChannelSelection({ conversationId: groupId, channelId: 0 });
   }
 
-  return { createGroupChannel, selectGroupChannel, refreshGroupChannels };
+  function updateChannelAvatar(groupId: number, channelId: number, avatarUrl?: string) {
+    setGroupChannelState(current => current.conversationId !== groupId ? current : {
+      ...current, channels: current.channels.map(channel => channel.id === channelId ? { ...channel, avatarUrl } : channel),
+    });
+  }
+  return { createGroupChannel, selectGroupChannel, refreshGroupChannels, updateChannelAvatar };
 }

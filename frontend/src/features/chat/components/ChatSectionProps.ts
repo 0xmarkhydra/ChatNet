@@ -78,6 +78,7 @@ export type ChatSectionProps = {
   groupChannelBusy: boolean;
   groupChannels: GroupChannel[];
   refreshGroupChannels: () => Promise<void>;
+  updateChannelAvatar: (groupId: number, channelId: number, avatarUrl?: string) => void;
   groupChannelUnreadAvailable: boolean;
   groupInviteCandidates: FriendConnection[];
   groupInviteSearch: string;

@@ -10,6 +10,7 @@ import 'presentation/mobile_channel_picker.dart';
 import 'presentation/mobile_reverse_scroll_region.dart';
 import 'presentation/conversation_avatar.dart';
 import 'presentation/chat_information_sheet.dart';
+import 'presentation/conversation_photo_editor.dart';
 import 'presentation/contact_metadata_editor.dart';
 import 'presentation/conversation_list_presenter.dart';
 import 'models/navigation_models.dart';
@@ -446,6 +447,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     recentHistory.clear();
     _invalidateChannelWarm();
     await _refresh();
+    if (!mounted) return;
+    final groupId = (pickerGroup?['id'] as num?)?.toInt();
+    if (groupId != null) {
+      final replacement = conversations
+          .where((item) => item['id'] == groupId)
+          .firstOrNull;
+      if (replacement != null) setState(() => pickerGroup = replacement);
+      try {
+        await _reloadGroupChannels(groupId);
+      } catch (_) {
+        /* keep confirmed channel metadata */
+      }
+    }
     if (active != null) {
       final room = active!;
       await _loadMessages(room, channelId: selectedChannelId);
@@ -2755,6 +2769,55 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
+  Future<void> _editConversationPhoto(
+    Json room,
+    int channelId,
+    Json? channel,
+  ) async {
+    final roomId = (room['id'] as num).toInt();
+    final accountGeneration = widget.api.generation;
+    final source = channelId == 0 ? room : channel;
+    if (source == null) return;
+    final updated = await showConversationPhotoEditor(
+      context,
+      api: widget.api,
+      groupId: roomId,
+      channelId: channelId,
+      name: source['name']?.toString() ?? '',
+      avatarUrl: source['avatarUrl']?.toString() ?? '',
+    );
+    if (!mounted ||
+        updated == null ||
+        accountGeneration != widget.api.generation) {
+      return;
+    }
+    _invalidateChannelWarm();
+    final avatar = updated['avatarUrl']?.toString() ?? '';
+    setState(() {
+      if (channelId == 0) {
+        conversations = conversations
+            .map(
+              (item) =>
+                  item['id'] == roomId ? {...item, 'avatarUrl': avatar} : item,
+            )
+            .toList();
+        if (active?['id'] == roomId) active = {...active!, 'avatarUrl': avatar};
+        if (pickerGroup?['id'] == roomId) {
+          pickerGroup = {...pickerGroup!, 'avatarUrl': avatar};
+        }
+      } else if (pickerGroup?['id'] == roomId) {
+        channels = channels
+            .map(
+              (item) => item['id'] == channelId
+                  ? {...item, 'avatarUrl': avatar}
+                  : item,
+            )
+            .toList();
+      }
+    });
+    _show(channelId == 0 ? 'Đã cập nhật ảnh nhóm.' : 'Đã cập nhật ảnh kênh.');
+  }
+
   Future<void> _showConversationInformation(Json room) async {
     final roomId = (room['id'] as num?)?.toInt();
     final isGroup = room['type'] == 'group';
@@ -2766,6 +2829,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               .firstOrNull;
     var canManageChannel = false;
     var canCreateChannel = false;
+    var canEditPhoto = false;
+    final accountGeneration = widget.api.generation;
     if (isGroup && roomId != null) {
       try {
         final members = objects(
@@ -2781,7 +2846,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         // membership information is temporarily unavailable.
       }
     }
-    if (!mounted || active?['id'] != room['id']) return;
+    if (isGroup && roomId != null && (channelId == 0 || channel != null)) {
+      try {
+        final permission = object(
+          await widget.api.request(
+            'GET',
+            '/api/conversations/$roomId${channelId == 0 ? '' : '/channels/$channelId'}/avatar',
+          ),
+        );
+        canEditPhoto = permission['canUpdateAvatar'] == true;
+      } catch (_) {
+        /* only offer editing when permitted by the backend */
+      }
+    }
+    if (!mounted ||
+        active?['id'] != room['id'] ||
+        selectedChannelId != channelId ||
+        accountGeneration != widget.api.generation) {
+      return;
+    }
     final action = await showChatInformationSheet(
       context,
       conversation: room,
@@ -2789,10 +2872,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       selectedChannel: channel,
       isDemo: widget.api.isDemo,
       canManageChannel: canManageChannel,
+      canEditPhoto: canEditPhoto,
       canCreateChannel: canCreateChannel,
     );
-    if (!mounted || active?['id'] != room['id'] || action == null) return;
+    if (!mounted ||
+        active?['id'] != room['id'] ||
+        selectedChannelId != channelId ||
+        accountGeneration != widget.api.generation ||
+        action == null) {
+      return;
+    }
     switch (action) {
+      case ChatInfoAction.editPhoto:
+        if (canEditPhoto && roomId != null) {
+          await _editConversationPhoto(room, channelId, channel);
+        }
       case ChatInfoAction.shared:
         await showSharedContent(
           context,

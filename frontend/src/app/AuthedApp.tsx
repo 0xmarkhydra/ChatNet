@@ -1033,7 +1033,7 @@ export default function AuthedApp({
     conversationListSearch.retry();
   }, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
   const { notificationBusyId, toggleConversationNotifications } = useConversationNotificationToggle({ apiFetch, setConversations, setNotice });
-  const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setReplyingTo });
+  const { createGroupChannel, selectGroupChannel, refreshGroupChannels, updateChannelAvatar } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setReplyingTo });
   const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
   const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
 
@@ -2431,6 +2431,7 @@ export default function AuthedApp({
           createDirect={createDirect}
           createGroupChannel={createGroupChannel}
           refreshGroupChannels={refreshGroupChannels}
+          updateChannelAvatar={updateChannelAvatar}
           directUsername={directUsername}
           effectiveAutoTranslate={effectiveAutoTranslate}
           effectiveTargetLanguage={effectiveTargetLanguage}
