@@ -136,6 +136,10 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
    applyAssignment(id, categoryId)
   })
  }
+ function removeClearedConversation(id: number) {
+  setItems(current => current.filter(item => item.id !== id))
+  if (selectedRef.current !== null) void load(false, true)
+ }
  function refreshFiltered() { if (selectedRef.current !== null) void load() }
 
  function discardPendingReads() { ++sequence.current; ++categorySequence.current }
@@ -153,5 +157,5 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
   return discardPendingReads
  }, [session?.sessionId, lifecycle])
 
- return { categories, selected, select, items, hasMore, loading, busy, error, listError, load, save, remove, assign, refreshCategories, refreshFiltered, applyAssignment }
+ return { categories, selected, select, items, hasMore, loading, busy, error, listError, load, save, remove, assign, refreshCategories, refreshFiltered, removeClearedConversation, applyAssignment }
 }

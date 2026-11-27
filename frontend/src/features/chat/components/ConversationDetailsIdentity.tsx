@@ -9,14 +9,13 @@ type Props = {
   conversation: Conversation
   channel: GroupChannel
   selectedChannelId: number
-  compactDirect?: boolean
   canEditGroupPhotos: boolean
   photoBusy: boolean
   onEditPhoto: (target: GroupPhotoTarget) => void
 }
 
 export default function ConversationDetailsIdentity({
-  conversation, channel, selectedChannelId, canEditGroupPhotos, photoBusy, onEditPhoto, compactDirect = false,
+  conversation, channel, selectedChannelId, canEditGroupPhotos, photoBusy, onEditPhoto,
 }: Props) {
   const isGroup = conversation.type === 'group'
   const isChannel = isGroup && selectedChannelId !== 0
@@ -26,7 +25,6 @@ export default function ConversationDetailsIdentity({
 
   return (
 <div className="conversation-info-panel-identity social-chat-details-identity">
-        {isGroup || compactDirect ? (
           <div className="group-photo-avatar-wrap">
             {isChannel
               ? <UserAvatar name={displayName} className="conversation-info-panel-avatar social-chat-details-avatar" group imageUrl={displayAvatar} />
@@ -39,11 +37,6 @@ export default function ConversationDetailsIdentity({
               <Camera size={17} aria-hidden="true" />
             </button>}
           </div>
-        ) : (
-          <UserAvatar username={conversation.otherUsername} name={conversation.name}
-            className="conversation-info-panel-avatar social-chat-details-avatar"
-            online={conversation.online} />
-        )}
         <strong title={displayName}>{displayName}</strong>
         <span>{blocked ? (conversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này')
           : isChannel ? `Kênh của nhóm ${conversation.name}` : isGroup ? `${conversation.memberCount} thành viên`

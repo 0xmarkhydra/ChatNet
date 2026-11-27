@@ -1,12 +1,12 @@
-import { Bell, Check, FileText, Files, Globe2, LockKeyhole } from 'lucide-react'
+import { Bell, Check, FileText, Globe2, LockKeyhole } from 'lucide-react'
 import { useGroupManagementDetails, type Community, type GroupManagementDetailsProps } from '../hooks/useGroupManagementDetails'
 
-export default function GroupManagementDetails({ conversationId, section, canEdit, request, notify, onOpenShared }: GroupManagementDetailsProps) {
-  const { community, setCommunity, preferences, setPreferences, files, loading, busy, error, saveCommunity, saveNotifications } =
+export default function GroupManagementDetails({ conversationId, section, canEdit, request, notify }: GroupManagementDetailsProps) {
+  const { community, setCommunity, preferences, setPreferences, loading, busy, error, saveCommunity, saveNotifications } =
     useGroupManagementDetails({ conversationId, section, canEdit, request, notify })
 
   if (loading) return <p className="group-management-empty" role="status">Đang tải dữ liệu nhóm...</p>
-  return <div className="group-management-detail" aria-label={section === 'details' ? 'Thông tin cộng đồng' : section === 'rules' ? 'Nội quy nhóm' : section === 'notifications' ? 'Thông báo nhóm' : 'Tệp đã chia sẻ'}>
+  return <div className="group-management-detail" aria-label={section === 'details' ? 'Thông tin cộng đồng' : section === 'rules' ? 'Nội quy nhóm' : 'Thông báo nhóm'}>
     {error && <p className="group-management-error" role="alert">{error}</p>}
 
     {section === 'details' && <div className="group-management-form">
@@ -49,17 +49,5 @@ export default function GroupManagementDetails({ conversationId, section, canEdi
       <button type="button" className="group-management-save" disabled={busy} onClick={() => void saveNotifications()}><Check size={16} /> Lưu cài đặt</button>
     </div>}
 
-    {section === 'files' && <div className="group-management-form">
-      <p className="group-management-help"><Files size={16} aria-hidden="true" /> Tệp đã được chia sẻ trong phần thảo luận chung.</p>
-      {files.length === 0 && <p className="group-management-empty">Chưa có tệp được chia sẻ.</p>}
-      {files.flatMap(message => (message.attachments || [])
-        .filter(attachment => attachment.kind === 'file' || attachment.kind === 'audio')
-        .map(attachment => (
-          <div className="group-management-file" key={`${message.id}-${attachment.id}`}>
-            <FileText size={18} aria-hidden="true" /><span title={attachment.name}>{attachment.name || 'Tệp đính kèm'}</span>
-          </div>
-        )))}
-      <button type="button" className="group-management-save secondary" onClick={onOpenShared}>Xem kho nội dung chia sẻ</button>
-    </div>}
   </div>
 }

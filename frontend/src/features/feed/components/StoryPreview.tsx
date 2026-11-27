@@ -13,7 +13,8 @@ export default function StoryPreview({ story, className }: { story: Story; class
     )
   }
   if (attachment.kind === 'video') {
-    return <video className={cn('absolute inset-0 size-full object-cover', className)} src={attachment.url} muted playsInline preload="metadata" aria-hidden="true" />
+    // iOS draws no frame from metadata alone; a start-time fragment makes it paint the first one.
+    return <video className={cn('absolute inset-0 size-full object-cover', className)} src={`${attachment.url}#t=0.001`} muted playsInline preload="metadata" aria-hidden="true" />
   }
   return <img className={cn('absolute inset-0 size-full object-cover', className)} src={attachment.url} alt="" loading="lazy" />
 }

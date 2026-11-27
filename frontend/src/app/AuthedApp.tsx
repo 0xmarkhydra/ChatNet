@@ -99,7 +99,7 @@ import FeedReactionControl from "../features/feed/components/FeedReactionControl
 import StoryViewer from "../features/feed/components/StoryViewer";
 import MessageActions from "../features/chat/components/MessageActions";
 import LinkPreview from "../features/chat/components/LinkPreview";
-import { GroupActivityComposerMenu, GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/components/GroupActivities";
+import { GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/components/GroupActivities";
 import { messageReactionLabel } from "../features/chat/utils/messageReactions";
 import {
   copyChatImage,
@@ -268,6 +268,7 @@ import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
 import FeedPostDetail from "../features/feed/components/FeedPostDetail";
 import FeedSection from "../features/feed/components/FeedSection";
+import { useConversationNotificationToggle } from "../features/chat/hooks/useConversationNotificationToggle";
 import ConversationActionDialog from "../features/chat/components/ConversationActionDialog";
 import MessageActionDialog from "../features/chat/components/MessageActionDialog";
 import StoryOverlay from "../features/feed/components/StoryOverlay";
@@ -598,6 +599,7 @@ export default function AuthedApp({
     conversationOffset,
     reconcileConversationMemberships,
     refreshConversations,
+    removeClearedConversation,
     loadMoreConversations,
   } = useConversationData({
     session,
@@ -830,6 +832,7 @@ export default function AuthedApp({
     apiFetch, setConversations, refreshConversations, setNotice,
   })
 
+
   useEffect(() => {
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
   }, [groupSettingsOpen, setGroupMemberViewOpen]);
@@ -968,7 +971,7 @@ export default function AuthedApp({
       ].find((item) => item.id === visibleActivePostId) || null
     : null;
   const activeConversationAction = conversationActionId
-    ? displayConversations.find((item) => item.id === conversationActionId) || null : null;
+    ? displayConversations.find((item) => item.id === conversationActionId) || conversationListSearch.items.find((item) => item.id === conversationActionId) || conversationCategories.items.find((item) => item.id === conversationActionId) || null : null;
   const activeMessageAction = messageActionId
     ? messages.find((item) => item.id === messageActionId) || null
     : null;
@@ -1014,7 +1017,13 @@ export default function AuthedApp({
   const { addComment, manageFeedComment, reportFeedComment, setCommentLike } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
   const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ setActivePostId });
 
-  const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
+  const { clearActiveConversationHistory, clearSelectedConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, onHistoryCleared: (id) => {
+    if (routeConversationId === id) navigate(TAB_PATH.chat, { replace: true });
+    removeClearedConversation(id);
+    conversationCategories.removeClearedConversation(id);
+    conversationListSearch.retry();
+  }, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
+  const { notificationBusyId, toggleConversationNotifications } = useConversationNotificationToggle({ apiFetch, setConversations, setNotice });
   const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setReplyingTo });
   const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
   const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
@@ -1953,44 +1962,6 @@ export default function AuthedApp({
             progress={mediaUploading ? mediaUploadProgress : null}
             onCancel={() => mediaUploadAbort.current?.abort()}
           />
-          {visitorUsername && (
-        <VisitorProfile
-          key={session.sessionId + ":" + visitorUsername}
-          username={visitorUsername}
-          friendOnline={friends.some((friend) => friend.username === visitorUsername.toLowerCase()
-            && friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther && friend.online)}
-          request={apiFetch}
-          currentUser={name}
-          token={session.token}
-          targetLanguage={translationPreferencesLoaded ? targetLanguage : ""}
-          relationship={friendRelationship}
-          friendBusy={friendActionBusy}
-          onFriend={actOnFriend}
-          onRemoveFriend={(friend) => removeAcceptedFriend(friend, { keepProfileOpen: true })}
-          onMessage={async (username) => {
-            await openDirectByUsername(username);
-          }}
-          onClose={closeVisitor}
-          onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
-          onOpenOriginal={openFeedPostDetails}
-          onRepostChanged={refreshAfterRepost}
-          onShareToChat={setPostLinkToSend}
-          onPostOpen={(post) => {
-            setPosts((current) => [
-              post,
-              ...current.filter((item) => item.id !== post.id),
-            ]);
-            setActivePostId(post.id);
-          }}
-          onUpdated={syncFeedPost}
-          onUserOpen={openVisitor}
-          onEditPost={openEditPost}
-          taggedNames={friendTaggedNames}
-          updates={posts}
-          onDeleted={removeFeedPost}
-          feedback={setNotice}
-        />
-      )}
           {newChatMode === "group" && (
         <GroupCreator
           ownerId={session.user.id}
@@ -2009,7 +1980,7 @@ export default function AuthedApp({
         </>
       }
       // The search page owns its search field and title, so the shared header is omitted there.
-      header={isSearchResultsRoute || tab === "market" || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
+      header={visitorUsername || isSearchResultsRoute || tab === "market" || (tab === "profile" && desktopProfileOverview && !profileEditorOpen) ? null : (
         <AppHeader
           mobileSearchActions={tab !== "chat"}
           className={`chatnet-appbar ${tab === "chat" && desktopSection === null && translationSettingsConversationId === null ? "mobile-chat-appbar" : ""} ${searchInConversationList ? "mobile-search-in-list" : ""} ${tab === "profile" || tab === "discover" ? "mobile-section-header" : ""}`}
@@ -2194,7 +2165,42 @@ export default function AuthedApp({
             switchTab,
           },
         }),
-        profile: <>
+        profile: visitorUsername ? (<VisitorProfile
+          key={session.sessionId + ":" + visitorUsername}
+          username={visitorUsername}
+          mobile={!isProfileDesktop}
+          friendOnline={friends.some((friend) => friend.username === visitorUsername.toLowerCase()
+            && friend.status === "accepted" && !friend.blockedByMe && !friend.blockedByOther && friend.online)}
+          request={apiFetch}
+          currentUser={name}
+          token={session.token}
+          targetLanguage={translationPreferencesLoaded ? targetLanguage : ""}
+          relationship={friendRelationship}
+          friendBusy={friendActionBusy}
+          onFriend={actOnFriend}
+          onRemoveFriend={(friend) => removeAcceptedFriend(friend, { keepProfileOpen: true })}
+          onMessage={async (username) => {
+            await openDirectByUsername(username);
+          }}
+          onReactionUsers={(post) => setReactionTarget({kind: "post", id: post.id, reactions: post.reactions})}
+          onOpenOriginal={openFeedPostDetails}
+          onRepostChanged={refreshAfterRepost}
+          onShareToChat={setPostLinkToSend}
+          onPostOpen={(post) => {
+            setPosts((current) => [
+              post,
+              ...current.filter((item) => item.id !== post.id),
+            ]);
+            setActivePostId(post.id);
+          }}
+          onUpdated={syncFeedPost}
+          onUserOpen={openVisitor}
+          onEditPost={openEditPost}
+          taggedNames={friendTaggedNames}
+          updates={posts}
+          onDeleted={removeFeedPost}
+          feedback={setNotice}
+        />) : <>
         {desktopProfileOverview && (
           <ProfileOverviewSection
           apiFetch={apiFetch}
@@ -2347,6 +2353,9 @@ export default function AuthedApp({
         chat: <>
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
+          onContactSaved={(id, metadata) => setContactMetadata(current => ({ ...current, [id]: metadata }))}
+          notificationBusyId={notificationBusyId}
+          toggleConversationNotifications={toggleConversationNotifications}
           activeChatTranslationSettings={activeChatTranslationSettings}
           activeConversation={activeConversation}
           activeConversationId={activeConversationId}
@@ -2621,8 +2630,7 @@ export default function AuthedApp({
           mediaUploading={mediaUploading}
           name={name}
           normalizedSearch={normalizedSearch}
-          searchQuery={globalSearch}
-          onSearchChange={setGlobalSearch}
+          onSearchSubmit={query => navigate(ROUTE.search + '?q=' + encodeURIComponent(query))}
           communityCard={<CommunitySuggestions
             title="Cộng đồng của bạn"
             joinedItems={conversations.filter(group => group.type === "group").slice(0, 3).map(group => ({
@@ -2677,6 +2685,23 @@ export default function AuthedApp({
           pinBusy={pinBusy}
           setConversationActionId={setConversationActionId}
           toggleConversationPin={toggleConversationPin}
+          onSetUnread={async (conversation, unread) => {
+            try {
+              const response = await apiFetch('/api/conversations/' + conversation.id + '/read-state', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ unread }),
+              });
+              if (!response.ok) throw new Error('Không cập nhật được trạng thái đọc.');
+              setConversations(current => current.map(item => item.id === conversation.id ? { ...item, manualUnread: unread, unreadCount: unread ? item.unreadCount : 0 } : item));
+              void refreshConversations();
+            } catch (e) { setNotice(e instanceof Error ? e.message : 'Không cập nhật được trạng thái đọc.', 'error'); }
+          }}
+          notificationBusy={notificationBusyId !== null}
+          onToggleNotifications={toggleConversationNotifications}
+          historyActionBusy={historyActionBusy}
+          clearSelectedConversationHistory={clearSelectedConversationHistory}
+          categories={conversationCategories.categories}
+          categoryBusy={conversationCategories.busy}
+          onAssignCategory={conversationCategories.assign}
         />
         )}
 

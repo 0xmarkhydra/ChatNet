@@ -51,6 +51,8 @@ export type Conversation = {
   otherUsername?: string
   memberCount: number
   unreadCount: number
+  manualUnread?: boolean
+  wallpaper?: string
   avatarUrl?: string
   avatarMembers?: string[]
   muted?: boolean

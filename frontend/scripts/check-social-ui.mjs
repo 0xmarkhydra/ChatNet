@@ -2,7 +2,8 @@ import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import { mkdirSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const port = await new Promise((done, reject) => {
@@ -11,7 +12,7 @@ const port = await new Promise((done, reject) => {
   s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => done(p)) })
 })
 const origin = `http://127.0.0.1:${port}`
-const frontendRoot = process.cwd().replace(/\\/g, '/').endsWith('/frontend') ? process.cwd() : resolve('frontend')
+const frontendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1',
   '--port', String(port), '--strictPort'], { cwd: frontendRoot, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, VITE_API_URL: 'http://localhost:8080' } })
 let serverLog = ''
@@ -1358,22 +1359,31 @@ try {
       && Math.abs(before['.social-feed-side'].top - before['[data-slot="story-tray"]'].top) <= 2
       && Math.abs(after['.social-feed-side'].top - before['.social-feed-side'].top) <= 2,
       'Right rail must start aligned with feed and stay pinned while feed scrolls: ' + JSON.stringify({before, after}))
-    const searchInput = page.locator('.social-feed-search-field input')
+    const searchInput = page.locator('.social-feed-search-card [data-slot="search-field-input"]')
     await searchInput.focus()
-    const focusRing = await page.locator('.social-feed-search-field').evaluate(element => {
+    const focusRing = await page.locator('.social-feed-search-card [data-slot="search-field"]').evaluate(element => {
       const css = getComputedStyle(element)
       const parent = element.closest('.social-feed-side')
       const field = element.getBoundingClientRect()
       const rail = parent?.getBoundingClientRect()
-      return { outlineWidth: css.outlineWidth, outlineOffset: css.outlineOffset,
+      return { boxShadow: css.boxShadow,
         fieldLeft: field.left, fieldRight: field.right, railLeft: rail?.left, railRight: rail?.right }
     })
-    assert(focusRing.outlineWidth === '2px' && Number.parseFloat(focusRing.outlineOffset) <= -2
+    assert(focusRing.boxShadow.includes('inset') && focusRing.boxShadow.includes('2px')
       && focusRing.railLeft !== undefined && focusRing.railRight !== undefined
       && focusRing.fieldLeft >= focusRing.railLeft && focusRing.fieldRight <= focusRing.railRight,
       'Search focus outline must remain fully visible inside the scrolling right rail: ' + JSON.stringify(focusRing))
+    const feedBeforeTyping = await feed.locator('.feed-post-card').allTextContents()
+    await searchInput.fill('   ')
+    await searchInput.press('Enter')
+    assert(!new URL(page.url()).pathname.startsWith('/search'), 'Blank query must not navigate')
+    await searchInput.fill('xin chào & bạn')
+    await page.waitForTimeout(350)
+    assert(JSON.stringify(await feed.locator('.feed-post-card').allTextContents()) === JSON.stringify(feedBeforeTyping), 'Typing in global search must not filter feed posts')
+    await searchInput.press('Enter')
+    await page.waitForURL(url => url.pathname === '/search' && url.searchParams.get('q') === 'xin chào & bạn')
     assert(errors.length === 0, 'Uncaught JS errors: ' + errors.join(', '))
-    console.log('PASS: Pinned right rail, visible search focus outline and post author alignment')
+    console.log('PASS: Global search submit, pinned right rail, visible inset search focus ring and post author alignment')
     await browser.close()
     server.kill('SIGTERM')
     process.exit(0)

@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SmilePlus, Plus } from 'lucide-react'
 import { messageReactions } from '../utils/messageReactions'
 import type { Message } from '../types'
+
+// Only one quick reaction popover may be visible, even while crossing bubbles.
+const REACTION_PICKER_OPEN = 'chatnet:reaction-picker-open'
 
 type Props = {
   message: Message
@@ -18,15 +21,15 @@ export default function MessageReactionQuickPicker({ message, busy, toggleReacti
   const focusFirst = useRef(false)
   const [position, setPosition] = useState<{ left: number; top: number; width: number } | null>(null)
 
-  function cancelClose() {
+  const cancelClose = useCallback(() => {
     if (closeTimer.current !== null) clearTimeout(closeTimer.current)
     closeTimer.current = null
-  }
+  }, [])
 
-  function close() {
+  const close = useCallback(() => {
     cancelClose()
     setPosition(null)
-  }
+  }, [cancelClose])
 
   function scheduleClose() {
     cancelClose()
@@ -46,10 +49,11 @@ export default function MessageReactionQuickPicker({ message, busy, toggleReacti
     const top = anchor.top >= Math.max(8, bounds?.top ?? 0) + 48
       ? anchor.top - 48
       : Math.min(anchor.bottom + 10, window.innerHeight - 58)
+    document.dispatchEvent(new CustomEvent(REACTION_PICKER_OPEN, { detail: element }))
     setPosition({ left, top, width })
   }
 
-  useEffect(() => () => cancelClose(), [])
+  useEffect(() => () => cancelClose(), [cancelClose])
   useEffect(() => {
     if (!position) return
     if (focusFirst.current) {
@@ -66,17 +70,23 @@ export default function MessageReactionQuickPicker({ message, busy, toggleReacti
         close()
       }
     }
+    const closeOtherPicker = (event: Event) => { if ((event as CustomEvent).detail !== trigger.current) close() }
+    const closeForContextMenu = () => close()
+    document.addEventListener(REACTION_PICKER_OPEN, closeOtherPicker)
+    document.addEventListener('contextmenu', closeForContextMenu)
     document.addEventListener('pointerdown', dismiss)
     window.addEventListener('keydown', escape)
     window.addEventListener('scroll', close, true)
     window.addEventListener('resize', close)
     return () => {
+      document.removeEventListener(REACTION_PICKER_OPEN, closeOtherPicker)
+      document.removeEventListener('contextmenu', closeForContextMenu)
       document.removeEventListener('pointerdown', dismiss)
       window.removeEventListener('keydown', escape)
       window.removeEventListener('scroll', close, true)
       window.removeEventListener('resize', close)
     }
-  }, [position])
+  }, [position, close])
 
   const selected = message.reactions?.find(reaction => reaction.mine)?.emoji
   return <>

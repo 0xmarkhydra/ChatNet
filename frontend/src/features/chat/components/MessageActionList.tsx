@@ -9,15 +9,6 @@ export default function MessageActionList({
  const mine = activeMessageAction.senderId === userId
  return <>
         <div className="message-context-actions">
-          {!activeMessageAction.deleted && (
-            <button type="button" onClick={() => {
-                setMessageActionId(null)
-                void toggleMessagePin(activeMessageAction)
-              }}>
-              <span aria-hidden="true"><Pin size={20} strokeWidth={2} /></span>
-              <b>{isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}</b>
-            </button>
-          )}
           <button
             type="button"
             onClick={() => {
@@ -43,6 +34,16 @@ export default function MessageActionList({
             <button type="button" onClick={() => void copyMessageContent(activeMessageAction, copyTarget)}>
               <span aria-hidden="true"><Copy size={20} strokeWidth={2} /></span>
               <b>Sao chép</b>
+            </button>
+          )}
+
+          {!activeMessageAction.deleted && (
+            <button type="button" onClick={() => {
+                setMessageActionId(null)
+                void toggleMessagePin(activeMessageAction)
+              }}>
+              <span aria-hidden="true"><Pin size={20} strokeWidth={2} /></span>
+              <b>{isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}</b>
             </button>
           )}
 
