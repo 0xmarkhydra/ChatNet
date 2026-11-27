@@ -65,6 +65,17 @@
   background:transparent; font:inherit; font-size:12px;
 }
 .group-channel-sidebar-search input::placeholder { color:#92a0b4; }
+.group-channel-sidebar-search input[type="search"]:focus,
+.group-channel-sidebar-search input[type="search"]:focus-visible {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.group-channel-sidebar-search input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
 .group-channel-sidebar-search button { display:grid; place-items:center; padding:3px; border:0; background:transparent; color:#8394aa; cursor:pointer; }
 .group-channel-sidebar-caption {
   display:flex; align-items:center; justify-content:space-between;
