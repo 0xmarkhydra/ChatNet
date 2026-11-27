@@ -43,9 +43,11 @@ export function useApiRequest({
     responseCache.current.setScope(cacheScope)
     if (write) responseCache.current.invalidate(mutationTags(path))
     const method = (init.method || 'GET').toUpperCase()
-    const operation = method === 'GET' && !init.signal && !init.headers && init.cache !== 'no-store'
+    const warmChannel = method === 'GET' && init.signal && !init.headers && !init.cache && /^\/api\/conversations\/\d+\/channels$/.test(path)
+      ? responseCache.current.consumeWarm(cacheScope, path, init.signal) : undefined
+    const operation = warmChannel ?? (method === 'GET' && !init.signal && !init.headers && init.cache !== 'no-store'
       ? responseCache.current.read(cacheScope, path, performRequest, init.cache === 'reload' || init.cache === 'no-cache', warm)
-      : performRequest()
+      : performRequest())
     if (write) mutationRequests.current.set(key, operation)
     try {
       const response = await operation

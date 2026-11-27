@@ -50,13 +50,19 @@ final sessionSnapshotProvider = Provider<SessionSnapshot>((ref) {
 
 /// Reconcile-only SSE transport: server has no replay cursor. One subscription
 /// per provider container, shared across all consumers and canceled on logout.
-final realtimeRevisionProvider = StreamProvider.autoDispose<int>((ref) async* {
+final realtimeEventProvider = StreamProvider.autoDispose<Json>((ref) async* {
   final api = ref.watch(apiProvider);
   var revision = 0;
   await for (final _ in api.events()) {
-    yield ++revision;
+    yield {...api.lastRealtimeEvent, '_revision': ++revision};
   }
 });
+
+final realtimeRevisionProvider = Provider.autoDispose<AsyncValue<int>>(
+  (ref) => ref
+      .watch(realtimeEventProvider)
+      .whenData((event) => event['_revision'] as int),
+);
 
 class ConversationsNotifier extends AsyncNotifier<List<Conversation>> {
   @override

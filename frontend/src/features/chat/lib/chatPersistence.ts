@@ -15,6 +15,7 @@ const MAX_TEXT_LENGTH = 12000
 const MAX_SIGNATURE_LENGTH = 32000
 const PENDING_TTL_MS = 24 * 60 * 60 * 1000
 const draftKey = (userId: number) => `chatnet:drafts:v1:${userId}`
+const channelDraftKey = (userId: number) => `chatnet:channel-drafts:v1:${userId}`
 const pendingKey = (userId: number) => `chatnet:pending-send:v1:${userId}`
 
 let platformStore: ChatStore | undefined
@@ -62,6 +63,36 @@ export function saveChatDrafts(userId: number, drafts: Record<number, SavedChatD
     if (Object.keys(filtered).length === 0) target.removeItem(draftKey(userId))
     else target.setItem(draftKey(userId), JSON.stringify(filtered))
   } catch { /* Ignore quota exceeded, privacy mode, and restricted storage. */ }
+}
+
+export function loadChannelDrafts(userId: number, store?: ChatStore): Record<string, SavedChatDraft> {
+  const result: Record<string, SavedChatDraft> = {}
+  if (!validUser(userId)) return result
+  try {
+    const raw = usableStore(store)?.getItem(channelDraftKey(userId))
+    if (!raw || raw.length > MAX_DRAFTS * (MAX_TEXT_LENGTH + 80)) return result
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return result
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!/^[1-9]\d*:[1-9]\d*$/.test(key) || Object.keys(result).length >= MAX_DRAFTS) continue
+      if (!value || typeof value !== 'object' || !('text' in value) || typeof value.text !== 'string') continue
+      if (value.text.length && value.text.length <= MAX_TEXT_LENGTH) result[key] = { text: value.text }
+    }
+  } catch { /* restricted storage */ }
+  return result
+}
+
+export function saveChannelDrafts(userId: number, drafts: Record<string, SavedChatDraft>, store?: ChatStore): void {
+  if (!validUser(userId)) return
+  try {
+    const target = usableStore(store)
+    if (!target) return
+    const filtered = Object.fromEntries(Object.entries(drafts).filter(([key, value]) =>
+      /^[1-9]\d*:[1-9]\d*$/.test(key) && typeof value?.text === 'string' && value.text.length > 0 && value.text.length <= MAX_TEXT_LENGTH
+    ).slice(0, MAX_DRAFTS).map(([key,value]) => [key,{text:value.text}]))
+    if (Object.keys(filtered).length) target.setItem(channelDraftKey(userId),JSON.stringify(filtered))
+    else target.removeItem(channelDraftKey(userId))
+  } catch { /* restricted storage */ }
 }
 
 export function loadPendingSend(userId: number, sessionId: string, store?: ChatStore, now = Date.now()): SavedPendingSend | null {
@@ -114,6 +145,7 @@ export function clearChatPersistence(userId: number, store?: ChatStore): void {
   try {
     const target = usableStore(store)
     target?.removeItem(draftKey(userId))
+    target?.removeItem(channelDraftKey(userId))
     target?.removeItem(pendingKey(userId))
   } catch { /* Session logout still succeeds if storage is unavailable. */ }
 }

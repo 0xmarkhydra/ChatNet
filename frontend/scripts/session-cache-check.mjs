@@ -109,3 +109,18 @@ await pendingWarm
 assert.deepEqual(await (await foreground).json(), { n: 99 })
 assert.deepEqual(await (await warmed.read('b', historyPath, readWarm)).json(), { n: 7 })
 console.log('PASS: foreground joins in-flight prefetch without retaining stale response')
+const cancelCache = new SessionResponseCache()
+const channelPath = '/api/conversations/9/channels'
+await cancelCache.read('a', channelPath, async () => Response.json([1]), false, true)
+assert.deepEqual(await (await cancelCache.consumeWarm('a', channelPath, new AbortController().signal)).json(), [1])
+assert.equal(cancelCache.consumeWarm('a', channelPath, new AbortController().signal), undefined)
+let resolveChannel
+const prefetch = cancelCache.read('a', channelPath, () => new Promise(resolve => { resolveChannel=resolve }), false, true)
+const abort = new AbortController()
+const consumer = cancelCache.consumeWarm('a', channelPath, abort.signal)
+abort.abort()
+await assert.rejects(consumer, { name: 'AbortError' })
+resolveChannel(Response.json([2]))
+assert.deepEqual(await (await prefetch).json(), [2])
+assert.equal(cancelCache.consumeWarm('a', channelPath, new AbortController().signal), undefined)
+console.log('PASS: abortable channel foreground warm consumption without canceling shared prefetch')

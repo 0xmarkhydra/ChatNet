@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'state/app_providers.dart';
+import 'data/chat_local_state.dart';
 import 'presentation/mobile_avatar_channel_split.dart';
 import 'presentation/mobile_channel_picker.dart';
 import 'presentation/mobile_reverse_scroll_region.dart';
@@ -38,6 +39,7 @@ class ChatScreen extends ConsumerStatefulWidget {
     this.openConversationRequest = 0,
     this.createRequest = 0,
     this.resetRequest = 0,
+    this.visible = true,
     this.onUnreadChanged,
     this.onMobileScroll,
     this.onMobileReverseScroll,
@@ -50,6 +52,7 @@ class ChatScreen extends ConsumerStatefulWidget {
   final int openConversationRequest;
   final int createRequest;
   final int resetRequest;
+  final bool visible;
   final ValueChanged<int>? onUnreadChanged;
 
   /// Forward only the visible inbox/channel scrollers to the shared chrome.
@@ -63,7 +66,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final messageController = TextEditingController();
   final messageFocus = FocusNode();
   List<MentionCandidate> mentionMembers = [];
@@ -76,6 +79,109 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final scrollController = ScrollController(keepScrollOffset: false);
   final showLatest = ValueNotifier<bool>(false);
   int messageLoadGeneration = 0;
+  bool hasOlderMessages = false, olderLoading = false;
+  int unreadRequestRevision = 0;
+  final readAcknowledged = <String, int>{};
+  final readInFlight = <String>{};
+  bool get appForeground =>
+      WidgetsBinding.instance.lifecycleState == null ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+  bool get chatVisible =>
+      widget.visible &&
+      (WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed);
+  late ChatLocalState localChat;
+  bool localReady = false, draining = false;
+  String? enqueuingScope;
+  Timer? draftTimer, retryTimer, reconcileTimer;
+  bool reconciling = false;
+  final pendingEvents = <Json>[];
+  String? get draftScope => active == null
+      ? null
+      : ChatLocalState.scope(active!['id'], selectedChannelId);
+  List<Json> get pendingOutgoing => localChat.outbox
+      .where(
+        (row) =>
+            row['roomId'] == active?['id'] &&
+            row['channelId'] == selectedChannelId,
+      )
+      .toList();
+
+  void _captureDraft() {
+    final key = draftScope;
+    if (key == null || key == enqueuingScope) return;
+    if (messageController.text.isEmpty &&
+        pendingAttachments.isEmpty &&
+        replyingTo == null) {
+      localChat.drafts.remove(key);
+    } else {
+      localChat.drafts[key] = {
+        'text': messageController.text,
+        'attachments': pendingAttachments.map((item) => {...item}).toList(),
+        'reply': replyingTo,
+      };
+    }
+  }
+
+  void _restoreDraft(Json room, int channel) {
+    final draft = localChat.drafts[ChatLocalState.scope(room['id'], channel)];
+    final text = draft?['text']?.toString() ?? '';
+    messageController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    pendingAttachments = objects(draft?['attachments']);
+    replyingTo = draft?['reply'] is Map ? object(draft?['reply']) : null;
+  }
+
+  void _saveDraftSoon() {
+    _captureDraft();
+    draftTimer?.cancel();
+    if (!localReady || widget.api.isDemo) return;
+    draftTimer = Timer(const Duration(milliseconds: 350), () {
+      unawaited(_persistDraft());
+    });
+  }
+
+  Future<void> _persistDraft() async {
+    try {
+      await localChat.persist();
+    } catch (_) {
+      if (mounted) _show('Không lưu được bản nháp trên thiết bị.');
+    }
+  }
+
+  Future<void> _initLocal() async {
+    final state = localChat;
+    try {
+      await state.restore();
+    } catch (_) {
+      if (mounted) _show('Không khôi phục được bản nháp hoặc hàng đợi.');
+    }
+    if (!mounted || !identical(state, localChat) || !state.current) return;
+    setState(() {
+      localReady = true;
+      if (active != null &&
+          messageController.text.isEmpty &&
+          pendingAttachments.isEmpty &&
+          replyingTo == null) {
+        _restoreDraft(active!, selectedChannelId);
+      }
+    });
+    unawaited(_drainOutbox());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _queueRealtime(const {'type': 'reconnect'});
+      unawaited(_drainOutbox());
+    } else if (localReady) {
+      _captureDraft();
+      unawaited(_persistDraft());
+    }
+  }
+
   bool initialTimelinePending = true;
   int? unreadMessageId;
   int? messageGapBefore;
@@ -248,6 +354,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    localChat = ChatLocalState(widget.api);
+    unawaited(_initLocal());
+    if (!widget.api.isDemo) {
+      retryTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (appForeground) unawaited(_drainOutbox());
+      });
+    }
     railSplitController = AnimationController(
       vsync: this,
       value: 1,
@@ -266,6 +380,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (!identical(oldWidget.api, widget.api)) {
       recentHistory.clear();
       _invalidateChannelWarm();
+      readAcknowledged.clear();
+      localChat = ChatLocalState(widget.api);
+      localReady = false;
+      messageController.clear();
+      pendingAttachments = [];
+      replyingTo = null;
+      unawaited(_initLocal());
+    }
+    if (widget.visible && !oldWidget.visible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _queueRealtime(const {'type': 'reconnect'});
+      });
     }
     final requested = widget.requestedConversation;
     if (requested != null &&
@@ -329,13 +455,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         loading = false;
         error = '';
       });
-      widget.onUnreadChanged?.call(
-        conversations.fold<int>(
-          0,
-          (total, room) =>
-              total + ((room['unreadCount'] as num?)?.toInt() ?? 0),
-        ),
-      );
+      await _refreshUnread();
       unawaited(_prefetchOlderGroups());
       unawaited(_warmRecentGroup());
       if (active != null) {
@@ -441,35 +561,189 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
-  Future<void> _reconcile() async {
-    // Realtime can change visibility, receipts, or message content.
-    historyCacheRevision++;
-    recentHistory.clear();
-    _invalidateChannelWarm();
-    await _refresh();
-    if (!mounted) return;
-    final groupId = (pickerGroup?['id'] as num?)?.toInt();
-    if (groupId != null) {
-      final replacement = conversations
-          .where((item) => item['id'] == groupId)
-          .firstOrNull;
-      if (replacement != null) setState(() => pickerGroup = replacement);
-      try {
-        await _reloadGroupChannels(groupId);
-      } catch (_) {
-        /* keep confirmed channel metadata */
+  Future<void> _refreshUnread() async {
+    final revision = ++unreadRequestRevision;
+    final epoch = widget.api.generation;
+    try {
+      final result = object(
+        await widget.api.request('GET', '/api/conversations/unread'),
+      );
+      final count = result['unreadCount'];
+      if (mounted &&
+          epoch == widget.api.generation &&
+          revision == unreadRequestRevision &&
+          count is num &&
+          count >= 0) {
+        widget.onUnreadChanged?.call(count.toInt());
       }
-    }
-    if (active != null) {
-      final room = active!;
-      await _loadMessages(room, channelId: selectedChannelId);
-      await _refreshPins(room);
+    } catch (_) {
+      /* Keep last confirmed count rather than guessing from a page. */
     }
   }
 
-  Future<void> _loadMessages(Json conversation, {int channelId = 0}) async {
+  void _queueRealtime(Json event) {
+    if (!mounted) return;
+    final type = event['type'];
+    if (type == 'reconnect') unawaited(_drainOutbox());
+    if (![
+      'reconnect',
+      'message',
+      'message.updated',
+      'conversation.read',
+      'conversation.created',
+      'conversation.updated',
+      'conversation.removed',
+      'pins.updated',
+      'privacy.updated',
+      'friend.updated',
+      'category.updated',
+      'group.activity',
+    ].contains(type)) {
+      return;
+    }
+    pendingEvents.add(event);
+    if (reconciling) return;
+    reconcileTimer?.cancel();
+    reconcileTimer = Timer(const Duration(milliseconds: 120), () {
+      if (mounted) unawaited(_reconcile());
+    });
+  }
+
+  Future<void> _reconcile() async {
+    if (!mounted || reconciling || pendingEvents.isEmpty) return;
+    reconciling = true;
+    final events = [...pendingEvents];
+    pendingEvents.clear();
+    final epoch = widget.api.generation;
+    final roomId = active?['id'];
+    final channel = selectedChannelId;
+    final pickerId = pickerGroup?['id'];
+    bool matches(Json event, dynamic id) =>
+        id != null &&
+        (event['conversationId'] ??
+                object(event['message'])['conversationId']) ==
+            id;
+    final privacyChanged = events.any(
+      (event) =>
+          event['type'] == 'privacy.updated' ||
+          event['type'] == 'friend.updated',
+    );
+    final full = events.any(
+      (event) => [
+        'reconnect',
+        'privacy.updated',
+        'friend.updated',
+      ].contains(event['type']),
+    );
+    final removed = events.any(
+      (event) =>
+          event['type'] == 'conversation.removed' &&
+          (matches(event, roomId) || matches(event, pickerId)),
+    );
+    final history =
+        full ||
+        events.any((event) {
+          if (!matches(event, roomId)) return false;
+          if (event['type'] == 'conversation.read') return true;
+          if (!['message', 'message.updated'].contains(event['type'])) {
+            return false;
+          }
+          final message = object(event['message']);
+          return (message['channelId'] as num?)?.toInt() == channel ||
+              (message['channelId'] == null && channel == 0) ||
+              message.isEmpty;
+        });
+    try {
+      historyCacheRevision++;
+      recentHistory.clear();
+      if (privacyChanged && active != null) {
+        setState(() {
+          messages = [];
+          hasOlderMessages = false;
+          messageGapBefore = null;
+          unreadMessageId = null;
+          initialTimelinePending = true;
+        });
+      }
+      _invalidateChannelWarm();
+      if (events.any((event) => event['type'] == 'conversation.removed')) {
+        setState(() {
+          conversations.removeWhere(
+            (room) => events.any(
+              (event) =>
+                  event['type'] == 'conversation.removed' &&
+                  matches(event, room['id']),
+            ),
+          );
+        });
+        if (removed) {
+          _closeConversation();
+          setState(() {
+            pickerGroup = null;
+            channels = [];
+          });
+        }
+      }
+      await _refresh();
+      if (!mounted || epoch != widget.api.generation) return;
+      if (pickerId != null &&
+          pickerGroup?['id'] == pickerId &&
+          (full || events.any((event) => matches(event, pickerId)))) {
+        final replacement = conversations
+            .where((item) => item['id'] == pickerId)
+            .firstOrNull;
+        if (replacement != null) setState(() => pickerGroup = replacement);
+        try {
+          await _reloadGroupChannels((pickerId as num).toInt());
+        } catch (_) {}
+      }
+      if (!mounted || epoch != widget.api.generation) return;
+      if (!removed &&
+          roomId != null &&
+          active?['id'] == roomId &&
+          selectedChannelId == channel) {
+        if (history && chatVisible) {
+          await _loadMessages(
+            active!,
+            channelId: channel,
+            resetHistory: privacyChanged,
+          );
+        }
+        if (mounted &&
+            active?['id'] == roomId &&
+            (full ||
+                events.any(
+                  (event) =>
+                      event['type'] == 'pins.updated' && matches(event, roomId),
+                ))) {
+          await _refreshPins(active!);
+        }
+      }
+    } finally {
+      reconciling = false;
+      if (mounted && pendingEvents.isNotEmpty) {
+        reconcileTimer?.cancel();
+        reconcileTimer = Timer(const Duration(milliseconds: 120), () {
+          if (mounted) unawaited(_reconcile());
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMessages(
+    Json conversation, {
+    int channelId = 0,
+    bool resetHistory = false,
+  }) async {
     final changedConversation =
         active?['id'] != conversation['id'] || selectedChannelId != channelId;
+    if (changedConversation) {
+      readAcknowledged.remove(
+        ChatLocalState.scope(conversation['id'], channelId),
+      );
+      _captureDraft();
+      if (localReady) unawaited(_persistDraft());
+    }
     final generation = ++messageLoadGeneration;
     final cacheRevision = historyCacheRevision;
     final accountGeneration = widget.api.generation;
@@ -490,6 +764,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       if (conversation['type'] == 'group') pickerGroup = conversation;
       if (changedConversation) {
         messages = warm ?? [];
+        hasOlderMessages = false;
+        olderLoading = false;
         unreadMessageId = null;
         initialTimelinePending = true;
         messageGapBefore = null;
@@ -499,7 +775,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           mentionRoomId = null;
         }
         pinnedMessages = [];
-        pendingAttachments = [];
+        _restoreDraft(conversation, channelId);
         pinnedExpanded = false;
         searchingMessages = false;
         searchSenderId = null;
@@ -514,14 +790,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       gapLoading = false;
       loading = messages.isEmpty;
       if (changedConversation) error = '';
-      if (changedConversation) replyingTo = null;
       if (changedConversation) {
         friendConnection = null;
         friendLoading = conversation['type'] == 'direct';
         friendError = '';
       }
     });
-    widget.onConversationChanged(true);
+    if (widget.visible) widget.onConversationChanged(true);
     if (conversation['type'] == 'group' &&
         mentionRoomId != (conversation['id'] as num?)?.toInt()) {
       unawaited(_loadMentionMembers(conversation));
@@ -566,7 +841,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               failure: null,
             );
       if (result.failure != null) throw result.failure!;
-      final recent = objects(result.data);
+      final recent = objects(result.data)
+        ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
       if (!current()) return;
       final opening = initialTimelinePending;
       final snapshot = opening
@@ -575,13 +851,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final anchor = snapshot != null && snapshot > 0 ? snapshot : null;
       var data = recent;
       int? gap;
+      var more = recent.length == 200;
       if (anchor != null && !recent.any((m) => m['id'] == anchor)) {
         final windows = await Future.wait([
           widget.api.request('GET', '$path&limit=20&before=$anchor'),
           widget.api.request('GET', '$path&limit=80&after=${anchor - 1}'),
         ]);
         if (!current()) return;
-        final around = [...objects(windows[0]), ...objects(windows[1])];
+        final older = objects(windows[0]);
+        more = older.length == 20;
+        final around = [...older, ...objects(windows[1])]
+          ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
         if (around.isNotEmpty &&
             recent.length == 200 &&
             (around.last['id'] as num) < (recent.first['id'] as num)) {
@@ -592,6 +872,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         };
         data = byId.values.toList()
           ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
+      }
+      if (!opening &&
+          !resetHistory &&
+          !changedConversation &&
+          messages.isNotEmpty &&
+          data.isNotEmpty) {
+        final first = (data.first['id'] as num).toInt();
+        final recentStart = recent.isEmpty
+            ? first
+            : (recent.first['id'] as num).toInt();
+        final preserved = messages.where(
+          (row) => (row['id'] as num) < recentStart,
+        );
+        final byId = {
+          for (final row in [...preserved, ...data]) row['id']: row,
+        };
+        data = byId.values.toList()
+          ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
+        more = hasOlderMessages;
+        gap = messageGapBefore ?? gap;
       }
       for (final message in data) {
         if (message['translationLanguage'] != target) {
@@ -608,6 +908,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       }
       setState(() {
         messages = data;
+        hasOlderMessages = more;
+        olderLoading = false;
         unreadMessageId = anchor;
         initialTimelinePending = false;
         messageGapBefore = gap;
@@ -624,15 +926,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         }
         _syncMessageScroll();
       });
-      try {
-        final group = conversation['type'] == 'group';
-        await widget.api.request(
-          'POST',
-          '/api/conversations/${conversation['id']}/${group ? 'channel-read' : 'read'}',
-          group ? {'channelId': channelId} : <String, dynamic>{},
-        );
-      } catch (_) {
-        // History remains visible even when a read receipt could not be sent.
+      if (chatVisible && !conversationBlocked && current()) {
+        await _acknowledgeRead(conversation, channelId, data);
       }
       if (!current()) return;
       if (changedConversation) {
@@ -652,6 +947,60 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           }
         });
       }
+    }
+  }
+
+  Future<void> _acknowledgeRead(Json room, int channel, List<Json> rows) async {
+    if (!chatVisible ||
+        active?['id'] != room['id'] ||
+        selectedChannelId != channel) {
+      return;
+    }
+    final scope = ChatLocalState.scope(room['id'], channel);
+    final latest = rows.fold<int>(
+      0,
+      (max, row) =>
+          (row['id'] as num).toInt() > max ? (row['id'] as num).toInt() : max,
+    );
+    if (readInFlight.contains(scope) ||
+        (readAcknowledged[scope] == latest && room['manualUnread'] != true)) {
+      return;
+    }
+    final epoch = widget.api.generation;
+    readInFlight.add(scope);
+    try {
+      final group = room['type'] == 'group';
+      await widget.api.request(
+        'POST',
+        '/api/conversations/${room['id']}/${group ? 'channel-read' : 'read'}',
+        {if (group) 'channelId': channel},
+      );
+      if (!mounted || epoch != widget.api.generation) return;
+      readAcknowledged[scope] = latest;
+      if (!group) {
+        setState(() {
+          conversations = conversations
+              .map(
+                (item) => item['id'] == room['id']
+                    ? {...item, 'unreadCount': 0, 'manualUnread': false}
+                    : item,
+              )
+              .toList();
+          if (active?['id'] == room['id']) {
+            active = {...active!, 'unreadCount': 0, 'manualUnread': false};
+          }
+        });
+      } else if (pickerGroup?['id'] == room['id']) {
+        _invalidateChannelWarm();
+        try {
+          await _reloadGroupChannels((room['id'] as num).toInt());
+        } catch (_) {}
+      }
+      await _refreshUnread();
+    } catch (_) {
+      /* retain badge until confirmed */
+    } finally {
+      readInFlight.remove(scope);
     }
   }
 
@@ -1008,6 +1357,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (pickerGroup == null || active != null) railSplitController.value = 1;
     railExpandedTarget = false;
     final cachedChannels = _takeWarmChannels(room['id']);
+    _captureDraft();
+    if (localReady) unawaited(_persistDraft());
     setState(() {
       active = null;
       messageLoadGeneration++;
@@ -1419,6 +1770,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   void _closeConversation() {
+    _captureDraft();
+    if (localReady) unawaited(_persistDraft());
     setState(() {
       active = null;
       messageLoadGeneration++;
@@ -1428,6 +1781,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       pinnedMessages = [];
       pendingAttachments = [];
       replyingTo = null;
+      messageController.clear();
     });
     widget.onConversationChanged(false);
   }
@@ -1444,55 +1798,207 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         conversationBlocked ||
         sending ||
         uploading ||
+        !localReady ||
         (text.isEmpty && outgoingAttachments.isEmpty)) {
       return;
     }
-    final roomId = active!['id'];
-    final channelId = selectedChannelId;
-    final body = <String, dynamic>{
-      'text': text,
-      'clientId': DateTime.now().microsecondsSinceEpoch.toString(),
-      if (active?['type'] == 'group') 'channelId': selectedChannelId,
-      if (!quickLike && replyingTo != null)
-        'replyToMessageId': replyingTo!['id'],
-      if (outgoingAttachments.isNotEmpty) 'attachments': outgoingAttachments,
+    if (localChat.outbox.length >= 100) {
+      _show('Hàng đợi đã đầy. Thử gửi lại tin nhắn đang chờ.');
+      return;
+    }
+    final room = active!;
+    final channel = selectedChannelId;
+    final scope = draftScope;
+    final state = localChat;
+    final id = ChatLocalState.clientId();
+    final row = <String, dynamic>{
+      'clientId': id,
+      'roomId': room['id'],
+      'channelId': channel,
+      'status': 'queued',
+      'body': <String, dynamic>{
+        'text': text,
+        'clientId': id,
+        if (room['type'] == 'group') 'channelId': channel,
+        if (!quickLike && replyingTo != null)
+          'replyToMessageId': replyingTo!['id'],
+        if (outgoingAttachments.isNotEmpty) 'attachments': outgoingAttachments,
+      },
     };
-    setState(() => sending = true);
+    _captureDraft();
+    final originalDraft = state.drafts[scope];
+    setState(() {
+      sending = true;
+      enqueuingScope = quickLike ? null : scope;
+      state.outbox.add(row);
+      if (!quickLike && scope != null) state.drafts.remove(scope);
+    });
     try {
-      final result = object(
-        await widget.api.request(
-          'POST',
-          '/api/conversations/$roomId/messages',
-          body,
-        ),
-      );
-      if (!mounted) return;
-      recentHistory.clear();
-      if (active?['id'] == roomId && selectedChannelId == channelId) {
+      await state.persist();
+      if (!mounted || !identical(state, localChat) || !state.current) return;
+      if (!quickLike && draftScope == scope) {
         setState(() {
-          messages = [...messages, result];
-          if (!quickLike) {
-            messageController.clear();
-            pendingAttachments = [];
-            replyingTo = null;
-          }
+          messageController.clear();
+          pendingAttachments = [];
+          replyingTo = null;
         });
       }
-      // Scroll after the new bubble has been laid out, not against the old
-      // maxScrollExtent. Otherwise freshly sent mentions can sit under the composer.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted &&
-            active?['id'] == roomId &&
-            selectedChannelId == channelId) {
-          _scrollToBottom();
+    } catch (_) {
+      state.outbox.remove(row);
+      if (scope != null && originalDraft != null) {
+        state.drafts[scope] = originalDraft;
+        if (mounted && draftScope == scope && active != null) {
+          setState(() => _restoreDraft(active!, selectedChannelId));
         }
-      });
-      await _refresh();
-    } catch (value) {
-      _show(value.toString());
+      }
+      if (mounted) _show('Không lưu được hàng đợi. Tin nhắn chưa được gửi.');
+      return;
     } finally {
+      enqueuingScope = null;
       if (mounted) setState(() => sending = false);
     }
+    unawaited(_drainOutbox());
+  }
+
+  Future<void> _drainOutbox() async {
+    if (!mounted ||
+        !localReady ||
+        draining ||
+        sending ||
+        !appForeground ||
+        !localChat.current ||
+        localChat.outbox.isEmpty) {
+      return;
+    }
+    final state = localChat;
+    draining = true;
+    try {
+      final attempted = <String>{};
+      var sentAny = false;
+      while (true) {
+        final row = state.outbox
+            .where(
+              (item) =>
+                  item['status'] != 'failed' &&
+                  !attempted.contains(item['clientId']),
+            )
+            .firstOrNull;
+        if (row == null) break;
+        attempted.add(row['clientId'] as String);
+        if (!mounted ||
+            !identical(state, localChat) ||
+            !state.current ||
+            !appForeground) {
+          break;
+        }
+        final roomId = row['roomId'];
+        final channel = row['channelId'];
+        setState(() => row['status'] = 'sending');
+        try {
+          final result = object(
+            await widget.api.request(
+              'POST',
+              '/api/conversations/$roomId/messages',
+              object(row['body']),
+            ),
+          );
+          if (!state.current || !identical(state, localChat)) return;
+          if (result['id'] is! num ||
+              (result['conversationId'] != null &&
+                  result['conversationId'] != roomId) ||
+              ((result['channelId'] as num?)?.toInt() ?? 0) != channel) {
+            throw const ApiError('Chưa xác nhận được tin nhắn.');
+          }
+          state.outbox.remove(row);
+          sentAny = true;
+          if (mounted) {
+            setState(() {
+              if (active?['id'] == roomId && selectedChannelId == channel) {
+                final byId = {
+                  for (final item in [...messages, result]) item['id']: item,
+                };
+                messages = byId.values.toList()
+                  ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
+              }
+            });
+            recentHistory.clear();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted &&
+                  active?['id'] == roomId &&
+                  selectedChannelId == channel) {
+                unawaited(_scrollToBottom());
+              }
+            });
+          }
+          try {
+            await state.persist();
+          } catch (_) {
+            /* same clientId is safe to retry after restore */
+          }
+        } catch (error) {
+          if (!state.current || !identical(state, localChat)) return;
+          final status = error is ApiError ? error.status : null;
+          final permanent =
+              status != null &&
+              status >= 400 &&
+              status < 500 &&
+              status != 408 &&
+              status != 429;
+          row['status'] = permanent ? 'failed' : 'queued';
+          if (mounted) setState(() {});
+          try {
+            await state.persist();
+          } catch (_) {}
+          if (!permanent) break;
+        }
+      }
+      if (mounted && state.current && sentAny) await _refresh();
+    } finally {
+      draining = false;
+    }
+  }
+
+  Widget _outboxPreview() {
+    final rows = pendingOutgoing;
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 144),
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          for (final row in rows)
+            ListTile(
+              key: ValueKey('outbox-${row['clientId']}'),
+              dense: true,
+              title: Text(
+                object(row['body'])['text']?.toString().isNotEmpty == true
+                    ? object(row['body'])['text'].toString()
+                    : 'Tệp đính kèm',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                row['status'] == 'sending'
+                    ? 'Đang gửi…'
+                    : row['status'] == 'failed'
+                    ? 'Không gửi được'
+                    : 'Chờ kết nối',
+              ),
+              trailing: row['status'] == 'sending'
+                  ? null
+                  : IconButton(
+                      tooltip: 'Gửi lại',
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () {
+                        setState(() => row['status'] = 'queued');
+                        unawaited(_drainOutbox());
+                      },
+                    ),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickAttachment({bool mediaOnly = false}) async {
@@ -1532,6 +2038,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           active?['id'] == roomId &&
           selectedChannelId == channelId) {
         setState(() => pendingAttachments.addAll(staged));
+        _saveDraftSoon();
       }
     } catch (value) {
       _show(value.toString());
@@ -1999,6 +2506,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               onTap: () {
                 Navigator.pop(context);
                 setState(() => replyingTo = message);
+                _saveDraftSoon();
               },
             ),
             if (message['text']?.toString().isNotEmpty ?? false)
@@ -2131,6 +2639,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (!mounted || !scrollController.hasClients) return;
     final position = scrollController.position;
     if (!position.hasContentDimensions) return;
+    final olderDistance = centeredTimeline
+        ? position.extentBefore
+        : position.extentAfter;
+    if (olderDistance < 120 &&
+        hasOlderMessages &&
+        !olderLoading &&
+        !loading &&
+        !searchingMessages) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_loadOlderMessages());
+      });
+    }
     showLatest.value =
         (centeredTimeline ? position.extentAfter : position.extentBefore) >= 96;
   }
@@ -2161,6 +2681,48 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       await WidgetsBinding.instance.endOfFrame;
     }
     _syncMessageScroll();
+  }
+
+  Future<void> _loadOlderMessages() async {
+    final room = active;
+    if (room == null ||
+        messages.isEmpty ||
+        !hasOlderMessages ||
+        olderLoading ||
+        searchingMessages) {
+      return;
+    }
+    final generation = messageLoadGeneration;
+    final channel = selectedChannelId;
+    final before = messages.first['id'];
+    setState(() => olderLoading = true);
+    try {
+      final data = objects(
+        await widget.api.request(
+          'GET',
+          '/api/conversations/${room['id']}/messages?target=${Uri.encodeQueryComponent(targetLanguage)}&channelId=$channel&limit=80&before=$before',
+        ),
+      );
+      if (!mounted || generation != messageLoadGeneration) return;
+      final byId = {
+        for (final item in [...data, ...messages]) item['id']: item,
+      };
+      setState(() {
+        messages = byId.values.toList()
+          ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
+        hasOlderMessages =
+            data.length == 80 &&
+            data.any((item) => (item['id'] as num) < (before as num));
+      });
+    } catch (_) {
+      if (mounted && generation == messageLoadGeneration) {
+        _show('Không tải được tin nhắn cũ.');
+      }
+    } finally {
+      if (mounted && generation == messageLoadGeneration) {
+        setState(() => olderLoading = false);
+      }
+    }
   }
 
   Future<void> _loadMessageGap() async {
@@ -2311,11 +2873,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   );
 
   Future<void> _reloadGroupChannels(int roomId) async {
-    _invalidateChannelWarm();
-    final data = objects(
-      await widget.api.request('GET', '/api/conversations/$roomId/channels'),
-    );
-    if (!mounted || pickerGroup?['id'] != roomId) return;
+    final epoch = widget.api.generation;
+    final navigation = railNavigationGeneration;
+    final data = await _requestChannels(roomId);
+    if (!mounted ||
+        pickerGroup?['id'] != roomId ||
+        epoch != widget.api.generation ||
+        navigation != railNavigationGeneration) {
+      return;
+    }
     setState(() {
       generalChannel = data
           .where((item) => (item['id'] as num?)?.toInt() == 0)
@@ -2323,6 +2889,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       channels = data
           .where((item) => (item['id'] as num?)?.toInt() != 0)
           .toList();
+      if (data.isNotEmpty && data.every((item) => item['unreadCount'] is num)) {
+        final total = data.fold<int>(
+          0,
+          (sum, item) => sum + (item['unreadCount'] as num).toInt(),
+        );
+        conversations = conversations
+            .map(
+              (item) =>
+                  item['id'] == roomId ? {...item, 'unreadCount': total} : item,
+            )
+            .toList();
+        pickerGroup = {...pickerGroup!, 'unreadCount': total};
+        if (active?['id'] == roomId) {
+          active = {...active!, 'unreadCount': total};
+        }
+      }
     });
   }
 
@@ -2947,6 +3529,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    draftTimer?.cancel();
+    retryTimer?.cancel();
+    reconcileTimer?.cancel();
+    _captureDraft();
+    if (localReady && localChat.current) {
+      unawaited(localChat.persist().catchError((Object _) {}));
+    }
     searchDebounce?.cancel();
     messageController.dispose();
     messageFocus.dispose();
@@ -2965,9 +3555,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<int>>(realtimeRevisionProvider, (previous, next) {
+    ref.listen<AsyncValue<Json>>(realtimeEventProvider, (previous, next) {
       if (next.hasValue && next.value != previous?.value) {
-        unawaited(_reconcile());
+        _queueRealtime(next.value!);
       }
     });
     final filtered = filterConversations(
@@ -3052,7 +3642,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                           key: const ValueKey('mobile-chat-search'),
                           controller: chatSearchController,
                           focusNode: chatSearchFocus,
-                          onChanged: (_) => setState(() {}),
+                          onChanged: (_) {
+                            setState(() {});
+                            _saveDraftSoon();
+                          },
                           decoration: InputDecoration(
                             hintText: 'Tìm hội thoại...',
                             hintStyle: const TextStyle(
@@ -4096,6 +4689,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       : _messageTimeline(visibleMessages),
                 ),
               ),
+              _outboxPreview(),
               _composer(),
             ],
           ),
@@ -4103,6 +4697,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       },
     );
   }
+
+  Widget _olderControl() => hasOlderMessages && !searchingMessages
+      ? TextButton(
+          onPressed: olderLoading ? null : _loadOlderMessages,
+          child: Text(olderLoading ? 'Đang tải…' : 'Tải thêm tin nhắn cũ'),
+        )
+      : const SizedBox.shrink();
 
   Widget _messageTimeline(List<Json> rows) {
     final anchor = centeredTimeline
@@ -4157,7 +4758,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       sliver: SliverList.builder(
                         itemCount: anchor + 1,
                         itemBuilder: (_, i) => i == anchor
-                            ? _dayDivider()
+                            ? Column(children: [_olderControl(), _dayDivider()])
                             : row(rows[anchor - 1 - i]),
                       ),
                     ),
@@ -4184,7 +4785,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   ),
                   itemCount: rows.length + 1,
                   itemBuilder: (_, i) => i == rows.length
-                      ? _dayDivider()
+                      ? Column(children: [_olderControl(), _dayDivider()])
                       : row(rows[rows.length - 1 - i]),
                   findChildIndexCallback: (key) {
                     if (key is! ValueKey) return null;
@@ -4574,6 +5175,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       selection: TextSelection.collapsed(offset: start + emoji.length),
     );
     setState(() {});
+    _saveDraftSoon();
   }
 
   Future<void> _showQuickReplies({String? query}) async {
@@ -4933,7 +5535,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Widget _composer() {
     final hasMessageContent =
-        messageController.text.trim().isNotEmpty || pendingAttachments.isNotEmpty;
+        messageController.text.trim().isNotEmpty ||
+        pendingAttachments.isNotEmpty;
     return Container(
       padding: EdgeInsets.fromLTRB(
         11,
@@ -4966,7 +5569,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     ),
                   ),
                   IconButton(
-                    onPressed: () => setState(() => replyingTo = null),
+                    onPressed: () {
+                      setState(() => replyingTo = null);
+                      _saveDraftSoon();
+                    },
                     icon: const Icon(Icons.close_rounded, size: 17),
                   ),
                 ],
@@ -4997,9 +5603,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     ),
                     onDeleted: sending || uploading
                         ? null
-                        : () => setState(
-                            () => pendingAttachments.removeAt(index),
-                          ),
+                        : () {
+                            setState(() => pendingAttachments.removeAt(index));
+                            _saveDraftSoon();
+                          },
                   );
                 },
               ),
@@ -5056,7 +5663,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 child: TextField(
                   controller: messageController,
                   focusNode: messageFocus,
-                  enabled: !sending,
+                  enabled: !sending && localReady,
                   minLines: 1,
                   maxLines: 5,
                   maxLength: 4000,
@@ -5102,7 +5709,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   padding: EdgeInsets.zero,
                   shape: const CircleBorder(),
                 ),
-                onPressed: sending || uploading || conversationBlocked
+                onPressed:
+                    sending || uploading || conversationBlocked || !localReady
                     ? null
                     : hasMessageContent
                     ? () => _send()
