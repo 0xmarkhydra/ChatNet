@@ -304,7 +304,15 @@
 .explore-person h3, .explore-person p { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .explore-person h3 { font-size: 14px; }
 .explore-person p { font-size: 12px; margin-top: 3px; }
-.explore-person button { flex: none; padding: 0 12px; }
+.explore-person > button {
+  box-sizing: border-box;
+  flex: 0 0 96px;
+  width: 96px;
+  height: 44px;
+  padding: 0 6px;
+  white-space: nowrap;
+  text-align: center;
+}
 .explore-content-layout-single .explore-people-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
 .explore-content-layout-single .explore-person { padding: 16px; border: 1px solid var(--soco-line); border-radius: 18px; background: var(--soco-surface); }
 .explore-state {
