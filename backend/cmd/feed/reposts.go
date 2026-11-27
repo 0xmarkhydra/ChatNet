@@ -120,6 +120,9 @@ func (s *server) createRepost(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, 500, "cannot save repost")
 		return
 	}
+	if sourceAuthor != claims.UserID {
+		s.publishFeedNotificationUpdate(r.Context(), []int64{sourceAuthor})
+	}
 	s.respondPost(w, r, sourceID, claims.UserID, 201)
 }
 

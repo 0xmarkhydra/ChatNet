@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { useSession } from '../../../shared/context/SessionContext'
 import { AtSign, Bell, Check, MessageCircle, Settings, UserRoundPlus, Users, X } from 'lucide-react'
@@ -6,6 +6,7 @@ import type { FriendConnection } from '../../contacts'
 import type { Conversation } from '../../chat'
 import type { PostMentionNotification } from '../../feed'
 import UserAvatar from '../../../shared/ui/UserAvatar'
+import ConversationAvatar from '../../chat/components/ConversationAvatar'
 import useSlidingPill from '../../../shared/ui/useSlidingPill'
 import { buildNotificationItems, countUnreadNotificationItems, filterNotificationItems, type NotificationFilter } from '../utils/notification-items'
 import '../styles/notifications-page.css'
@@ -43,22 +44,11 @@ export default function NotificationsPage({
   const notificationList = useRef<HTMLDivElement>(null)
   const previousNotifications = useRef<{ sessionId: string; keys: Set<string> } | null>(null)
   const [selectedKey, setSelectedKey] = useScopedState<string | null>(session.sessionId, null)
-  const [readKeys, setReadKeys] = useScopedState<Set<string>>(session.sessionId, new Set())
   const notifications = useMemo(() => buildNotificationItems(requests, conversations, mentions), [requests, conversations, mentions])
 
-  const filtered = filterNotificationItems(notifications, filter, search, readKeys)
+  const filtered = filterNotificationItems(notifications, filter, search)
   const selected = filtered.find(n => n.key === selectedKey) ?? filtered[0] ?? null
-  const unseenCount = countUnreadNotificationItems(notifications, readKeys)
-
-  useEffect(() => {
-    // Retain local read state only for notifications still backed by active server data.
-    setReadKeys(previous => {
-      if (!previous.size) return previous
-      const known = new Set(notifications.map(n => n.key))
-      const next = new Set([...previous].filter(key => known.has(key)))
-      return next.size === previous.size ? previous : next
-    })
-  }, [notifications, setReadKeys])
+  const unseenCount = countUnreadNotificationItems(notifications)
 
   useLayoutEffect(() => {
     const previous = previousNotifications.current
@@ -83,16 +73,7 @@ export default function NotificationsPage({
 
   const markRead = (key: string) => {
     const item = notifications.find(value => value.key === key)
-    if (item?.mention) {
-      if (!item.mention.readAt) onReadMention(item.mention.id)
-      return
-    }
-    setReadKeys(previous => {
-      if (previous.has(key)) return previous
-      const next = new Set(previous)
-      next.add(key)
-      return next
-    })
+    if (item?.mention && !item.mention.readAt) onReadMention(item.mention.id)
   }
 
   return <div className="np-screen" aria-label="Màn hình Thông báo">
@@ -108,10 +89,11 @@ export default function NotificationsPage({
         </div>
         <div className="np-notification-list" ref={notificationList}>
           {filtered.map(item => <button key={item.key} type="button" data-notification-key={item.key}
-            className={'np-notification-row' + (selected?.key === item.key ? ' selected' : '') + ((item.mention ? Boolean(item.mention.readAt) : readKeys.has(item.key)) ? ' is-read' : '')}
+            className={'np-notification-row' + (selected?.key === item.key ? ' selected' : '') + (item.mention?.readAt ? ' is-read' : '')}
             onClick={() => { setSelectedKey(item.key); markRead(item.key) }}>
             {(item.kind === 'friend' || item.kind === 'mention') && item.username
               ? <UserAvatar username={item.username} name={item.name} online={false} className="avatar np-avatar"/>
+              : item.conversation ? <ConversationAvatar conversation={item.conversation} className="avatar np-avatar" />
               : <span className="np-group-avatar"><Users size={21}/></span>}
             <span className="np-notification-copy">
               <strong>{item.name}</strong><span>{item.subtitle}</span>
@@ -135,13 +117,14 @@ export default function NotificationsPage({
           <div className="np-detail-person">
             {(selected.kind === 'friend' || selected.kind === 'mention') && selected.username
               ? <UserAvatar username={selected.username} name={selected.name} online={false} className="avatar np-detail-avatar"/>
+              : selected.conversation ? <ConversationAvatar conversation={selected.conversation} className="avatar np-detail-avatar" />
               : <span className="np-detail-group-avatar"><Users size={35}/></span>}
             <h3>{selected.name}</h3>
             <p>{selected.subtitle}</p>
           </div>
           <div className="np-detail-description">
             {selected.mention ? <>
-              <p><strong>Bài viết gắn thẻ bạn</strong></p>
+              <p><strong>{selected.mention.kind === 'repost' ? 'Bài viết được đăng lại' : selected.mention.kind === 'quote' ? 'Bài viết được trích dẫn' : 'Bài viết gắn thẻ bạn'}</strong></p>
               <p>Bạn có thể mở bài viết hoặc xem hồ sơ người đăng.</p>
             </> : selected.kind === 'friend' && selected.friend ? <>
               <p><strong>@{selected.friend.username}</strong></p>
@@ -157,11 +140,11 @@ export default function NotificationsPage({
           <div className="np-detail-actions">
             {selected.mention ? <>
               <button type="button" className="np-primary" onClick={() => onOpenMention(selected.mention!)}>
-                <AtSign size={17}/>Mở bài viết được gắn thẻ</button>
+                <AtSign size={17}/>Mở bài viết</button>
               {!selected.mention.readAt && <button type="button" className="np-secondary"
                 onClick={() => onReadMention(selected.mention!.id)}><Check size={17}/>Đánh dấu đã xem</button>}
               <button type="button" className="np-text-link"
-                onClick={() => selected.username && onOpenFriend(selected.username)}>Xem hồ sơ người gắn thẻ</button>
+                onClick={() => selected.username && onOpenFriend(selected.username)}>Xem hồ sơ người đăng</button>
             </> : selected.friend ? <>
               <button type="button" className="np-primary" disabled={busyFriendIds.has(selected.friend.id)}
                 onClick={() => onAccept(selected.friend!)}><Check size={17}/>Chấp nhận lời mời</button>
@@ -171,8 +154,7 @@ export default function NotificationsPage({
             </> : selected.conversation ? <>
               <button type="button" className="np-primary" onClick={() => onOpenConversation(selected.conversation!.id)}>
                 <MessageCircle size={17}/>Mở cuộc trò chuyện</button>
-              <button type="button" className="np-secondary" onClick={() => markRead(selected.key)}>
-                <Check size={17}/>Đánh dấu đã xem trên thiết bị</button>
+              <p className="np-unread-hint">Mở và đọc tin nhắn để cập nhật trạng thái chưa đọc.</p>
             </> : null}
           </div>
         </> : <div className="np-detail-empty"><Bell size={40}/>

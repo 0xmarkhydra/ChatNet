@@ -383,9 +383,15 @@ class DemoApi extends Api {
     if (parts[1] == 'conversations') {
       if (parts.length == 2) {
         final type = uri.queryParameters['type'];
-        final matching = type == null
-            ? rooms
-            : rooms.where((room) => room['type'] == type).toList();
+        final matching = rooms
+            .where(
+              (room) =>
+                  (type == null || room['type'] == type) &&
+                  (uri.queryParameters['unread'] != 'true' ||
+                      ((room['unreadCount'] as num?) ?? 0) > 0 ||
+                      room['manualUnread'] == true),
+            )
+            .toList();
         final offset = int.tryParse(uri.queryParameters['offset'] ?? '0') ?? 0;
         final limit =
             int.tryParse(uri.queryParameters['limit'] ?? '') ?? matching.length;

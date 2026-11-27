@@ -181,7 +181,10 @@ export function useAppRealtime({
         }
         seenMessageIds.add(id)
       }
-      if (['message', 'conversation.read', 'conversation.created', 'conversation.removed', 'privacy.updated'].includes(update.type)) refreshDesktopUnread()
+      if (['message', 'message.updated', 'conversation.read', 'conversation.created', 'conversation.removed', 'conversation.updated', 'privacy.updated'].includes(update.type)) {
+        refreshDesktopUnread()
+        window.dispatchEvent(new Event('chatnet:notification-source-changed'))
+      }
       if (update.type === 'privacy.updated' || update.type === 'conversation.removed') clearDesktopNotifications(session.sessionId)
       if (update.type === 'privacy.updated') {
         // Remove potentially forbidden content immediately; refetch using current access rules.
@@ -195,6 +198,10 @@ export function useAppRealtime({
         void handlers.current.refreshPosts()
         void handlers.current.refreshStories()
         void handlers.current.reconcileConversationMemberships()
+        return
+      }
+      if (update.type === 'feed.notification.updated') {
+        window.dispatchEvent(new Event('chatnet:feed-notification-updated'))
         return
       }
       if (update.type === 'group.activity') {

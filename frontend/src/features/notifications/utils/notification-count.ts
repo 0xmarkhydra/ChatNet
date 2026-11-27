@@ -7,7 +7,7 @@ import type { Conversation } from '../../chat'
  * Do not sum message unread counts or include outgoing invitations.
  */
 export const isIncomingFriendRequest = (request: FriendConnection): boolean =>
-  request.direction === 'incoming'
+  request.direction === 'incoming' && request.status === 'pending'
 
 export const hasUnreadConversation = (conversation: Conversation): boolean =>
   conversation.unreadCount > 0

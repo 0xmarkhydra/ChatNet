@@ -9,13 +9,12 @@ const items: NotificationItem[] = [
 
 describe('notification presentation helpers', () => {
   it('filters unread items without treating read mentions as unread', () => {
-    const readKeys = new Set(['friend:1'])
-    expect(filterNotificationItems(items, 'unread', '', readKeys).map(item => item.key)).toEqual(['chat:2'])
-    expect(countUnreadNotificationItems(items, readKeys)).toBe(1)
+    expect(filterNotificationItems(items, 'unread', '').map(item => item.key)).toEqual(['friend:1', 'chat:2'])
+    expect(countUnreadNotificationItems(items)).toBe(2)
   })
 
   it('applies mention and Vietnamese text filters independently of read state', () => {
-    expect(filterNotificationItems(items, 'mentions', '', new Set()).map(item => item.key)).toEqual(['mention:3'])
-    expect(filterNotificationItems(items, 'all', 'nhÓm', new Set()).map(item => item.key)).toEqual(['chat:2'])
+    expect(filterNotificationItems(items, 'mentions', '').map(item => item.key)).toEqual(['mention:3'])
+    expect(filterNotificationItems(items, 'all', 'nhÓm').map(item => item.key)).toEqual(['chat:2'])
   })
 })

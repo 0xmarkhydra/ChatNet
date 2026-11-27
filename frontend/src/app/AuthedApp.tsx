@@ -115,7 +115,9 @@ import ProfileIdentityForm from "../features/profile/components/ProfileIdentityF
 import BottomNavigation from "./navigation/BottomNavigation";
 import AppSidebar from "./navigation/AppSidebar";
 import { useDesktopScreenshot } from "./navigation/useDesktopScreenshot";
-import { countNotificationItems, formatNotificationBadge } from "../features/notifications/utils/notification-count";
+import { formatNotificationBadge } from "../features/notifications/utils/notification-count";
+import { useUnreadNotificationConversations } from "../features/notifications/hooks/useUnreadNotificationConversations";
+import { buildNotificationItems, countUnreadNotificationItems } from "../features/notifications/utils/notification-items";
 import NotificationsPage from "../features/notifications/components/NotificationsPage";
 import type { PostMentionNotification } from "../features/feed/utils/postMentionNotifications";
 import ConversationDetailsPanel from "../features/chat/components/ConversationDetailsPanel";
@@ -1620,8 +1622,8 @@ export default function AuthedApp({
   });
 
   const unreadTotal = nativeNotifications.unreadCount ?? 0;
-  const notificationItemCount = countNotificationItems(friendRequests, conversations)
-    + postMentions.filter(mention => !mention.readAt).length;
+  const notificationConversations = useUnreadNotificationConversations({ sessionId: session?.sessionId ?? null, request: apiFetch, conversations, active: tab === 'notifications' });
+  const notificationItemCount = useMemo(() => countUnreadNotificationItems(buildNotificationItems(friendRequests, notificationConversations, postMentions)), [friendRequests, notificationConversations, postMentions]);
   const notificationBadgeText = formatNotificationBadge(notificationItemCount);
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase("vi-VN");
   // The conversation sidebar is independent of the keyword. Only the dropdown searches.
@@ -2131,7 +2133,7 @@ export default function AuthedApp({
         ...createSecondaryPageSlots({
           notifications: {
             actOnFriend,
-            conversations,
+            conversations: notificationConversations,
             declineFriendRequest,
             friendBusyIds,
             friendRequests,
