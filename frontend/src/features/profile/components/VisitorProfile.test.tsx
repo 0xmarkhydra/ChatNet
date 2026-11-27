@@ -111,6 +111,13 @@ describe('VisitorProfile data-driven sections', () => {
       const tab = [...element.querySelectorAll('button')].find(button => button.textContent === 'Ảnh & video')
       await act(async () => tab?.click())
       expect(element.querySelector('.visitor-media-grid img')?.getAttribute('src')).toBe('/media/real.jpg')
+      await act(async () => root.render(<VisitorProfile {...props} token="new-session" mobile />))
+      expect(element.querySelector('[aria-label="Tải lại hồ sơ"]')).toBeNull()
+      expect(element.textContent).not.toContain('Chỉnh sửa thông tin')
+      const all = [...element.querySelectorAll('button')].find(button => button.textContent === 'Tất cả')
+      await act(async () => all?.click())
+      expect(element.textContent).toContain('Xem nhanh')
+      expect(element.textContent).not.toContain('Email chỉ hiển thị với bạn')
     } finally {
       await act(async () => root.unmount())
       element.remove()

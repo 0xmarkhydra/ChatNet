@@ -67,7 +67,7 @@ export default function StoryHighlights({ request, username, owner = false, clas
     }
   }
 
-  const full = owner && mobileProfile
+  const full = mobileProfile
   const activeStory = items?.find(item => item.id === activeStoryId)
   if (!owner && (!items || items.length === 0)) return null
   return (
