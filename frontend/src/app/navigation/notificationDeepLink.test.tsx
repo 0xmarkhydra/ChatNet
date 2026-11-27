@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HashRouter, MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { notificationDeepLink, notificationRouteTarget } from "./notificationDeepLink";
+import DiscoverSection, { type DiscoverSectionProps } from "../../features/discover/components/DiscoverSection";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 const cleanup: Array<() => void> = [];
@@ -37,6 +38,58 @@ describe("notification deep links", () => {
       .toEqual({ pathname: "/feed", search: "?post=41", hash: "" });
     expect(notificationRouteTarget({ pathname: "/chat", search: "?conversation=-5&foo=1", hash: "" })?.to)
       .toEqual({ pathname: "/chat", search: "?foo=1", hash: "" });
+  });
+
+  it("does not consume Discover's feature-owned tabs", () => {
+    for (const tab of ["all", "people", "posts", "communities", "recent"]) {
+      expect(notificationRouteTarget({ pathname: "/discover", search: "?tab=" + tab, hash: "" })).toBeNull();
+    }
+    expect(notificationRouteTarget({ pathname: "/discover", search: "?tab=people&message=invalid", hash: "" })?.to)
+      .toEqual({ pathname: "/discover", search: "?tab=people", hash: "" });
+    expect(notificationRouteTarget({ pathname: "/discover", search: "?tab=people&conversation=12", hash: "" })?.to)
+      .toEqual({ pathname: "/chat/12", search: "", hash: "" });
+    expect(notificationRouteTarget({ pathname: "/discover", search: "?tab=feed&post=41", hash: "" })?.to)
+      .toEqual({ pathname: "/feed", search: "?post=41", hash: "" });
+  });
+
+  it("keeps all Discover shortcuts open under the global notification URL effect", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const props: DiscoverSectionProps = {
+      request: vi.fn(async () => ({ ok: true, json: async () => [] }) as Response),
+      sessionId: "session-a", actOnFriend: vi.fn(async () => {}),
+      findNearby: vi.fn(async () => {}), friendActionBusy: null,
+      friendRelationship: () => "none", globalSearch: "", nearbyBusy: false,
+      nearbyRadiusKm: 5, nearbyResultRadiusKm: 5, nearbyScanning: false,
+      nearbyUntil: 0, nearbyUsers: [], setGlobalSearch: vi.fn(),
+      setNearbyRadiusKm: vi.fn(), stopNearby: vi.fn(async () => {}),
+    };
+    function Shell() {
+      const location = useLocation();
+      const navigate = useNavigate();
+      useEffect(() => {
+        const target = notificationRouteTarget(location);
+        if (target) navigate(target.to, { replace: true });
+      }, [location, navigate]);
+      return <><DiscoverSection {...props} /><output>{location.pathname + location.search}</output></>;
+    }
+    try {
+      await act(async () => root.render(<MemoryRouter initialEntries={["/discover"]}><Shell /></MemoryRouter>));
+      for (const [index, tab, title] of [
+        [0, "people", "Mọi người"], [1, "posts", "Bài viết"], [2, "communities", "Cộng đồng"], [3, "recent", "Gần đây"],
+      ] as const) {
+        await act(async () => container.querySelector<HTMLButtonElement>(".explore-tabs button")?.click());
+        await act(async () => container.querySelectorAll<HTMLButtonElement>(".explore-shortcut-grid button")[index]?.click());
+        expect(container.querySelector("output")?.textContent).toBe("/discover?tab=" + tab);
+        expect(container.querySelector('.explore-tabs [aria-current="page"]')?.textContent).toBe(title);
+        expect(container.querySelector(".explore-shortcuts")).toBeNull();
+      }
+      expect(props.findNearby).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
   });
 
   it("navigates inside Desktop HashRouter without rewriting the outer browser URL", () => {

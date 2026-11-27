@@ -79,7 +79,7 @@ export async function geolocationErrorMessage(error: unknown) {
   const detail = browserMessage ? ` Chi tiết: ${browserMessage}` : ''
 
   if (code === 1 || permission === 'denied') {
-    return `${browser} đang báo quyền vị trí bị từ chối (GPS 1), dù macOS có thể đã bật Location Services. Hãy kiểm tra cả 2 lớp quyền: macOS → Privacy & Security → Location Services → bật cho ${browser}; sau đó trong ${browser}, mở quyền của chat.codelocal.cloud → Location → Allow. Nếu đều đã bật, hãy chuyển quyền trang về Ask/Reset, tải lại trang rồi cấp lại quyền.${detail}`
+    return `${browser} đang báo quyền vị trí bị từ chối (GPS 1), Hãy kiểm tra quyền vị trí của hệ điều hành (Windows: Settings → Privacy → Location; macOS: Privacy & Security → Location Services), sau đó mở quyền của trang ChatNet đang dùng trong ${browser} → Location → Allow. Nếu đã bật, hãy đặt lại quyền trang, tải lại và cấp quyền lại.${detail}`
   }
   if (code === 2) {
     return `Máy chưa xác định được vị trí (GPS 2). ChatNet đã thử cả chế độ chính xác cao và định vị mạng nhưng vẫn thất bại. Hãy bật Wi‑Fi, kiểm tra Location Services cho ${browser}, rồi thử lại.${detail}`

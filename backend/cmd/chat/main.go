@@ -422,6 +422,11 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 		  AND NOT EXISTS (
 			SELECT 1 FROM direct_contacts dc WHERE dc.user_id=u.id
 		  )
+		  AND NOT EXISTS (
+		    SELECT 1 FROM friend_connections f
+		    WHERE f.user_low=LEAST($1,u.id) AND f.user_high=GREATEST($1,u.id)
+		      AND f.status='accepted'
+		  )
 		ORDER BY COALESCE(sg.mutual_groups,0) DESC, u.created_at DESC
 		LIMIT 10`, claims.UserID)
 	if err != nil {

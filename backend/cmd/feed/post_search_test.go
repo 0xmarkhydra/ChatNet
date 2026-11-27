@@ -150,6 +150,15 @@ func TestPostSearchGlobalCursorAndPrivacyIntegration(t *testing.T) {
 	if _, err := db.Exec(ctx, `INSERT INTO saved_posts(user_id,post_id) VALUES($1,$2)`, ids[0], first); err != nil {
 		t.Fatal(err)
 	}
+	ownPrivate := insert(0, "Private "+needle, "private")
+	ownFriends := insert(0, "Friends "+needle, "friends")
+	publicPage := search(needle, 0, "&scope=public")
+	if len(publicPage) != 2 || publicPage[0].ID != third || publicPage[1].ID != second {
+		t.Fatalf("public discovery leaked private/friends/blocked posts (own %d, %d): %+v", ownPrivate, ownFriends, publicPage)
+	}
+	if rest := search(needle, second, "&scope=public"); len(rest) != 1 || rest[0].ID != first {
+		t.Fatalf("public discovery cursor failed: %+v", rest)
+	}
 	saved := search(needle, 0, "&scope=saved")
 	if len(saved) != 1 || saved[0].ID != first {
 		t.Fatalf("saved search ignored scope: %+v", saved)

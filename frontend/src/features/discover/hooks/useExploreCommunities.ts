@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ApiRequest } from '../../../shared/types/api'
-import { joinExploreCommunity, listExploreCommunities, type PublicCommunity } from '../api/explore'
+import { exploreHttpError, joinExploreCommunity, listExploreCommunities, type PublicCommunity } from '../api/explore'
 
 type LoadState = { status: 'loading' | 'ready' | 'error'; items: PublicCommunity[]; error: string }
 
@@ -15,7 +15,7 @@ export function useExploreCommunities(request: ApiRequest, sessionId: string, ac
     if (!active) return
     const controller = new AbortController()
     void listExploreCommunities(request, controller.signal).then(async response => {
-      if (!response.ok) throw new Error(response.status === 403 ? 'Bạn không có quyền xem cộng đồng.' : 'Không tải được cộng đồng công khai.')
+      if (!response.ok) throw exploreHttpError(response, 'Không tải được cộng đồng công khai.')
       const data: unknown = await response.json()
       if (!Array.isArray(data)) throw new Error('Dữ liệu cộng đồng không hợp lệ.')
       const items = data.filter((item): item is PublicCommunity =>
