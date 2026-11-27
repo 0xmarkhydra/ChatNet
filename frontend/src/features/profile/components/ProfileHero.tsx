@@ -14,6 +14,7 @@ type Props = {
   avatar: ReactNode
   actions?: ReactNode
   identityNotice?: ReactNode
+  desktopMasthead?: boolean
   compact?: boolean
   centered?: boolean
   bio?: string
@@ -21,7 +22,7 @@ type Props = {
   note?: ReactNode
 }
 
-export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice, compact = false, centered = false, bio, headingRef, note }: Props) {
+export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice, desktopMasthead = false, compact = false, centered = false, bio, headingRef, note }: Props) {
   const [failedCover, setFailedCover] = useState<string>()
   const showCover = coverUrl && coverUrl !== failedCover
   const coverClass = showCover ? 'has-user-cover' : fallbackCoverTone === undefined ? 'has-default-cover' : `has-account-cover avatar-tone-${fallbackCoverTone}`
@@ -53,29 +54,31 @@ export default function ProfileHero({ displayName, username, city, workplace, sc
     )
   }
   return (
-    <section className={'profile-page-hero' + (compact ? ' profile-page-hero-compact' : '')}>
-      <div className={`profile-page-cover ${coverClass}`}>
+    <section className={'profile-page-hero' + (compact ? ' profile-page-hero-compact' : '') + (desktopMasthead ? ' app-desktop:max-w-none! app-desktop:border-0! app-desktop:rounded-none! app-desktop:bg-card! app-desktop:shadow-none!' : '')}>
+      <div className={`profile-page-cover ${coverClass} ${desktopMasthead ? "app-desktop:mx-auto app-desktop:h-[clamp(260px,23vw,400px)]! app-desktop:max-w-[1060px] app-desktop:rounded-b-ui-md! app-desktop:bg-secondary! app-desktop:bg-none!" : ""}`}>
+        {desktopMasthead && !showCover && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent" />}
         {showCover && <img src={coverUrl} alt="Ảnh bìa" draggable={false} onError={() => setFailedCover(coverUrl)} />}
         {coverAction}
       </div>
-      <div className="profile-page-hero-bottom">
-        <div className="profile-page-avatar-wrap">{note}{avatar}</div>
-        <div className="profile-page-identity-text">
-          <h1>{displayName}</h1>
+      <div className={`profile-page-hero-bottom ${desktopMasthead ? "app-desktop:mx-auto app-desktop:max-w-[1024px] app-desktop:items-start! app-desktop:gap-ui-4! app-desktop:px-ui-4! app-desktop:py-ui-6!" : ""}`}>
+        <div className={`profile-page-avatar-wrap ${desktopMasthead ? "app-desktop:size-[180px]! app-desktop:p-0! app-desktop:shadow-none!" : ""}`}>{note}{avatar}</div>
+        <div className={`profile-page-identity-text ${desktopMasthead ? "app-desktop:mt-ui-4!" : ""}`}>
+          <h1 className={desktopMasthead ? "app-desktop:text-[32px]! app-desktop:font-bold! app-desktop:text-foreground!" : undefined}>{displayName}</h1>
           <div className="profile-page-identity-summary">
-            <div className="profile-page-identity-meta">@{username}</div>
+            {!desktopMasthead && <div className="profile-page-identity-meta">@{username}</div>}
             {friendCount !== undefined && friendCount > 0 &&
               <p className="profile-page-friend-summary">{friendCount.toLocaleString('vi-VN')} người bạn</p>}
           </div>
+          {desktopMasthead && bio?.trim() && <p className="m-0 mt-ui-1 text-ui-body font-normal text-foreground">{bio}</p>}
           {details.length > 0 && <ul role="list" className="profile-page-identity-details mt-[5px] flex list-none flex-wrap gap-x-3 gap-y-[5px] p-0 text-sm leading-[1.45] text-muted-foreground">
             {details.map(({ id, text, label, Icon }) => <li key={id} className="flex min-w-0 max-w-full items-start gap-[5px]">
               <Icon size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 break-words"><span className="sr-only">{label}: </span>{text}</span>
+              <span className={`min-w-0 break-words ${desktopMasthead ? "app-desktop:font-semibold app-desktop:text-foreground" : ""}`}><span className="sr-only">{label}: </span>{desktopMasthead && id === "city" && text ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer" className="text-inherit no-underline hover:underline focus-visible:underline">{text}</a> : text}</span>
             </li>)}
           </ul>}
           {identityNotice}
         </div>
-        {actions && <div className="profile-page-hero-actions">{actions}</div>}
+        {actions && <div className={`profile-page-hero-actions ${desktopMasthead ? "app-desktop:mt-ui-4! app-desktop:justify-end" : ""}`}>{actions}</div>}
       </div>
     </section>
   )
