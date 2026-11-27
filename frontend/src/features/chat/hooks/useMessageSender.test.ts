@@ -20,7 +20,7 @@ vi.mock('../../../shared/context/SessionContext', () => ({
   useSession: () => ({ session: mocked.session, sessionRef: mocked.sessionRef }),
 }))
 
-async function setup() {
+async function setup(overrides: Partial<UseMessageSenderDeps> = {}) {
   const updateChatOutbox = vi.fn((transform) => transform([]))
   const setMessageDrafts = vi.fn()
   const setReplyingTo = vi.fn()
@@ -29,6 +29,8 @@ async function setup() {
   const deps = {
     activeConversationId: 52,
     canSend: true,
+    canSendSticker: true,
+    uploadMediaFiles: vi.fn(async () => []),
     channelDraftKey: '',
     draft: { text: 'Secret', attachments: [] },
     messageText: 'Secret',
@@ -43,8 +45,9 @@ async function setup() {
     setMessageDrafts,
     setReplyingTo,
     updateChatOutbox,
+    ...overrides,
   } as unknown as UseMessageSenderDeps
-  let send!: (event: FormEvent) => Promise<void>
+  let send!: ReturnType<typeof useMessageSender>['sendMessage']
   const root = createRoot(document.createElement('div'))
   function Harness() {
     const current = useMessageSender(deps)
@@ -59,6 +62,7 @@ async function setup() {
   return {
     submit,
     begin,
+    sendSticker: (sticker: string | File) => act(async () => { await send(null, sticker) }),
     sendingRef: deps.sendingRef,
     rerender: async () => act(async () => root.render(createElement(Harness))),
     updateChatOutbox,
@@ -186,4 +190,50 @@ describe('message composer E2EE no-downgrade gate', () => {
     await sender.cleanup()
   })
 
+})
+
+describe('instant sticker delivery', () => {
+  const url = 'https://media4.giphy.com/media/abc/giphy.gif'
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    vi.stubGlobal('navigator', { onLine: true })
+    mocked.session = { sessionId: 'sess1', user: { id: 18 } }
+    mocked.sessionRef.current = mocked.session
+    mocked.apiFetch.mockResolvedValue({ ok: true, json: async () => ({ mode: 'legacy' }) })
+  })
+
+  it('queues a standalone GIPHY sticker without clearing an existing draft', async () => {
+    const sender = await setup({ canSend: false })
+    await sender.sendSticker(url)
+    expect(sender.updateChatOutbox).toHaveBeenCalledTimes(1)
+    expect(sender.updateChatOutbox.mock.results[0].value[0]).toMatchObject({ text: url, attachments: [], conversationId: 52 })
+    expect(sender.setMessageDrafts).not.toHaveBeenCalled()
+    expect(sender.retryQueuedChatMessages).toHaveBeenCalled()
+    await sender.cleanup()
+  })
+
+  it('uploads and queues a static sticker separately from the draft', async () => {
+    const media = { storageRef: 'sticker-ref', name: 'sticker.png', sizeBytes: 3, contentType: 'image/png', kind: 'image' as const, url: '' }
+    const upload = vi.fn(async () => [media])
+    const sender = await setup({ uploadMediaFiles: upload })
+    const file = new File(['png'], 'sticker.png', { type: 'image/png' })
+    await sender.sendSticker(file)
+    expect(upload).toHaveBeenCalledWith([file], 'chat')
+    expect(sender.updateChatOutbox.mock.results[0].value[0]).toMatchObject({ text: '', attachments: [{ storageRef: 'sticker-ref' }] })
+    expect(sender.setMessageDrafts).not.toHaveBeenCalled()
+    await sender.cleanup()
+  })
+
+  it('does not send if the conversation is blocked or encryption requires MLS', async () => {
+    const blocked = await setup({ canSendSticker: false })
+    await blocked.sendSticker(url)
+    expect(blocked.updateChatOutbox).not.toHaveBeenCalled()
+    await blocked.cleanup()
+    mocked.apiFetch.mockResolvedValue({ ok: true, json: async () => ({ mode: 'e2ee' }) })
+    const encrypted = await setup()
+    await encrypted.sendSticker(url)
+    expect(encrypted.updateChatOutbox).not.toHaveBeenCalled()
+    await encrypted.cleanup()
+  })
 })

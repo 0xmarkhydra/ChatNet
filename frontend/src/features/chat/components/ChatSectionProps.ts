@@ -123,7 +123,7 @@ export type ChatSectionProps = {
   searchInConversationList: boolean;
   selectedChannelId: number;
   selectGroupChannel: (channelId: number) => void;
-  sendMessage: (event: FormEvent) => void;
+  sendMessage: (event: FormEvent | null, sticker?: string | File) => void;
   session: Session;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
   setChatCreateError: Dispatch<SetStateAction<string>>;
