@@ -50,7 +50,7 @@ jobs:
         run: npm run check:tailwind-policy
       - name: Enforce design-debt ratchet
         run: npm run check:design-debt
-      - name: Enforce React Hooks lint baseline
+      - name: Enforce React Hooks and i18n quality gates
         run: npm run lint
       - name: Test architecture boundary rules
         run: node --test scripts/architecture-boundaries-selfcheck.mjs

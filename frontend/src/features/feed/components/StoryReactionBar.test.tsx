@@ -40,15 +40,15 @@ describe('StoryReactionBar', () => {
   it('shows a heart for a like from a server without reaction types', async () => {
     const request = vi.fn(async () => Response.json({ liked: true }))
     await act(async () => root.render(<StoryReactionBar request={request} storyId={12} />))
-    expect(pressed()).toEqual(['Love'])
+    expect(pressed()).toEqual(['Yêu thích'])
   })
 
   it('rereads the saved reaction when a change cannot be confirmed', async () => {
     const request = vi.fn(async (_url: string, init?: RequestInit) =>
       init?.method ? new Response(null, { status: 500 }) : Response.json({ liked: true, emoji: '👍' }))
     await act(async () => root.render(<StoryReactionBar request={request} storyId={12} />))
-    await click('Sad')
-    expect(pressed()).toEqual(['Like'])
+    await click('Buồn')
+    expect(pressed()).toEqual(['Thích'])
     expect(host.querySelector('[role="status"]')?.textContent).toContain('Không thể xác nhận')
   })
 })

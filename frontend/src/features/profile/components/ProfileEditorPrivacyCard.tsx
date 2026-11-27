@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Check, Eye, ShieldCheck } from 'lucide-react'
 import type { UserPrivacy } from '../types'
 
@@ -17,13 +18,15 @@ const accessRows = [
 ] as const
 
 export default function ProfileEditorPrivacyCard({ privacy, privacyBusy, privacyError, retryPrivacy, changePrivacy }: Props) {
+  const trUi = useUiTranslation()
+
   return (
-        <section className="profile-editor-privacy-card app-desktop:min-h-[384px] app-desktop:px-[18px] app-desktop:pt-[18px] app-desktop:pb-[25px]" aria-label="Quyền hiển thị">
-          <div className="profile-editor-privacy-heading app-desktop:mx-[5px] app-desktop:flex app-desktop:min-h-[31px] app-desktop:items-center app-desktop:gap-2.5 app-desktop:[&>svg]:shrink-0 app-desktop:[&>svg]:text-primary"><Eye size={22} aria-hidden="true" /><h2>Quyền hiển thị</h2></div>
-          <p className="app-desktop:mx-1.5 app-desktop:mt-[17px] app-desktop:mb-[18px] app-desktop:text-[13px] app-desktop:text-[#8694ac]">Chọn cách người khác tìm và kết nối với bạn.</p>
+        <section className="profile-editor-privacy-card app-desktop:min-h-[384px] app-desktop:px-[18px] app-desktop:pt-[18px] app-desktop:pb-[25px]" aria-label={trUi("profile.visibility")}>
+          <div className="profile-editor-privacy-heading app-desktop:mx-[5px] app-desktop:flex app-desktop:min-h-[31px] app-desktop:items-center app-desktop:gap-2.5 app-desktop:[&>svg]:shrink-0 app-desktop:[&>svg]:text-primary"><Eye size={22} aria-hidden="true" /><h2>{trUi("profile.visibility")}</h2></div>
+          <p className="app-desktop:mx-1.5 app-desktop:mt-[17px] app-desktop:mb-[18px] app-desktop:text-[13px] app-desktop:text-[#8694ac]">{trUi("settings.privacyIntro")}</p>
 
           {privacyError && <div role="alert" className="profile-editor-privacy-error app-desktop:mb-[9px] app-desktop:rounded-[9px] app-desktop:bg-[#fff0f0] app-desktop:p-2.5 app-desktop:text-xs app-desktop:text-[#af3535]">{privacyError}
-            <button type="button" onClick={retryPrivacy}>Thử lại</button>
+            <button type="button" onClick={retryPrivacy}>{trUi("common.retry")}</button>
           </div>}
           {privacy && <div className="profile-editor-privacy-rows app-desktop:grid app-desktop:gap-3">
             {accessRows.map(row => (
@@ -32,7 +35,7 @@ export default function ProfileEditorPrivacyCard({ privacy, privacyBusy, privacy
                 <button type="button" role="switch" className={privacy[row.key] ? 'is-on' : ''}
                   aria-label={row.title} aria-checked={privacy[row.key]} disabled={privacyBusy}
                   onClick={() => void changePrivacy(row.key)}>
-                  <span>{privacy[row.key] ? 'Bật' : 'Tắt'}</span><i aria-hidden="true"><Check size={11}/></i>
+                  <span>{privacy[row.key] ? trUi("common.on") : trUi("common.off")}</span><i aria-hidden="true"><Check size={11}/></i>
                 </button>
               </div>
             ))}

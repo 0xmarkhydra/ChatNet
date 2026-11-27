@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import type { ManagedAccountSession } from '../types'
 
 type Props = {
@@ -15,11 +16,13 @@ export default function AccountSessionsPanel({
   sessionsBusy, canManageSessions, sessionsOpen, setSessionsOpen,
   fetchAccountSessions, sessionsError, managedSessions, revokeAccountSessions,
 }: Props) {
+  const trUi = useUiTranslation()
+
   return (
     <>
       <div className="settings-row">
         <div>
-          <strong>Thiết bị đã đăng nhập</strong>
+          <strong>{trUi("settings.devices")}</strong>
           <small>Kiểm tra và thu hồi những phiên đăng nhập không còn sử dụng.</small>
         </div>
         <button type="button" className="settings-action"
@@ -28,18 +31,18 @@ export default function AccountSessionsPanel({
             if (sessionsOpen) setSessionsOpen(false)
             else void fetchAccountSessions()
           }}>
-          {sessionsOpen ? 'Thu gọn' : 'Xem thiết bị'}
+          {sessionsOpen ? trUi("common.collapse") : 'Xem thiết bị'}
         </button>
       </div>
       {sessionsError && <div className="settings-row" role="alert">
         <small>{sessionsError}</small>
         <button type="button" className="settings-action" disabled={sessionsBusy}
-          onClick={() => void fetchAccountSessions()}>Thử lại</button>
+          onClick={() => void fetchAccountSessions()}>{trUi("common.retry")}</button>
       </div>}
       {sessionsOpen && (
         <div className="account-sessions-panel">
           <p>Phiên đã thu hồi sẽ bị server từ chối. Thiết bị mất mạng cập nhật trạng thái khi kết nối lại.</p>
-          {managedSessions.length === 0 && <small>Không có phiên đang hoạt động.</small>}
+          {managedSessions.length === 0 && <small>{trUi("settings.noSessions")}</small>}
           {managedSessions.map((device) => (
             <div className="account-session-item" key={device.id}>
               <div className="account-session-details">
@@ -49,15 +52,13 @@ export default function AccountSessionsPanel({
               </div>
               <button type="button" className="settings-action" disabled={sessionsBusy}
                 onClick={() => void revokeAccountSessions(device.id)}>
-                {device.current ? 'Đăng xuất' : 'Thu hồi'}
+                {device.current ? trUi("profile.logout") : trUi("chat.recall")}
               </button>
             </div>
           ))}
           {managedSessions.some((device) => !device.current) && (
             <button type="button" className="settings-action account-revoke-others"
-              disabled={sessionsBusy} onClick={() => void revokeAccountSessions()}>
-              Đăng xuất tất cả thiết bị khác
-            </button>
+              disabled={sessionsBusy} onClick={() => void revokeAccountSessions()}>{trUi("settings.logoutOthers")}</button>
           )}
         </div>
       )}

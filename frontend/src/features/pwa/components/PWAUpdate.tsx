@@ -1,8 +1,11 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { watchPWAUpdates } from '../lib/pwa-updates'
 
 export function PWAUpdate() {
+  const trUi = useUiTranslation()
+
   const [available, setAvailable] = useState(false)
   const [applying, setApplying] = useState(false)
   const updates = useRef<ReturnType<typeof watchPWAUpdates> | null>(null)
@@ -23,14 +26,14 @@ export function PWAUpdate() {
   if (!available) return null
 
   return (
-    <aside className="pwa-update" aria-label="Cập nhật ứng dụng">
+    <aside className="pwa-update" aria-label={trUi("common.ui.updateApp")}>
       <span role="status">Đã có bản cập nhật mới</span>
       <button type="button" disabled={applying} onClick={() => {
         setApplying(true)
         updates.current?.apply()
       }}>
         <RefreshCw size={18} aria-hidden="true" />
-        {applying ? 'Đang tải lại...' : 'Tải lại'}
+        {applying ? 'Đang tải lại...' : trUi("common.reload")}
       </button>
     </aside>
   )

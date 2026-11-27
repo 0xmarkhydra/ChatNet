@@ -40,6 +40,27 @@ Follow `docs/engineering/AGENT_FILE_OWNERSHIP.md` before changing files while ot
 - Prefer lazy-loading genuinely heavy routes or features only after identifying a measured bundle or UX problem. No automatic dependency additions (router, query/cache, state manager, form library) just to follow trends.
 - Keep render and API responsibilities separate but avoid unnecessary `useMemo`, `useCallback`, providers and abstractions.
 
+## Internationalization (mandatory for every UI change)
+
+- Supported app locales: `vi`, `en`, `zh` (Simplified Chinese), `ja`, `ko`. App language is independent of AI message/call translation. Do not add other app locales without explicit product approval.
+- Use `useUiTranslation()` from `@/shared/i18n/locale` inside React components. In pure helpers, accept the translator or locale as a parameter. Store typed keys in menu/tab/config definitions and translate at render time; never store localized labels as IDs or API values.
+- Add new keys in the relevant module under `frontend/src/shared/i18n/locales/{vi,en,zh,ja,ko}/`. Reuse existing keys where semantics match. Every locale must have identical keys and placeholders. Do not ship missing translations or use runtime AI to translate UI.
+- All visible copy is in scope: headings, buttons, placeholders, titles/tooltips, accessibility labels, dropdowns, empty/loading/error/validation states, confirmations, toast and notification templates, relative dates and numeric counts. English hardcode is also prohibited; the scanner alone cannot detect every case.
+- Use `formatUiRelativeTime`, `formatUiDate`, `formatUiNumber` with `useUiLocale()` (or pass the locale to pure utilities). Use count interpolation and plural variants for counts; do not concatenate translated fragments or hardcode `vi-VN` in displayed dates.
+- Keep usernames, display names, file names, group/channel names, location names and user-generated text verbatim. Insert them as interpolation values; preserve API enums, IDs and payloads. For backend notifications, translate known event types/error codes, not arbitrary server text.
+- A locale change must update the current UI without losing drafts, selections or form data. Add regression tests for all five locales on new flows, including at least one dynamic value and error/empty state when applicable. Check layout with longer labels and CJK text in browser.
+- Before PR: run `npm --prefix frontend run check:i18n`, `node frontend/scripts/check-i18n-hardcode.mjs --extended`, relevant component tests and build. The extended inventory is a review aid, not proof of full coverage. Existing baseline entries are debt, not permission to add more. Never raise the baseline to pass CI.
+
+Example:
+
+```tsx
+const t = useUiTranslation()
+const locale = useUiLocale()
+<button aria-label={t('common.send')}>{t('common.send')}</button>
+<time>{formatUiRelativeTime(post.createdAt, locale, t('feed.justNow'))}</time>
+<span>{t('feed.authorPost', { name: authorName })}</span>
+```
+
 ## UI design skills and conflict precedence
 
 For UI design, UI implementation, responsive fixes and visual review, follow [UI skill orchestration](UI_SKILL_ORCHESTRATION.md) in addition to this standard. The vendored `ui-ux-pro-max` skill is a **read-only design/UX advisory**, not an alternative design authority or automatic theme generator. Approved SocCo tokens, existing shadcn/Tailwind source, Penpot references and `ios-inspired-ui-design` keep precedence. Never apply externally generated colors/fonts, install packages, or rewrite CSS resets without explicit review.

@@ -1,3 +1,4 @@
+import { useUiTranslation, useUiLocale, formatUiNumber, formatUiRelativeTime } from '@/shared/i18n/locale'
 import PostLocationTag from './PostLocationTag'
 import type { ReactNode } from 'react'
 
@@ -10,20 +11,8 @@ import FeedLikeButton from './FeedLikeButton'
 import FeedRepostAction from './FeedRepostAction'
 import { postActionClassName } from './postCardStyles'
 
-function formatCount(count: number): string {
-  if (count < 1000) return count.toLocaleString('vi-VN')
-  return (count / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + 'K'
-}
-
-function relativeDate(value: string): string {
-  const parsed = Date.parse(value)
-  if (!Number.isFinite(parsed)) return value
-  const minutes = Math.max(0, Math.floor((Date.now() - parsed) / 60000))
-  if (minutes < 1) return 'Vừa xong'
-  if (minutes < 60) return `${minutes} phút trước`
-  if (minutes < 1440) return `${Math.floor(minutes / 60)} giờ trước`
-  if (minutes < 10080) return `${Math.floor(minutes / 1440)} ngày trước`
-  return new Date(parsed).toLocaleDateString('vi-VN')
+function formatCount(count: number, locale: string): number | string {
+  return count < 1000 ? count : formatUiNumber(count, locale, { notation: 'compact', maximumFractionDigits: 1 })
 }
 
 type PostActions = {
@@ -45,6 +34,9 @@ export function PostCardHeader({
   onEditPost?: (post: Post) => void
   openPost: () => void
 }) {
+  const trUi = useUiTranslation()
+  const locale = useUiLocale()
+
   return (
     <header className="feed-post-header post-card-header flex w-full min-w-0 items-start gap-[9px]">
       <UserAvatar username={post.author} name={authorLabel} className="avatar size-10! basis-10! shrink-0! rounded-full! bg-none! bg-secondary! text-primary!" />
@@ -53,10 +45,10 @@ export function PostCardHeader({
           <strong className="block! truncate! text-base! font-bold! text-[#142443]!">
             {onAuthorOpen ? <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(post.author)}>{authorLabel}</button> : authorLabel}
           </strong>
-          {post.repostKind && <span className="block text-sm text-muted-foreground">{post.repostKind === 'quick' ? 'Đã đăng lại' : 'Đã trích dẫn'}</span>}
+          {post.repostKind && <span className="block text-sm text-muted-foreground">{trUi(post.repostKind === 'quick' ? 'feed.reposted' : 'feed.quoted')}</span>}
           <small className="block! text-xs! text-[#7889aa]!">
-            <button type="button" className="feed-post-open-date" aria-label="Mở bài viết" onClick={openPost}>{relativeDate(post.createdAt)}</button>
-            {' · '}{post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'}
+            <button type="button" className="feed-post-open-date" aria-label={trUi("common.ui.openPost")} onClick={openPost}>{formatUiRelativeTime(post.createdAt, locale, trUi('feed.justNow'))}</button>
+            {' · '}{post.visibility === 'private' ? trUi("profile.onlyMe") : post.visibility === 'friends' ? trUi("contacts.friends") : trUi("common.public")}
           </small>
           <PostLocationTag post={post} />
         </div>
@@ -78,15 +70,18 @@ export function PostCardEngagement({ post, onReactionUsers }: {
   post: Post
   onReactionUsers: (post: Post) => void
 }) {
+  const trUi = useUiTranslation()
+
+  const locale = useUiLocale()
   const commentsCount = post.comments?.length ?? 0
   return (
     <div className="feed-post-engagement whitespace-nowrap flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-2 text-ui-label! text-[#7585a7]!">
       <button type="button" className="feed-post-likes feed-reaction-users-trigger inline-flex items-center gap-2"
-        disabled={post.likes === 0} aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`} onClick={() => onReactionUsers(post)}>
-        <span>{formatCount(post.likes)} lượt thích</span>
+        disabled={post.likes === 0} aria-label={trUi("common.ui.viewReactionsCount", { v1: String(post.likes) })} onClick={() => onReactionUsers(post)}>
+        <span>{trUi('feed.likesCount', { count: formatCount(post.likes, locale) })}</span>
       </button>
       <span className="feed-post-conversation-stats ml-auto text-right">
-        {commentsCount.toLocaleString('vi-VN')} bình luận{Boolean(post.repostCount) && ` · ${formatCount(post.repostCount ?? 0)} lượt đăng lại`}
+        {trUi('feed.commentsCount', { count: commentsCount })}{Boolean(post.repostCount) && ` · ${trUi('feed.repostsCount', { count: formatCount(post.repostCount ?? 0, locale) })}`}
       </span>
     </div>
   )
@@ -101,20 +96,22 @@ export function PostCardToolbar({
   discussion?: ReactNode
   openPost: () => void
 }) {
+  const trUi = useUiTranslation()
+
   return (
     <>
       <div className="feed-post-toolbar grid grid-cols-3 items-center gap-1 mt-0 mx-4 pt-1 border-t border-border-subtle">
         <FeedLikeButton post={post} busy={busy} onLike={(emoji) => void like(post, emoji)} />
         <button type="button" className={`post-detail-trigger ${postActionClassName}`}
-          aria-label="Mở bài viết để bình luận"
+          aria-label={trUi("common.ui.openPostComment")}
           onClick={openPost}>
-          <UiIcon name="comment" size={18} /><span>Bình luận</span>
+          <UiIcon name="comment" size={18} /><span>{trUi("feed.comment")}</span>
         </button>
         <FeedRepostAction post={post} request={actions.apiFetch} onUpdated={actions.syncFeedPost} onRemoved={actions.removeFeedPost}
           onChanged={actions.onRepostChanged} onShareToChat={actions.onShareToChat} onFeedback={actions.setNotice} />
       </div>
       {discussion && (
-        <section className="feed-inline-comments" aria-label="Ô viết bình luận">
+        <section className="feed-inline-comments" aria-label={trUi("common.ui.commentField")}>
           {discussion}
         </section>
       )}

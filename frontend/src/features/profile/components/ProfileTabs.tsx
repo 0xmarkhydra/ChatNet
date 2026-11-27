@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
 
 type Props<T extends string> = {
@@ -9,6 +10,8 @@ type Props<T extends string> = {
 }
 
 export default function ProfileTabs<T extends string>({ idPrefix = 'profile-page', tabs, active, onChange, action }: Props<T>) {
+  const trUi = useUiTranslation()
+
   const tabbarRef = useRef<HTMLDivElement>(null)
   const activeTabRef = useRef<HTMLButtonElement>(null)
 
@@ -37,7 +40,7 @@ export default function ProfileTabs<T extends string>({ idPrefix = 'profile-page
   }, [active])
 
   return (
-    <div className="profile-page-tabbar sticky top-0 z-12 mx-auto flex min-h-[61px] w-full max-w-[1060px] items-center gap-1 overflow-x-auto border-t border-border-subtle bg-card px-6 shadow-[0_2px_10px_rgba(30,51,96,.06)] app-mobile:min-h-[52px] app-mobile:px-2.5" ref={tabbarRef} role="tablist" aria-label="Chọn nội dung hồ sơ">
+    <div className="profile-page-tabbar sticky top-0 z-12 mx-auto flex min-h-[61px] w-full max-w-[1060px] items-center gap-1 overflow-x-auto border-t border-border-subtle bg-card px-6 shadow-[0_2px_10px_rgba(30,51,96,.06)] app-mobile:min-h-[52px] app-mobile:px-2.5" ref={tabbarRef} role="tablist" aria-label={trUi("common.ui.chooseProfileContent")}>
       <span className="profile-page-tab-indicator" aria-hidden="true" />
       {tabs.map((tab, index) => (
         <button key={tab.id} type="button" role="tab" id={`${idPrefix}-tab-${tab.id}`}

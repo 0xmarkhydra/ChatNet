@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
@@ -11,6 +12,8 @@ type Props = {
 }
 
 export default function ProfileOverlay({ title, drawer = false, busy = false, closeLabel, onClose, children }: Props) {
+  const trUi = useUiTranslation()
+
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -40,7 +43,7 @@ export default function ProfileOverlay({ title, drawer = false, busy = false, cl
       }}>
       <header className="profile-overlay-heading">
         <h2>{title}</h2>
-        <button type="button" disabled={busy} onClick={onClose} aria-label={closeLabel ?? (drawer ? 'Đóng chỉnh sửa hồ sơ' : 'Đóng tạo bài viết')}><X size={23} /></button>
+        <button type="button" disabled={busy} onClick={onClose} aria-label={closeLabel ?? (drawer ? trUi("common.ui.closeProfileEdit") : trUi("common.ui.closePostComposer"))}><X size={23} /></button>
       </header>
       <div className="profile-overlay-body">{children}</div>
     </dialog>

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { ProfileOverlay } from "../../profile";
 import { type Post } from "../types";
 import { type SetStateAction } from "react";
@@ -24,9 +25,11 @@ export default function FeedComposerOverlay({
   setFeedCheckInOpen,
   setFeedComposerOpen,
 }: FeedComposerOverlayProps) {
+  const trUi = useUiTranslation()
+
   return (
       <ProfileOverlay
-          title={editingPost ? "Chỉnh sửa bài viết" : "Tạo bài viết"}
+          title={editingPost ? trUi("feed.editPost") : trUi("feed.newPost")}
           busy={!!pendingPost || postEditBusy || mediaUploading === "feed"}
           onClose={() => {
             setFeedComposerOpen(false);

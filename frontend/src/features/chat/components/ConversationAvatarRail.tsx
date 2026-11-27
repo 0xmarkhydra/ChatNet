@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { conversationPreview } from '../utils/conversationPreview'
 import type { ReactNode, MouseEvent, PointerEvent } from 'react'
 import { Ellipsis, Pin } from 'lucide-react'
@@ -44,13 +45,15 @@ export default function ConversationAvatarRail({
   hasMore, loadingMore, onLoadMore, loadError, onRetry, searchValue, onSearchChange, categoryControls, filter, onFilterChange, categories, visibleConversationIds,
   onEntryContextMenu, onEntryPointerDown, onEntryPointerMove, onEntryPointerEnd, desktop = false,
 }: ConversationRailProps & { desktop?: boolean }) {
+  const trUi = useUiTranslation()
+
   const prefix = desktop ? 'desktop-conversation-rail' : 'conversation-avatar-rail'
   const showDetails = expanded || keepDetailsMounted
   const visibleIds = new Set(visibleConversationIds)
   const items = showDetails ? conversations.filter(conversation => visibleIds.has(conversation.id)) : conversations
   return (
     <nav className={`${prefix}${expanded ? ' is-expanded' : ''}${keepDetailsMounted ? ' is-revealing' : ''}`}
-      aria-label={desktop ? "Thanh avatar và hội thoại" : "Cuộc trò chuyện"} data-expanded={expanded}>
+      aria-label={desktop ? trUi("common.ui.avatarRail") : trUi("chat.conversation")} data-expanded={expanded}>
       <div className={`${prefix}-top`}>
       <div className={`${prefix}-top-actions`}>
         <ConversationRailMenu categoryControls={categoryControls} filter={filter} onFilterChange={onFilterChange} expanded={expanded}
@@ -59,9 +62,9 @@ export default function ConversationAvatarRail({
           <div className={`${prefix}-search-line`}>
             <label className={`${prefix}-search-field`}>
               <Search size={16} aria-hidden="true" />
-              <input aria-label="Tìm trong danh sách hội thoại" type="search"
+              <input aria-label={trUi("common.ui.findInChats")} type="search"
                 value={searchValue} onChange={event => onSearchChange(event.target.value)}
-                placeholder="Tìm hội thoại..." />
+                placeholder={trUi("chat.searchConversations")} />
             </label>
           </div>
         </div>}
@@ -77,7 +80,7 @@ export default function ConversationAvatarRail({
           const entryClass = desktop ? 'desktop-conversation-rail-entry' : 'conversation-avatar-rail-item'
           const entry = <button type="button" key={conversation.id}
             className={`${entryClass}${selectedId === conversation.id ? ' selected' : ''}`}
-            aria-label={`Mở ${conversation.type === 'group' ? 'nhóm' : desktop ? 'tin nhắn' : 'cuộc trò chuyện'} ${conversation.name}${conversation.unreadCount ? `, ${conversation.unreadCount}${desktop ? ' chưa đọc' : ' tin chưa đọc'}` : ''}`}
+            aria-label={trUi("common.ui.openNamed", { v1: String(conversation.type === 'group' ? 'nhóm' : desktop ? 'tin nhắn' : 'cuộc trò chuyện'), v2: String(conversation.name), v3: String(conversation.unreadCount ? `, ${conversation.unreadCount}${desktop ? ' chưa đọc' : ' tin chưa đọc'}` : '') })}
             aria-current={selectedId === conversation.id ? 'page' : undefined}
             title={conversation.name} onClick={() => onSelect(conversation)}
             onPointerDown={event => onEntryPointerDown(conversation, event)}
@@ -95,13 +98,13 @@ export default function ConversationAvatarRail({
             <span className={`${prefix}-meta`} aria-hidden={!showDetails}>
               <span className={`${prefix}-meta-top`}>
                 <span className="conversation-rail-title-group">
-                  <strong>{conversation.pinnedAt && <Pin className="conversation-rail-pin" size={12} aria-label="Đã ghim" />} {conversation.name}</strong>
+                  <strong>{conversation.pinnedAt && <Pin className="conversation-rail-pin" size={12} aria-label={trUi("common.pinned")} />} {conversation.name}</strong>
                   <ConversationRailStatus category={category} muted={conversation.muted} />
                 </span>
                 {desktop ? <span className="desktop-conversation-rail-time-space" aria-hidden="true" /> : <time>{formatTime(conversation.lastMessageAt)}</time>}
               </span>
               <span className={`${prefix}-meta-bottom`}>
-                <small>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</small>
+                <small>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : trUi("chat.startChat"))}</small>
               </span>
             </span>
             {(conversation.unreadCount > 0 || conversation.manualUnread) && (
@@ -116,8 +119,8 @@ export default function ConversationAvatarRail({
               <div className="desktop-conversation-rail-time-actions">
                 <time>{formatTime(conversation.lastMessageAt)}</time>
                 <button type="button" className="desktop-conversation-rail-more-action"
-                  aria-label={`Tùy chọn cuộc trò chuyện ${conversation.name}`} aria-haspopup="dialog"
-                  title="Tùy chọn cuộc trò chuyện"
+                  aria-label={trUi("common.ui.conversationOptionsName", { v1: String(conversation.name) })} aria-haspopup="dialog"
+                  title={trUi("chat.chatOptions")}
                   onClick={event => onEntryContextMenu(conversation, event)}>
                   <Ellipsis size={18} aria-hidden="true"/>
                 </button>
@@ -126,11 +129,11 @@ export default function ConversationAvatarRail({
           ) : entry
         })}
         {loadError && expanded && <p className={`${prefix}-empty`} role="alert">{loadError}</p>}
-        {loadError && <button type="button" className={desktop ? "desktop-conversation-rail-load" : "conversation-avatar-rail-more"} title="Không tải được hội thoại. Thử lại" aria-label="Thử tải lại các cuộc hội thoại" onClick={() => void onRetry()}><RefreshCw size={desktop ? 18 : 17} aria-hidden="true" /></button>}
-        {items.length === 0 && expanded && !loadError && <p className={`${prefix}-empty`}>Không có hội thoại phù hợp.</p>}
+        {loadError && <button type="button" className={desktop ? "desktop-conversation-rail-load" : "conversation-avatar-rail-more"} title={trUi("chat.loadChatFailed")} aria-label={trUi("chat.retryConversations")} onClick={() => void onRetry()}><RefreshCw size={desktop ? 18 : 17} aria-hidden="true" /></button>}
+        {items.length === 0 && expanded && !loadError && <p className={`${prefix}-empty`}>{trUi("chat.noMatchingConversations")}</p>}
         {hasMore && (
           <button type="button" className={desktop ? "desktop-conversation-rail-load" : "conversation-avatar-rail-more"}
-            title={desktop ? "Tải thêm hội thoại" : "Tải thêm cuộc trò chuyện"} aria-label={desktop ? "Tải thêm hội thoại" : "Tải thêm cuộc trò chuyện"}
+            title={desktop ? trUi("chat.moreConversations") : trUi("chat.loadMore")} aria-label={desktop ? trUi("chat.moreConversations") : trUi("chat.loadMore")}
             disabled={loadingMore} onClick={() => void onLoadMore()}>
             <RefreshCw size={desktop ? 18 : 17} aria-hidden="true" className={!desktop && loadingMore ? 'rail-spinning' : ''} />
           </button>

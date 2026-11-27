@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
@@ -42,6 +43,8 @@ async function sharePost(id: number, feedback: Feedback, copyOnly = false) {
 }
 
 export default function FeedPostActions<P extends FeedActionPost>({ post, mine, request, onUpdated, onDeleted, onFeedback, onEdit }: Props<P>) {
+  const trUi = useUiTranslation()
+
   const quickRepost = post.repostKind === 'quick'
   const deleteLabel = quickRepost ? 'Bỏ đăng lại' : 'Xóa bài viết'
   const portalContainer = useContext(ModalPortalContext)
@@ -151,26 +154,26 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
 
   return (
     <div className="feed-actions-root">
-      <button ref={trigger} className="post-more" type="button" aria-label="Tùy chọn bài viết"
+      <button ref={trigger} className="post-more" type="button" aria-label={trUi("feed.postOptions")}
         aria-haspopup="dialog" aria-expanded={open} onClick={openOptions}>
         <Ellipsis size={21} />
       </button>
       {open && createPortal(
         <div className="feed-actions-overlay" data-feed-options={post.id}>
           <button type="button" className="feed-actions-backdrop" tabIndex={-1}
-            aria-label="Đóng tùy chọn" onClick={close} />
-          <section ref={panel} tabIndex={-1} className="feed-actions-panel" role="dialog" aria-modal="true" aria-label="Tùy chọn bài viết"
+            aria-label={trUi("common.ui.closeOptions")} onClick={close} />
+          <section ref={panel} tabIndex={-1} className="feed-actions-panel" role="dialog" aria-modal="true" aria-label={trUi("feed.postOptions")}
             style={{ top: screenPosition.top, left: screenPosition.left }}>
             <div className="feed-actions-grabber" aria-hidden="true" />
             <div className="feed-actions-header">
-              <strong>{screen === 'report' ? 'Báo cáo bài viết' : screen === 'delete' ? quickRepost ? 'Xác nhận bỏ đăng lại' : 'Xác nhận xóa' : 'Tùy chọn bài viết'}</strong>
-              <button type="button" onClick={close} aria-label="Đóng"><X size={19} /></button>
+              <strong>{screen === 'report' ? trUi("feed.reportPost") : screen === 'delete' ? quickRepost ? 'Xác nhận bỏ đăng lại' : trUi("common.deleteConfirm") : trUi("feed.postOptions")}</strong>
+              <button type="button" onClick={close} aria-label={trUi("common.close")}><X size={19} /></button>
             </div>
             {screen === 'delete' ? (
               <div className="feed-actions-editor">
                 <p className="feed-delete-warning">{quickRepost ? 'Bài viết gốc sẽ không bị xóa.' : 'Bài viết và các bình luận sẽ bị xóa vĩnh viễn. Bạn có chắc muốn xóa?'}</p>
                 <div className="feed-actions-footer">
-                  <button type="button" onClick={() => setScreen('options')}>Hủy</button>
+                  <button type="button" onClick={() => setScreen('options')}>{trUi("common.cancel")}</button>
                   <button type="button" className="feed-confirm-delete" disabled={busy}
                     onClick={() => void deletePost()}>{deleteLabel}</button>
                 </div>
@@ -183,25 +186,23 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
                   </select>
                 </label>
                 <div className="feed-actions-footer">
-                  <button type="button" onClick={() => setScreen('options')}>Hủy</button>
-                  <button type="button" disabled={busy} onClick={() => void reportPost()}>Gửi báo cáo</button>
+                  <button type="button" onClick={() => setScreen('options')}>{trUi("common.cancel")}</button>
+                  <button type="button" disabled={busy} onClick={() => void reportPost()}>{trUi("feed.sendReport")}</button>
                 </div>
               </div>
             ) : (
               <div className="feed-actions-list">
                 <button type="button" disabled={busy} onClick={() => void savePost()}>
-                  <Bookmark size={19} />{post.saved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
+                  <Bookmark size={19} />{post.saved ? trUi("feed.unsavePost") : trUi("feed.savePost")}
                 </button>
                 <button type="button" onClick={() => { close(); void sharePost(post.id, onFeedback) }}>
-                  <Share2 size={19} />Chia sẻ bài viết
-                </button>
+                  <Share2 size={19} />{trUi("feed.sharePost")}</button>
                 <button type="button" onClick={() => { close(); void sharePost(post.id, onFeedback, true) }}>
-                  <Copy size={19} />Sao chép liên kết
-                </button>
+                  <Copy size={19} />{trUi("feed.copyLink")}</button>
                 {mine ? (
                   <>
                     <div className="feed-actions-separator" />
-                    {onEdit && <button type="button" onClick={startEdit}><Pencil size={19} />Chỉnh sửa bài viết</button>}
+                    {onEdit && <button type="button" onClick={startEdit}><Pencil size={19} />{trUi("feed.editPost")}</button>}
                     <button type="button" className="danger" onClick={() => setScreen('delete')}>
                       <Trash2 size={19} />{deleteLabel}
                     </button>
@@ -209,7 +210,7 @@ export default function FeedPostActions<P extends FeedActionPost>({ post, mine, 
                 ) : (
                   <>
                     <div className="feed-actions-separator" />
-                    <button type="button" onClick={() => setScreen('report')}><Flag size={19} />Báo cáo bài viết</button>
+                    <button type="button" onClick={() => setScreen('report')}><Flag size={19} />{trUi("feed.reportPost")}</button>
                   </>
                 )}
               </div>

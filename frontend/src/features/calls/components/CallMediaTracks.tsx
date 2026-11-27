@@ -1,7 +1,10 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef } from 'react'
 import { Track, type LocalTrack, type Participant, type RemoteTrack, type TrackPublication, type Room } from 'livekit-client'
 
 export function ParticipantTile({ participant, local }: { participant: Participant; local: boolean }) {
+  const trUi = useUiTranslation()
+
   const camera = participant.getTrackPublication(Track.Source.Camera)
   const screen = participant.getTrackPublication(Track.Source.ScreenShare)
   const videoPublication = screen?.track ? screen : camera
@@ -14,7 +17,7 @@ export function ParticipantTile({ participant, local }: { participant: Participa
         <div className="call-avatar-fallback"><span>{identityLabel(participant.identity)}</span></div>
       )}
       <div className="call-participant-label">
-        <span>{local ? 'Bạn' : identityLabel(participant.identity)}</span>
+        <span>{local ? trUi("common.you") : identityLabel(participant.identity)}</span>
         {participant.isSpeaking && <i className="call-speaking-dot" />}
       </div>
     </div>

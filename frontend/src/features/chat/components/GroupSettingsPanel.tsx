@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import { ArrowLeft, Bell, Check, ChevronRight, Clock3, FileText, Files, Info, ScrollText, Search, ShieldCheck, UserPlus, UsersRound, X } from 'lucide-react'
 import type { GroupMember, Conversation } from '../types'
@@ -73,6 +74,8 @@ export default function GroupSettingsPanel({
   notify,
   onMembersChanged,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [activeSection, setActiveSection] = useState<GroupManagementSection>(initialSection)
   const [memberSearch, setMemberSearch] = useState('')
   const filteredMembers = groupMembers.filter(member => `${member.displayName} ${member.username}`.toLocaleLowerCase('vi-VN').includes(memberSearch.trim().toLocaleLowerCase('vi-VN')))
@@ -81,11 +84,11 @@ export default function GroupSettingsPanel({
 
 
   return (
-    <section className="group-settings-panel" role="region" aria-label="Quản lý nhóm">
+    <section className="group-settings-panel" role="region" aria-label={trUi("chat.manageGroup")}>
       <div className="group-settings-heading">
-        {memberViewOpen && <button type="button" className="group-member-back" autoFocus onClick={() => { setMemberViewOpen(false) }} aria-label="Quay lại quản lý nhóm"><ArrowLeft size={20} /></button>}
+        {memberViewOpen && <button type="button" className="group-member-back" autoFocus onClick={() => { setMemberViewOpen(false) }} aria-label={trUi("common.ui.backGroupManagement")}><ArrowLeft size={20} /></button>}
         <div>
-          <strong>{memberViewOpen ? 'Thành viên nhóm' : 'Quản lý nhóm'}</strong>
+          <strong>{memberViewOpen ? 'Thành viên nhóm' : trUi("chat.manageGroup")}</strong>
           <small>{memberViewOpen ? `${groupMembers.length} thành viên` :
             activeGroupMember
               ? activeGroupMember.role === 'owner'
@@ -96,13 +99,13 @@ export default function GroupSettingsPanel({
               : ''}
           </small>
         </div>
-        <button type="button" className="sidebar-panel-close" autoFocus onClick={() => setGroupSettingsOpen(false)} aria-label="Đóng thanh quản lý nhóm">
+        <button type="button" className="sidebar-panel-close" autoFocus onClick={() => setGroupSettingsOpen(false)} aria-label={trUi("chat.groupManageClose")}>
           <X size={19} aria-hidden="true" />
         </button>
       </div>
 
       {!memberViewOpen && <>
-        <nav className="group-management-navigation" aria-label="Danh mục quản lý nhóm">
+        <nav className="group-management-navigation" aria-label={trUi("common.ui.groupManagementCategories")}>
           {([
             ['members', 'Thành viên', UsersRound],
             ['details', 'Thông tin cộng đồng', Info],
@@ -123,28 +126,28 @@ export default function GroupSettingsPanel({
 
         {activeSection === 'members' && <>
           <div className="group-management-section-title">
-            <h3>Thành viên</h3>
+            <h3>{trUi("chat.members")}</h3>
             <p>{groupMembers.length} người · {groupMembers.filter(member => member.role !== 'member').length} quản trị viên</p>
           </div>
           <label className="group-management-search"><Search size={16} aria-hidden="true" />
-            <input type="search" aria-label="Tìm thành viên trong nhóm" value={memberSearch}
-              onChange={event => setMemberSearch(event.target.value)} placeholder="Tìm thành viên..." />
+            <input type="search" aria-label={trUi("chat.groupMembersSearch")} value={memberSearch}
+              onChange={event => setMemberSearch(event.target.value)} placeholder={trUi("common.ui.memberSearchPlaceholder")} />
           </label>
           <div className="group-management-member-preview">
             {filteredMembers.slice(0, 5).map(member => (
               <button type="button" key={member.id} className="group-management-member-preview-row"
-                onClick={() => onOpenMemberProfile(member.username)} aria-label={`Xem trang cá nhân ${member.displayName || member.username}`}>
+                onClick={() => onOpenMemberProfile(member.username)} aria-label={trUi("common.ui.profileNamed", { v1: String(member.displayName || member.username) })}>
                 <UserAvatar username={member.username} name={member.displayName || member.username} className="group-member-avatar" online={member.online} />
                 <span className="group-management-preview-copy">
                   <strong>{member.displayName || member.username}{member.id === userId ? ' · Bạn' : ''}</strong>
-                  <small>{member.role === 'owner' ? 'Chủ nhóm' : member.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}</small>
+                  <small>{member.role === 'owner' ? trUi("chat.owner") : member.role === 'admin' ? trUi("chat.admin") : trUi("chat.members")}</small>
                 </span>
-                {member.role === 'owner' && <span className="group-management-owner-tag">Chủ nhóm</span>}
+                {member.role === 'owner' && <span className="group-management-owner-tag">{trUi("chat.owner")}</span>}
               </button>
             ))}
             {filteredMembers.length === 0 && <p className="group-management-empty">Không tìm thấy thành viên phù hợp.</p>}
           </div>
-          <button type="button" className="group-members-preview" aria-label={`Xem danh sách ${groupMembers.length} thành viên nhóm`}
+          <button type="button" className="group-members-preview" aria-label={trUi("common.ui.groupMembersCount", { v1: String(groupMembers.length) })}
             onClick={() => setMemberViewOpen(true)}>
             <span className="group-members-preview-icon"><UsersRound size={20} aria-hidden="true" /></span>
             <span className="group-members-preview-copy">
@@ -160,7 +163,7 @@ export default function GroupSettingsPanel({
               </div>
               <input className="group-invite-search" type="search" value={groupInviteSearch}
                 onChange={event => setGroupInviteSearch(event.target.value)}
-                placeholder="Tìm bạn theo tên hoặc @username" autoComplete="off" />
+                placeholder={trUi("common.ui.findFriendUsername")} autoComplete="off" />
               <div className="group-invite-list">
                 {groupInviteCandidates.length === 0 && <p className="group-invite-empty">Không còn bạn phù hợp để mời.</p>}
                 {groupInviteCandidates.map(friend => {
@@ -184,9 +187,9 @@ export default function GroupSettingsPanel({
             </button>
           </div>}
 
-          <div className="group-management-permission-summary" aria-label="Quyền quản trị hiện tại">
-            <h4><ShieldCheck size={17} aria-hidden="true" /> Quyền quản trị</h4>
-            <p>Vai trò hiện tại: <strong>{isOwner ? 'Chủ nhóm' : activeGroupMember?.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}</strong></p>
+          <div className="group-management-permission-summary" aria-label={trUi("common.ui.currentAdminPermissions")}>
+            <h4><ShieldCheck size={17} aria-hidden="true" />{trUi("chat.adminRights")}</h4>
+            <p>{trUi("chat.currentRole") + ' '}<strong>{isOwner ? trUi("chat.owner") : activeGroupMember?.role === 'admin' ? trUi("chat.admin") : trUi("chat.members")}</strong></p>
             {([
               ['Duyệt thành viên mới', isManager],
               ['Mời thành viên', canInviteActiveGroup],
@@ -194,7 +197,7 @@ export default function GroupSettingsPanel({
               ['Quản lý kênh riêng', isOwner],
               ['Sửa thông tin cộng đồng', canEditGroup],
             ] as const).map(([label, allowed]) => <div className="group-management-permission-row" key={label}>
-              <span className={allowed ? 'allowed' : ''} aria-label={allowed ? 'Có quyền' : 'Không có quyền'}>
+              <span className={allowed ? 'allowed' : ''} aria-label={allowed ? trUi("common.ui.hasPermission") : trUi("common.ui.noPermission")}>
                 {allowed ? <Check size={13} /> : <X size={13} />}
               </span><span>{label}</span>
             </div>)}
@@ -216,7 +219,7 @@ export default function GroupSettingsPanel({
         {(['details', 'rules', 'notifications'] as const).includes(activeSection as 'details' | 'rules' | 'notifications') && (
           <div className="group-management-section-body">
             <div className="group-management-section-title">
-              <h3>{activeSection === 'details' ? 'Thông tin cộng đồng' : activeSection === 'rules' ? 'Nội quy nhóm' : 'Thông báo'}</h3>
+              <h3>{activeSection === 'details' ? trUi("chat.communityInfo") : activeSection === 'rules' ? trUi("chat.groupRules") : trUi("common.notifications")}</h3>
             </div>
             <GroupManagementDetails key={`${activeConversation.id}:${activeSection}`}
               conversationId={activeConversation.id}

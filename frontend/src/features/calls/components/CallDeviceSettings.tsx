@@ -1,7 +1,10 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { RoomEvent, type Room } from 'livekit-client'
 
 export default function CallDeviceSettings({ room, micOn, cameraOn }: { room: Room; micOn: boolean; cameraOn: boolean }) {
+  const trUi = useUiTranslation()
+
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [active, setActive] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -45,12 +48,12 @@ export default function CallDeviceSettings({ room, micOn, cameraOn }: { room: Ro
     } catch { if (mounted.current && activeRoom.current === room) setError('Không chuyển được thiết bị. Thiết bị có thể bị ngắt hoặc đang được ứng dụng khác sử dụng.') }
     finally { if (mounted.current) setBusy(false) }
   }
-  return <div className="call-device-settings" role="group" aria-label="Thiết bị cuộc gọi">
+  return <div className="call-device-settings" role="group" aria-label={trUi("calls.devices")}>
     {(['audioinput', 'videoinput'] as const).map((kind) => <label key={kind}>
       {kind === 'audioinput' ? 'Microphone' : 'Camera'}
       <select value={active[kind] || ''} disabled={busy || (kind === 'audioinput' ? !micOn : !cameraOn)}
         onChange={(event) => void select(kind, event.target.value)}>
-        <option value="" disabled>Thiết bị đang dùng</option>
+        <option value="" disabled>{trUi("calls.activeDevices")}</option>
         {devices.filter((item) => item.kind === kind).map((device, index) =>
           <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Thiết bị ${index + 1}`}</option>)}
       </select>

@@ -1,9 +1,12 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useState } from 'react'
 import { giphyConfigured, searchGiphy, type GiphyItem, type GiphyKind } from '../api/giphy'
 
 type Props = { disabled: boolean; onSelect: (url: string) => void }
 
 export default function GiphyPicker({ disabled, onSelect }: Props) {
+  const trUi = useUiTranslation()
+
   const [kind, setKind] = useState<GiphyKind>('stickers')
   const [query, setQuery] = useState('')
   const [retry, setRetry] = useState(0)
@@ -23,16 +26,16 @@ export default function GiphyPicker({ disabled, onSelect }: Props) {
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [kind, query, requestKey])
   return <div className="flex flex-col gap-ui-2 p-ui-2">
-    <div role="group" aria-label="Loại nội dung GIPHY" className="flex gap-ui-2">
+    <div role="group" aria-label={trUi("common.ui.giphyType")} className="flex gap-ui-2">
       {(['stickers', 'gifs'] as const).map(value => <button key={value} type="button" aria-pressed={kind === value}
         onClick={() => setKind(value)} className="flex-1 min-h-control-touch rounded-ui-md border-0 bg-transparent text-foreground aria-pressed:bg-accent">
         {value === 'stickers' ? 'Sticker động' : 'GIF'}
       </button>)}
     </div>
-    <input type="search" aria-label="Tìm GIPHY" placeholder="Tìm GIF hoặc sticker..." value={query}
+    <input type="search" aria-label={trUi("common.ui.findGiphy")} placeholder={trUi("common.ui.gifStickerSearch")} value={query}
       onChange={event => setQuery(event.target.value)} className="min-h-control-touch w-full rounded-ui-md border border-border bg-card px-ui-3 text-foreground" />
-    {!giphyConfigured ? <p role="status">Chưa cấu hình API key GIPHY.</p> : !current ? <p role="status">Đang tải...</p> : current.error ?
-      <div role="alert">{current.error} <button type="button" onClick={() => setRetry(value => value + 1)}>Thử lại</button></div> :
+    {!giphyConfigured ? <p role="status">Chưa cấu hình API key GIPHY.</p> : !current ? <p role="status">{trUi("common.loadingDots")}</p> : current.error ?
+      <div role="alert">{current.error} <button type="button" onClick={() => setRetry(value => value + 1)}>{trUi("common.retry")}</button></div> :
       current.items.length ? <div className="grid max-h-64 grid-cols-3 gap-ui-2 overflow-y-auto overscroll-contain">
         {current.items.map(item => <button key={item.id} type="button" disabled={disabled} aria-label={item.title}
           onClick={() => onSelect(item.url)} className="aspect-square cursor-pointer overflow-hidden rounded-ui-md border-0 bg-transparent focus-visible:ring-2 focus-visible:ring-ring">

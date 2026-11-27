@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Fragment, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
 import { Phone, Plus, RefreshCw, Search, Users, Video, X } from 'lucide-react'
@@ -65,6 +66,8 @@ export default function ContactsView({
   removeAcceptedFriend, connectionUrl, onScanQr, suggestions, suggestionsLoading, suggestionsError, onRetrySuggestions, onSettings, embeddedInCalls = false,
   callConversations = EMPTY_CALL_CONVERSATIONS, onOpenCallChat,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [directoryFilter, setDirectoryFilter] = useState<DirectoryFilter>('alphabetical')
   const { hostRef: filterHostRef, pillRef: filterPillRef, activeRef: filterActiveRef } = useSlidingPill<HTMLDivElement>(directoryFilter)
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -178,36 +181,36 @@ export default function ContactsView({
     onOpenProfile={setFriendPreview}
     onSettings={onSettings} connectionUrl={connectionUrl} onScanQr={onScanQr} />
 
-  return <div className={'friends-design-v2' + (embeddedInCalls ? ' is-call-directory' : '')} aria-label={screen === 'directory' ? 'Danh bạ' : 'Lời mời kết bạn'}>
+  return <div className={'friends-design-v2' + (embeddedInCalls ? ' is-call-directory' : '')} aria-label={screen === 'directory' ? trUi("contacts.directory") : trUi("contacts.friendRequests")}>
     {screen === 'directory' ? <>
       <div className={'fd-directory-layout' + (embeddedInCalls ? ' fd-list-only' : '')}>
         <div className="fd-directory-main">
       {!embeddedInCalls && <section className="fd-searchbar">
         <label><Search size={22} aria-hidden="true"/>
           <input ref={searchRef} type="search" value={friendQuery} onChange={event => setFriendQuery(event.target.value)}
-            placeholder="Tìm theo tên, số điện thoại hoặc ID SocCo..." aria-label="Tìm trong danh bạ" />
-          {friendQuery && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => {setFriendQuery('');searchRef.current?.focus()}}><X size={17}/></button>}
+            placeholder={trUi("common.ui.searchNamePhoneId")} aria-label={trUi("contacts.searchContacts")} />
+          {friendQuery && <button type="button" aria-label={trUi("common.clearSearch")} onClick={() => {setFriendQuery('');searchRef.current?.focus()}}><X size={17}/></button>}
         </label>
-        <button type="button" className="fd-primary fd-add-new" onClick={enterInvitations} title="Kết bạn mới"><Plus size={18}/>Kết bạn mới</button>
+        <button type="button" className="fd-primary fd-add-new" onClick={enterInvitations} title={trUi("contacts.newFriends")}><Plus size={18}/>{trUi("contacts.newFriends")}</button>
       </section>}
         <section className="fd-card fd-list-card">
           {searching ? <>
-            <div className="fd-list-header"><div><h2>Kết quả tìm kiếm</h2><p>Tìm người dùng theo tên, username hoặc email</p></div>
-              <button type="button" className="fd-text-button" onClick={() => setFriendQuery('')}>Xóa tìm kiếm</button></div>
+            <div className="fd-list-header"><div><h2>{trUi("common.searchResults")}</h2><p>Tìm người dùng theo tên, username hoặc email</p></div>
+              <button type="button" className="fd-text-button" onClick={() => setFriendQuery('')}>{trUi("common.clearSearch")}</button></div>
 
             <ContactSearchResults results={contactSearchResults}
               loading={friendSearching} error={friendSearchError} busyIds={friendBusyIds}
               relationshipFor={friendRelationship} onAction={act} onProfile={setFriendPreview}
               onRetry={() => setFriendSearchRetry(value => value + 1)} />
           </> : <>
-            <div className="fd-list-header"><h2>{embeddedInCalls ? 'Bạn bè' : 'Tất cả bạn bè'}</h2>
+            <div className="fd-list-header"><h2>{embeddedInCalls ? trUi("contacts.friends") : 'Tất cả bạn bè'}</h2>
               <div className="fd-list-actions">
-                <span>{friends.length.toLocaleString('vi-VN')} người</span>
-                <button type="button" aria-label="Tải lại danh sách bạn bè" title="Tải lại danh sách bạn bè"
+                <span>{trUi("common.countPeople", { count: friends.length })}</span>
+                <button type="button" aria-label={trUi("contacts.reloadFriends")} title={trUi("contacts.reloadFriends")}
                   disabled={friendsLoading} onClick={onRetryFriends}><RefreshCw size={17} aria-hidden="true"/></button>
               </div>
             </div>
-            <div ref={filterHostRef} className="fd-filters sliding-pill-host" role="group" aria-label="Lọc danh bạ">
+            <div ref={filterHostRef} className="fd-filters sliding-pill-host" role="group" aria-label={trUi("common.ui.filterContacts")}>
               <span ref={filterPillRef} className="sliding-pill contacts-filter-active-pill" aria-hidden="true" />
               {([['alphabetical','A – Z'],['online','Đang online'],['favorites','Yêu thích']] as const).map(([filter,label]) =>
                 <button ref={directoryFilter === filter ? filterActiveRef : undefined} type="button" key={filter} className={directoryFilter === filter ? 'active' : ''}
@@ -215,9 +218,9 @@ export default function ContactsView({
             </div>
             {friendsError && <div className="fd-sync-feedback" role="alert">
               <span>{friendsError}</span>
-              <button type="button" className="fd-secondary" disabled={friendsLoading} onClick={onRetryFriends}>Thử lại</button>
+              <button type="button" className="fd-secondary" disabled={friendsLoading} onClick={onRetryFriends}>{trUi("common.retry")}</button>
             </div>}
-            <div className="fd-person-list" aria-label="Danh sách bạn bè" aria-busy={friendsLoading}>
+            <div className="fd-person-list" aria-label={trUi("contacts.friendList")} aria-busy={friendsLoading}>
               {visibleFriends.map(friend => <Fragment key={friend.id}><div className={'fd-person-row' + (!embeddedInCalls && selectedFriend?.id === friend.id ? ' selected' : '') + (!embeddedInCalls && expandedFriendId === friend.id ? ' expanded' : '')}>
                 <button type="button" className="fd-person-identity" aria-pressed={embeddedInCalls ? undefined : selectedFriend?.id === friend.id}
                   aria-expanded={embeddedInCalls ? undefined : expandedFriendId === friend.id}
@@ -228,7 +231,7 @@ export default function ContactsView({
                     setExpandedFriendId(value => value === friend.id ? null : friend.id)
                   }}>{avatar(friend)}<span>
                     <strong>{contactMetadata[friend.id]?.nickname || personName(friend)}</strong>
-                    <small>{friend.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
+                    <small>{friend.online ? trUi("profile.active") : trUi("common.offline")}
                       {contactMetadata[friend.id]?.favorite ? ' · Yêu thích' : ''}
                       {friend.blockedByOther ? ' · Bạn đã bị chặn' : friend.blockedByMe ? ' · Đã chặn' : ''}</small>
                   </span></button>
@@ -244,15 +247,15 @@ export default function ContactsView({
               </section>}
               </Fragment>)}
               {visibleFriends.length === 0 && !friendsError && (!embeddedInCalls || (callSections.groups.length === 0 && callSections.otherContacts.length === 0)) && <p className="fd-empty" role={friendsLoading ? 'status' : undefined}>
-                {friendsLoading ? 'Đang tải danh sách bạn bè...' : friends.length ? 'Không có bạn bè phù hợp.' : embeddedInCalls ? 'Bạn chưa có bạn bè trong danh bạ.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}
+                {friendsLoading ? 'Đang tải danh sách bạn bè...' : friends.length ? trUi("chat.noFriends") : embeddedInCalls ? 'Bạn chưa có bạn bè trong danh bạ.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}
               </p>}
-              {embeddedInCalls && <ContactCallConversationSection items={callSections.groups} label="Nhóm" onOpenCallChat={onOpenCallChat} />}
-              {embeddedInCalls && <ContactCallConversationSection items={callSections.otherContacts} label="Liên hệ khác" onOpenCallChat={onOpenCallChat} />}
+              {embeddedInCalls && <ContactCallConversationSection items={callSections.groups} label={trUi("chat.group")} onOpenCallChat={onOpenCallChat} />}
+              {embeddedInCalls && <ContactCallConversationSection items={callSections.otherContacts} label={trUi("contacts.otherContacts")} onOpenCallChat={onOpenCallChat} />}
             </div>
           </>}
         </section>
         </div>
-        {!embeddedInCalls && <section className="fd-card fd-profile-panel" aria-label="Thông tin bạn bè">
+        {!embeddedInCalls && <section className="fd-card fd-profile-panel" aria-label={trUi("contacts.friendInfo")}>
           {selectedFriend && !searching ? profileDetails(selectedFriend) : <div className="fd-empty fd-profile-placeholder"><Users size={38}/>
             <h2>{searching ? 'Kết nối bạn bè' : 'Chưa chọn bạn bè'}</h2><p>{searching ? 'Chọn một kết quả tìm kiếm để xem hồ sơ.' : 'Kết bạn mới để xem thông tin ở đây.'}</p></div>}
         </section>}
@@ -260,11 +263,11 @@ export default function ContactsView({
     </> : <ContactInvitations friendRequests={friendRequests} friendBusyIds={friendBusyIds} actOnFriend={actOnFriend} declineFriendRequest={declineFriendRequest} connectionUrl={connectionUrl} onScanQr={onScanQr} onBack={() => { onScreenChange('directory'); setFriendQuery('') }} onSearch={openSearch} />}
     {modalOpen && modalFriend && createPortal(
       <div className="friends-design-v2 fd-friend-modal-layer">
-        <button className="fd-friend-modal-backdrop" type="button" aria-label="Đóng thông tin bạn bè" onClick={closeFriendModal} tabIndex={-1} />
+        <button className="fd-friend-modal-backdrop" type="button" aria-label={trUi("contacts.closeFriendInfo")} onClick={closeFriendModal} tabIndex={-1} />
         <div ref={modalRef} className="fd-friend-modal-dialog fd-card" role="dialog" aria-modal="true" aria-labelledby="fd-friend-modal-title">
           <div className="fd-friend-modal-heading">
-            <h2 id="fd-friend-modal-title">Thông tin bạn bè</h2>
-            <button ref={modalCloseRef} type="button" aria-label="Đóng thông tin bạn bè" onClick={closeFriendModal}><X size={19}/></button>
+            <h2 id="fd-friend-modal-title">{trUi("contacts.friendInfo")}</h2>
+            <button ref={modalCloseRef} type="button" aria-label={trUi("contacts.closeFriendInfo")} onClick={closeFriendModal}><X size={19}/></button>
           </div>
           {profileDetails(modalFriend, true)}
         </div>

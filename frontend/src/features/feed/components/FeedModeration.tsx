@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useCallback, useEffect, useState } from 'react'
 import { useLatest } from '../../../shared/hooks/useLatest'
 import { ShieldCheck, RefreshCw } from 'lucide-react'
@@ -22,6 +23,8 @@ type Props = {
 // Mounted only on Feed. Checks /api/feed/moderation/me before fetching reports.
 // The backend independently checks database-granted moderator membership.
 export default function FeedModeration({ request, onRemoved }: Props) {
+  const trUi = useUiTranslation()
+
   const [allowed, setAllowed] = useState(false)
   const [open, setOpen] = useState(false)
   const [reports, setReports] = useState<Report[]>([])
@@ -104,25 +107,24 @@ export default function FeedModeration({ request, onRemoved }: Props) {
   if (!allowed) return null
 
   return (
-    <section className="soco-moderation" aria-label="Kiểm duyệt bảng tin">
+    <section className="soco-moderation" aria-label={trUi("common.ui.feedModeration")}>
       <div className="soco-moderation-heading">
         <ShieldCheck size={20} aria-hidden="true" />
         <strong>Kiểm duyệt nội dung</strong>
         <span>{reports.length} báo cáo chờ xử lý</span>
         <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-          {open ? 'Thu gọn' : 'Xem báo cáo'}
+          {open ? trUi("common.collapse") : 'Xem báo cáo'}
         </button>
       </div>
       {open && (
         <div className="soco-moderation-list">
           <button type="button" onClick={() => void load()} disabled={loading || busy !== null}>
-            <RefreshCw size={16} aria-hidden="true" /> Làm mới
-          </button>
+            <RefreshCw size={16} aria-hidden="true" />{trUi("common.refresh")}</button>
           {error && <p role="alert" className="soco-moderation-error">{error}</p>}
           {!reports.length && !loading && <p>Không có báo cáo đang chờ xử lý.</p>}
           {reports.map((report) => (
             <article key={report.id} className="soco-moderation-report">
-              <div><strong>{report.targetType === 'post' ? 'Bài viết' : report.targetType === 'comment' ? 'Bình luận' : 'Story'} #{report.targetId}</strong>
+              <div><strong>{report.targetType === 'post' ? trUi("feed.post") : report.targetType === 'comment' ? trUi("feed.comment") : 'Story'} #{report.targetId}</strong>
                 <small> Báo cáo bởi @{report.reporter} · {new Date(report.createdAt).toLocaleString('vi-VN')}</small>
               </div>
               <p><strong>Lý do:</strong> {report.reason}</p>

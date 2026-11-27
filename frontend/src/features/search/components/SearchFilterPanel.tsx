@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useId, useState } from 'react'
 import { Check, ChevronDown, FileText, LayoutGrid, Package, RotateCcw, UserRound, UsersRound } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
@@ -21,6 +22,8 @@ export type SearchFilterPanelProps = {
 const priceInput = 'h-10 min-w-0 flex-1 rounded-ui-sm border border-border bg-card px-ui-3 text-[length:var(--soco-type-body)] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring max-lg:h-11'
 
 export default function SearchFilterPanel({ type, values, minPrice, maxPrice, onType, onFilter, onPrice, onReset, showTypes = true }: SearchFilterPanelProps) {
+  const trUi = useUiTranslation()
+
   const [openGroup, setOpenGroup] = useState<FilterId | null>(null)
   const groups = GROUPS_FOR[type]
   const idPrefix = useId()
@@ -28,7 +31,7 @@ export default function SearchFilterPanel({ type, values, minPrice, maxPrice, on
   return (
     <div className="flex flex-col gap-ui-1">
       {showTypes && (
-        <div className="mb-ui-2 grid gap-0.5 border-b border-border pb-ui-3" role="group" aria-label="Loại kết quả">
+        <div className="mb-ui-2 grid gap-0.5 border-b border-border pb-ui-3" role="group" aria-label={trUi("search.resultType")}>
           {SEARCH_TYPES.map(item => {
             const Icon = TYPE_ICONS[item.key]
             const selected = type === item.key
@@ -38,7 +41,7 @@ export default function SearchFilterPanel({ type, values, minPrice, maxPrice, on
                   selected && 'bg-secondary text-primary hover:bg-secondary')}>
                 <span aria-hidden="true" className={cn('inline-grid size-8.5 place-items-center rounded-ui-sm',
                   selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground')}><Icon size={18} /></span>
-                {item.label}
+                {trUi(item.label)}
               </button>
             )
           })}
@@ -46,8 +49,8 @@ export default function SearchFilterPanel({ type, values, minPrice, maxPrice, on
       )}
 
       <div className={cn('flex items-center px-ui-2 py-ui-1', showTypes ? 'justify-between' : 'justify-end')}>
-        {showTypes && <h3 className="m-0 text-[length:var(--soco-type-subtitle)] font-bold text-foreground">Bộ lọc</h3>}
-        <button type="button" className={link} onClick={onReset}><RotateCcw size={14} aria-hidden="true" /> Đặt lại</button>
+        {showTypes && <h3 className="m-0 text-[length:var(--soco-type-subtitle)] font-bold text-foreground">{trUi("common.filter")}</h3>}
+        <button type="button" className={link} onClick={onReset}><RotateCcw size={14} aria-hidden="true" />{trUi("common.reset")}</button>
       </div>
 
       {groups.map(id => {
@@ -59,20 +62,20 @@ export default function SearchFilterPanel({ type, values, minPrice, maxPrice, on
           <div key={id} className="border-b border-border last:border-b-0">
             <button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpenGroup(open ? null : id)}
               className={cn(plainButton, 'grid min-h-13 w-full grid-cols-[minmax(0,1fr)_18px] items-center gap-x-ui-2 rounded-ui-sm p-ui-2 hover:bg-muted')}>
-              <span className="text-[length:var(--soco-type-body)] font-semibold">{group.label}</span>
-              <span className={cn('text-[length:var(--soco-type-caption)]', changed ? 'font-semibold text-primary' : 'text-muted-foreground')}>{optionLabel(id, values[id])}</span>
+              <span className="text-[length:var(--soco-type-body)] font-semibold">{trUi(group.label)}</span>
+              <span className={cn('text-[length:var(--soco-type-caption)]', changed ? 'font-semibold text-primary' : 'text-muted-foreground')}>{optionLabel(id, values[id], trUi)}</span>
               <ChevronDown size={18} aria-hidden="true"
                 className={cn('col-start-2 row-span-2 row-start-1 text-muted-foreground transition-transform motion-reduce:transition-none', open && 'rotate-180')} />
             </button>
             {open && (
-              <div id={panelId} className="grid gap-0.5 pb-ui-2" role="group" aria-label={group.label}>
+              <div id={panelId} className="grid gap-0.5 pb-ui-2" role="group" aria-label={trUi(group.label)}>
                 {group.options.map(option => {
                   const selected = values[id] === option.value
                   return (
                     <button key={option.value} type="button" aria-pressed={selected} onClick={() => onFilter(id, option.value)}
                       className={cn(plainButton, 'flex min-h-10 items-center justify-between rounded-ui-sm px-ui-3 text-[length:var(--soco-type-body)]! hover:bg-muted max-lg:min-h-11',
                         selected && 'bg-secondary font-semibold! text-primary hover:bg-secondary')}>
-                      {option.label}
+                      {trUi(option.label)}
                       {selected && <Check size={16} aria-hidden="true" />}
                     </button>
                   )
@@ -85,18 +88,18 @@ export default function SearchFilterPanel({ type, values, minPrice, maxPrice, on
 
       {type === 'products' && (
         <fieldset className="m-0 border-0 p-ui-2">
-          <legend className="mb-ui-2 p-0 text-[length:var(--soco-type-body)] font-semibold text-foreground">Khoảng giá</legend>
+          <legend className="mb-ui-2 p-0 text-[length:var(--soco-type-body)] font-semibold text-foreground">{trUi("discover.priceRange")}</legend>
           <div className="flex items-center gap-ui-2 text-muted-foreground">
-            <input type="number" inputMode="numeric" min={0} aria-label="Giá thấp nhất" placeholder="Tối thiểu"
+            <input type="number" inputMode="numeric" min={0} aria-label={trUi("discover.minPrice")} placeholder={trUi("common.ui.minimum")}
               data-slot="input" className={priceInput} value={minPrice} onChange={event => onPrice('min', event.target.value)} />
             <span aria-hidden="true">–</span>
-            <input type="number" inputMode="numeric" min={0} aria-label="Giá cao nhất" placeholder="Tối đa"
+            <input type="number" inputMode="numeric" min={0} aria-label={trUi("discover.maxPrice")} placeholder={trUi("common.ui.maximum")}
               data-slot="input" className={priceInput} value={maxPrice} onChange={event => onPrice('max', event.target.value)} />
           </div>
         </fieldset>
       )}
 
-      {type === 'all' && <p className="m-0 p-ui-2 text-[length:var(--soco-type-caption)] text-muted-foreground">Chọn một loại kết quả để có thêm bộ lọc phù hợp.</p>}
+      {type === 'all' && <p className="m-0 p-ui-2 text-[length:var(--soco-type-caption)] text-muted-foreground">{trUi('search.filterHint')}</p>}
     </div>
   )
 }

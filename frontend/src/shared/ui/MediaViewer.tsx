@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ModalPortalContext } from './modalPortalContext'
@@ -8,13 +9,15 @@ import './media-viewer.css'
 type PreviewMedia = MediaAttachment & { url: string }
 
 function MediaViewerDisplay({ item }: { item: PreviewMedia }) {
+  const trUi = useUiTranslation()
+
   const [failed, setFailed] = useState(false)
   return failed ? (
-    <p role="alert" className="media-viewer-error">Không thể tải nội dung này. Liên kết có thể đã hết hạn.</p>
+    <p role="alert" className="media-viewer-error">{trUi("common.ui.mediaFailed")}</p>
   ) : item.kind === 'video' ? (
-    <video src={item.url} controls playsInline autoPlay aria-label={`Video: ${item.name || 'Tệp đính kèm'}`} onError={() => setFailed(true)} />
+    <video src={item.url} controls playsInline autoPlay aria-label={trUi("common.ui.videoNamed", { name: item.name || trUi("common.ui.attachment") })} onError={() => setFailed(true)} />
   ) : (
-    <img src={item.url} alt={item.name || 'Ảnh đính kèm'} onError={() => setFailed(true)} />
+    <img src={item.url} alt={item.name || trUi("common.ui.attachedPhoto")} onError={() => setFailed(true)} />
   )
 }
 
@@ -26,6 +29,8 @@ export default function MediaViewer({
   onChange: (index: number) => void
   onClose: () => void
 }) {
+  const trUi = useUiTranslation()
+
   const portalContainer = useContext(ModalPortalContext)
   const item = items[activeIndex]
   const hasActiveItem = Boolean(item)
@@ -87,7 +92,7 @@ export default function MediaViewer({
       ref={dialog}
       role="dialog"
       aria-modal="true"
-      aria-label="Xem ảnh và video"
+      aria-label={trUi("common.ui.viewMedia")}
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
@@ -96,15 +101,15 @@ export default function MediaViewer({
       <div className="media-viewer-panel">
         <header className="media-viewer-header">
           <div className="media-viewer-heading">
-            <strong title={item.name}>{item.name || (item.kind === 'video' ? 'Video' : 'Ảnh')}</strong>
+            <strong title={item.name}>{item.name || (item.kind === 'video' ? trUi('common.ui.video') : trUi("common.photos"))}</strong>
             {items.length > 1 && <span>{activeIndex + 1} / {items.length}</span>}
           </div>
           <div className="media-viewer-actions">
-            <a href={item.url} target="_blank" rel="noopener noreferrer" aria-label="Mở tệp gốc trong tab mới">
+            <a href={item.url} target="_blank" rel="noopener noreferrer" aria-label={trUi("common.ui.openOriginalFile")}>
               <ExternalLink size={18} aria-hidden="true" />
-              <span>Mở bản gốc</span>
+              <span>{trUi("common.ui.openOriginal")}</span>
             </a>
-            <button ref={closeButton} type="button" onClick={onClose} aria-label="Đóng trình xem ảnh hoặc video">
+            <button ref={closeButton} type="button" onClick={onClose} aria-label={trUi("common.ui.closeMediaViewer")}>
               <X size={22} aria-hidden="true" />
             </button>
           </div>
@@ -112,14 +117,14 @@ export default function MediaViewer({
         <div className="media-viewer-content">
           {items.length > 1 && activeIndex > 0 && (
             <button type="button" className="media-viewer-nav previous"
-              aria-label="Ảnh trước" onClick={() => onChange(activeIndex - 1)}>
+              aria-label={trUi("common.ui.previousPhoto")} onClick={() => onChange(activeIndex - 1)}>
               <ChevronLeft size={27} aria-hidden="true" />
             </button>
           )}
           <MediaViewerDisplay key={`${activeIndex}:${item.url}`} item={item} />
           {items.length > 1 && activeIndex < items.length - 1 && (
             <button type="button" className="media-viewer-nav next"
-              aria-label="Ảnh tiếp theo" onClick={() => onChange(activeIndex + 1)}>
+              aria-label={trUi("common.ui.nextPhoto")} onClick={() => onChange(activeIndex + 1)}>
               <ChevronRight size={27} aria-hidden="true" />
             </button>
           )}

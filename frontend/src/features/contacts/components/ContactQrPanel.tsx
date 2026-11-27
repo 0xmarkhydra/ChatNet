@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { Copy, QrCode, ShieldCheck } from 'lucide-react'
@@ -7,6 +8,8 @@ type QrResult = { key: string; image?: string; error?: boolean }
 type CopyResult = { url: string; message: string; failed: boolean }
 
 export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
+  const trUi = useUiTranslation()
+
   const [qrResult, setQrResult] = useState<QrResult | null>(null)
   const [copyResult, setCopyResult] = useState<CopyResult | null>(null)
   const [copyPendingUrl, setCopyPendingUrl] = useState<string | null>(null)
@@ -48,20 +51,20 @@ export default function ContactQrPanel({ connectionUrl, onScanQr }: Props) {
   }
 
   return (
-    <aside className="fd-card fd-qr-panel" aria-label="Mã QR kết bạn">
+    <aside className="fd-card fd-qr-panel" aria-label={trUi("common.ui.friendQR")}>
       <h2>Kết bạn bằng QR</h2>
       <p>Chia sẻ mã QR cá nhân hoặc mở camera để quét.</p>
       <div className="fd-qr-preview" aria-busy={!qrImage && !qrError}>
-        {qrImage ? <img src={qrImage} alt="Mã QR liên kết kết bạn của tôi" /> :
+        {qrImage ? <img src={qrImage} alt={trUi("common.ui.myFriendQR")} /> :
           qrError ? <div className="fd-qr-fallback" role="alert">
             <span>{connectionUrl ? 'Không thể tạo mã QR.' : 'Chưa có liên kết kết bạn.'}</span>
-            {connectionUrl && <button type="button" className="fd-secondary" onClick={() => setRetry(value => value + 1)}>Thử lại</button>}
+            {connectionUrl && <button type="button" className="fd-secondary" onClick={() => setRetry(value => value + 1)}>{trUi("common.retry")}</button>}
           </div> : <span className="fd-qr-loading" role="status">Đang tạo mã QR...</span>}
       </div>
       <small>Mã QR của tài khoản hiện tại</small>
       <div className="fd-qr-actions">
-        <button type="button" className="fd-secondary" disabled={!connectionUrl || copying} aria-busy={copying} onClick={() => void copyLink()}><Copy size={17} aria-hidden="true" />{copying ? 'Đang sao chép...' : 'Sao chép link'}</button>
-        <button type="button" className="fd-primary" onClick={onScanQr}><QrCode size={18} aria-hidden="true" />Quét QR</button>
+        <button type="button" className="fd-secondary" disabled={!connectionUrl || copying} aria-busy={copying} onClick={() => void copyLink()}><Copy size={17} aria-hidden="true" />{copying ? 'Đang sao chép...' : trUi("profile.copyLink")}</button>
+        <button type="button" className="fd-primary" onClick={onScanQr}><QrCode size={18} aria-hidden="true" />{trUi("profile.scanQr")}</button>
       </div>
       {copyStatus && <p className={'fd-copy-status' + (copyResult?.failed ? ' is-error' : '')} role="status">{copyStatus}</p>}
       <div className="fd-security-tip"><ShieldCheck size={20} aria-hidden="true" />

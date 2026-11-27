@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Plus } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
@@ -34,6 +35,8 @@ function activate(event: MouseEvent<HTMLButtonElement>, action: () => void) {
 
 /** Story strip for every viewport: a "create" card, then one card per person (ring: gradient = unseen, grey = seen). */
 export default function StoryTray({ username, displayName, stories, seen, busy, pending, onRetry, onCancel, onCreate, onOpen }: Props) {
+  const trUi = useUiTranslation()
+
   const groups = groupStories(stories, seen, username)
   const hasFriendStories = groups.some(group => !group.own)
   const stripRef = useRef<HTMLDivElement>(null)
@@ -57,38 +60,38 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
     strip?.scrollBy({ left: direction * strip.clientWidth * 0.8, behavior: 'smooth' })
   }
   return (
-    <section aria-label="Tin mới từ bạn bè" data-slot="story-tray" className="relative box-border bg-card py-ui-3 app-desktop:bg-transparent app-desktop:py-0">
+    <section aria-label={trUi("common.ui.friendStories")} data-slot="story-tray" className="relative box-border bg-card py-ui-3 app-desktop:bg-transparent app-desktop:py-0">
       {edges.prev && (
-        <button type="button" aria-label="Lướt về các tin trước" onClick={() => page(-1)} className={arrow + ' left-ui-2'}>
+        <button type="button" aria-label={trUi("common.ui.scrollPreviousStories")} onClick={() => page(-1)} className={arrow + ' left-ui-2'}>
           <ChevronLeft size={22} aria-hidden="true" />
         </button>
       )}
       {edges.next && (
-        <button type="button" aria-label="Xem thêm tin" onClick={() => page(1)} className={arrow + ' right-ui-2'}>
+        <button type="button" aria-label={trUi("common.ui.moreStories")} onClick={() => page(1)} className={arrow + ' right-ui-2'}>
           <ChevronRight size={22} aria-hidden="true" />
         </button>
       )}
       <div ref={stripRef} onScroll={measure} className="flex gap-ui-2 overflow-x-auto pb-ui-1 [scrollbar-width:none]">
         {pending ? (
-          <div role={pending.status === 'failed' ? 'alert' : 'status'} aria-label={pending.status === 'failed' ? 'Không đăng được tin' : 'Đang đăng tin'}
+          <div role={pending.status === 'failed' ? 'alert' : 'status'} aria-label={pending.status === 'failed' ? trUi("common.ui.storyFailed") : trUi("common.ui.storyPosting")}
             className={cn('relative grid h-46 w-28 flex-none place-content-center justify-items-center gap-ui-2 overflow-hidden rounded-ui-md bg-(image:--soco-gradient) p-ui-2 text-center text-white', pending.status === 'failed' && 'ring-2 ring-destructive ring-inset')}>
             <span aria-hidden="true" className="absolute inset-0 bg-black/55" />
             {pending.status === 'failed' ? (
               <>
                 <AlertCircle size={28} aria-hidden="true" className="relative" />
                 <span className="relative text-ui-label font-semibold">Không đăng được</span>
-                <button type="button" onClick={onRetry} className="relative min-h-control-touch cursor-pointer rounded-full border-0 bg-white px-ui-3 text-ui-label font-bold text-foreground">Thử lại</button>
-                <button type="button" onClick={onCancel} className="relative min-h-control-touch cursor-pointer border-0 bg-transparent p-0 text-ui-label font-semibold text-white underline">Hủy</button>
+                <button type="button" onClick={onRetry} className="relative min-h-control-touch cursor-pointer rounded-full border-0 bg-white px-ui-3 text-ui-label font-bold text-foreground">{trUi("common.retry")}</button>
+                <button type="button" onClick={onCancel} className="relative min-h-control-touch cursor-pointer border-0 bg-transparent p-0 text-ui-label font-semibold text-white underline">{trUi("common.cancel")}</button>
               </>
             ) : (
               <>
                 <Loader2 size={28} aria-hidden="true" className="relative animate-spin" />
-                <span className="relative text-ui-label font-bold">{pending.percent === null ? 'Đang đăng...' : `Đang đăng ${pending.percent}%`}</span>
+                <span className="relative text-ui-label font-bold">{pending.percent === null ? trUi("feed.posting") : `Đang đăng ${pending.percent}%`}</span>
               </>
             )}
           </div>
         ) : (
-        <button data-slot="story-card" type="button" disabled={busy} onClick={event => activate(event, onCreate)} aria-label="Tạo Story mới"
+        <button data-slot="story-card" type="button" disabled={busy} onClick={event => activate(event, onCreate)} aria-label={trUi("common.ui.createNewStory")}
           className="group focus-visible:outline-none relative flex h-46 w-28 flex-none cursor-pointer flex-col items-stretch overflow-hidden rounded-ui-md border border-border bg-card p-0 text-left disabled:cursor-not-allowed disabled:opacity-60">
           <span className="grid flex-1 place-items-center overflow-hidden bg-(image:--soco-gradient)">
             <UserAvatar username={username} name={displayName} className="size-full text-ui-page font-black [--avatar-radius:0px]" />
@@ -97,14 +100,14 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
             <span className="absolute -top-4 left-1/2 grid size-8 -translate-x-1/2 place-items-center rounded-full border-3 border-card bg-primary text-primary-foreground">
               <Plus size={16} strokeWidth={3} aria-hidden="true" />
             </span>
-            <span className="w-full text-center text-ui-label font-bold text-foreground">Tạo tin</span>
+            <span className="w-full text-center text-ui-label font-bold text-foreground">{trUi("feed.createStoryAlt")}</span>
           </span>
           {focusRing}
         </button>
         )}
         {groups.map(group => (
           <button data-slot="story-card" key={group.author} type="button" onClick={event => activate(event, () => onOpen(group.openId))}
-            aria-label={group.own ? 'Xem tin của bạn' : `Xem Story của ${group.displayName}, ${group.hasUnseen ? 'chưa xem' : 'đã xem'}`}
+            aria-label={group.own ? trUi("common.ui.viewYourStory") : trUi("common.ui.viewStoryNamed", { v1: String(group.displayName), v2: String(group.hasUnseen ? 'chưa xem' : 'đã xem') })}
             className={cn('group focus-visible:outline-none relative h-46 w-28 flex-none cursor-pointer overflow-hidden rounded-ui-md border-0 bg-muted p-0 shadow-ui-sm', !group.hasUnseen && 'opacity-80')}>
             <StoryPreview story={group.latest} />
             <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-black/60 to-transparent" />

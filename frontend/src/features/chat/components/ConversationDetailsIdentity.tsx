@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Camera } from 'lucide-react'
 import type { Conversation } from '../types'
 import type { GroupChannel } from '../utils/groupChannels'
@@ -17,6 +18,8 @@ type Props = {
 export default function ConversationDetailsIdentity({
   conversation, channel, selectedChannelId, canEditGroupPhotos, photoBusy, onEditPhoto,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const isGroup = conversation.type === 'group'
   const isChannel = isGroup && selectedChannelId !== 0
   const displayName = isChannel ? channel.name : conversation.name
@@ -31,16 +34,16 @@ export default function ConversationDetailsIdentity({
               : <ConversationAvatar conversation={conversation} className="conversation-info-panel-avatar social-chat-details-avatar" />}
 
             {isGroup && canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
-              aria-label={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'} title={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'}
+              aria-label={isChannel ? trUi("chat.changeChannelPhoto") : trUi("chat.changeGroupPhoto")} title={isChannel ? trUi("chat.changeChannelPhoto") : trUi("chat.changeGroupPhoto")}
               onClick={() => onEditPhoto({ name: displayName, avatarUrl: displayAvatar,
                 kind: isChannel ? 'channel' : 'group', channelId: isChannel ? selectedChannelId : undefined })}>
               <Camera size={17} aria-hidden="true" />
             </button>}
           </div>
         <strong title={displayName}>{displayName}</strong>
-        <span>{blocked ? (conversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này')
+        <span>{blocked ? (conversation.blockedByOther ? trUi("chat.blockedBy") : trUi("chat.blockedUser"))
           : isChannel ? `Kênh của nhóm ${conversation.name}` : isGroup ? `${conversation.memberCount} thành viên`
-          : conversation.online ? '● Đang hoạt động' : 'Chat riêng'}</span>
+          : conversation.online ? '● Đang hoạt động' : trUi("app.privateChat")}</span>
       </div>
   )
 }

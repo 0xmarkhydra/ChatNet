@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { ImagePlus } from 'lucide-react'
 import { ProfileOverlay } from '../../profile'
@@ -21,6 +22,8 @@ const choiceLabel = 'grid min-h-10 place-items-center text-balance sm:min-h-12'
 export default function StoryDraftOverlay({
   createStory, mediaUploading, setStoryDraft, storyBusy, storyDraft,
 }: StoryDraftOverlayProps) {
+  const trUi = useUiTranslation()
+
   const [fileError, setFileError] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
   const mediaChoice = useRef<HTMLButtonElement>(null)
@@ -36,12 +39,12 @@ export default function StoryDraftOverlay({
   const busy = storyBusy || (storyDraft.kind === 'media' && Boolean(mediaUploading))
 
   return (
-    <ProfileOverlay title="Tạo Story" closeLabel="Đóng tạo tin" busy={storyBusy || mediaUploading === 'story'}
+    <ProfileOverlay title={trUi("feed.createStory")} closeLabel="Đóng tạo tin" busy={storyBusy || mediaUploading === 'story'}
       onClose={() => setStoryDraft(null)}>
       <div className="box-border px-4 pt-4 pb-5 sm:px-6 sm:pt-5 sm:pb-6">
         {storyDraft.kind === 'choose' ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4" aria-label="Chọn loại tin" role="group">
-            <input ref={fileInput} hidden type="file" accept={STORY_MEDIA_ACCEPT} aria-label="Chọn ảnh hoặc video cho Story"
+          <div className="grid grid-cols-2 gap-3 sm:gap-4" aria-label={trUi("common.ui.chooseStoryType")} role="group">
+            <input ref={fileInput} hidden type="file" accept={STORY_MEDIA_ACCEPT} aria-label={trUi("common.ui.chooseStoryMedia")}
               onChange={event => {
                 const selected = event.currentTarget.files?.[0]
                 event.currentTarget.value = ''

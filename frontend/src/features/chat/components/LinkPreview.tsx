@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
@@ -70,6 +71,8 @@ export default function LinkPreview({
   cacheScope: string
   request: RequestPreview
 }) {
+  const trUi = useUiTranslation()
+
   const url = firstPreviewURL(text)
   const parsed = url ? new URL(url) : null
   const postId = parsed ? feedPostIdFromUrl(parsed, window.location.origin) : null
@@ -137,7 +140,7 @@ export default function LinkPreview({
       <span ref={holder} className="message-link-preview-holder">
         <Link className={`message-link-preview${post ? '' : ' message-link-preview-fallback'}`}
           to={feedPostPath(postId)}
-          aria-label={post ? `Mở bài viết của ${post.author}` : 'Mở bài viết ChatNet'}>
+          aria-label={post ? trUi("common.ui.openPostNamed", { v1: String(post.author) }) : trUi("common.ui.openChatNetPost")}>
           <span className="message-link-preview-details">
             <span className="message-link-preview-domain">Bài viết · ChatNet</span>
             <strong className="message-link-preview-title">{post?.author ?? 'Bài viết ChatNet'}</strong>
@@ -158,7 +161,7 @@ export default function LinkPreview({
   return (
     <span ref={holder} className="message-link-preview-holder">
       <a className={`message-link-preview${preview ? '' : ' message-link-preview-fallback'}`} href={url} target="_blank" rel="noopener noreferrer"
-        aria-label={`Mở liên kết: ${card.title}`}>
+        aria-label={trUi("common.ui.openLinkNamed", { v1: String(card.title) })}>
           {card.image && !imageFailed && (
             <span className="message-link-preview-image">
               <img src={card.image} alt="" loading="lazy" referrerPolicy="no-referrer"

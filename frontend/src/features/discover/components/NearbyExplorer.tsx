@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { MapPin, Users, Search, RefreshCw, Navigation, List, Map as MapIcon, ShieldCheck } from 'lucide-react'
 const NearbyMap = lazy(() => import('./NearbyMap'))
@@ -49,6 +50,8 @@ export default function NearbyExplorer({
   query, onQueryChange, users, peopleBusy, peopleScanning, peopleError, peopleActive, peopleRadiusKm, resultRadiusKm,
   onPeopleRadiusChange, onScanPeople, onStopPeople, friendActionBusy, onFriendAction, getFriendActionLabel,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [mode, setMode] = useState<'people' | 'places'>('people')
   const [view, setView] = useState<'list' | 'map'>('map')
   const listViewButton = useRef<HTMLButtonElement>(null)
@@ -128,62 +131,62 @@ export default function NearbyExplorer({
     window.open(`https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(`${from}${place.latitude},${place.longitude}`)}`, '_blank', 'noopener,noreferrer')
   }
 
-  return <section className="nearby-explorer" aria-label="Khám phá quanh đây">
+  return <section className="nearby-explorer" aria-label={trUi("common.ui.exploreNearby")}>
     <header className="nearby-heading">
       <h1>Quanh đây</h1>
       {mode === 'people' && <label className="nearby-visibility">
-        <span>Hiển thị</span><input type="checkbox" role="switch" aria-label="Hiển thị quanh đây" checked={peopleActive} disabled={busy} onChange={() => void (peopleActive ? onStopPeople() : scan())} />
+        <span>{trUi("common.show")}</span><input type="checkbox" role="switch" aria-label={trUi("common.ui.showNearby")} checked={peopleActive} disabled={busy} onChange={() => void (peopleActive ? onStopPeople() : scan())} />
       </label>}
     </header>
-    <div className="nearby-mode" aria-label="Loại kết quả">
+    <div className="nearby-mode" aria-label={trUi("search.resultType")}>
       <button aria-pressed={mode === 'people'} onClick={() => { setMode('people'); onQueryChange('') }}><Users size={18} />Người ở gần</button>
       <button aria-pressed={mode === 'places'} onClick={() => { setMode('places'); onQueryChange('') }}><MapPin size={18} />Địa điểm</button>
     </div>
     <div className="nearby-toolbar">
-      <label className="nearby-search"><Search size={18} /><input aria-label={mode === 'people' ? 'Tìm người quanh đây' : 'Tìm địa điểm'} placeholder={mode === 'people' ? 'Tên hoặc @username' : 'Tên địa điểm hoặc địa chỉ'} value={query} onChange={(event) => onQueryChange(event.target.value)} /></label>
-      <label className="nearby-radius-field"><select aria-label="Bán kính tìm kiếm" title="Bán kính tìm kiếm" value={mode === 'people' ? peopleRadiusKm : radius} disabled={mode === 'people' ? busy : locating} onChange={(event) => mode === 'people' ? onPeopleRadiusChange(Number(event.target.value)) : setRadius(Number(event.target.value))}>
+      <label className="nearby-search"><Search size={18} /><input aria-label={mode === 'people' ? trUi("common.ui.findNearbyPeople") : trUi("common.ui.findPlaces")} placeholder={mode === 'people' ? trUi("common.ui.nameUsername") : trUi("common.ui.placeAddress")} value={query} onChange={(event) => onQueryChange(event.target.value)} /></label>
+      <label className="nearby-radius-field"><select aria-label={trUi("discover.searchRadius")} title={trUi("discover.searchRadius")} value={mode === 'people' ? peopleRadiusKm : radius} disabled={mode === 'people' ? busy : locating} onChange={(event) => mode === 'people' ? onPeopleRadiusChange(Number(event.target.value)) : setRadius(Number(event.target.value))}>
         {(mode === 'people' ? [1, 5, 10, 25, 50] : [0.5, 1, 3, 5]).map((value) => <option key={value} value={value}>{value < 1 ? '500 m' : `${value} km`}</option>)}
       </select></label>
-      <button className="nearby-refresh" disabled={busy} title="Tìm lại" aria-label="Tìm lại" onClick={() => void (mode === 'people' ? scan() : location ? setReload((value) => value + 1) : locate())}><RefreshCw size={19} /></button>
+      <button className="nearby-refresh" disabled={busy} title={trUi("discover.searchAgain")} aria-label={trUi("discover.searchAgain")} onClick={() => void (mode === 'people' ? scan() : location ? setReload((value) => value + 1) : locate())}><RefreshCw size={19} /></button>
     </div>
-    {mode === 'places' && <div className="nearby-categories" aria-label="Loại địa điểm">{categories.map((item) =>
+    {mode === 'places' && <div className="nearby-categories" aria-label={trUi("common.ui.placeType")}>{categories.map((item) =>
       <button key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>}
     {mode === 'people' && <p className="nearby-privacy"><ShieldCheck size={16} />Vị trí chính xác của bạn không được chia sẻ.</p>}
     {mode === 'people' && peopleScanning && <p role="status" aria-live="polite" aria-busy="true">Đang xác định vị trí và tìm người quanh đây…</p>}
-    {mode === 'people' && peopleError && <div className="nearby-error" role="alert">{peopleError}<button type="button" disabled={busy} onClick={() => void scan()}>Thử lại</button></div>}
-    {locating && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang xác định vị trí…</p>}
+    {mode === 'people' && peopleError && <div className="nearby-error" role="alert">{peopleError}<button type="button" disabled={busy} onClick={() => void scan()}>{trUi("common.retry")}</button></div>}
+    {locating && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">{trUi("discover.locating")}</p>}
     {loading && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang tải địa điểm…</p>}
     {locationError && mode === 'places' && <p className="nearby-error" role="alert">{locationError}</p>}
-    {error && mode === 'places' && <div className="nearby-error" role="alert">{error}<button type="button" disabled={loading} onClick={() => setReload((value) => value + 1)}>Thử lại</button></div>}
+    {error && mode === 'places' && <div className="nearby-error" role="alert">{error}<button type="button" disabled={loading} onClick={() => setReload((value) => value + 1)}>{trUi("common.retry")}</button></div>}
     <div className="nearby-results-heading">
       <strong>{count} {mode === 'people' ? 'người' : 'địa điểm'}</strong>
       {mode === 'people' ? <span>{users.length ? `Trong ${resultRadiusKm} km · gần nhất trước` : ''}</span> : <div className="nearby-view">
-        <button ref={listViewButton} title="Danh sách" aria-label="Danh sách" aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={18} /></button>
-        <button title="Bản đồ" aria-label="Bản đồ" aria-pressed={view === 'map'} onClick={() => setView('map')}><MapIcon size={18} /></button>
+        <button ref={listViewButton} title={trUi("common.list")} aria-label={trUi("common.list")} aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={18} /></button>
+        <button title={trUi("discover.map")} aria-label={trUi("discover.map")} aria-pressed={view === 'map'} onClick={() => setView('map')}><MapIcon size={18} /></button>
       </div>}
     </div>
     {mode === 'people' && users.length > 0 && resultRadiusKm !== peopleRadiusKm && <p className="nearby-privacy">Bán kính đã đổi. Kết quả vẫn thuộc lần tìm trước; nhấn Tìm lại để quét bán kính mới.</p>}
     {mode === 'people' ? <div className="nearby-people-list">
       {!count && !busy && !peopleError && <div className="nearby-empty">
-        <Users size={36} /><h2>{normalized ? 'Không khớp tìm kiếm' : peopleActive ? 'Chưa có ai ở gần' : 'Tìm người ở gần bạn'}</h2>
+        <Users size={36} /><h2>{normalized ? trUi("discover.noMatch") : peopleActive ? 'Chưa có ai ở gần' : 'Tìm người ở gần bạn'}</h2>
         <p>{normalized ? 'Thử tên khác hoặc xóa tìm kiếm.' : peopleActive ? 'Thử tăng bán kính hoặc tìm lại sau.' : 'Chỉ người từng bật Quanh đây và còn lưu vị trí mới xuất hiện. Bật tìm kiếm cũng cho phép người khác tìm thấy bạn.'}</p>
-        <button className="nearby-primary" onClick={() => normalized ? onQueryChange('') : void scan()}>{normalized ? 'Xóa tìm kiếm' : peopleActive ? 'Tìm lại' : 'Bật và tìm người'}</button>
+        <button className="nearby-primary" onClick={() => normalized ? onQueryChange('') : void scan()}>{normalized ? trUi("common.clearSearch") : peopleActive ? trUi("discover.searchAgain") : 'Bật và tìm người'}</button>
       </div>}
       {visibleUsers.map((user) => <article className="nearby-person" key={user.id}>
         <div className="nearby-avatar" aria-hidden="true">{(user.displayName || user.username).trim().split(/\s+/).slice(-2).map((part) => part[0]).join('').toUpperCase()}</div>
-        <div className="nearby-person-copy"><strong>{user.displayName || user.username}</strong><span>@{user.username}</span><small><MapPin size={13} />{distance(user.distanceKm)}<i className={user.online ? 'online' : ''} />{user.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</small></div>
+        <div className="nearby-person-copy"><strong>{user.displayName || user.username}</strong><span>@{user.username}</span><small><MapPin size={13} />{distance(user.distanceKm)}<i className={user.online ? 'online' : ''} />{user.online ? trUi("profile.active") : trUi("common.offline")}</small></div>
         <button className="nearby-connect" disabled={friendActionBusy === user.id || getFriendActionLabel(user) === 'Đã gửi'} onClick={() => void onFriendAction(user)}>{getFriendActionLabel(user)}</button>
       </article>)}
     </div> : <>
       {!location && !busy && <div className="nearby-empty"><MapPin size={36} /><h2>Tìm địa điểm gần bạn</h2><button className="nearby-primary" onClick={() => void locate()}>Dùng vị trí hiện tại</button></div>}
       {location && <div className={`nearby-place-content${view === 'map' ? ' map-view' : ''}`}>
-      {view === 'map' && <ErrorBoundary fallback={() => <div className="nearby-map nearby-map-fallback"><div className="nearby-map-error" role="alert">Không thể hiển thị bản đồ.<button type="button" onClick={showListAfterMapFailure}>Xem danh sách</button></div></div>}><Suspense fallback={<p role="status" aria-live="polite" aria-busy="true">Đang tải bản đồ…</p>}><NearbyMap location={location} places={visiblePlaces} selected={visibleSelected} onSelect={setSelected} onShowList={showListAfterMapFailure} /></Suspense></ErrorBoundary>}
-      <div className="nearby-place-list" aria-label="Kết quả địa điểm">
-      {location && !busy && !error && !count && <div className="nearby-empty"><Search size={30} /><h2>{normalized ? 'Không khớp tìm kiếm' : 'Chưa tìm thấy địa điểm'}</h2><p>{normalized ? 'Thử từ khóa khác hoặc xóa tìm kiếm.' : 'Thử tăng bán kính hoặc tìm lại.'}</p>{normalized && <button type="button" className="nearby-primary" onClick={() => onQueryChange('')}>Xóa tìm kiếm</button>}</div>}
+      {view === 'map' && <ErrorBoundary fallback={() => <div className="nearby-map nearby-map-fallback"><div className="nearby-map-error" role="alert">Không thể hiển thị bản đồ.<button type="button" onClick={showListAfterMapFailure}>{trUi("discover.listView")}</button></div></div>}><Suspense fallback={<p role="status" aria-live="polite" aria-busy="true">{trUi("discover.loadingMap")}</p>}><NearbyMap location={location} places={visiblePlaces} selected={visibleSelected} onSelect={setSelected} onShowList={showListAfterMapFailure} /></Suspense></ErrorBoundary>}
+      <div className="nearby-place-list" aria-label={trUi("common.ui.placeResults")}>
+      {location && !busy && !error && !count && <div className="nearby-empty"><Search size={30} /><h2>{normalized ? trUi("discover.noMatch") : 'Chưa tìm thấy địa điểm'}</h2><p>{normalized ? 'Thử từ khóa khác hoặc xóa tìm kiếm.' : 'Thử tăng bán kính hoặc tìm lại.'}</p>{normalized && <button type="button" className="nearby-primary" onClick={() => onQueryChange('')}>{trUi("common.clearSearch")}</button>}</div>}
       {visiblePlaces.map((place, index) => <article key={place.id} className={`nearby-place-row${place.id === visibleSelected ? ' selected' : ''}`}>
-        <button className="nearby-place-number" aria-label={`Xem ${place.name} trên bản đồ`} aria-pressed={place.id === visibleSelected} onClick={() => { setSelected(place.id); setView('map') }}>{index + 1}</button>
+        <button className="nearby-place-number" aria-label={trUi("common.ui.viewOnMap", { v1: String(place.name) })} aria-pressed={place.id === visibleSelected} onClick={() => { setSelected(place.id); setView('map') }}>{index + 1}</button>
         <div><strong>{place.name}</strong><span>{categories.find((item) => item.id === place.category)?.label} · {distance(place.distanceKm)}</span>{place.address && <small>{place.address}</small>}{place.openingHours && <small>{place.openingHours}</small>}</div>
-        <button className="nearby-route" title={`Chỉ đường đến ${place.name}`} aria-label={`Chỉ đường đến ${place.name}`} onClick={() => directions(place)}><Navigation size={19} /></button>
+        <button className="nearby-route" title={trUi("common.ui.directionsTo", { v1: String(place.name) })} aria-label={trUi("common.ui.directionsTo", { v1: String(place.name) })} onClick={() => directions(place)}><Navigation size={19} /></button>
       </article>)}</div>
       </div>}
       {location && view === 'list' && <p className="nearby-source">Dữ liệu © OpenStreetMap</p>}

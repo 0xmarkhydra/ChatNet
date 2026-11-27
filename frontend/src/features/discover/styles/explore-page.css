@@ -262,7 +262,7 @@
 .explore-community-copy h3 { overflow-wrap: anywhere; }
 .explore-community-copy p { font-size: 13px; line-height: 1.5; margin-top: 6px; }
 .explore-community-copy small { display: block; font-size: 12px; margin-top: 8px; }
-.explore-community-card > button, .explore-person button {
+.explore-community-card > button {
   min-height: 44px;
   border: 1px solid #c9cbf5;
   border-radius: 12px;
@@ -288,7 +288,6 @@
 .explore-people, .explore-near { min-width: 0; padding: 20px; }
 .explore-rail h2 { font-size: 18px; }
 .explore-people-grid { display: grid; gap: 16px; min-width: 0; }
-.explore-person { display: flex; align-items: center; min-width: 0; gap: 10px; }
 .explore-person-avatar {
   width: 44px;
   height: 44px;
@@ -304,15 +303,6 @@
 .explore-person h3, .explore-person p { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .explore-person h3 { font-size: 14px; }
 .explore-person p { font-size: 12px; margin-top: 3px; }
-.explore-person > button {
-  box-sizing: border-box;
-  flex: 0 0 96px;
-  width: 96px;
-  height: 44px;
-  padding: 0 6px;
-  white-space: nowrap;
-  text-align: center;
-}
 .explore-content-layout-single .explore-people-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
 .explore-content-layout-single .explore-person { padding: 16px; border: 1px solid var(--soco-line); border-radius: 18px; background: var(--soco-surface); }
 .explore-state {

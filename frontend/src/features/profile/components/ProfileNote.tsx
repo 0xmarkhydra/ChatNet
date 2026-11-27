@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import BubbleTextarea from '../../../shared/ui/BubbleTextarea'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -12,6 +13,8 @@ export default function ProfileNote(props: Props) {
  return <ProfileNoteSession key={JSON.stringify([props.username, props.owner ?? false, props.refreshKey])} {...props} />
 }
 function ProfileNoteSession({ username, displayName = username, owner = false, request }: Props) {
+  const trUi = useUiTranslation()
+
  const [note,setNote] = useState<Note|null>(null)
  const [loaded,setLoaded] = useState(false)
  const [error,setError] = useState('')
@@ -72,37 +75,37 @@ function ProfileNoteSession({ username, displayName = username, owner = false, r
  if(!owner&&!currentNote)return null
  return <span className="profile-note" onClick={e=>e.stopPropagation()}>
   {loaded&&<button ref={trigger} type="button" className={'profile-note-bubble'+(currentNote?' has-note':'')}
-   aria-label={currentNote?'Xem ghi chú':'Đăng ghi chú'} title={currentNote?.content} disabled={busy}
+   aria-label={currentNote?trUi("common.ui.viewNote"):trUi("profile.postNote")} title={currentNote?.content} disabled={busy}
    onClick={()=>{setConfirm(false);dialog.current?.showModal()}}>
-   {currentNote?<span>{currentNote.content}</span>:<><Plus size={13}/><span>{error?'Tải lại ghi chú':'Chia sẻ suy nghĩ…'}</span></>}
+   {currentNote?<span>{currentNote.content}</span>:<><Plus size={13}/><span>{error?trUi("profile.reloadNote"):trUi("profile.shareThoughts")}</span></>}
   </button>}
-  <dialog ref={dialog} className="profile-note-dialog" aria-label={currentNote?'Ghi chú':'Đăng ghi chú'}
+  <dialog ref={dialog} className="profile-note-dialog" aria-label={currentNote?trUi("common.note"):trUi("profile.postNote")}
    onClose={()=>trigger.current?.focus()} onCancel={e=>{if(busy)e.preventDefault()}}>
-   <header><div><MessageCircle size={20}/><h2>{currentNote?'Ghi chú':'Chia sẻ suy nghĩ'}</h2></div>
-    <button type="button" aria-label="Đóng ghi chú" disabled={busy} onClick={()=>dialog.current?.close()}><X size={20}/></button></header>
+   <header><div><MessageCircle size={20}/><h2>{currentNote?trUi("common.note"):'Chia sẻ suy nghĩ'}</h2></div>
+    <button type="button" aria-label={trUi("common.ui.closeNote")} disabled={busy} onClick={()=>dialog.current?.close()}><X size={20}/></button></header>
    {currentNote?<div className="profile-note-body">
     <p className="profile-note-full">{currentNote.content}</p>
     <small className="profile-note-meta">{currentNote.visibility==='friends'?<Users size={14}/>:currentNote.visibility==='private'?<LockKeyhole size={14}/>:<Globe size={14}/>}
-     {currentNote.visibility==='friends'?'Bạn bè':currentNote.visibility==='private'?'Chỉ mình tôi':'Công khai'} · Tự hết hạn sau 24 giờ</small>
+     {currentNote.visibility==='friends'?trUi("contacts.friends"):currentNote.visibility==='private'?trUi("profile.onlyMe"):trUi("common.public")} · Tự hết hạn sau 24 giờ</small>
     {owner&&<div className="profile-note-delete">
      {confirm&&<p>Xóa ghi chú này? Bạn có thể đăng ghi chú mới sau đó.</p>}
-     <button type="button" disabled={busy} onClick={()=>confirm?void publishOrDelete(true):setConfirm(true)}><Trash2 size={16}/>{busy?'Đang xóa…':confirm?'Xác nhận xóa':'Xóa ghi chú'}</button>
-     {confirm&&<button type="button" disabled={busy} onClick={()=>setConfirm(false)}>Giữ lại</button>}
+     <button type="button" disabled={busy} onClick={()=>confirm?void publishOrDelete(true):setConfirm(true)}><Trash2 size={16}/>{busy?'Đang xóa…':confirm?trUi("common.deleteConfirm"):'Xóa ghi chú'}</button>
+     {confirm&&<button type="button" disabled={busy} onClick={()=>setConfirm(false)}>{trUi("common.keep")}</button>}
     </div>}
    </div>:owner&&<form className="profile-note-body" onSubmit={e=>{e.preventDefault();void publishOrDelete()}}>
     <p className="profile-note-hint">Một suy nghĩ nhỏ, một ngày mới. Ghi chú hiển thị trong 24 giờ.</p>
     <div className="profile-note-compose">
-     <BubbleTextarea className="profile-note-input-bubble" aria-label="Nội dung ghi chú" placeholder="Chia sẻ suy nghĩ…" value={draft} disabled={busy} onChange={e=>setDraft(e.target.value)} autoFocus />
+     <BubbleTextarea className="profile-note-input-bubble" aria-label={trUi("chat.noteContent")} placeholder={trUi("profile.shareThoughts")} value={draft} disabled={busy} onChange={e=>setDraft(e.target.value)} autoFocus />
      <UserAvatar username={username} name={displayName} className="profile-note-compose-avatar" />
      <span className={'profile-note-count'+(count>60?' over-limit':'')}>{count}/60</span>
     </div>
     <label className="profile-note-audience"><Users size={16}/><span>Ai có thể xem?</span>
-     <select aria-label="Ai có thể xem ghi chú" value={visibility} disabled={busy} onChange={e=>setVisibility(e.target.value as Note['visibility'])}>
-      <option value="friends">Bạn bè</option><option value="public">Công khai</option><option value="private">Chỉ mình tôi</option>
+     <select aria-label={trUi("common.ui.noteAudience")} value={visibility} disabled={busy} onChange={e=>setVisibility(e.target.value as Note['visibility'])}>
+      <option value="friends">{trUi("contacts.friends")}</option><option value="public">{trUi("common.public")}</option><option value="private">{trUi("profile.onlyMe")}</option>
      </select></label>
-    <button type="submit" className="profile-note-publish" disabled={busy||!loaded||!!error||count<1||count>60}>Đăng ghi chú</button>
+    <button type="submit" className="profile-note-publish" disabled={busy||!loaded||!!error||count<1||count>60}>{trUi("profile.postNote")}</button>
    </form>}
-   {error&&<div className="profile-note-error" role="alert"><span>{error}</span><button type="button" disabled={busy} onClick={()=>void load(true)}><RefreshCw size={14}/>Tải lại ghi chú</button></div>}
+   {error&&<div className="profile-note-error" role="alert"><span>{error}</span><button type="button" disabled={busy} onClick={()=>void load(true)}><RefreshCw size={14}/>{trUi("profile.reloadNote")}</button></div>}
   </dialog>
  </span>
 }

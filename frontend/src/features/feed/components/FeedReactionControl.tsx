@@ -1,7 +1,8 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from "react";
 import { Heart, ThumbsUp } from "lucide-react";
 import type { Post } from "../types";
-import { reactionOptions } from "../../../shared/utils/reactions";
+import { reactionOptions, reactionLabel } from "../../../shared/utils/reactions";
 import { burstPostHearts } from "../utils/postHeartBurst";
 import "../styles/feed-actions.css";
 
@@ -16,6 +17,8 @@ export default function FeedReactionControl({
   react: (post: Post, emoji?: string) => Promise<void>;
   showCount?: boolean;
 }) {
+  const trUi = useUiTranslation()
+
   const [open, setOpen] = useState(false);
   const [reactionPulse, setReactionPulse] = useState(0);
   const host = useRef<HTMLDivElement>(null);
@@ -47,7 +50,7 @@ export default function FeedReactionControl({
 
   const selected = post.myReaction || (post.liked ? "👍" : "");
   const label =
-    reactionOptions.find(({ emoji }) => emoji === selected)?.label || "Thích";
+    reactionLabel(selected || "👍", trUi);
 
   return (
     <div
@@ -126,13 +129,13 @@ export default function FeedReactionControl({
         <div
           role="group"
           className="feed-reaction-picker"
-          aria-label="Cảm xúc bài viết"
+          aria-label={trUi("feed.postReaction")}
         >
-          {reactionOptions.map(({ emoji, label: reactionLabel }) => (
+          {reactionOptions.map(({ emoji }) => (
             <button
               type="button"
               key={emoji}
-              aria-label={reactionLabel}
+              aria-label={reactionLabel(emoji, trUi)}
               className={
                 "feed-reaction-option " +
                 (emoji === "👍"
@@ -142,7 +145,7 @@ export default function FeedReactionControl({
                     : "reaction-face")
               }
               aria-pressed={selected === emoji}
-              title={reactionLabel}
+              title={reactionLabel(emoji, trUi)}
               disabled={busy}
               onClick={(event) => {
                 if (emoji === "❤️" && selected !== emoji) burstPostHearts(event.currentTarget);

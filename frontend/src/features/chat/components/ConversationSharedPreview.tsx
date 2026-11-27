@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { ChevronRight, Film, Images } from 'lucide-react'
 import MediaViewer from '../../../shared/ui/MediaViewer'
 import { useConversationSharedPreview } from '../hooks/useConversationSharedPreview'
@@ -15,10 +16,12 @@ export default function ConversationSharedPreview(props: Props) {
 }
 
 function ConversationSharedPreviewContent({ conversationId, channelId, request, onOpen }: Props) {
+  const trUi = useUiTranslation()
+
   const { items, mediaCount, loading, error, viewerIndex, setViewerIndex, retry } =
     useConversationSharedPreview({ conversationId, channelId, request })
   return (
-    <section className="conversation-shared-preview" aria-label="File phương tiện, liên kết">
+    <section className="conversation-shared-preview" aria-label={trUi("chat.sharedMedia")}>
       {items.length > 0 ? (
         <div className="conversation-shared-preview-grid">
           {items.map((item, index) => (
@@ -45,7 +48,7 @@ function ConversationSharedPreviewContent({ conversationId, channelId, request, 
 
       <button type="button" className="conversation-shared-preview-title" onClick={() => onOpen('media')}>
         <span className="conversation-shared-preview-title-icon"><Images size={18} aria-hidden="true" /></span>
-        <strong>File phương tiện, liên kết</strong>
+        <strong>{trUi("chat.sharedMedia")}</strong>
         <ChevronRight size={18} aria-hidden="true" />
       </button>
       {viewerIndex !== null && items[viewerIndex] && (

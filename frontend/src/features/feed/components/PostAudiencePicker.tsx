@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { Check, ChevronDown, Globe2, LockKeyhole, UsersRound } from 'lucide-react'
@@ -17,6 +18,8 @@ const audienceChoices = [
 ] as const
 
 export default function PostAudiencePicker({ value, disabled = false, onChange }: Props) {
+  const trUi = useUiTranslation()
+
   const [open, setOpen] = useScopedState(disabled ? 'disabled' : 'enabled', false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -101,7 +104,7 @@ export default function PostAudiencePicker({ value, disabled = false, onChange }
   return (
     <div className="smart-composer-audience" ref={containerRef}>
       <button ref={triggerRef} type="button" className="smart-audience-trigger"
-        aria-label="Ai có thể xem bài viết" aria-haspopup="menu"
+        aria-label={trUi("feed.audience")} aria-haspopup="menu"
         aria-expanded={open} aria-controls={open ? menuId : undefined}
         disabled={disabled}
         onClick={() => setOpen(previous => !previous)}
@@ -121,7 +124,7 @@ export default function PostAudiencePicker({ value, disabled = false, onChange }
         <ChevronDown size={13} className={open ? 'smart-audience-chevron is-open' : 'smart-audience-chevron'} aria-hidden="true" />
       </button>
       {open && <div className="smart-audience-menu" id={menuId}
-        role="menu" aria-label="Ai có thể xem bài viết" popover="manual"
+        role="menu" aria-label={trUi("feed.audience")} popover="manual"
         ref={menuRef} onKeyDown={onMenuKeyDown}>
         <div className="smart-audience-menu-heading">
           <strong>Ai có thể xem bài viết?</strong>

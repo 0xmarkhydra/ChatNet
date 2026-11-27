@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useId, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronsLeftRight, Menu, MessageSquarePlus, Search, Tags } from 'lucide-react'
 
@@ -18,6 +19,8 @@ type Props = {
 export default function ConversationRailMenu({
   categoryControls, filter, onFilterChange, expanded, onCreate, onExpand, onCollapse,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const id = useId()
   const popover = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -74,7 +77,7 @@ export default function ConversationRailMenu({
     <div className="conversation-rail-menu-host">
       <button
         ref={trigger} type="button" className="conversation-rail-menu-trigger"
-        aria-label="Menu hội thoại" title="Menu hội thoại"
+        aria-label={trUi("chat.conversationMenu")} title={trUi("chat.conversationMenu")}
         aria-expanded={open} aria-controls={id} popoverTarget={id}
         onClick={position}
       >
@@ -92,13 +95,11 @@ export default function ConversationRailMenu({
           }
         }}
       >
-        <div className="conversation-rail-menu-title">Tùy chọn hội thoại</div>
+        <div className="conversation-rail-menu-title">{trUi("chat.conversationOptions")}</div>
         <button type="button" className="conversation-rail-menu-item"
           onClick={focusConversationSearch}>
-          <Search size={18} aria-hidden="true" />
-          Tìm hội thoại
-        </button>
-        <div role="group" aria-label="Lọc hội thoại">
+          <Search size={18} aria-hidden="true" />{trUi("chat.searchChat")}</button>
+        <div role="group" aria-label={trUi("chat.filterChat")}>
           {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map(option => (
             <button key={option.key} type="button" className="conversation-rail-menu-item" aria-pressed={filter === option.key}
               onClick={() => run(() => { onFilterChange(option.key); if (!visuallyExpanded) onExpand(); })}>
@@ -113,9 +114,7 @@ export default function ConversationRailMenu({
         </div>
         <button type="button" className="conversation-rail-menu-item"
           onClick={() => run(onCreate)}>
-          <MessageSquarePlus size={18} aria-hidden="true" />
-          Tạo cuộc trò chuyện
-        </button>
+          <MessageSquarePlus size={18} aria-hidden="true" />{trUi("chat.newConversation")}</button>
         <button type="button" className="conversation-rail-menu-item"
           onClick={() => run(expanded ? onCollapse : onExpand)}>
           <ChevronsLeftRight size={18} aria-hidden="true" />

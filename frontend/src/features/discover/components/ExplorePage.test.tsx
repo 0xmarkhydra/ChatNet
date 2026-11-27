@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, expect, it, vi } from 'vitest'
 import ExplorePage from './ExplorePage'
+import { UiLocaleContext } from '@/shared/i18n/locale'
 import { getCurrentPositionSmart } from '../lib/geolocation'
 
 vi.mock('../lib/geolocation', () => ({ getCurrentPositionSmart: vi.fn(async () => ({ coords: { latitude: 21, longitude: 105 } })), geolocationErrorMessage: vi.fn(async () => 'Không lấy được vị trí') }))
@@ -22,7 +23,7 @@ function RouteLocation() {
   return <output data-testid="route">{location.pathname + location.search}</output>
 }
 
-function mount(request: DiscoverSectionProps['request'], route = '/discover') {
+function mount(request: DiscoverSectionProps['request'], route = '/discover', locale = 'vi') {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
@@ -34,15 +35,16 @@ function mount(request: DiscoverSectionProps['request'], route = '/discover') {
     nearbyScanning: false, nearbyUntil: 0, nearbyUsers: [],
     setGlobalSearch: vi.fn(), setNearbyRadiusKm: vi.fn(), stopNearby: vi.fn(async () => {}),
   }
-  const Test = () => <MemoryRouter initialEntries={[route]}>
+  let currentLocale = locale
+  const Test = () => <UiLocaleContext.Provider value={{ locale: currentLocale }}><MemoryRouter initialEntries={[route]}>
     <ExplorePage {...props} /><RouteLocation />
-  </MemoryRouter>
+  </MemoryRouter></UiLocaleContext.Provider>
   roots.push(async () => { await act(async () => root.unmount()) })
   const render = async () => {
     await act(async () => root.render(<Test />))
   }
   const rerender = render
-  return { host, props, render, rerender,
+  return { host, props, render, rerender, setLocale: async (next: string) => { currentLocale = next; await render() },
     route: () => host.querySelector('[data-testid="route"]')?.textContent,
     button: (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === label),
   }
@@ -458,4 +460,45 @@ it('renders nearby post extras as separate metadata and opens media in post deta
   expect(card.querySelector('a[href="/feed/posts/42"]')).not.toBeNull()
   await act(async () => card.querySelector<HTMLButtonElement>('button[aria-label="Xem bài viết có ảnh Ảnh núi"]')?.click())
   expect(view.route()).toBe('/feed/posts/42')
+})
+
+it('localizes discover banner, tabs and nearby post actions for all five languages', async () => {
+  const view = mount(vi.fn(async () => ok([])))
+  await view.render()
+  for (const [locale, heading, tab, action] of [
+    ['vi','Hôm nay bạn muốn khám phá gì?','Mọi người','Tìm bài viết gần tôi'],
+    ['en','What would you like to discover today?','People','Find posts near me'],
+    ['zh','今天想探索什么？','用户','查找我附近的帖子'],
+    ['ja','今日は何を発見しますか？','ユーザー','近くの投稿を探す'],
+    ['ko','오늘 무엇을 탐색할까요?','사람','내 주변 게시물 찾기'],
+  ]) {
+    await view.setLocale(locale)
+    expect(view.host.querySelector('#explore-feature-title')?.textContent).toBe(heading)
+    expect(view.button(tab)).toBeTruthy()
+    expect(view.button(action)).toBeTruthy()
+    expect(view.props.findNearby).not.toHaveBeenCalled()
+  }
+})
+
+it('keeps connection actions readable and preserves relationships across locale changes', async () => {
+  const view = mount(vi.fn(async () => ok([])), '/discover?tab=people')
+  view.props.nearbyUsers = [{ id: 23, username: 'long_username_123456789', displayName: 'Nguyễn An', online: true }, { id: 24, username: 'another_user', displayName: 'Bảo', online: false }]
+  view.props.friendRelationship = id => id === 23 ? 'outgoing' : 'none'
+  await view.render()
+  await view.setLocale('en')
+  const cards = Array.from(view.host.querySelectorAll('.explore-person'))
+  expect(cards).toHaveLength(2)
+  const cancel = cards[0].querySelector('button')!
+  const add = cards[1].querySelector('button')!
+  expect(cancel.textContent).toBe('Cancel request')
+  expect(add.textContent).toBe('Add friend')
+  expect(cancel.classList.contains('whitespace-normal')).toBe(true)
+  expect(add.classList.contains('w-full')).toBe(true)
+  expect(cards[0].textContent).toContain('Nguyễn An')
+  expect(cancel.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
+  await act(async () => cancel.click())
+  expect(view.props.actOnFriend).toHaveBeenCalledWith(view.props.nearbyUsers[0])
+  await view.setLocale('ja')
+  expect(cards[0].querySelector('button')?.textContent).not.toBe('Cancel request')
+  expect(view.route()).toBe('/discover?tab=people')
 })

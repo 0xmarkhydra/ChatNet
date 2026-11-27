@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState } from 'react'
 import type { MediaAttachment } from '../utils/media'
 import { formatBytes } from '../utils/format'
@@ -17,6 +18,8 @@ export default function MediaAttachmentsView({
   onRemove?: (index: number) => void
   onImageClick?: (index: number) => void
 }) {
+  const trUi = useUiTranslation()
+
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   if (!items?.length) return null
   const previews = items.filter(previewable)
@@ -30,7 +33,7 @@ export default function MediaAttachmentsView({
               <button
                 type="button"
                 className={onImageClick ? 'media-image-button open-post' : 'media-image-button'}
-                aria-label={onImageClick ? `Xem bài viết có ảnh ${item.name}` : `Xem ảnh ${item.name}`}
+                aria-label={onImageClick ? trUi("common.ui.viewPostPhotoNamed", { v1: String(item.name) }) : trUi("common.ui.viewPhotoNamed", { v1: String(item.name) })}
                 onClick={(event) => {
                   event.stopPropagation()
                   if (onImageClick) onImageClick(index)
@@ -56,7 +59,7 @@ export default function MediaAttachmentsView({
               <div className="media-file-card">
                 <span>🎙️</span>
                 <div><strong>{item.name}</strong><small>{formatBytes(item.sizeBytes)}</small></div>
-                <audio src={item.url} controls preload="none" aria-label={`Âm thanh: ${item.name}`} />
+                <audio src={item.url} controls preload="none" aria-label={trUi("common.ui.audioNamed", { v1: String(item.name) })} />
               </div>
             ) : item.url ? (
               <a className="media-file-card" href={item.url} target="_blank" rel="noopener noreferrer">
@@ -70,7 +73,7 @@ export default function MediaAttachmentsView({
               </div>
             )}
             {pending && onRemove && (
-              <button type="button" className="media-remove" onClick={() => onRemove(index)} aria-label={`Bỏ ${item.name}`}>×</button>
+              <button type="button" className="media-remove" onClick={() => onRemove(index)} aria-label={trUi("common.ui.removeNamed", { v1: String(item.name) })}>×</button>
             )}
           </div>
         ))}

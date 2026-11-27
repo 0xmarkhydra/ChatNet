@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState } from 'react'
 import { Check, Palette } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
@@ -19,6 +20,8 @@ export default function ChatWallpaperPicker({ conversation, request, notify, onR
   conversation: Conversation; request: (path: string, init?: RequestInit) => Promise<Response>
   notify: (text: string, kind?: 'success' | 'error' | 'warning') => void; onRefresh?: () => Promise<void>
 }) {
+  const trUi = useUiTranslation()
+
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   async function select(wallpaper: string) {
@@ -33,11 +36,11 @@ export default function ChatWallpaperPicker({ conversation, request, notify, onR
     finally { setBusy(false) }
   }
   return <>
-    <ConversationOptionRow icon={<Palette size={18}/>} aria-haspopup="dialog" onClick={() => setOpen(true)}>Đổi hình nền hội thoại</ConversationOptionRow>
+    <ConversationOptionRow icon={<Palette size={18}/>} aria-haspopup="dialog" onClick={() => setOpen(true)}>{trUi("chat.wallpaper")}</ConversationOptionRow>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
-        <DialogTitle>Đổi hình nền hội thoại</DialogTitle>
-        <DialogDescription>Hình nền chỉ hiển thị với tài khoản của bạn.</DialogDescription>
+        <DialogTitle>{trUi("chat.wallpaper")}</DialogTitle>
+        <DialogDescription>{trUi("chat.wallpaperPrivate")}</DialogDescription>
         <div className="grid grid-cols-2 gap-2">
           {presets.map(item => {
             const selected = (conversation.wallpaper || 'default') === item.key

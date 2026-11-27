@@ -1,3 +1,4 @@
+import { useUiTranslation, type UiCopyKey } from '@/shared/i18n/locale'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, BellRing, ChevronLeft, Search, SlidersHorizontal, X } from 'lucide-react'
@@ -33,20 +34,21 @@ export type SearchResultsPageProps = {
   renderPosts: SearchResultsProps['renderPosts']
 }
 
-const PLACEHOLDER: Record<SearchType, string> = {
-  all: 'Tìm người, bài viết, cộng đồng và sản phẩm…',
-  people: 'Tìm theo tên hoặc @username…',
-  posts: 'Tìm nội dung bài viết…',
-  communities: 'Tìm cộng đồng công khai…',
-  products: 'Tìm sản phẩm trên Marketplace…',
+const PLACEHOLDER: Record<SearchType, UiCopyKey> = {
+  all: 'common.ui.searchAll',
+  people: 'common.ui.searchPeople',
+  posts: 'common.ui.searchPostContent',
+  communities: 'common.ui.searchPublicCommunity',
+  products: 'common.ui.searchMarketplaceProducts',
 }
 const page = 'min-h-full w-full min-w-0 overflow-x-clip bg-background text-foreground'
 const activeChip = 'inline-flex min-h-8 cursor-pointer items-center gap-ui-1 rounded-full border-0 bg-card py-0 pr-ui-2 pl-ui-3 shadow-ui-sm text-[length:var(--soco-type-label)]! font-semibold! text-primary max-lg:min-h-11'
 // Focusing on a phone would open the keyboard over the home content (checked once in the component).
-const HOME_PLACEHOLDER = 'Tìm người, bài viết, cộng đồng, sản phẩm…'
 const FILTER_KEYS = [...Object.keys(FILTER_GROUPS), 'range', 'min', 'max']
 
 export default function SearchResultsPage({ request, sessionId, onOpenProfile, onOpenPost, renderPosts }: SearchResultsPageProps) {
+  const trUi = useUiTranslation()
+
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const query = params.get('q')?.trim().slice(0, 120) ?? ''
@@ -88,7 +90,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
   const suggestion = query ? pastQueries.find(item => item !== query && foldText(item) === foldedQuery) : undefined
   const recentQueries = history.recent.filter(item => item !== query).slice(0, 6)
   const rail = useRailData(request, sessionId, !isHome)
-  const chips = activeFilters(type, values)
+  const chips = activeFilters(type, values, trUi)
   const priceActive = parsePrice(minPrice) !== null || parsePrice(maxPrice) !== null
   const activeCount = chips.length + Number(priceActive)
   const saved = Boolean(query) && isSaved(history, query)
@@ -153,19 +155,19 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
   // Same control in two places: next to the header field on desktop, above the results on phones.
   // Always drawn (disabled until there is a query) so the field keeps the same width before and after a search starts.
   const saveButton = (className: string, compact: boolean) => (
-    <Button size="sm" variant={saved ? 'secondary' : 'outline'} className={cn(className, saved && 'text-primary')} aria-pressed={saved} disabled={!query} title={saved ? 'Đã lưu tìm kiếm' : query ? 'Lưu tìm kiếm' : 'Nhập từ khóa để lưu tìm kiếm'}
+    <Button size="sm" variant={saved ? 'secondary' : 'outline'} className={cn(className, saved && 'text-primary')} aria-pressed={saved} disabled={!query} title={saved ? trUi("search.saved") : query ? trUi("search.save") : trUi("common.ui.saveSearchHint")}
       onClick={() => updateHistory(sessionId, current => toggleSaved(current, query, Date.now()))}>
       {saved ? <BellRing size={16} aria-hidden="true" /> : <Bell size={16} aria-hidden="true" />}
-      <span className={cn(compact && 'max-xl:sr-only')}>{saved ? 'Đã lưu tìm kiếm' : 'Lưu tìm kiếm'}</span>
+      <span className={cn(compact && 'max-xl:sr-only')}>{saved ? trUi("search.saved") : trUi("search.save")}</span>
     </Button>
   )
 
   return (
-    <section className={page} aria-label={isHome ? 'Tìm kiếm' : 'Kết quả tìm kiếm'}>
+    <section className={page} aria-label={isHome ? trUi("common.search") : trUi("common.searchResults")}>
       <SearchHeader className={isHome ? undefined : 'max-lg:hidden'}>
         <div className="flex items-center gap-ui-2">
           <div className="min-w-0 flex-1">
-            <SearchForm large suggest={suggest} initialQuery={query} autoFocus={isHome && focusField} placeholder={isHome ? HOME_PLACEHOLDER : PLACEHOLDER[type]}
+            <SearchForm large suggest={suggest} initialQuery={query} autoFocus={isHome && focusField} placeholder={trUi(isHome ? 'search.allPlaceholder' : PLACEHOLDER[type])}
               onSubmit={value => isHome ? startSearch(value) : submit(value)} />
           </div>
           {saveButton('h-control-touch shrink-0 max-xl:px-3', true)}
@@ -179,7 +181,7 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
           onToggleSaved={value => updateHistory(sessionId, current => toggleSaved(current, value, Date.now()))} />
       ) : (
       <div className="grid min-h-full grid-cols-[340px_minmax(0,1fr)] max-xl:grid-cols-[300px_minmax(0,1fr)] max-lg:block">
-        <aside className="flex min-w-0 flex-col gap-ui-3 border-r border-border bg-card p-ui-4 max-lg:hidden" aria-label="Bộ lọc tìm kiếm">
+        <aside className="flex min-w-0 flex-col gap-ui-3 border-r border-border bg-card p-ui-4 max-lg:hidden" aria-label={trUi("common.ui.searchFilter")}>
           <SearchFilterPanel {...panelProps} />
         </aside>
 
@@ -188,43 +190,42 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
         <div className="mx-auto flex w-full max-w-190 min-w-0 flex-col gap-ui-3 px-ui-4 pt-ui-4 pb-ui-8 max-lg:max-w-none max-lg:gap-ui-2 max-lg:px-ui-3 max-lg:pt-0 max-lg:pb-ui-6">
           <div className="sticky top-0 z-2 -mx-ui-3 hidden grid-cols-[minmax(0,1fr)] gap-ui-2 border-b border-border bg-card px-ui-3 py-ui-2 max-lg:grid">
             <div className="flex items-center gap-ui-2">
-              <button type="button" aria-label="Quay lại" className={cn(plainButton, 'inline-grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted')}
+              <button type="button" aria-label={trUi("common.back")} className={cn(plainButton, 'inline-grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted')}
                 onClick={goBack}><ChevronLeft size={22} aria-hidden="true" /></button>
-              <SearchForm key={'mobile' + query + type} suggest={suggest} className="flex-1" initialQuery={query} placeholder={PLACEHOLDER[type]} onSubmit={submit} />
-              <button type="button" className={cn(plainButton, 'relative inline-grid size-11 shrink-0 place-items-center rounded-full bg-muted')} onClick={() => setFiltersOpen(true)} aria-label={'Bộ lọc' + (activeCount ? ', ' + activeCount + ' đang bật' : '')}>
+              <SearchForm key={'mobile' + query + type} suggest={suggest} className="flex-1" initialQuery={query} placeholder={trUi(PLACEHOLDER[type])} onSubmit={submit} />
+              <button type="button" className={cn(plainButton, 'relative inline-grid size-11 shrink-0 place-items-center rounded-full bg-muted')} onClick={() => setFiltersOpen(true)} aria-label={activeCount ? trUi('search.activeFiltersLabel', { count: activeCount }) : trUi('common.filter')}>
                 <SlidersHorizontal size={18} aria-hidden="true" />
                 {activeCount > 0 && <span className="absolute top-0.5 right-0.5 h-4.5 min-w-4.5 rounded-full bg-primary px-ui-1 text-center text-[length:var(--soco-type-caption)] leading-4.5 font-bold text-primary-foreground">{activeCount}</span>}
               </button>
             </div>
-            <div className="-mx-ui-3 flex gap-ui-2 overflow-x-auto px-ui-3 [scrollbar-width:none]" role="group" aria-label="Loại kết quả">
+            <div className="-mx-ui-3 flex gap-ui-2 overflow-x-auto px-ui-3 [scrollbar-width:none]" role="group" aria-label={trUi("search.resultType")}>
               {SEARCH_TYPES.map(item => (
                 <button key={item.key} type="button" aria-pressed={type === item.key}
-                  className={cn(plainButton, 'min-h-11 shrink-0 rounded-full bg-muted px-ui-4 text-[length:var(--soco-type-label)]! font-semibold!', type === item.key && 'bg-secondary text-primary')} onClick={() => setType(item.key)}>{item.label}</button>
+                  className={cn(plainButton, 'min-h-11 shrink-0 rounded-full bg-muted px-ui-4 text-[length:var(--soco-type-label)]! font-semibold!', type === item.key && 'bg-secondary text-primary')} onClick={() => setType(item.key)}>{trUi(item.label)}</button>
               ))}
             </div>
           </div>
 
           {query && (
             <header className="flex items-center justify-between gap-ui-3 max-lg:pt-ui-2 lg:sr-only">
-              <h2 className="sr-only">Kết quả cho “{query}”</h2>
+              <h2 className="sr-only">{trUi('search.resultsFor', { query })}</h2>
               <div className="ml-auto lg:hidden">{saveButton('h-11', false)}</div>
             </header>
           )}
 
           {activeCount > 0 && (
-            <div className="flex flex-wrap items-center gap-ui-2" aria-label="Bộ lọc đang bật">
-              <span className="text-[length:var(--soco-type-label)] font-semibold text-muted-foreground">Đang lọc</span>
+            <div className="flex flex-wrap items-center gap-ui-2" aria-label={trUi("common.ui.activeFilters")}>
+              <span className="text-[length:var(--soco-type-label)] font-semibold text-muted-foreground">{trUi('search.filtering')}</span>
               {chips.map(chip => (
-                <button key={chip.id} type="button" className={activeChip} aria-label={'Bỏ lọc ' + chip.label} onClick={() => setFilter(chip.id, FILTER_GROUPS[chip.id].options[0].value)}>
+                <button key={chip.id} type="button" className={activeChip} aria-label={trUi('search.removeFilter', { name: chip.label })} onClick={() => setFilter(chip.id, FILTER_GROUPS[chip.id].options[0].value)}>
                   {chip.label}<X size={14} aria-hidden="true" />
                 </button>
               ))}
               {priceActive && (
-                <button type="button" className={activeChip} aria-label="Bỏ lọc khoảng giá" onClick={() => change(next => { next.delete('min'); next.delete('max') })}>
-                  Khoảng giá<X size={14} aria-hidden="true" />
+                <button type="button" className={activeChip} aria-label={trUi("common.ui.removePriceFilter")} onClick={() => change(next => { next.delete('min'); next.delete('max') })}>{trUi("discover.priceRange")}<X size={14} aria-hidden="true" />
                 </button>
               )}
-              <button type="button" className={link} onClick={resetFilters}>Xóa tất cả</button>
+              <button type="button" className={link} onClick={resetFilters}>{trUi('search.clearAll')}</button>
             </div>
           )}
 
@@ -243,8 +244,8 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
           ) : (
             <div className={cn(card, 'grid justify-items-center gap-ui-2 px-ui-5 py-ui-8 text-center')}>
               <span className={emptyIcon} aria-hidden="true"><Search size={24} /></span>
-              <h2 className="m-0 text-[length:var(--soco-type-section)] font-bold text-foreground">Nhập từ khóa để tìm trong {SEARCH_TYPES.find(item => item.key === type)?.label.toLocaleLowerCase('vi-VN')}</h2>
-              <p className="m-0 text-[length:var(--soco-type-body)] text-muted-foreground">Bộ lọc bạn chọn sẽ được giữ khi tìm kiếm.</p>
+              <h2 className="m-0 text-[length:var(--soco-type-section)] font-bold text-foreground">{trUi('search.enterQuery', { name: trUi(SEARCH_TYPES.find(item => item.key === type)?.label ?? 'common.all') })}</h2>
+              <p className="m-0 text-[length:var(--soco-type-body)] text-muted-foreground">{trUi('search.keepFilters')}</p>
             </div>
           )}
         </div>
@@ -257,13 +258,13 @@ export default function SearchResultsPage({ request, sessionId, onOpenProfile, o
 
       <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
         <DialogContent className="top-auto bottom-0 left-0 w-full max-w-none max-h-[85dvh] translate-x-0 translate-y-0 gap-ui-3 rounded-b-none p-ui-4 pb-[calc(var(--soco-space-4)+env(safe-area-inset-bottom))]">
-          <DialogTitle className="m-0 flex min-h-control-touch items-center">Bộ lọc</DialogTitle>
-          <DialogDescription className="sr-only">Thu hẹp kết quả tìm kiếm theo loại và tiêu chí.</DialogDescription>
+          <DialogTitle className="m-0 flex min-h-control-touch items-center">{trUi("common.filter")}</DialogTitle>
+          <DialogDescription className="sr-only">{trUi('search.filterDescription')}</DialogDescription>
           <SearchFilterPanel {...panelProps} showTypes={false} />
           <div className="flex gap-ui-2">
-            {activeCount > 0 && <Button variant="secondary" className="h-11 text-primary" onClick={resetFilters}>Đặt lại</Button>}
+            {activeCount > 0 && <Button variant="secondary" className="h-11 text-primary" onClick={resetFilters}>{trUi("common.reset")}</Button>}
             <Button className="h-11 flex-1" onClick={() => setFiltersOpen(false)}>
-              {activeCount ? 'Áp dụng ' + activeCount + ' bộ lọc' : 'Xem kết quả'}
+              {activeCount ? trUi('search.applyFilters', { count: activeCount }) : trUi('search.showResults')}
             </Button>
           </div>
         </DialogContent>

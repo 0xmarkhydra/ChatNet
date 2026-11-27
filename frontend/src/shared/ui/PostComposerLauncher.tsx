@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useRef } from 'react'
 import { Clapperboard, ImagePlus, MapPin } from 'lucide-react'
 import PostStatusPrompt from './PostStatusPrompt'
@@ -23,10 +24,12 @@ export default function PostComposerLauncher({
   username, displayName, prompt, onCreatePost, onCreateMediaPost, onCreateStory, onCheckIn,
   pending = false, storyBusy = false, flushOnMobile = false,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const quickMediaInput = useRef<HTMLInputElement>(null)
 
   return (
-    <section aria-label="Tạo nội dung mới"
+    <section aria-label={trUi("common.ui.createContent")}
       className={`box-border flex w-full min-w-0 flex-col rounded-2xl border border-[#e5eaf2] bg-white p-3 px-4 shadow-[0_3px_16px_rgba(30,51,96,0.035)] app-mobile:p-3 ${flushOnMobile ? 'app-mobile:rounded-none app-mobile:border-x-0' : 'app-mobile:rounded-[14px]'}`}>
       <div className="flex w-full min-w-0 items-center gap-[11px] app-mobile:gap-2">
         <PostStatusPrompt
@@ -38,25 +41,25 @@ export default function PostComposerLauncher({
           onCreatePost={onCreatePost}
           pending={pending}
         />
-        <div className="flex shrink-0 items-center justify-end gap-1.5 app-mobile:gap-1" role="group" aria-label="Tạo nội dung nhanh">
+        <div className="flex shrink-0 items-center justify-end gap-1.5 app-mobile:gap-1" role="group" aria-label={trUi("common.ui.quickCreateContent")}>
           <input ref={quickMediaInput} className="sr-only" type="file" accept="image/*,video/*" multiple
-            aria-label="Chọn ảnh hoặc video đăng bài"
+            aria-label={trUi("common.ui.chooseMediaPost")}
             onChange={event => {
               const files = Array.from(event.currentTarget.files || [])
               event.currentTarget.value = ''
               if (files.length) onCreateMediaPost(files)
             }} />
-          <button type="button" aria-label="Ảnh / Video" title="Thêm ảnh hoặc video" disabled={pending}
+          <button type="button" aria-label={trUi("common.photoSlashVideo")} title={trUi("feed.addMedia")} disabled={pending}
             className={`${shortcutClass} border-[#e0f0e6] bg-[#e9f8ef] text-[#168658]`}
             onClick={() => quickMediaInput.current?.click()}>
             <ImagePlus size={21} aria-hidden="true" />
           </button>
-          <button type="button" aria-label="Story" title="Tạo Story" disabled={pending || storyBusy}
+          <button type="button" aria-label="Story" title={trUi("feed.createStory")} disabled={pending || storyBusy}
             className={`${shortcutClass} border-[#ebe1fc] bg-[#f3edfe] text-[#8250cb]`}
             onClick={onCreateStory}>
             <Clapperboard size={21} aria-hidden="true" />
           </button>
-          <button type="button" aria-label="Check-in" title="Thêm địa điểm check-in" disabled={pending}
+          <button type="button" aria-label="Check-in" title={trUi("common.ui.addCheckin")} disabled={pending}
             className={`${shortcutClass} border-[#f9e7d3] bg-[#fff3e6] text-[#d47a26]`}
             onClick={onCheckIn}>
             <MapPin size={21} aria-hidden="true" />

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { ArrowLeft, Bookmark, ChevronRight, PencilLine, QrCode, ShieldCheck, UserRoundX } from 'lucide-react'
 import UserAvatar from '@/shared/ui/UserAvatar'
@@ -10,6 +11,8 @@ export function isMobileProfileEdit(view: MobileProfileSettingsView) {
 }
 
 export function MobileProfileScreen({ title, onBack, backDisabled = false, children }: { title: string; onBack: () => void; backDisabled?: boolean; children: ReactNode }) {
+  const trUi = useUiTranslation()
+
   const screen = useRef<HTMLElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   useLayoutEffect(() => {
@@ -18,7 +21,7 @@ export function MobileProfileScreen({ title, onBack, backDisabled = false, child
   }, [title])
   return <section ref={screen} className="flex min-w-0 flex-1 flex-col bg-background pb-[var(--bottom-nav-space,84px)] text-foreground">
     <header className="sticky top-0 z-10 grid h-14 grid-cols-[var(--soco-control-touch)_minmax(0,1fr)_var(--soco-control-touch)] items-center border-0 border-b border-solid border-border bg-card px-ui-2">
-      <button type="button" aria-label="Quay lại" disabled={backDisabled} onClick={onBack} className="grid size-control-touch place-items-center rounded-ui-md border-0 bg-transparent text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"><ArrowLeft size={22} aria-hidden="true" /></button>
+      <button type="button" aria-label={trUi("common.back")} disabled={backDisabled} onClick={onBack} className="grid size-control-touch place-items-center rounded-ui-md border-0 bg-transparent text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"><ArrowLeft size={22} aria-hidden="true" /></button>
       <h2 ref={heading} tabIndex={-1} className="m-0 text-center text-ui-subtitle font-bold leading-tight text-foreground focus:outline-none">{title}</h2>
     </header>
     <div className="grid min-w-0 content-start gap-ui-4 p-ui-3">{children}</div>
@@ -75,9 +78,11 @@ const privacyGroups = [
 ] as const
 
 export function MobileProfilePrivacy({ privacy, loading, busy, error, onRetry, onSave }: { privacy: UserPrivacy | null; loading: boolean; busy: boolean; error: string; onRetry: () => void; onSave: (value: UserPrivacy) => Promise<void> }) {
+  const trUi = useUiTranslation()
+
   return <>
-    <p className="m-0 text-ui-body text-foreground/75">Chọn cách người khác tìm và kết nối với bạn.</p>
-    {loading && !privacy ? <div role="status" className="rounded-ui-lg bg-card p-ui-4">Đang tải cài đặt riêng tư…<div aria-hidden="true" className="mt-ui-3 grid gap-ui-3 motion-safe:animate-pulse">{Array.from({ length: 5 }, (_, i) => <div key={i} className="h-14 rounded-ui-md bg-secondary" />)}</div></div> : !privacy ? <div role="alert" className="rounded-ui-lg bg-card p-ui-4">Không thể tải cài đặt riêng tư.<button type="button" onClick={onRetry} className="ml-ui-2 min-h-control-touch border-0 bg-transparent font-semibold text-primary">Thử lại</button></div> : <>
+    <p className="m-0 text-ui-body text-foreground/75">{trUi("settings.privacyIntro")}</p>
+    {loading && !privacy ? <div role="status" className="rounded-ui-lg bg-card p-ui-4">Đang tải cài đặt riêng tư…<div aria-hidden="true" className="mt-ui-3 grid gap-ui-3 motion-safe:animate-pulse">{Array.from({ length: 5 }, (_, i) => <div key={i} className="h-14 rounded-ui-md bg-secondary" />)}</div></div> : !privacy ? <div role="alert" className="rounded-ui-lg bg-card p-ui-4">Không thể tải cài đặt riêng tư.<button type="button" onClick={onRetry} className="ml-ui-2 min-h-control-touch border-0 bg-transparent font-semibold text-primary">{trUi("common.retry")}</button></div> : <>
       {error && <p role="alert" className="m-0 rounded-ui-md bg-card p-ui-3 text-ui-body text-danger">Lưu thất bại. Cài đặt trước đó vẫn được giữ.</p>}
       {privacyGroups.map(group => <section key={group.title} className="rounded-ui-lg bg-card p-ui-3">
         <h3 className="m-0 px-ui-1 pb-ui-2 text-ui-subtitle font-bold">{group.title}</h3>

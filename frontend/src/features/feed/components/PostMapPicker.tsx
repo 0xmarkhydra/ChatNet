@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { LocateFixed, MapPin } from 'lucide-react'
 import * as maplibregl from 'maplibre-gl'
@@ -9,6 +10,8 @@ maplibregl.setWorkerUrl(workerUrl)
 export default function PostMapPicker({ value, disabled, onConfirm }: {
   value: string; disabled: boolean; onConfirm: (pin: MapCheckIn) => void
 }) {
+  const trUi = useUiTranslation()
+
   const [initial] = useState(() => parseMapCheckIn(value))
   const host = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
@@ -65,12 +68,12 @@ export default function PostMapPicker({ value, disabled, onConfirm }: {
   return <div className="grid min-w-0 gap-2">
     <small>Di chuyển bản đồ và chạm vào một điểm để ghim. Bạn không cần bật GPS.</small>
     <div className="relative overflow-hidden rounded-xl border border-border-subtle">
-      <div ref={host} aria-label="Bản đồ chọn vị trí" style={{ width: '100%', height: 'min(42vh, 300px)' }} />
-      <button type="button" aria-label="Về vị trí của tôi" disabled={!ready || disabled || locating} onClick={locate} className="absolute left-2 top-2 rounded-lg bg-white p-2 shadow"><LocateFixed size={18} /></button>
+      <div ref={host} aria-label={trUi("common.ui.locationMap")} style={{ width: '100%', height: 'min(42vh, 300px)' }} />
+      <button type="button" aria-label={trUi("discover.myLocation")} disabled={!ready || disabled || locating} onClick={locate} className="absolute left-2 top-2 rounded-lg bg-white p-2 shadow"><LocateFixed size={18} /></button>
     </div>
-    {error && <small role="status">{error} {!ready && <button type="button" onClick={() => { setReady(false); setError(''); setAttempt(v => v + 1) }}>Thử lại</button>}</small>}
+    {error && <small role="status">{error} {!ready && <button type="button" onClick={() => { setReady(false); setError(''); setAttempt(v => v + 1) }}>{trUi("common.retry")}</button>}</small>}
     {point && <small className="text-muted-foreground"><MapPin size={14} aria-hidden="true" /> {point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}</small>}
-    <input type="text" aria-label="Tên vị trí đã chọn" placeholder="Tên địa điểm (không bắt buộc)" value={name} maxLength={120} disabled={disabled || !point} onChange={e => setName(e.target.value)} />
+    <input type="text" aria-label={trUi("common.ui.selectedLocation")} placeholder={trUi("common.ui.optionalPlaceName")} value={name} maxLength={120} disabled={disabled || !point} onChange={e => setName(e.target.value)} />
     <button type="button" className="rounded-lg bg-primary px-3 py-2 font-medium text-white disabled:opacity-50" disabled={disabled || !point || !ready} onClick={() => point && onConfirm({ ...point, name })}>Xác nhận vị trí</button>
   </div>
 }

@@ -1,3 +1,4 @@
+import { UiLocaleContext } from "../shared/i18n/locale";
 import ProfileNote from "../features/profile/components/ProfileNote";
 import ConversationCategories, {
   CategoryAssignment,
@@ -225,20 +226,16 @@ import {
 
 const ProfileQr = lazy(() => import("../features/profile/components/ProfileQr"));
 import {
-  defaultBundle,
-  loadCachedBundle,
   resolveEffectiveLocale,
-  saveCachedBundle,
   translateUI,
-  UI_BUNDLE_VERSION,
   UI_MESSAGES,
-  type UIBundle,
 } from "../features/i18n/lib/i18n";
 import {
+  buildAppLanguageOptions,
   buildLanguageOptions,
   filterLanguageOptions,
-  isSupportedLanguageCode,
 } from "../features/i18n/utils/languages";
+import { isAppLocale } from "../shared/i18n/supportedLocales";
 import {
   disableOneSignalPush,
   enableOneSignalPush,
@@ -364,7 +361,7 @@ export default function AuthedApp({
 
   const { isProfileDesktop, postSubmitError, profileBioDraft, profileBusy, profileCityDraft, profilePublicDetailsDraft, profileComposerOpen, profileDisplayNameDraft, profileEditorOpen, profileHasMore, profileHeadingRef, profileIdentityRef, profileLoadSequence, profileMedia, profilePagingBusy, profilePosts, profilePostsBusy, profilePostsError, profileSaving, profileTimelineOpen, profileUsernameDraft, setPostSubmitError, setProfileBioDraft, setProfileBusy, setProfileCityDraft, setProfilePublicDetailsDraft, setProfileComposerOpen, setProfileDisplayNameDraft, setProfileEditorOpen, setProfileHasMore, setProfileMedia, setProfilePosts, setProfilePostsBusy, setProfilePostsError, setProfileSaving, setProfileTimelineOpen, setProfileUsernameDraft } = useProfileState({ sessionId: session?.sessionId ?? null });
 
-  const { appLocale, languageSearch, localePickerOpen, localeSearch, setAppLocale, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setTranslationPickerOpen, setUiBundle, setUiLocaleLoading, translationPickerOpen, uiBundle, uiLocaleLoading } = useAppLocaleState({  });
+  const { appLocale, languageSearch, localePickerOpen, localeSearch, setAppLocale, setLanguageSearch, setLocalePickerOpen, setLocaleSearch, setTranslationPickerOpen, translationPickerOpen, uiBundle, uiLocaleLoading } = useAppLocaleState({  });
 
   const { friendActionBusy, friendActionRef, friendBusyIds, friendMenuId, friendQuery, friendResults, friendSearchError, friendSearchRetry, friendSearching, setFriendActionBusy, setFriendBusyIds, setFriendMenuId, setFriendQuery, setFriendResults, setFriendSearchError, setFriendSearchRetry, setFriendSearching } = useFriendSearch({  });
 
@@ -985,7 +982,7 @@ export default function AuthedApp({
   const activeStory = activeStoryIndex < 0 ? null : stories[activeStoryIndex];
   const effectiveAppLocale = resolveEffectiveLocale(
     appLocale,
-    isSupportedLanguageCode,
+    isAppLocale,
   );
   const interfaceLocale = effectiveAppLocale || "vi";
   const languageOptions = useMemo(
@@ -1000,8 +997,8 @@ export default function AuthedApp({
     [languageOptions, languageSearch],
   );
   const visibleLocaleOptions = useMemo(
-    () => filterLanguageOptions(languageOptions, localeSearch),
-    [languageOptions, localeSearch],
+    () => filterLanguageOptions(buildAppLanguageOptions(interfaceLocale), localeSearch),
+    [interfaceLocale, localeSearch],
   );
   const visibleTranslationSettingsOptions = useMemo(
     () => filterLanguageOptions(languageOptions, translationSettingsSearch),
@@ -1011,6 +1008,7 @@ export default function AuthedApp({
     languageOptions.find((language) => language.value === effectiveAppLocale) ||
     languageOptions[0];
   const t = (key: keyof typeof UI_MESSAGES) => translateUI(uiBundle, key);
+  const uiLocaleContext = useMemo(() => ({ locale: effectiveAppLocale, bundle: uiBundle }), [effectiveAppLocale, uiBundle]);
 
   const { connectUrl, copyInviteLink, openConnectSurface, shareMyProfile } = useInviteSharing({ setActiveConversationId, setFriendQuery, setNewChatMode, setQuickCreateOpen, setTab });
 
@@ -1104,62 +1102,8 @@ export default function AuthedApp({
   });
 
   useEffect(() => {
-    document.documentElement.lang = effectiveAppLocale;
-
-    const cached = loadCachedBundle(effectiveAppLocale);
-    if (cached) {
-      setUiBundle(cached);
-    } else {
-      setUiBundle(defaultBundle());
-    }
-
-    if (effectiveAppLocale === "vi" || !session?.token) {
-      setUiLocaleLoading(false);
-      return;
-    }
-
-    const sessionId = session.sessionId;
-    let cancelled = false;
-    setUiLocaleLoading(true);
-
-    apiFetch("/api/i18n/bundle", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        locale: effectiveAppLocale,
-        version: UI_BUNDLE_VERSION,
-        messages: UI_MESSAGES,
-      }),
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("cannot load UI locale");
-        return response.json() as Promise<{
-          locale: string;
-          messages: UIBundle;
-        }>;
-      })
-      .then((result) => {
-        if (
-          cancelled ||
-          sessionRef.current?.sessionId !== sessionId ||
-          result.locale !== effectiveAppLocale
-        )
-          return;
-        const bundle = { ...defaultBundle(), ...result.messages };
-        setUiBundle(bundle);
-        saveCachedBundle(effectiveAppLocale, bundle);
-      })
-      .catch(() => {
-        // Cached bundle or Vietnamese source remains available as a safe fallback.
-      })
-      .finally(() => {
-        if (!cancelled) setUiLocaleLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveAppLocale, session?.token]);
+    document.documentElement.lang = effectiveAppLocale === "zh" ? "zh-Hans" : effectiveAppLocale;
+  }, [effectiveAppLocale]);
 
   useEffect(() => {
     if (!session?.token) return;
@@ -1944,11 +1888,13 @@ export default function AuthedApp({
   );
 
   return (
+    <UiLocaleContext.Provider value={uiLocaleContext}>
     <AppLayout
       activeTab={tab}
       className={`app-shell modern-shell app-layout ${tab === "contacts" || tab === "notifications" ? "friends-layout-active" : ""} ${tab === "chat" && activeConversation && !desktopSection ? "conversation-open" : ""} ${tab === "chat" && !desktopSection && translationSettingsConversationId === null ? "chat-rail-screen" : ""}`}
       sidebar={
         <AppSidebar
+        t={t}
         tab={tab}
         section={tab === "chat" ? desktopSection : null}
         username={session.user.username}
@@ -2675,7 +2621,7 @@ export default function AuthedApp({
           normalizedSearch={normalizedSearch}
           onSearchSubmit={query => navigate(ROUTE.search + '?q=' + encodeURIComponent(query))}
           communityCard={<CommunitySuggestions
-            title="Cộng đồng của bạn"
+            title={uiBundle["copy.feed.yourCommunities"]}
             joinedItems={conversations.filter(group => group.type === "group").slice(0, 3).map(group => ({
               id: group.id, name: group.name, memberCount: group.memberCount,
               avatarUrl: group.avatarUrl,
@@ -2899,5 +2845,6 @@ export default function AuthedApp({
         }
       />
     </AppLayout>
+    </UiLocaleContext.Provider>
   );
 }

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useId } from 'react'
 import { UsersRound } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
@@ -27,6 +28,8 @@ function RailSkeleton() {
 
 /** Suggested people and public communities; a section that fails or is empty is left out rather than shown as an error. */
 export default function SearchRail({ data, className, onOpenProfile, onOpenCommunity }: SearchRailProps) {
+  const trUi = useUiTranslation()
+
   const idPrefix = useId()
   const people = data.people.items.slice(0, ROWS)
   const communities = data.communities.items.slice(0, ROWS)
@@ -35,10 +38,10 @@ export default function SearchRail({ data, className, onOpenProfile, onOpenCommu
   if (!showPeople && !showCommunities) return null
 
   return (
-    <aside className={cn('grid content-start gap-ui-3', className)} aria-label="Gợi ý cho bạn">
+    <aside className={cn('grid content-start gap-ui-3', className)} aria-label={trUi("common.ui.suggestionsForYou")}>
       {showPeople && (
         <section className={card} aria-labelledby={idPrefix + 'people'}>
-          <h2 id={idPrefix + 'people'} className={cn(cardTitle, 'mb-ui-3')}>Gợi ý kết nối</h2>
+          <h2 id={idPrefix + 'people'} className={cn(cardTitle, 'mb-ui-3')}>{trUi("contacts.connectSuggestions")}</h2>
           {data.people.loading ? <RailSkeleton /> : (
             <ul className="m-0 grid list-none p-0">
               {people.map(person => (
@@ -48,7 +51,7 @@ export default function SearchRail({ data, className, onOpenProfile, onOpenCommu
                     <strong className={rowTitle}>{person.displayName || person.username}</strong>
                     <small className={rowMeta}>{person.reason}</small>
                   </div>
-                  <Button variant="secondary" size="sm" className="text-primary max-lg:h-11" onClick={() => onOpenProfile(person.username, person.displayName || person.username)}>Xem</Button>
+                  <Button variant="secondary" size="sm" className="text-primary max-lg:h-11" onClick={() => onOpenProfile(person.username, person.displayName || person.username)}>{trUi('search.view')}</Button>
                 </li>
               ))}
             </ul>
@@ -57,7 +60,7 @@ export default function SearchRail({ data, className, onOpenProfile, onOpenCommu
       )}
       {showCommunities && (
         <section className={card} aria-labelledby={idPrefix + 'communities'}>
-          <h2 id={idPrefix + 'communities'} className={cn(cardTitle, 'mb-ui-3')}>Cộng đồng nổi bật</h2>
+          <h2 id={idPrefix + 'communities'} className={cn(cardTitle, 'mb-ui-3')}>{trUi('search.featuredCommunities')}</h2>
           {data.communities.loading ? <RailSkeleton /> : (
             <ul className="m-0 grid list-none p-0">
               {communities.map(community => (
@@ -65,9 +68,9 @@ export default function SearchRail({ data, className, onOpenProfile, onOpenCommu
                   <span className={iconTile} aria-hidden="true"><UsersRound size={22} /></span>
                   <div className={rowCopy}>
                     <strong className={rowTitle}>{community.name}</strong>
-                    <small className={rowMeta}>{community.memberCount.toLocaleString('vi-VN')} thành viên</small>
+                    <small className={rowMeta}>{trUi('common.countMembers', { count: community.memberCount })}</small>
                   </div>
-                  <Button variant="secondary" size="sm" className="text-primary max-lg:h-11" onClick={() => onOpenCommunity(community.name)}>Xem</Button>
+                  <Button variant="secondary" size="sm" className="text-primary max-lg:h-11" onClick={() => onOpenCommunity(community.name)}>{trUi('search.view')}</Button>
                 </li>
               ))}
             </ul>

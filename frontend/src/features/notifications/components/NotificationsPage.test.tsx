@@ -7,6 +7,7 @@ import type { PostMentionNotification } from '../../feed'
 import type { Session } from '../../../shared/types/session'
 import { SessionContext } from '../../../shared/context/SessionContext'
 import NotificationsPage from './NotificationsPage'
+import { UiLocaleContext } from '../../../shared/i18n/locale'
 
 const request: FriendConnection = {
   id: 7, username: 'friend', displayName: 'Friend', online: false,
@@ -70,14 +71,14 @@ function mention(id: number): PostMentionNotification {
   return { id, postId: id, author: 'linh', authorDisplayName: 'Linh', createdAt: `2026-11-${10 + id}` }
 }
 
-function render(mentions: PostMentionNotification[], search = '') {
+function render(mentions: PostMentionNotification[], search = '', locale = 'vi') {
   const session: Session = { token: 'test', sessionId: motionSessionId, user: { id: 1, email: 'test@example.com', username: 'linh', displayName: 'Linh' } }
-  act(() => root.render(<SessionContext.Provider value={{ session, sessionRef: { current: session } }}><NotificationsPage
+  act(() => root.render(<UiLocaleContext.Provider value={{ locale }}><SessionContext.Provider value={{ session, sessionRef: { current: session } }}><NotificationsPage
     requests={[]} conversations={[]} mentions={mentions} search={search}
     busyFriendIds={new Set()} onReadMention={noop} onOpenMention={noop}
     onAccept={noop} onDecline={noop} onOpenConversation={noop}
     onOpenInvitations={noop} onOpenFriend={noop} onSettings={noop}
-  /></SessionContext.Provider>))
+  /></SessionContext.Provider></UiLocaleContext.Provider>))
 }
 
 describe('live notification entry motion', () => {
@@ -115,6 +116,28 @@ describe('live notification entry motion', () => {
     motionSessionId = 'account-b'
     render([mention(4)])
     expect(animated).toHaveBeenCalledTimes(1)
+  })
+
+  it('localizes existing tagged-post notifications and preserves author names on language switch', () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
+    const entries = [{ ...mention(1), authorDisplayName: 'Nguyễn An' }]
+    for (const [locale, filter, subtitle, action] of [
+      ['vi','Nhắc đến','đã gắn thẻ bạn trong một bài viết','Mở bài viết được gắn thẻ'],
+      ['en','Mentions','tagged you in a post','Open tagged post'],
+      ['zh','提及','在一篇帖子中标记了你','打开标记你的帖子'],
+      ['ja','メンション','投稿であなたをタグ付けしました','タグ付けされた投稿を開く'],
+      ['ko','언급','게시물에 나를 태그했습니다','태그된 게시물 열기'],
+    ]) {
+      render(entries, '', locale)
+      expect(host.querySelector('button[role="tab"]:last-child')?.textContent).toBe(filter)
+      expect(host.querySelector('.np-notification-copy strong')?.textContent).toBe('Nguyễn An')
+      expect(host.querySelector('.np-notification-copy span')?.textContent).toBe(subtitle)
+      expect(host.querySelector('.np-detail-person p')?.textContent).toBe(subtitle)
+      expect(host.querySelector('.np-primary')?.textContent).toBe(action)
+    }
+    render(entries, 'tagged', 'en')
+    expect(host.querySelectorAll('.np-notification-row')).toHaveLength(1)
   })
 
   it('leaves the new notification visible without animating under reduced motion', () => {

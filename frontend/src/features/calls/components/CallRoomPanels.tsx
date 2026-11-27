@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { type Dispatch, type SetStateAction } from 'react'
 import { type Participant } from 'livekit-client'
 import { ChevronDown, Languages, Mic, Settings2, ShieldCheck, Sparkles, Volume2 } from 'lucide-react'
@@ -13,22 +14,24 @@ type CallGroupPanelProps = {
 }
 
 export function CallGroupPanel({ participants, localParticipant, translationOn, toggleTranslation, setTranslationSheetOpen }: CallGroupPanelProps) {
+  const trUi = useUiTranslation()
+
   return (
-<aside className="call-group-panel" aria-label="Người tham gia cuộc gọi nhóm">
-              <header><strong>Người tham gia</strong><span>{participants.length} người đang kết nối</span></header>
+<aside className="call-group-panel" aria-label={trUi("calls.groupParticipants")}>
+              <header><strong>{trUi("calls.participants")}</strong><span>{participants.length} người đang kết nối</span></header>
               <div className="call-group-members">
-                {participants.length === 0 ? <p>Đang kết nối với phòng gọi…</p> : participants.map((participant) => (
+                {participants.length === 0 ? <p>{trUi("calls.connectingRoom")}</p> : participants.map((participant) => (
                   <div key={participant.identity} className="call-group-member">
                     <span className="call-group-member-avatar">{participant === localParticipant ? 'B' : identityLabel(participant.identity).slice(0, 2)}</span>
-                    <span><strong>{participant === localParticipant ? 'Bạn' : identityLabel(participant.identity)}</strong><small>{participant.isSpeaking ? 'Đang nói' : 'Đang nghe'}</small></span>
+                    <span><strong>{participant === localParticipant ? trUi("common.you") : identityLabel(participant.identity)}</strong><small>{participant.isSpeaking ? trUi("calls.speaking") : trUi("calls.listening")}</small></span>
                     {participant.isSpeaking ? <Volume2 size={17} /> : <Mic size={17} />}
                   </div>
                 ))}
               </div>
               <footer>
-                <strong><Languages size={17} /> Dịch AI {translationOn ? 'đã bật' : 'đang tắt'}</strong>
+                <strong><Languages size={17} />{trUi("chat.aiTranslation") + ' '}{translationOn ? 'đã bật' : 'đang tắt'}</strong>
                 <button type="button" onClick={() => { if (!translationOn) toggleTranslation(); else setTranslationSheetOpen(true) }}>
-                  <Settings2 size={15} /> {translationOn ? 'Xem bản dịch' : 'Thiết lập dịch'}
+                  <Settings2 size={15} /> {translationOn ? trUi("calls.showTranslation") : trUi("calls.translationOptions")}
                 </button>
               </footer>
             </aside>
@@ -50,16 +53,18 @@ type CallTranslationPanelProps = {
 }
 
 export function CallTranslationPanel({ callTargetLanguage, languageOptions, translatingIds, waitingConsentCount, translationError, captions, captionMode, setTranslationSheetOpen, setCallTargetLanguage, setTranslationError, setTranslationRetryEpoch }: CallTranslationPanelProps) {
+  const trUi = useUiTranslation()
+
   return (
-<aside className="call-live-panel" aria-label="Dịch trực tiếp">
+<aside className="call-live-panel" aria-label={trUi("calls.liveTranslation")}>
               <div className="call-sheet-grabber" aria-hidden="true" />
               <header className="call-live-heading">
                 <div className="call-live-title-icon"><Languages size={19} /></div>
                 <div className="call-live-heading-copy">
-                  <strong>Dịch trực tiếp</strong>
+                  <strong>{trUi("calls.liveTranslation")}</strong>
                   <small>Phụ đề và giọng dịch tự động</small>
                 </div>
-                <button type="button" aria-label="Thu gọn bảng dịch" onClick={() => setTranslationSheetOpen(false)}>
+                <button type="button" aria-label={trUi("common.ui.collapseTranslation")} onClick={() => setTranslationSheetOpen(false)}>
                   <ChevronDown size={20} />
                 </button>
               </header>
@@ -83,7 +88,7 @@ export function CallTranslationPanel({ callTargetLanguage, languageOptions, tran
               {translationError && (
                 <div className="call-live-error" role="alert">
                   <span>{translationError}</span>
-                  <button type="button" onClick={() => { setTranslationError(''); setTranslationRetryEpoch((value) => value + 1) }}>Thử lại</button>
+                  <button type="button" onClick={() => { setTranslationError(''); setTranslationRetryEpoch((value) => value + 1) }}>{trUi("common.retry")}</button>
                 </div>
               )}
               <div className="call-live-transcript" aria-live="polite">

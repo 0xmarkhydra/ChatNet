@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Bell, MessageCircle, PencilLine, Search, UserRoundPlus, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import UiIcon from "../../shared/ui/UiIcon";
@@ -50,12 +51,14 @@ function QuickCreateItem({ icon, title, hint, onClick }: { icon: ReactNode; titl
 }
 
 function ChatActions(p: HeaderActionsProps) {
+  const trUi = useUiTranslation()
+
   const { chat, desktopSection } = p;
   const groups = desktopSection === "groups";
   return (
     <>
       {!groups && (
-        <HeaderIconButton className="appbar-qr-action" aria-label="Quét QR" onClick={chat.onScanQr}>
+        <HeaderIconButton className="appbar-qr-action" aria-label={trUi("profile.scanQr")} onClick={chat.onScanQr}>
           <UiIcon name="qr" size={28} />
         </HeaderIconButton>
       )}
@@ -63,21 +66,21 @@ function ChatActions(p: HeaderActionsProps) {
         <HeaderIconButton
           className={cn("appbar-create-trigger appbar-primary-action", chat.quickCreateOpen && "active")}
           type="button"
-          aria-label={groups ? "Tạo cộng đồng mới" : "Tạo mới"}
+          aria-label={groups ? trUi("chat.communityCreate") : trUi("common.new")}
           aria-expanded={groups ? false : chat.quickCreateOpen}
           aria-haspopup={groups ? undefined : "menu"}
           onClick={groups ? chat.onCreateCommunity : chat.onToggleQuickCreate}
         >
-          <UiIcon name="plus" size={23} /><span className="appbar-action-label">{groups ? "Tạo cộng đồng" : "Tạo mới"}</span>
+          <UiIcon name="plus" size={23} /><span className="appbar-action-label">{groups ? trUi("chat.communityCreate") : trUi("common.new")}</span>
         </HeaderIconButton>
         {chat.quickCreateOpen && !groups && (
           <>
-            <button type="button" className="quick-create-dismiss" aria-label="Đóng menu tạo mới" onClick={chat.onCloseQuickCreate} />
-            <div className="quick-create-menu" role="menu" aria-label="Tạo cuộc trò chuyện mới">
-              <div className="quick-create-caption">TẠO MỚI</div>
-              <QuickCreateItem icon={<Search size={19} aria-hidden="true" />} title="Tìm & kết nối" hint="Tìm bạn bè bằng tên hoặc @username" onClick={chat.onConnect} />
-              <QuickCreateItem icon={<MessageCircle size={19} aria-hidden="true" />} title="Chat riêng" hint="Bắt đầu cuộc trò chuyện 1-1" onClick={chat.onNewDirect} />
-              <QuickCreateItem icon={<Users size={19} aria-hidden="true" />} title="Tạo nhóm" hint="Trò chuyện cùng nhiều người" onClick={chat.onNewGroup} />
+            <button type="button" className="quick-create-dismiss" aria-label={trUi("app.closeCreate")} onClick={chat.onCloseQuickCreate} />
+            <div className="quick-create-menu" role="menu" aria-label={trUi("chat.newConversationFull")}>
+              <div className="quick-create-caption">{trUi("app.create")}</div>
+              <QuickCreateItem icon={<Search size={19} aria-hidden="true" />} title={trUi("contacts.findConnect")} hint={trUi("contacts.friendSearch")} onClick={chat.onConnect} />
+              <QuickCreateItem icon={<MessageCircle size={19} aria-hidden="true" />} title={trUi("app.privateChat")} hint={trUi("app.startChat")} onClick={chat.onNewDirect} />
+              <QuickCreateItem icon={<Users size={19} aria-hidden="true" />} title={trUi("chat.groupCreate")} hint={trUi("app.groupChat")} onClick={chat.onNewGroup} />
             </div>
           </>
         )}
@@ -88,10 +91,12 @@ function ChatActions(p: HeaderActionsProps) {
 
 /** Page actions live at the end; the existing desktop sidebar owns notifications. */
 export default function HeaderActions(p: HeaderActionsProps) {
+  const trUi = useUiTranslation()
+
   const notification = (
     <HeaderIconButton
       className="notification-appbar"
-      aria-label={p.tab === "notifications" ? "Trang Thông báo" : "Mở thông báo"}
+      aria-label={p.tab === "notifications" ? trUi("notifications.page") : trUi("notifications.open")}
       aria-current={p.tab === "notifications" ? "page" : undefined}
       onClick={p.tab === "notifications" ? undefined : p.onOpenNotifications}
     >
@@ -110,8 +115,8 @@ export default function HeaderActions(p: HeaderActionsProps) {
         <HeaderIconButton
           className="social-feed-header-community appbar-mobile-community"
           type="button"
-          aria-label="Cộng đồng"
-          title="Cộng đồng"
+          aria-label={trUi("feed.community")}
+          title={trUi("feed.community")}
           aria-pressed={p.feed.communitiesOpen}
           onClick={p.feed.onToggleCommunities}
         >
@@ -121,22 +126,22 @@ export default function HeaderActions(p: HeaderActionsProps) {
       break;
     case "profile":
       pageActions = (
-        <HeaderIconButton className="profile-page-header-new appbar-primary-action" type="button" aria-label="Đăng bài" onClick={p.profile.onNewPost}>
-          <PencilLine size={20} aria-hidden="true" /><span className="appbar-action-label">Đăng bài</span>
+        <HeaderIconButton className="profile-page-header-new appbar-primary-action" type="button" aria-label={trUi("feed.publish")} onClick={p.profile.onNewPost}>
+          <PencilLine size={20} aria-hidden="true" /><span className="appbar-action-label">{trUi("feed.publish")}</span>
         </HeaderIconButton>
       );
       break;
     case "notifications":
       pageActions = (
-        <HeaderIconButton className="appbar-primary-action" aria-label="Đăng bài" onClick={p.notifications.onNewPost}>
-          <UiIcon name="plus" size={21} /><span className="appbar-action-label">Đăng bài</span>
+        <HeaderIconButton className="appbar-primary-action" aria-label={trUi("feed.publish")} onClick={p.notifications.onNewPost}>
+          <UiIcon name="plus" size={21} /><span className="appbar-action-label">{trUi("feed.publish")}</span>
         </HeaderIconButton>
       );
       break;
     case "contacts":
       pageActions = (
-        <HeaderIconButton className="appbar-primary-action" aria-label="Thêm bạn" onClick={p.contacts.onAddFriend}>
-          <UserRoundPlus size={19} aria-hidden="true" /><span className="appbar-action-label">Thêm bạn</span>
+        <HeaderIconButton className="appbar-primary-action" aria-label={trUi("contacts.addFriendAlt")} onClick={p.contacts.onAddFriend}>
+          <UserRoundPlus size={19} aria-hidden="true" /><span className="appbar-action-label">{trUi("contacts.addFriendAlt")}</span>
         </HeaderIconButton>
       );
       break;

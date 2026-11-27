@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState, type ReactNode, type RefObject } from 'react'
 import { BriefcaseBusiness, GraduationCap, MapPin } from 'lucide-react'
 
@@ -22,6 +23,8 @@ type Props = {
 }
 
 export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice, compact = false, centered = false, bio, headingRef, note }: Props) {
+  const trUi = useUiTranslation()
+
   const [failedCover, setFailedCover] = useState<string>()
   const showCover = coverUrl && coverUrl !== failedCover
   const coverClass = showCover ? 'has-user-cover' : fallbackCoverTone === undefined ? 'has-default-cover' : `has-account-cover avatar-tone-${fallbackCoverTone}`
@@ -34,7 +37,7 @@ export default function ProfileHero({ displayName, username, city, workplace, sc
     return (
       <section className="profile-mobile-full-hero relative mx-auto w-full min-w-0 shrink-0 bg-card">
         <div className={`relative h-[250px] w-full overflow-hidden bg-[image:var(--soco-avatar-gradient)] ${coverClass}`}>
-          {showCover && <img className="block size-full object-cover" src={coverUrl} alt="Ảnh bìa" draggable={false} onError={() => setFailedCover(coverUrl)} />}
+          {showCover && <img className="block size-full object-cover" src={coverUrl} alt={trUi("profile.cover")} draggable={false} onError={() => setFailedCover(coverUrl)} />}
           <div className="absolute inset-x-0 top-28 z-10">{note}</div>
           {coverAction}
         </div>
@@ -55,7 +58,7 @@ export default function ProfileHero({ displayName, username, city, workplace, sc
   return (
     <section className={'profile-page-hero' + (compact ? ' profile-page-hero-compact' : '')}>
       <div className={`profile-page-cover ${coverClass}`}>
-        {showCover && <img src={coverUrl} alt="Ảnh bìa" draggable={false} onError={() => setFailedCover(coverUrl)} />}
+        {showCover && <img src={coverUrl} alt={trUi("profile.cover")} draggable={false} onError={() => setFailedCover(coverUrl)} />}
         {coverAction}
       </div>
       <div className="profile-page-hero-bottom">

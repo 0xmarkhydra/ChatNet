@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Send } from 'lucide-react'
 import { Button } from '../../../shared/ui/button'
@@ -10,6 +11,8 @@ export default function StoryTextComposer({ busy, onBack, onPublish }: {
   onBack: () => void
   onPublish: (input: TextStoryInput) => Promise<boolean>
 }) {
+  const trUi = useUiTranslation()
+
   const [text, setText] = useState('')
   const [background, setBackground] = useState<StoryBackground>('berry')
   const [publishFailed, setPublishFailed] = useState(false)
@@ -21,7 +24,7 @@ export default function StoryTextComposer({ busy, onBack, onPublish }: {
   useEffect(() => { input.current?.focus({ preventScroll: true }) }, [])
 
   return (
-    <form className="grid min-w-0 gap-4" aria-label="Soạn tin văn bản" onSubmit={async event => {
+    <form className="grid min-w-0 gap-4" aria-label={trUi("common.ui.composeTextStory")} onSubmit={async event => {
       event.preventDefault()
       if (!canPublish) return
       setPublishFailed(false)
@@ -32,7 +35,7 @@ export default function StoryTextComposer({ busy, onBack, onPublish }: {
           <label className="text-sm font-semibold" htmlFor="story-text">Nội dung tin</label>
           <Textarea ref={input} id="story-text" value={text} onChange={event => setText(event.currentTarget.value)}
             aria-describedby="story-text-length" aria-invalid={length > STORY_TEXT_LIMIT}
-            placeholder="Bạn muốn chia sẻ điều gì?" disabled={busy} />
+            placeholder={trUi("common.ui.storySharePrompt")} disabled={busy} />
           <p className="m-0 text-sm text-muted-foreground" id="story-text-length">
             {length} / {STORY_TEXT_LIMIT} ký tự{length > STORY_TEXT_LIMIT && ' · Nội dung quá dài'}
           </p>
@@ -51,7 +54,7 @@ export default function StoryTextComposer({ busy, onBack, onPublish }: {
             </div>
           </fieldset>
         </div>
-        <section aria-label="Xem trước tin văn bản" data-story-background={background}
+        <section aria-label={trUi("common.ui.previewTextStory")} data-story-background={background}
           className="grid min-w-0 place-items-center rounded-xl p-4 text-center font-semibold text-white sm:min-h-52">
           <p className="m-0 max-h-48 w-full overflow-auto wrap-anywhere whitespace-pre-wrap">
             {text.trim() || 'Nội dung tin sẽ hiện ở đây'}
@@ -61,8 +64,8 @@ export default function StoryTextComposer({ busy, onBack, onPublish }: {
       <p className="m-0 text-sm text-muted-foreground">Tin sẽ hiển thị trong 24 giờ.</p>
       {publishFailed && <p role="alert" className="m-0 text-sm text-destructive">Không đăng được tin. Bản nháp vẫn được giữ lại.</p>}
       <div className="flex flex-wrap justify-between gap-2">
-        <Button type="button" variant="secondary" aria-label="Quay lại chọn loại tin" onClick={onBack} disabled={busy}><ArrowLeft size={17} aria-hidden="true" /> Quay lại</Button>
-        <Button type="submit" disabled={!canPublish}><Send size={17} aria-hidden="true" /> {busy ? 'Đang đăng...' : 'Đăng Story'}</Button>
+        <Button type="button" variant="secondary" aria-label={trUi("common.ui.backStoryType")} onClick={onBack} disabled={busy}><ArrowLeft size={17} aria-hidden="true" />{trUi("common.back")}</Button>
+        <Button type="submit" disabled={!canPublish}><Send size={17} aria-hidden="true" /> {busy ? trUi("feed.posting") : trUi("feed.publishStory")}</Button>
       </div>
     </form>
   )

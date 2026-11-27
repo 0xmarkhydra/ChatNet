@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Plus, Search, Pin, RefreshCw, Images, Users, Languages, MoreHorizontal, X, UserPlus, Check, SmilePlus, LoaderCircle, Ban, Hash, CornerUpLeft, Forward, ShieldAlert } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
@@ -237,6 +238,8 @@ export default function ChatSection({
   visibleLanguageOptions,
   visibleMessages,
 }: ChatSectionProps) {
+  const trUi = useUiTranslation()
+
   const {
     beginConversationLongPress, beginMessageLongPress, cancelConversationLongPress,
     cancelMessageLongPress, moveConversationLongPress, moveMessageLongPress,
@@ -681,7 +684,7 @@ export default function ChatSection({
                   }}
                 />
                 {channelSidebarOpen && <button type="button" className="group-channel-sidebar-overlay"
-                  aria-label="Đóng danh sách kênh" onClick={() => setChannelSidebarOpen(false)} />}
+                  aria-label={trUi("chat.closeChannelList")} onClick={() => setChannelSidebarOpen(false)} />}
               </>
             )}
             <DesktopConversationRail
@@ -790,16 +793,16 @@ export default function ChatSection({
                 <div className="chat-file-drop-overlay" role="status" aria-live="polite">
                   <div className="chat-file-drop-card">
                     <Images size={32} aria-hidden="true" />
-                    <strong>Thả ảnh hoặc tệp vào đây</strong>
-                    <span>Tệp sẽ được thêm vào tin nhắn, chưa gửi ngay · Tối đa 10 tệp</span>
+                    <strong>{trUi("chat.dropFiles")}</strong>
+                    <span>{trUi("chat.attachLimit")}</span>
                   </div>
                 </div>
               )}
               {!activeConversation ? (
                 <div className="conversation-empty">
-                  <SocoEmptyState kind="chat" title="Kết nối không biên giới"
-                    description="Chọn một cuộc trò chuyện để bắt đầu nhắn tin và dịch AI tự động."
-                    action={<SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn mới</SocoTextAction>}
+                  <SocoEmptyState kind="chat" title={trUi("chat.connectWithoutBorders")}
+                    description={trUi("chat.noConversationSelected")}
+                    action={<SocoTextAction onClick={() => openConnectSurface()}>{trUi("contacts.findFriends")}</SocoTextAction>}
                   />
                 </div>
               ) : (
@@ -852,17 +855,16 @@ export default function ChatSection({
                   />
 
                   {chatFriend && chatFriendRelationship !== 'accepted' && (friendSyncError || friendSyncSessionId === session?.sessionId) && (
-                    <div className={`chat-friend-bar relationship-${chatFriendRelationship}`} aria-label="Kết bạn trong cuộc trò chuyện">
+                    <div className={`chat-friend-bar relationship-${chatFriendRelationship}`} aria-label={trUi("common.ui.friendInChat")}>
                       <span role="status">
                         <UserPlus size={18} aria-hidden="true" />
-                        {friendSyncError || (friendSyncSessionId !== session?.sessionId ? 'Đang tải trạng thái kết bạn...' :
-                          chatFriendRelationship === 'incoming' ? 'Bạn nhận được lời mời kết bạn' :
-                          chatFriendRelationship === 'outgoing' ? 'Đã gửi lời mời kết bạn' : 'Hai bạn chưa kết bạn')}
+                        {friendSyncError || (friendSyncSessionId !== session?.sessionId ? trUi("chat.friendStatusLoading") :
+                          chatFriendRelationship === 'incoming' ? trUi("chat.incomingFriend") :
+                          chatFriendRelationship === 'outgoing' ? trUi("chat.friendRequestSent") : trUi("chat.notFriends"))}
                       </span>
                       {friendSyncError ? (
                         <button type="button" disabled={friendSyncBusy} onClick={() => void refreshFriendConnections()}>
-                          <RefreshCw size={16} aria-hidden="true" /> Thử lại
-                        </button>
+                          <RefreshCw size={16} aria-hidden="true" />{trUi("common.retry")}</button>
                       ) : friendSyncSessionId === session?.sessionId && (
                         <div className="chat-friend-actions">
                           <button
@@ -873,12 +875,11 @@ export default function ChatSection({
                           >
                             {chatFriendRelationship === 'incoming' ? <Check size={16} aria-hidden="true" /> :
                               chatFriendRelationship === 'outgoing' ? <X size={16} aria-hidden="true" /> : <UserPlus size={16} aria-hidden="true" />}
-                            {chatFriendRelationship === 'incoming' ? 'Chấp nhận' : chatFriendRelationship === 'outgoing' ? 'Hủy lời mời' : 'Gửi lời mời kết bạn'}
+                            {chatFriendRelationship === 'incoming' ? trUi("common.accept") : chatFriendRelationship === 'outgoing' ? trUi("contacts.cancelInvitation") : trUi("chat.sendFriendRequest")}
                           </button>
                           {chatFriendRelationship === 'incoming' && (
                             <button type="button" disabled={friendBusyIds.has(chatFriend.id)} onClick={() => void actOnFriend(chatFriend, true)}>
-                              <X size={16} aria-hidden="true" /> Từ chối
-                            </button>
+                              <X size={16} aria-hidden="true" />{trUi("common.decline")}</button>
                           )}
                         </div>
                       )}
@@ -999,13 +1000,11 @@ export default function ChatSection({
                     <div className="chat-blocked-composer" role="status" aria-live="polite">
                       <Ban size={20} aria-hidden="true" />
                       <div>
-                        <strong>{activeConversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này'}</strong>
-                        <span>Không thể nhắn tin, gọi điện hoặc gửi tệp trong cuộc trò chuyện này.</span>
+                        <strong>{activeConversation.blockedByOther ? trUi("chat.blockedBy") : trUi("chat.blockedUser")}</strong>
+                        <span>{trUi("chat.blockedConversation")}</span>
                       </div>
                       {activeConversation.blockedByMe && !activeConversation.blockedByOther && activeConversation.otherUserId && (
-                        <button type="button" onClick={() => void unblockContact(activeConversation.otherUserId!)} disabled={blockedBusy}>
-                          Bỏ chặn
-                        </button>
+                        <button type="button" onClick={() => void unblockContact(activeConversation.otherUserId!)} disabled={blockedBusy}>{trUi("contacts.unblock")}</button>
                       )}
                     </div>
                   ) : (mlsPilotMode === 'e2ee' || mlsPilotMode === 'pending') ? null : (
@@ -1111,9 +1110,9 @@ export default function ChatSection({
             {groupSettingsOpen && activeConversation?.type === 'group' && (
               <>
                 <button type="button" className="group-sidebar-scrim"
-                  aria-label="Đóng thanh quản lý nhóm"
+                  aria-label={trUi("chat.groupManageClose")}
                   onClick={() => setGroupSettingsOpen(false)} />
-                <aside className="group-settings-sidebar" id="group-settings-sidebar" aria-label="Thanh bên quản lý nhóm">
+                <aside className="group-settings-sidebar" id="group-settings-sidebar" aria-label={trUi("chat.groupSidebar")}>
                   <GroupSettingsPanel
                     key={`${activeConversation.id}:${groupManagementSection}`}
                     initialSection={groupManagementSection}

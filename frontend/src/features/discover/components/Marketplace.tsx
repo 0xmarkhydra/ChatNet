@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { ClipboardList, Info, PackageSearch, Plus, PlusCircle, ShoppingBag, ShoppingCart } from 'lucide-react'
 import { useLatest } from '../../../shared/hooks/useLatest'
@@ -52,6 +53,8 @@ export default function Marketplace(props: Props) {
 }
 
 function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
+  const trUi = useUiTranslation()
+
   const apiRef = useLatest(request)
   const revision = useRef(0)
   const readRevision = useRef(0)
@@ -220,8 +223,8 @@ function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
       <header className="flex min-h-16 flex-wrap items-center gap-3 border-b border-border-subtle bg-card px-2.5 py-2 sm:gap-4 sm:px-6">
         <h1 className="m-0! text-ui-page! font-bold tracking-[-0.3px]! text-foreground">Marketplace</h1>{/* design-debt-ignore: the global h1 rule in styles.css wins over layered utilities */}
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3 sm:gap-4">
-        <SearchField aria-label="Tìm trong Marketplace" placeholder="Tìm sản phẩm, mô tả..." value={query} onValueChange={setQuery} className="order-last basis-full sm:order-none sm:max-w-90 sm:flex-1 sm:basis-60"/>
-        <button type="button" aria-label={`Giỏ hàng, ${cart.length} sản phẩm`} onClick={() => setView('cart')} className="relative grid size-control-touch flex-none cursor-pointer place-items-center rounded-ui-md border border-border bg-card text-primary hover:bg-secondary">
+        <SearchField aria-label={trUi("common.ui.marketSearch")} placeholder={trUi("common.ui.searchProductDescription")} value={query} onValueChange={setQuery} className="order-last basis-full sm:order-none sm:max-w-90 sm:flex-1 sm:basis-60"/>
+        <button type="button" aria-label={trUi("common.ui.cartCount", { v1: String(cart.length) })} onClick={() => setView('cart')} className="relative grid size-control-touch flex-none cursor-pointer place-items-center rounded-ui-md border border-border bg-card text-primary hover:bg-secondary">
           <ShoppingCart size={20} aria-hidden="true"/>
           {cart.length > 0 && <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-ui-caption font-bold text-white">{cart.length}</span>}
         </button>
@@ -232,7 +235,7 @@ function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
       <aside className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-3.5 lg:w-70 lg:flex-none">
         <div className="grid gap-2 rounded-ui-lg border border-border bg-card p-3 sm:p-4">
           <h2 className="hidden text-ui-subtitle font-extrabold lg:block">Chợ SocCo</h2>
-          <nav aria-label="Sàn mua bán" className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] lg:grid">
+          <nav aria-label={trUi("common.ui.marketplace")} className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] lg:grid">
             {tabs.map(({ id, label, Icon }) => (
               <button key={id} type="button" aria-pressed={view === id}
                 onClick={() => setView(id)}
@@ -244,13 +247,13 @@ function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
           </nav>
         </div>
         {view === 'products' && <div className="grid gap-3 rounded-ui-lg border border-border bg-card p-4">
-          <h2 className="text-ui-subtitle font-extrabold">Bộ lọc</h2>
+          <h2 className="text-ui-subtitle font-extrabold">{trUi("common.filter")}</h2>
           <fieldset className="m-0 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 border-0 p-0">
-            <legend className="mb-2 p-0 text-ui-label font-bold">Khoảng giá</legend>
+            <legend className="mb-2 p-0 text-ui-label font-bold">{trUi("discover.priceRange")}</legend>
             <div className="flex items-center gap-2">
-              <input type="number" min={0} inputMode="numeric" aria-label="Giá thấp nhất" placeholder="Từ" value={minPrice} onChange={event => setMinPrice(event.target.value)} className="min-h-control-md min-w-0 flex-1 rounded-ui-md border border-border bg-card px-3 text-ui-label"/>
+              <input type="number" min={0} inputMode="numeric" aria-label={trUi("discover.minPrice")} placeholder={trUi("common.ui.from")} value={minPrice} onChange={event => setMinPrice(event.target.value)} className="min-h-control-md min-w-0 flex-1 rounded-ui-md border border-border bg-card px-3 text-ui-label"/>
               <span aria-hidden="true" className="text-muted-foreground">-</span>
-              <input type="number" min={0} inputMode="numeric" aria-label="Giá cao nhất" placeholder="Đến" value={maxPrice} onChange={event => setMaxPrice(event.target.value)} className="min-h-control-md min-w-0 flex-1 rounded-ui-md border border-border bg-card px-3 text-ui-label"/>
+              <input type="number" min={0} inputMode="numeric" aria-label={trUi("discover.maxPrice")} placeholder={trUi("common.ui.to")} value={maxPrice} onChange={event => setMaxPrice(event.target.value)} className="min-h-control-md min-w-0 flex-1 rounded-ui-md border border-border bg-card px-3 text-ui-label"/>
             </div>
           </fieldset>
         </div>}
@@ -279,20 +282,20 @@ function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
             <button type="button" onClick={() => setView('sell')} className="min-h-control-md flex-none cursor-pointer rounded-ui-md border-0 bg-white px-4 text-ui-body font-bold text-primary hover:bg-secondary">Bắt đầu bán hàng</button>
           </div>
           <div className="mb-3.5 flex items-center justify-between gap-3">
-            <div role="group" aria-label="Sắp xếp sản phẩm" className="flex gap-2 overflow-x-auto p-0.5 [scrollbar-width:none]">
+            <div role="group" aria-label={trUi("common.ui.sortProducts")} className="flex gap-2 overflow-x-auto p-0.5 [scrollbar-width:none]">
               {sortOptions.map(option => <button key={option.id} type="button" aria-pressed={sort === option.id}
                 onClick={() => setSort(option.id)} className={chipCls(sort === option.id)}>{option.label}</button>)}
               <button type="button" aria-pressed={onlyInStock} onClick={() => setOnlyInStock(value => !value)}
                 className={chipCls(onlyInStock)}>Còn hàng ({inStockCount})</button>
             </div>
-            <small className="hidden flex-none text-muted-foreground sm:block">{shownProducts.length} sản phẩm</small>
+            <small className="hidden flex-none text-muted-foreground sm:block">{shownProducts.length}{trUi("common.ui.productLower")}</small>
           </div>
           <div className={gridCls}>
             {shownProducts.length === 0 && <p className={emptyCls + ' col-span-full'}><PackageSearch size={32} aria-hidden="true"/>{searchTerm ? 'Không tìm thấy sản phẩm phù hợp.' : onlyInStock && visibleProducts.length > 0 ? 'Không có sản phẩm còn hàng.' : (minValue !== null || maxValue !== null) && visibleProducts.length > 0 ? 'Không có sản phẩm trong khoảng giá này.' : 'Chưa có sản phẩm được đăng.'}</p>}
             {shownProducts.map(p => <article key={p.id} className="flex flex-col overflow-hidden rounded-ui-lg border border-border bg-card transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/10 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
               <div className="relative grid aspect-square place-items-center" style={{ '--hue': 232 + (p.id * 37) % 70, background: 'linear-gradient(135deg,hsl(var(--hue) 85% 94%),hsl(calc(var(--hue) + 30) 80% 84%))' } as CSSProperties}>
                 <span aria-hidden="true" className="text-4xl font-extrabold text-primary/70 sm:text-5xl">{p.title.trim().charAt(0).toLocaleUpperCase('vi-VN') || '?'}</span>
-                {p.stock === 0 && <em className="absolute left-2.5 top-2.5 rounded-full bg-foreground px-2.5 py-1 text-ui-caption font-bold not-italic text-white">Hết hàng</em>}
+                {p.stock === 0 && <em className="absolute left-2.5 top-2.5 rounded-full bg-foreground px-2.5 py-1 text-ui-caption font-bold not-italic text-white">{trUi("discover.outOfStock")}</em>}
                 {p.stock > 0 && p.stock <= 3 && <em className="absolute left-2.5 top-2.5 rounded-full bg-white px-2.5 py-1 text-ui-caption font-bold not-italic text-amber-700">Chỉ còn {p.stock}</em>}
               </div>
               <div className="grid min-w-0 flex-1 content-start gap-1 px-2.5 pb-1.5 pt-2.5 sm:px-3.5 sm:pt-3">
@@ -303,7 +306,7 @@ function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
               </div>
               <button type="button" disabled={busy || p.stock === 0 || p.sellerId === userId} onClick={() => updateCart(p.id, 1)}
                 className="mx-2.5 mb-2.5 mt-1.5 min-h-control-md cursor-pointer rounded-ui-md border-0 bg-primary text-ui-body font-semibold text-white hover:bg-primary/90 disabled:bg-secondary disabled:text-primary sm:mx-3.5 sm:mb-3.5">
-                {p.sellerId === userId ? 'Sản phẩm của bạn' : p.stock === 0 ? 'Hết hàng' : 'Thêm vào giỏ'}
+                {p.sellerId === userId ? 'Sản phẩm của bạn' : p.stock === 0 ? trUi("discover.outOfStock") : 'Thêm vào giỏ'}
               </button>
             </article>)}
           </div>
@@ -321,9 +324,9 @@ function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
               {items.map(item => <div key={item.id} className={rowCls}>
                 <div className="grid min-w-0 gap-1"><strong>{item.title}</strong><small className="text-muted-foreground">{showMoney(item.priceAmount, item.priceUnit)} · Còn {item.stock}</small></div>
                 <div className="flex items-center gap-1 rounded-full bg-secondary p-0.75">
-                  <button disabled={busy} type="button" aria-label={`Giảm số lượng ${item.title}`} onClick={() => updateCart(item.id, item.quantity - 1)} className={stepCls}>−</button>
+                  <button disabled={busy} type="button" aria-label={trUi("common.ui.decreaseQuantity", { v1: String(item.title) })} onClick={() => updateCart(item.id, item.quantity - 1)} className={stepCls}>−</button>
                   <span className="min-w-7 text-center font-bold">{item.quantity}</span>
-                  <button disabled={busy || item.quantity >= item.stock || item.quantity >= 99} type="button" aria-label={`Tăng số lượng ${item.title}`} onClick={() => updateCart(item.id, item.quantity + 1)} className={stepCls}>＋</button>
+                  <button disabled={busy || item.quantity >= item.stock || item.quantity >= 99} type="button" aria-label={trUi("common.ui.increaseQuantity", { v1: String(item.title) })} onClick={() => updateCart(item.id, item.quantity + 1)} className={stepCls}>＋</button>
                 </div>
               </div>)}
               {valid ? <p className="flex items-center justify-between text-ui-body">Tạm tính <b className="text-ui-section text-primary">{showMoney(total, items[0].priceUnit)}</b></p>
@@ -350,7 +353,7 @@ function MarketplaceSession({ userId, searchQuery = '', request, }: Props) {
           <p className="text-ui-label text-muted-foreground"><strong>Trợ lý AI đăng bán sẽ được tích hợp ở bước tiếp theo.</strong> Đây là biểu mẫu dự phòng để tạo bản nháp, chưa phải AI.</p>
           <form onSubmit={createDraft} className="grid gap-3 [&_label]:grid [&_label]:content-start [&_label]:gap-1.5 [&_label]:text-ui-label [&_label]:font-semibold [&_input]:min-h-control-touch [&_input]:w-full [&_input]:rounded-ui-md [&_input]:border [&_input]:border-border [&_input]:bg-card [&_input]:px-3 [&_input]:font-[inherit] [&_textarea]:min-h-24 [&_textarea]:w-full [&_textarea]:resize-y [&_textarea]:rounded-ui-md [&_textarea]:border [&_textarea]:border-border [&_textarea]:bg-card [&_textarea]:p-3 [&_textarea]:font-[inherit]">
             <label>Tên sản phẩm<input required minLength={2} maxLength={160} value={title} onChange={event => setTitle(event.target.value)}/></label>
-            <label>Mô tả<textarea maxLength={4000} value={description} onChange={event => setDescription(event.target.value)}/></label>
+            <label>{trUi("common.description")}<textarea maxLength={4000} value={description} onChange={event => setDescription(event.target.value)}/></label>
             <div className="grid gap-3 sm:grid-cols-3">
               <label>Giá niêm yết<input type="number" min={1} required step={1} value={price} onChange={event => setPrice(event.target.value)}/></label>
               <label>Đơn vị giá hiển thị — không phải phương thức thanh toán<input required maxLength={16} value={unit} onChange={event => setUnit(event.target.value)}/></label>

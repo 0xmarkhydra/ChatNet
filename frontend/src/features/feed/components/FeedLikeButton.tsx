@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Heart } from 'lucide-react'
 import type { Post } from '../types'
 import { burstPostHearts } from '../utils/postHeartBurst'
@@ -12,6 +13,8 @@ export default function FeedLikeButton({
   busy: boolean
   onLike: (emoji: string) => void
 }) {
+  const trUi = useUiTranslation()
+
   const selectedReaction = post.myReaction || (post.liked ? '👍' : '')
   const liked = Boolean(selectedReaction)
   return (
@@ -21,14 +24,14 @@ export default function FeedLikeButton({
       disabled={busy}
       aria-pressed={liked}
       aria-busy={busy}
-      aria-label={liked ? 'Bỏ thích bài viết' : 'Thích bài viết'}
+      aria-label={liked ? trUi("common.ui.unlikePost") : trUi("common.ui.likePost")}
       onClick={(event) => {
         if (!liked) burstPostHearts(event.currentTarget)
         onLike(selectedReaction || '❤️')
       }}
     >
       <Heart size={18} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
-      <span>{liked ? 'Đã thích' : 'Thích'}</span>
+      <span>{liked ? trUi("feed.liked") : trUi("feed.like")}</span>
     </button>
   )
 }

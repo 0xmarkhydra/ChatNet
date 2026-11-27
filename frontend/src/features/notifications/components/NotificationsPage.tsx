@@ -1,3 +1,4 @@
+import { useUiTranslation, useUiLocale } from '@/shared/i18n/locale'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { useSession } from '../../../shared/context/SessionContext'
@@ -26,16 +27,19 @@ type Props = {
   onSettings: () => void
 }
 
-const displayDate = (input: string) => {
+const displayDate = (input: string, locale: string) => {
   if (!input) return ''
   const date = new Date(input)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 export default function NotificationsPage({
   requests, conversations, mentions, onReadMention, onOpenMention, search, busyFriendIds, onAccept, onDecline,
   onOpenConversation, onOpenInvitations, onOpenFriend, onSettings,
 }: Props) {
+  const trUi = useUiTranslation()
+  const locale = useUiLocale()
+
   const [filter, setFilter] = useState<NotificationFilter>('all')
   const { hostRef: filtersPillSetHost, activeRef: filtersPillSetActive, pillRef: filtersPillSetPill } = useSlidingPill<HTMLDivElement>(filter)
   const { session } = useSession()
@@ -44,7 +48,7 @@ export default function NotificationsPage({
   const previousNotifications = useRef<{ sessionId: string; keys: Set<string> } | null>(null)
   const [selectedKey, setSelectedKey] = useScopedState<string | null>(session.sessionId, null)
   const [readKeys, setReadKeys] = useScopedState<Set<string>>(session.sessionId, new Set())
-  const notifications = useMemo(() => buildNotificationItems(requests, conversations, mentions), [requests, conversations, mentions])
+  const notifications = useMemo(() => buildNotificationItems(requests, conversations, mentions, trUi), [requests, conversations, mentions, trUi])
 
   const filtered = filterNotificationItems(notifications, filter, search, readKeys)
   const selected = filtered.find(n => n.key === selectedKey) ?? filtered[0] ?? null
@@ -95,16 +99,16 @@ export default function NotificationsPage({
     })
   }
 
-  return <div className="np-screen" aria-label="Màn hình Thông báo">
+  return <div className="np-screen" aria-label={trUi("common.ui.notificationsScreen")}>
     <div className="np-layout">
-      <section className="np-card np-list-pane" aria-label="Thông báo mới">
-        <h2>Thông báo mới</h2>
-        <div ref={filtersPillSetHost} className="np-filters sliding-pill-host" role="tablist" aria-label="Lọc thông báo">
+      <section className="np-card np-list-pane" aria-label={trUi("notifications.new")}>
+        <h2>{trUi("notifications.new")}</h2>
+        <div ref={filtersPillSetHost} className="np-filters sliding-pill-host" role="tablist" aria-label={trUi("common.ui.filterNotifications")}>
           <span ref={filtersPillSetPill} className="sliding-pill notifications-active-pill" aria-hidden="true" />
-          {([['all','Tất cả'], ['unread','Chưa đọc'], ['mentions','Nhắc đến']] as const)
+          {([['all','common.all'], ['unread','notifications.unread'], ['mentions','notifications.mentions']] as const)
             .map(([key, label]) => <button ref={filter === key ? filtersPillSetActive : undefined} type="button" role="tab" key={key}
               className={filter === key ? 'active' : ''} aria-selected={filter === key}
-              onClick={() => setFilter(key)}>{label}</button>)}
+              onClick={() => setFilter(key)} >{trUi(label)}</button>)}
         </div>
         <div className="np-notification-list" ref={notificationList}>
           {filtered.map(item => <button key={item.key} type="button" data-notification-key={item.key}
@@ -115,7 +119,7 @@ export default function NotificationsPage({
               : <span className="np-group-avatar"><Users size={21}/></span>}
             <span className="np-notification-copy">
               <strong>{item.name}</strong><span>{item.subtitle}</span>
-              <small>{displayDate(item.date)}</small>
+              <small>{displayDate(item.date, locale)}</small>
             </span>
             <span className="np-row-icon" aria-hidden="true">
               {item.kind === 'friend' ? <UserRoundPlus size={18}/> : item.kind === 'mention' ? <AtSign size={18}/> : <MessageCircle size={18}/>}
@@ -123,14 +127,14 @@ export default function NotificationsPage({
           </button>)}
           {!filtered.length && <div className="np-empty" role="status">
             <Bell size={27}/>
-            <strong>{filter === 'mentions' ? 'Chưa có thông báo nhắc đến' : filter === 'unread' ? 'Không có thông báo chưa đọc' : 'Chưa có thông báo phù hợp'}</strong>
-            <p>{filter === 'mentions' ? 'Khi bạn bè gắn thẻ bạn trong bài viết, thông báo sẽ xuất hiện tại đây.' : 'Lời mời, hội thoại chưa đọc và bài viết gắn thẻ sẽ xuất hiện ở đây.'}</p>
+            <strong>{filter === 'mentions' ? trUi('notifications.emptyMentions') : filter === 'unread' ? trUi('notifications.emptyUnread') : trUi('notifications.empty')}</strong>
+            <p>{filter === 'mentions' ? trUi('notifications.emptyMentionHint') : trUi('notifications.emptyHint')}</p>
           </div>}
         </div>
-        {filter === 'all' && unseenCount > 0 && <small className="np-unread-hint">{unseenCount} thông báo chưa xem</small>}
+        {filter === 'all' && unseenCount > 0 && <small className="np-unread-hint">{trUi('notifications.unseenCount', { count: unseenCount })}</small>}
       </section>
-      <aside className="np-card np-detail-pane" aria-label="Thông tin thông báo">
-        <h2>Thông tin thông báo</h2>
+      <aside className="np-card np-detail-pane" aria-label={trUi("notifications.info")}>
+        <h2>{trUi("notifications.info")}</h2>
         {selected ? <>
           <div className="np-detail-person">
             {(selected.kind === 'friend' || selected.kind === 'mention') && selected.username
@@ -141,15 +145,15 @@ export default function NotificationsPage({
           </div>
           <div className="np-detail-description">
             {selected.mention ? <>
-              <p><strong>Bài viết gắn thẻ bạn</strong></p>
-              <p>Bạn có thể mở bài viết hoặc xem hồ sơ người đăng.</p>
+              <p><strong>{trUi('notifications.taggedPost')}</strong></p>
+              <p>{trUi('notifications.taggedPostHint')}</p>
             </> : selected.kind === 'friend' && selected.friend ? <>
               <p><strong>@{selected.friend.username}</strong></p>
               <p>{typeof selected.friend.mutualGroups === 'number'
-                ? 'Bạn có ' + selected.friend.mutualGroups + ' nhóm chung.'
-                : 'Lời mời kết bạn đang chờ phản hồi.'}</p>
+                ? trUi('notifications.mutualGroups', { count: selected.friend.mutualGroups })
+                : trUi('notifications.pendingFriend')}</p>
             </> : <>
-              <p><strong>{selected.conversation?.type === 'group' ? 'Nhóm trò chuyện' : 'Hội thoại cá nhân'}</strong></p>
+              <p><strong>{selected.conversation?.type === 'group' ? trUi("chat.groupChat") : trUi('notifications.directChat')}</strong></p>
               <p>{selected.subtitle}</p>
               {selected.conversation?.lastMessage && <p className="np-message-preview">{selected.conversation.lastMessage}</p>}
             </>}
@@ -157,31 +161,31 @@ export default function NotificationsPage({
           <div className="np-detail-actions">
             {selected.mention ? <>
               <button type="button" className="np-primary" onClick={() => onOpenMention(selected.mention!)}>
-                <AtSign size={17}/>Mở bài viết được gắn thẻ</button>
+                <AtSign size={17}/>{trUi('notifications.openTaggedPost')}</button>
               {!selected.mention.readAt && <button type="button" className="np-secondary"
-                onClick={() => onReadMention(selected.mention!.id)}><Check size={17}/>Đánh dấu đã xem</button>}
+                onClick={() => onReadMention(selected.mention!.id)}><Check size={17}/>{trUi('notifications.markSeen')}</button>}
               <button type="button" className="np-text-link"
-                onClick={() => selected.username && onOpenFriend(selected.username)}>Xem hồ sơ người gắn thẻ</button>
+                onClick={() => selected.username && onOpenFriend(selected.username)}>{trUi('notifications.taggerProfile')}</button>
             </> : selected.friend ? <>
               <button type="button" className="np-primary" disabled={busyFriendIds.has(selected.friend.id)}
-                onClick={() => onAccept(selected.friend!)}><Check size={17}/>Chấp nhận lời mời</button>
+                onClick={() => onAccept(selected.friend!)}><Check size={17}/>{trUi('notifications.acceptRequest')}</button>
               <button type="button" className="np-secondary" disabled={busyFriendIds.has(selected.friend.id)}
-                onClick={() => onDecline(selected.friend!)}><X size={17}/>Từ chối</button>
-              <button type="button" className="np-text-link" onClick={() => selected.username && onOpenFriend(selected.username)}>Xem hồ sơ người gửi</button>
+                onClick={() => onDecline(selected.friend!)}><X size={17}/>{trUi("common.decline")}</button>
+              <button type="button" className="np-text-link" onClick={() => selected.username && onOpenFriend(selected.username)}>{trUi('notifications.senderProfile')}</button>
             </> : selected.conversation ? <>
               <button type="button" className="np-primary" onClick={() => onOpenConversation(selected.conversation!.id)}>
-                <MessageCircle size={17}/>Mở cuộc trò chuyện</button>
+                <MessageCircle size={17}/>{trUi('notifications.openConversation')}</button>
               <button type="button" className="np-secondary" onClick={() => markRead(selected.key)}>
-                <Check size={17}/>Đánh dấu đã xem trên thiết bị</button>
+                <Check size={17}/>{trUi('notifications.markSeenDevice')}</button>
             </> : null}
           </div>
         </> : <div className="np-detail-empty"><Bell size={40}/>
-          <h3>Chọn một thông báo</h3><p>Chi tiết sẽ hiển thị ở đây.</p>
+          <h3>{trUi('notifications.selectNotice')}</h3><p>{trUi('notifications.detailHint')}</p>
         </div>}
         <button type="button" className="np-settings" onClick={onSettings}>
-          <Settings size={20}/><span><strong>Quản lý thông báo</strong><small>Tùy chỉnh thông báo bạn muốn nhận.</small></span>
+          <Settings size={20}/><span><strong>{trUi('notifications.manage')}</strong><small>{trUi('notifications.manageHint')}</small></span>
         </button>
-        <button type="button" className="np-invites-link" onClick={onOpenInvitations}>Xem lời mời kết bạn</button>
+        <button type="button" className="np-invites-link" onClick={onOpenInvitations}>{trUi('notifications.viewRequests')}</button>
       </aside>
     </div>
   </div>

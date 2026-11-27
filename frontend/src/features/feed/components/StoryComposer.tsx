@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useCallback, useRef, useState } from 'react'
 import { ArrowLeft, ImagePlus, Send } from 'lucide-react'
 import { STORY_MEDIA_ACCEPT } from '../utils/storyMedia'
@@ -15,6 +16,8 @@ type Props = {
 }
 
 export default function StoryComposer({ file, busy, onPublish, onBack, onChangeFile }: Props) {
+  const trUi = useUiTranslation()
+
   const [publishFailed, setPublishFailed] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // The object URL lives exactly as long as the preview element showing this file.
@@ -27,17 +30,17 @@ export default function StoryComposer({ file, busy, onPublish, onBack, onChangeF
 
   const isVideo = /\.(mp4|mov|m4v|webm)$/i.test(file.name)
   return (
-    <section className="grid w-full min-w-0 gap-3.75" aria-label="Xem trước Story">
+    <section className="grid w-full min-w-0 gap-3.75" aria-label={trUi("common.ui.storyPreview")}>
       <input ref={fileInputRef} className="hidden-media-input" type="file" accept={STORY_MEDIA_ACCEPT}
-        aria-label="Chọn tệp Story khác" onChange={event => {
+        aria-label={trUi("common.ui.chooseOtherStoryFile")} onChange={event => {
           const selected = event.currentTarget.files?.[0]
           event.currentTarget.value = ''
           if (selected) { setPublishFailed(false); onChangeFile(selected) }
         }} />
       <div className="smart-story-frame grid max-h-[min(62dvh,32.5rem)] min-h-55 w-full place-items-center overflow-hidden rounded-[0.8125rem] bg-story-frame">
         {isVideo
-          ? <video ref={showFile} className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" controls playsInline preload="metadata" aria-label="Video Story đã chọn" />
-          : <img ref={showFile} className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" alt="Xem trước ảnh Story đã chọn" />}
+          ? <video ref={showFile} className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" controls playsInline preload="metadata" aria-label={trUi("common.ui.selectedStoryVideo")} />
+          : <img ref={showFile} className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" alt={trUi("common.ui.storyPhotoPreview")} />}
       </div>
       <p className={note + ' break-all'}>{file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB</p>
       <p className={note}>Story sẽ hiển thị trong 24 giờ. Kiểm tra ảnh hoặc video trước khi đăng.</p>
@@ -45,8 +48,7 @@ export default function StoryComposer({ file, busy, onPublish, onBack, onChangeF
       {/* Font size and weight sit here because buttons inherit them from the legacy global rule. */}
       <div className="flex flex-wrap justify-end gap-2.5 text-[0.8125rem] font-[660]">
         <button type="button" className={secondaryAction} onClick={onBack} disabled={busy}>
-          <ArrowLeft size={18} aria-hidden="true" /> Quay lại
-        </button>
+          <ArrowLeft size={18} aria-hidden="true" />{trUi("common.back")}</button>
         <button type="button" className={secondaryAction} onClick={() => fileInputRef.current?.click()} disabled={busy}>
           <ImagePlus size={18} aria-hidden="true" /> Chọn tệp khác
         </button>
@@ -54,7 +56,7 @@ export default function StoryComposer({ file, busy, onPublish, onBack, onChangeF
           setPublishFailed(false)
           if (!await onPublish()) setPublishFailed(true)
         }} disabled={busy}>
-          <Send size={17} aria-hidden="true" /> {busy ? 'Đang đăng...' : 'Đăng Story'}
+          <Send size={17} aria-hidden="true" /> {busy ? trUi("feed.posting") : trUi("feed.publishStory")}
         </button>
       </div>
     </section>

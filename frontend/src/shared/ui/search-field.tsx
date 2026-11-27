@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Search, X } from "lucide-react";
@@ -23,7 +24,8 @@ type SearchFieldProps = Omit<React.ComponentProps<"input">, "size" | "value" | "
   };
 
 /** Presentational search box: icon, input and clear button. Suggestions, submit and history stay with the caller. */
-function SearchField({ value, onValueChange, size, className, clearLabel = "Xóa từ khóa", trailing, ...props }: SearchFieldProps) {
+function SearchField({ value, onValueChange, size, className, clearLabel, trailing, ...props }: SearchFieldProps) {
+  const trUi = useUiTranslation()
   return (
     <div data-slot="search-field" className={cn(searchFieldVariants({ size }), className)}>
       <Search size={18} aria-hidden="true" className="shrink-0 text-primary" />
@@ -38,7 +40,7 @@ function SearchField({ value, onValueChange, size, className, clearLabel = "Xóa
       {value && (
         <button
           type="button"
-          aria-label={clearLabel}
+          aria-label={clearLabel ?? trUi("common.ui.clearKeyword")}
           onClick={() => onValueChange("")}
           className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >

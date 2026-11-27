@@ -1,3 +1,4 @@
+import { createUiTranslator } from '@/shared/i18n/locale'
 import type { FriendConnection } from '../../contacts'
 import type { Conversation } from '../../chat'
 import type { PostMentionNotification } from '../../feed'
@@ -36,22 +37,23 @@ export function buildNotificationItems(
   requests: readonly FriendConnection[],
   conversations: readonly Conversation[],
   mentions: readonly PostMentionNotification[],
+  trUi = createUiTranslator('vi'),
 ): NotificationItem[] {
   const pending: NotificationItem[] = requests.filter(isIncomingFriendRequest).map(friend => ({
     key: 'friend:' + friend.id, kind: 'friend', name: friend.displayName || friend.username,
-    subtitle: 'đã gửi lời mời kết bạn', date: friend.updatedAt || '',
+    subtitle: trUi('notifications.friendSubtitle'), date: friend.updatedAt || '',
     username: friend.username, friend,
   }))
   const unreadChats: NotificationItem[] = conversations.filter(hasUnreadConversation).map(conversation => ({
     key: 'chat:' + conversation.id, kind: 'message', name: conversation.name,
-    subtitle: 'có ' + conversation.unreadCount + ' tin nhắn chưa đọc',
+    subtitle: trUi('notifications.messageSubtitle', { count: conversation.unreadCount }),
     date: conversation.lastMessageAt || conversation.createdAt || '', conversation,
   }))
   const taggedPosts: NotificationItem[] = mentions.map(mention => ({
     key: 'mention:' + mention.id, kind: 'mention',
     name: mention.authorDisplayName || mention.author,
-    subtitle: mention.kind === 'repost' ? 'đã đăng lại bài viết của bạn' :
-      mention.kind === 'quote' ? 'đã trích dẫn bài viết của bạn' : 'đã gắn thẻ bạn trong một bài viết',
+    subtitle: mention.kind === 'repost' ? trUi('notifications.repostSubtitle') :
+      mention.kind === 'quote' ? trUi('notifications.quoteSubtitle') : trUi('notifications.mentionSubtitle'),
     date: mention.createdAt, username: mention.author, mention,
   }))
   return [...pending, ...unreadChats, ...taggedPosts].sort((a, b) => (b.date || '').localeCompare(a.date || ''))

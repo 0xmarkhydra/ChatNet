@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, MessageCircle, UserPlus, UserMinus, UserCheck } from 'lucide-react'
 import UserAvatar, { profileAssetUrl, avatarTone } from '../../../shared/ui/UserAvatar'
@@ -34,6 +35,8 @@ type Props = {
 export default function VisitorProfileHero({
   profile, mobile = false, online = false, relation, friendBusy, action, request, onMessage, onFriendAction, onRemoveFriendAction,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [menuForUserId, setMenuForUserId] = useState<number | null>(null)
   const friendMenuOpen = relation === 'accepted' && menuForUserId === profile.id
   const friendMenuRef = useRef<HTMLDivElement>(null)
@@ -58,7 +61,7 @@ export default function VisitorProfileHero({
     coverUrl={profile.coverSet ? profileAssetUrl(profile.username, 'cover', profile.updatedAt) : undefined}
     avatar={<>
       <UserAvatar username={profile.username} name={displayName} className={mobile ? "avatar profile-hero-avatar size-full! rounded-full! text-5xl font-bold [&>.presence-dot]:right-auto! [&>.presence-dot]:left-2!" : "profile-page-avatar profile-hero-avatar"} online={online} />
-      {online && <span className="sr-only">Đang hoạt động</span>}
+      {online && <span className="sr-only">{trUi("profile.active")}</span>}
       {!mobile && <ProfileNote username={profile.username} request={request} refreshKey={relation} />}
     </>}
     identityNotice={!profile.allowFriendRequests && relation === 'none' && <small className="profile-page-hint">Tài khoản này đang tắt nhận lời mời kết bạn.</small>}
@@ -78,14 +81,14 @@ export default function VisitorProfileHero({
               <button ref={friendMenuTrigger} type="button" className={secondary}
                 aria-haspopup="menu" aria-expanded={friendMenuOpen} disabled={friendBusy === profile.id}
                 onClick={() => setMenuForUserId(current => current === profile.id ? null : profile.id)}>
-                <UserCheck size={18} aria-hidden="true" />Bạn bè<ChevronDown size={16} aria-hidden="true" />
+                <UserCheck size={18} aria-hidden="true" />{trUi("contacts.friends")}<ChevronDown size={16} aria-hidden="true" />
               </button>
               {friendMenuOpen && (
-                <div className="visitor-friend-popover" role="menu" aria-label="Tùy chọn bạn bè">
+                <div className="visitor-friend-popover" role="menu" aria-label={trUi("common.ui.friendOptions")}>
                   <button role="menuitem" type="button" disabled={friendBusy === profile.id} onClick={() => {
                     setMenuForUserId(null)
                     onRemoveFriendAction()
-                  }}><UserMinus size={18} aria-hidden="true" />Hủy kết bạn</button>
+                  }}><UserMinus size={18} aria-hidden="true" />{trUi("contacts.unfriend")}</button>
                 </div>
               )}
             </div>
@@ -98,7 +101,6 @@ export default function VisitorProfileHero({
             </button>
           )}
           <button type="button" className={relation === 'accepted' || relation === 'outgoing' ? primary : secondary} onClick={() => void onMessage(profile.username)}>
-            <MessageCircle size={18} aria-hidden="true" />Nhắn tin
-          </button>
+            <MessageCircle size={18} aria-hidden="true" />{trUi("chat.message")}</button>
     </>} />
 }
