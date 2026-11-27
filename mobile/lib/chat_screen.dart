@@ -4932,6 +4932,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Widget _composer() {
+    final hasMessageContent =
+        messageController.text.trim().isNotEmpty || pendingAttachments.isNotEmpty;
     return Container(
       padding: EdgeInsets.fromLTRB(
         11,
@@ -5090,53 +5092,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               ),
               const SizedBox(width: 4),
               IconButton(
-                key: const ValueKey('composer-quick-like'),
-                tooltip: 'Gửi Like',
+                key: const ValueKey('composer-primary-action'),
+                tooltip: hasMessageContent ? 'Gửi tin nhắn' : 'Gửi Like',
                 style: IconButton.styleFrom(
                   foregroundColor: socoBlue,
-                  minimumSize: const Size.square(40),
-                  maximumSize: const Size.square(40),
+                  backgroundColor: Colors.transparent,
+                  minimumSize: const Size.square(44),
+                  maximumSize: const Size.square(44),
                   padding: EdgeInsets.zero,
+                  shape: const CircleBorder(),
                 ),
                 onPressed: sending || uploading || conversationBlocked
                     ? null
+                    : hasMessageContent
+                    ? () => _send()
                     : () => _send(quickLike: true),
-                icon: const Icon(Icons.thumb_up_rounded, size: 23),
-              ),
-              const SizedBox(width: 4),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: socoGradient,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: IconButton(
-                  tooltip: 'Gửi',
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.square(44),
-                    maximumSize: const Size.square(44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed:
-                      sending ||
-                          uploading ||
-                          (messageController.text.trim().isEmpty &&
-                              pendingAttachments.isEmpty)
-                      ? null
-                      : _send,
-                  icon: sending
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const SocoIcon(SocoIconType.send, size: 20),
-                ),
+                icon: hasMessageContent
+                    ? const SocoIcon(SocoIconType.send, size: 21)
+                    : const Icon(Icons.thumb_up_rounded, size: 21),
               ),
             ],
           ),
