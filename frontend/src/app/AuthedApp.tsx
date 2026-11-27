@@ -1595,7 +1595,8 @@ export default function AuthedApp({
     ],
   );
   const { retryQueuedChatMessages } = useOutboxDelivery({ activeChannelIdRef, activeConversationIdRef, chatOutboxRef, chatOutboxSession, messageChanges, refreshConversations, retryOutboxBusyRef: retryOutboxBusy, sendingClientIDs, setMessages, updateChatOutbox });
-  const { sendMessage } = useMessageSender({ activeConversationId, canSend, channelDraftKey, draft, messageAttachments, messageText, ownSendScrollConversationRef: ownSendScrollConversation, replyingTo, retryQueuedChatMessages, selectedChannelId, sendingRef, setChannelDrafts, setChatOnline, setMessageDrafts, setReplyingTo, updateChatOutbox });
+  const canSendLike = Boolean(activeConversationId && !conversationBlocked && !mediaUploading && !messageSending);
+  const { sendMessage, sendLike } = useMessageSender({ activeConversationId, canSend, canSendLike, channelDraftKey, draft, messageAttachments, messageText, ownSendScrollConversationRef: ownSendScrollConversation, replyingTo, retryQueuedChatMessages, selectedChannelId, sendingRef, setChannelDrafts, setChatOnline, setMessageDrafts, setReplyingTo, updateChatOutbox });
   const { editOwnMessage, recallOwnMessage } = useMessageEdits({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReplyingTo, setTranslations });
   const { toggleReaction } = useMessageReactions({ actionLocks, activeConversationIdRef, messageChanges, setMessages, setReactionPreviews });
   const { cancelStory, createStory, deleteStory, pendingStory, replyToStory, reportStory, retryStory, shareStory } = useStoryActions({ mediaUploading, name, openDirectByUsername, ownSendScrollConversation, retryQueuedChatMessages, setActiveStoryId, setChatOnline, setStories, setStoryBusy, setStoryDraft, storyBusy, updateChatOutbox, uploadMediaFiles });
@@ -2372,6 +2373,7 @@ export default function AuthedApp({
           canInviteActiveGroup={canInviteActiveGroup}
           canManageActiveGroup={canManageActiveGroup}
           canSend={canSend}
+          canSendLike={canSendLike}
           changeAutoTranslate={changeAutoTranslate}
           changeGroupMemberRole={changeGroupMemberRole}
           changeTargetLanguage={changeTargetLanguage}
@@ -2466,6 +2468,7 @@ export default function AuthedApp({
           selectedChannelId={selectedChannelId}
           selectGroupChannel={selectGroupChannel}
           sendMessage={sendMessage}
+          sendLike={sendLike}
           session={session}
           setActiveConversationId={selectRoutedConversation}
           setChatCreateError={setChatCreateError}

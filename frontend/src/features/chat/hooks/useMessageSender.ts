@@ -10,6 +10,7 @@ import type { Message, MessageDraft } from "../types";
 export type UseMessageSenderDeps = {
   activeConversationId: number | null;
   canSend: boolean;
+  canSendLike?: boolean;
   channelDraftKey: string;
   draft: MessageDraft;
   messageAttachments: MediaAttachment[];
@@ -30,6 +31,7 @@ export type UseMessageSenderDeps = {
 export function useMessageSender({
   activeConversationId,
   canSend,
+  canSendLike = false,
   channelDraftKey,
   draft,
   messageAttachments,
@@ -51,7 +53,11 @@ export function useMessageSender({
   const activeAttempt = useRef<object | null>(null);
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
-    if (!canSend || !activeConversationId || sendingRef.current || !session ||
+    await queueMessage(false);
+  }
+  async function sendLike() { await queueMessage(true); }
+  async function queueMessage(quickLike: boolean) {
+    if (!(quickLike ? canSendLike : canSend) || !activeConversationId || sendingRef.current || !session ||
         sessionRef.current !== session)
       return;
     sendingRef.current = true;
@@ -70,13 +76,13 @@ export function useMessageSender({
     const channelId = selectedChannelId;
     const draftKey = channelDraftKey;
     const submittedDraft = draft;
-    const reply = replyingTo;
+    const reply = quickLike ? null : replyingTo;
     const item: QueuedChatMessage = {
       ...(channelId > 0 ? { channelId } : {}),
       clientId: crypto.randomUUID(),
       conversationId,
-      text: messageText.trim(),
-      attachments: messageAttachments.map(attachmentRequestBody),
+      text: quickLike ? '👍' : messageText.trim(),
+      attachments: quickLike ? [] : messageAttachments.map(attachmentRequestBody),
       ...(reply
         ? {
             replyToMessageId: reply.id,
@@ -96,6 +102,7 @@ export function useMessageSender({
       return;
     }
     ownSendScrollConversationRef.current = conversationId;
+    if (!quickLike) {
     if (channelId > 0) {
       setChannelDrafts(current => {
         if (current[draftKey] !== submittedDraft) return current;
@@ -112,6 +119,7 @@ export function useMessageSender({
       });
     }
     setReplyingTo((current) => (current === reply ? null : current));
+    }
     if (navigator.onLine) void retryQueuedChatMessages();
     else setChatOnline(false);
     } catch {
@@ -126,5 +134,5 @@ export function useMessageSender({
     }
   }
 
-  return { sendMessage };
+  return { sendMessage, sendLike };
 }

@@ -33,6 +33,7 @@ export type ChatSectionProps = {
   canInviteActiveGroup: boolean;
   canManageActiveGroup: boolean;
   canSend: boolean;
+  canSendLike: boolean;
   changeAutoTranslate: (next: boolean) => void;
   changeGroupMemberRole: (member: GroupMember, role: GroupMember["role"]) => Promise<void>;
   changeTargetLanguage: (next: string) => void;
@@ -128,6 +129,7 @@ export type ChatSectionProps = {
   selectedChannelId: number;
   selectGroupChannel: (channelId: number) => void;
   sendMessage: (event: FormEvent) => void;
+  sendLike: () => Promise<void>;
   session: Session;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
   setChatCreateError: Dispatch<SetStateAction<string>>;
