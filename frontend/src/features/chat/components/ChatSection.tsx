@@ -9,7 +9,7 @@ import { SocoEmptyState, SocoTextAction } from "../../../shared/ui/SocoUI";
 import { formatTime, attachmentLabel } from "../../../shared/utils/format";
 import { transferHasFiles, chatFilesFromClipboard } from "../utils/chatFileTransfer";
 import GroupChannelSidebar from "./GroupChannelSidebar";
-import ConversationAvatarRail from "./ConversationAvatarRail";
+import ConversationAvatarRail, { type ConversationRailProps } from "./ConversationAvatarRail";
 import ConversationRailControls from "./ConversationRailControls";
 import DesktopConversationRail from "./DesktopConversationRail";
 import { CallHeaderActions } from "../../calls";
@@ -20,7 +20,7 @@ import MessageReadersDialog from "./MessageReadersDialog";
 import { getMessageTranslationView } from "../utils/messageTranslationPresentation";
 import { messageReactionLabel } from "../utils/messageReactions";
 import { Fragment, FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
-import { GroupActivityMarker, GroupActivityComposerMenu, type GroupActivityKind } from "./GroupActivities";
+import { GroupActivityMarker, type GroupActivityKind } from "./GroupActivities";
 import { messageTextParts, messageLinkHref } from "../lib/messageClipboard";
 import LinkPreview from "./LinkPreview";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
@@ -64,6 +64,8 @@ export type { ChatSectionProps } from "./ChatSectionProps";
 
 
 export default function ChatSection({
+  notificationBusyId,
+  toggleConversationNotifications,
   activeChatTranslationSettings,
   activeConversation,
   activeConversationId,
@@ -101,6 +103,7 @@ export default function ChatSection({
   conversationLoadingMore,
   conversationListError,
   refreshConversations,
+  onContactSaved,
   copyInviteLink,
   createDirect,
   createGroupChannel,
@@ -132,8 +135,6 @@ export default function ChatSection({
   hasMoreConversations,
   hasMoreMessages,
   historyActionBusy,
-  notificationBusyId,
-  toggleConversationNotifications,
   inviteGroupMembers,
   isProfileDesktop,
   languageOptions,
@@ -575,6 +576,40 @@ export default function ChatSection({
     }
   }
 
+  const railProps: Omit<ConversationRailProps, 'keepDetailsMounted' | 'onSearchCompact' | 'onCollapse'> = {
+    conversations: railConversations,
+    visibleConversationIds: railVisibleConversationIds,
+    loadError: conversationListError,
+    onRetry: refreshConversations,
+    searchValue: chatListQuery,
+    onSearchChange: setChatListQuery,
+    categoryControls: railCategoryControls,
+    filter: chatListFilter,
+    onFilterChange: setChatListFilter,
+    categories: conversationCategories.categories,
+    onEntryContextMenu: (conversation, event) => {
+      event.preventDefault();
+      cancelConversationLongPress();
+      const touchMenu = 'pointerType' in event.nativeEvent && event.nativeEvent.pointerType !== 'mouse';
+      if (touchMenu && event.type !== 'click') suppressConversationClickRef.current = conversation.id;
+      const rect = event.currentTarget.getBoundingClientRect();
+      setConversationMenuPosition(event.type === 'click' ? { x: rect.right - 244, y: rect.bottom + 4 } : touchMenu ? null : { x: event.clientX, y: event.clientY });
+      setConversationActionId(conversation.id);
+    },
+    onEntryPointerDown: (conversation, event) => {
+      if (event.pointerType !== 'mouse') beginConversationLongPress(conversation.id, event.clientX, event.clientY);
+    },
+    onEntryPointerMove: event => moveConversationLongPress(event.clientX, event.clientY),
+    onEntryPointerEnd: cancelConversationLongPress,
+    selectedId: activeConversationId,
+    expanded: railListOpen,
+    onSelect: openConversationFromRail,
+    onCreate: () => { setChatCreateError(''); setNewChatMode('direct'); },
+    hasMore: railHasMore,
+    loadingMore: railLoadingMore,
+    onLoadMore: railLoadMore,
+  };
+
   return (
       <div ref={splitLayoutRef} className={`messenger-layout modern-messenger social-chat-layout avatar-rail-layout ${activeConversation ? 'has-active' : ''}${railListOpen ? ' avatar-rail-expanded' : ''}${newChatMode !== 'none' ? ' avatar-rail-creation-open' : ''}${activeConversation?.type === 'group' && desktopChannelPanelOpen ? ' desktop-channel-panel-open' : ''}${activeConversation?.type === 'group' ? ' group-channel-workspace' : ''}${activeConversation?.type === 'group' && channelSidebarOpen ? ' mobile-channel-picker-open' : ''} mobile-conversation-rail-visible${!activeConversation ? ' mobile-rail-list-view' : activeConversation.type === 'group' && !mobileChannelSelected ? ' mobile-rail-picker-view' : ' mobile-rail-chat-view'}${activeConversation?.type === 'group' && !channelSidebarOpen && !mobileChannelSelected ? ' mobile-channel-awaiting-choice' : ''}${conversationDetailsOpen ? ' details-open' : ''}${groupSettingsOpen && activeConversation?.type === 'group' ? ' group-sidebar-open' : ''}`}>
             {activeConversation?.type === 'group' && (
@@ -648,82 +683,20 @@ export default function ChatSection({
               </>
             )}
             <DesktopConversationRail
-              conversations={railConversations}
-              visibleConversationIds={railVisibleConversationIds}
-              loadError={conversationListError}
-              onRetry={refreshConversations}
-              searchValue={chatListQuery}
-              onSearchChange={setChatListQuery}
-              categoryControls={railCategoryControls}
-              categories={conversationCategories.categories}
-              onEntryContextMenu={(conversation, event) => {
-                event.preventDefault();
-                cancelConversationLongPress();
-                const touchMenu = 'pointerType' in event.nativeEvent && event.nativeEvent.pointerType !== 'mouse';
-                if (touchMenu && event.type !== 'click') suppressConversationClickRef.current = conversation.id;
-                const rect = event.currentTarget.getBoundingClientRect();
-                setConversationMenuPosition(event.type === 'click' ? { x: rect.right - 244, y: rect.bottom + 4 } : touchMenu ? null : { x: event.clientX, y: event.clientY });
-                setConversationActionId(conversation.id);
-              }}
-              onEntryPointerDown={(conversation, event) => {
-                if (event.pointerType !== 'mouse') beginConversationLongPress(conversation.id, event.clientX, event.clientY);
-              }}
-              onEntryPointerMove={(event) => moveConversationLongPress(event.clientX, event.clientY)}
-              onEntryPointerEnd={cancelConversationLongPress}
-              selectedId={activeConversationId}
-              expanded={railListOpen}
+              {...railProps}
               keepDetailsMounted={activeConversation?.type === 'group' && desktopChannelPanelOpen}
-              onSelect={openConversationFromRail}
-              onCreate={() => { setChatCreateError(''); setNewChatMode('direct') }}
               onSearchCompact={returnFromDesktopChannelPicker}
               onCollapse={collapseDesktopChannelPicker}
-              hasMore={railHasMore}
-              loadingMore={railLoadingMore}
-              onLoadMore={railLoadMore}
             />
-
             <ConversationAvatarRail
-                conversations={railConversations}
-                visibleConversationIds={railVisibleConversationIds}
-              loadError={conversationListError}
-              onRetry={refreshConversations}
-                searchValue={chatListQuery}
-                onSearchChange={setChatListQuery}
-                categoryControls={railCategoryControls}
-                categories={conversationCategories.categories}
-                onEntryContextMenu={(conversation, event) => {
-                  event.preventDefault();
-                  cancelConversationLongPress();
-                  const touchMenu = 'pointerType' in event.nativeEvent && event.nativeEvent.pointerType !== 'mouse';
-                  if (touchMenu) suppressConversationClickRef.current = conversation.id;
-                  setConversationMenuPosition(touchMenu ? null : { x: event.clientX, y: event.clientY });
-                  setConversationActionId(conversation.id);
-                }}
-                onEntryPointerDown={(conversation, event) => {
-                  if (event.pointerType !== 'mouse') beginConversationLongPress(conversation.id, event.clientX, event.clientY);
-                }}
-                onEntryPointerMove={(event) => moveConversationLongPress(event.clientX, event.clientY)}
-                onEntryPointerEnd={cancelConversationLongPress}
-                selectedId={activeConversationId}
-                expanded={railListOpen}
-                keepDetailsMounted={activeConversation?.type === 'group' && !mobileChannelSelected}
-                hasMore={railHasMore}
-                loadingMore={railLoadingMore}
-                onLoadMore={railLoadMore}
-                onSelect={openConversationFromRail}
-                onCreate={() => {
-                  setChatCreateError('');
-                  setNewChatMode('direct');
-                }}
-                onSearchCompact={returnFromChannelPicker}
-                onCollapse={() => {
-                  if (activeConversation?.type === 'group' && !mobileChannelSelected) {
-                    toggleGroupSplit();
-                  } else {
-                    setRailListOpen(false);
-                  }
-                }}
-              />
+              {...railProps}
+              keepDetailsMounted={activeConversation?.type === 'group' && !mobileChannelSelected}
+              onSearchCompact={returnFromChannelPicker}
+              onCollapse={() => {
+                if (activeConversation?.type === 'group' && !mobileChannelSelected) toggleGroupSplit();
+                else setRailListOpen(false);
+              }}
+            />
             <ConversationList
                 activeConversationId={activeConversationId}
                 actOnFriend={actOnFriend}
@@ -1082,7 +1055,10 @@ export default function ChatSection({
                   }
                 }}
                 onClearHistory={() => { void clearActiveConversationHistory() }}
-                onCreateGroupActivity={setGroupActivityCreateKind}
+                activities={groupActivities.activities}
+                onActivity={setGroupActivityViewedId}
+                onRefresh={refreshConversations}
+                onContactSaved={onContactSaved}
                 request={apiFetch}
                 selectedChannelId={selectedChannelId}
                 channel={groupChannels.find(item => item.id === selectedChannelId) || groupChannels[0] || {
@@ -1105,7 +1081,6 @@ export default function ChatSection({
                   setActiveConversationId(null);
                   setConversations(current => current.filter(item => item.id !== activeConversation.id));
                 }}
-                canManageGroup={canManageActiveGroup}
                 canCreateChannel={activeGroupMember?.role === 'owner'}
                 channelCreateBusy={groupChannelBusy}
                 onCreateChannel={createGroupChannel}
@@ -1126,7 +1101,6 @@ export default function ChatSection({
                   else if (activeConversation.otherUsername) openVisitor(activeConversation.otherUsername)
                   else setNotice('Không thể mở hồ sơ từ cuộc trò chuyện này.', 'warning')
                 }}
-                onSearch={() => { setConversationDetailsOpen(false); setMessageSearchOpen(true) }}
                 onShared={(tab = 'media') => { setSharedContentInitialTab(tab); setSharedContentOpen(true) }}
               />
             )}
@@ -1144,7 +1118,7 @@ export default function ChatSection({
                     canManageActiveGroup={canManageActiveGroup}
                     canInviteActiveGroup={canInviteActiveGroup}
                     canEditGroup={canEditGroup}
-                    onOpenShared={() => { setGroupSettingsOpen(false); setSharedContentOpen(true) }}
+                    onOpenShared={() => { setGroupSettingsOpen(false); setSharedContentInitialTab('files'); setSharedContentOpen(true) }}
                     onOpenMemberProfile={(username) => {
                       setGroupMemberViewOpen(false)
                       setGroupSettingsOpen(false)

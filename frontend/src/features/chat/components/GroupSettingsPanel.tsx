@@ -8,7 +8,7 @@ import GroupManagementDetails from './GroupManagementDetails'
 import GroupMemberDirectory from './GroupMemberDirectory'
 import '../styles/group-management-workspace.css'
 
-export type GroupManagementSection = 'members' | 'details' | 'permissions' | 'requests' | 'rules' | 'notifications' | 'files' | 'activity'
+export type GroupManagementSection = 'members' | 'details' | 'permissions' | 'requests' | 'rules' | 'notifications' | 'activity'
 
 type Props = {
   initialSection?: GroupManagementSection
@@ -115,7 +115,7 @@ export default function GroupSettingsPanel({
           ] as const).map(([id, label, Icon]) => (
             <button key={id} type="button" className={activeSection === id ? 'active' : ''}
               aria-current={activeSection === id ? 'page' : undefined}
-              onClick={() => { setActiveSection(id); setMemberSearch('') }}>
+              onClick={() => { if (id === 'files') { onOpenShared(); return } setActiveSection(id); setMemberSearch('') }}>
               <Icon size={16} aria-hidden="true" /><span>{label}</span>
             </button>
           ))}
@@ -213,15 +213,15 @@ export default function GroupSettingsPanel({
           </div>
         )}
 
-        {(['details', 'rules', 'notifications', 'files'] as const).includes(activeSection as 'details' | 'rules' | 'notifications' | 'files') && (
+        {(['details', 'rules', 'notifications'] as const).includes(activeSection as 'details' | 'rules' | 'notifications') && (
           <div className="group-management-section-body">
             <div className="group-management-section-title">
-              <h3>{activeSection === 'details' ? 'Thông tin cộng đồng' : activeSection === 'rules' ? 'Nội quy nhóm' : activeSection === 'notifications' ? 'Thông báo' : 'Tệp đã chia sẻ'}</h3>
+              <h3>{activeSection === 'details' ? 'Thông tin cộng đồng' : activeSection === 'rules' ? 'Nội quy nhóm' : 'Thông báo'}</h3>
             </div>
             <GroupManagementDetails key={`${activeConversation.id}:${activeSection}`}
               conversationId={activeConversation.id}
-              section={activeSection as 'details' | 'rules' | 'notifications' | 'files'}
-              canEdit={canEditGroup} request={request} notify={notify} onOpenShared={onOpenShared} />
+              section={activeSection as 'details' | 'rules' | 'notifications'}
+              canEdit={canEditGroup} request={request} notify={notify} />
           </div>
         )}
       </>}

@@ -169,6 +169,10 @@ RETURNING last_read_message_id
 		httpx.Error(w, 500, "cannot update channel read state")
 		return
 	}
+	if _, err := s.db.Exec(r.Context(), `UPDATE conversation_members SET manual_unread=FALSE WHERE conversation_id=$1 AND user_id=$2 AND manual_unread`, id, claims.UserID); err != nil {
+		httpx.Error(w, 500, "cannot clear unread marker")
+		return
+	}
 	// Synchronize channel badges on the member's other logged-in devices.
 	s.publishConversationEvent(r.Context(), []int64{claims.UserID}, realtimeEvent{Type: "conversation.updated", ConversationID: id})
 	w.Header().Set("Cache-Control", "no-store")

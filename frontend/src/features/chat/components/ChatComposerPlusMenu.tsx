@@ -19,14 +19,15 @@ type Props = {
   onSelectGiphy?: (url: string) => void
   onSelectSticker?: (file: File) => void
   onSchedule?: () => void
+  onQuickReplies?: () => void
   onGroupActivity?: (kind: GroupActivityKind) => void
 }
 
-export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachMedia, onInsertEmoji, userId, onSelectSticker, onSelectGiphy, onSchedule, onGroupActivity }: Props) {
+export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachMedia, onInsertEmoji, userId, onSelectSticker, onSelectGiphy, onSchedule, onQuickReplies, onGroupActivity }: Props) {
   const [mode, setMode] = useState<MenuMode>('closed')
   const [position, setPosition] = useState<ChatComposerMenuPosition | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const actionHeight = 198 + (onSelectGiphy ? 44 : 0) + (onSelectSticker ? 44 : 0) + (onSchedule ? 44 : 0)
+  const actionHeight = 198 + (onSelectGiphy ? 44 : 0) + (onSelectSticker ? 44 : 0) + (onSchedule ? 44 : 0) + (onQuickReplies ? 44 : 0)
   const groupHeight = onGroupActivity ? 132 : 0
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -39,7 +40,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
       top: visual?.offsetTop ?? 0,
       width: visual?.width ?? window.innerWidth,
       height: visual?.height ?? window.innerHeight,
-    }, nextMode !== 'actions' ? 430 : actionHeight + (window.innerWidth <= 760 ? groupHeight : 0)))
+    }, nextMode !== 'actions' ? 430 : actionHeight + groupHeight))
   }
 
   function show(nextMode: Exclude<MenuMode, 'closed'>) {
@@ -71,7 +72,7 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
         top: visual?.offsetTop ?? 0,
         width: visual?.width ?? window.innerWidth,
         height: visual?.height ?? window.innerHeight,
-      }, mode !== 'actions' ? 430 : actionHeight + (window.innerWidth <= 760 ? groupHeight : 0)))
+      }, mode !== 'actions' ? 430 : actionHeight + groupHeight))
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -138,19 +139,20 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
                 <Smile size={19} aria-hidden="true" /><span>Sticker</span>
               </button>}
               {onSelectGiphy && <button type="button" className="chat-composer-plus-option" onClick={() => show('giphy')}><Images size={19} aria-hidden="true" /><span>GIF / Sticker động</span></button>}
+              {onQuickReplies && <button type="button" className="chat-composer-plus-option" onClick={() => choose(onQuickReplies)}><ClipboardList size={19}/><span>Tin nhắn nhanh</span></button>}
               {onSchedule && (
                 <button type="button" className="chat-composer-plus-option" onClick={() => choose(onSchedule)}>
                   <Clock3 size={19} aria-hidden="true" /><span>Hẹn giờ gửi</span>
                 </button>
               )}
               {onGroupActivity && <>
-                <button type="button" className="chat-composer-plus-option chat-composer-mobile-option" onClick={() => choose(() => onGroupActivity('poll'))}>
+                <button type="button" className="chat-composer-plus-option" onClick={() => choose(() => onGroupActivity('poll'))}>
                   <ClipboardList size={19} aria-hidden="true" /><span>Bình chọn</span>
                 </button>
-                <button type="button" className="chat-composer-plus-option chat-composer-mobile-option" onClick={() => choose(() => onGroupActivity('note'))}>
+                <button type="button" className="chat-composer-plus-option" onClick={() => choose(() => onGroupActivity('note'))}>
                   <FileText size={19} aria-hidden="true" /><span>Ghi chú nhóm</span>
                 </button>
-                <button type="button" className="chat-composer-plus-option chat-composer-mobile-option" onClick={() => choose(() => onGroupActivity('reminder'))}>
+                <button type="button" className="chat-composer-plus-option" onClick={() => choose(() => onGroupActivity('reminder'))}>
                   <CalendarClock size={19} aria-hidden="true" /><span>Nhắc hẹn nhóm</span>
                 </button>
               </>}

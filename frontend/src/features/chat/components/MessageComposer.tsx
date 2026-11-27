@@ -1,3 +1,5 @@
+import { useQuickReplyVisibility } from "../hooks/useQuickReplyVisibility";
+import QuickReplyPanel from "./QuickReplyPanel";
 import { Images, X } from "lucide-react";
 import ChatComposerPlusMenu from "./ChatComposerPlusMenu";
 import ScheduledMessageQueue from "./ScheduledMessageQueue";
@@ -7,7 +9,6 @@ import { userLabel } from "../../../shared/utils/userLabel";
 import { attachmentLabel } from "../../../shared/utils/format";
 import { replyPreview, stickerPreviewUrl } from "../utils/conversationPreview";
 import { chatFilesFromClipboard } from "../utils/chatFileTransfer";
-import { GroupActivityComposerMenu } from "./GroupActivities";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import { isDesktopBuild } from "../../../platform/desktop";
 import VoiceRecorder from "./VoiceRecorder";
@@ -21,6 +22,7 @@ const CHAT_ATTACHMENT_ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xl
 type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[]; chatFileInputRef: RefObject<HTMLInputElement | null>; apiFetch: ApiRequest; canSchedule: boolean };
 
 export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, apiFetch, canSchedule, canSend, chatFileInputRef, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, groupMembers }: Props) {
+  const quickReplies = useQuickReplyVisibility(`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`, messageText);
   function openAttachmentPicker(mediaOnly: boolean) {
     const input = chatFileInputRef.current;
     if (!input) return;
@@ -52,6 +54,7 @@ export default function MessageComposer({ activeConversation, activeConversation
       onSelectGiphy={url => setMessageText([messageText, url].filter(Boolean).join('\n'))}
       onSelectSticker={file => { void addChatFiles([file]) }}
       onSchedule={onSchedule}
+      onQuickReplies={quickReplies.open}
       onGroupActivity={activeConversation.type === 'group' ? setGroupActivityCreateKind : undefined}
     />
   }
@@ -94,6 +97,7 @@ export default function MessageComposer({ activeConversation, activeConversation
                         />
                       </div>
                     )}
+                    <QuickReplyPanel key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`} request={apiFetch} query={quickReplies.query} managing={quickReplies.managing} onClose={quickReplies.close} onSelect={text => { if (/^\/[a-z0-9_-]*$/i.test(messageText)) setMessageText(text); else insertEmoji(text); }} />
                     {canSchedule ? <ScheduledMessageQueue
                       key={session.sessionId}
                       request={apiFetch}
@@ -114,12 +118,7 @@ export default function MessageComposer({ activeConversation, activeConversation
                       onRecorded={(file) => { void addChatFiles([file]) }}
                       onError={(message) => setNotice(message, 'error')}
                     />
-                    {activeConversation.type === 'group' && (
-                      <GroupActivityComposerMenu
-                        key={activeConversation.id}
-                        onCreate={setGroupActivityCreateKind}
-                      />
-                    )}
+
                     <ChatMentionInput
                       key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
                       conversationId={activeConversation.id}

@@ -249,14 +249,6 @@
   }
 }
 
-/* The demo composer groups secondary actions in +, while main retains the
-   approved 44px call and send controls. */
-@media (min-width: 761px) {
-  .chat-composer-plus-popover > .chat-composer-mobile-option {
-    display: none;
-  }
-}
-
 @media (max-width: 760px) {
   .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
   > .conversation-panel > .media-composer.compact-chat-composer {

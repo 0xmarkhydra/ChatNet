@@ -89,6 +89,9 @@ var storyReactionsSQL string
 //go:embed migrations/022_story_views.sql
 var storyViewsSQL string
 
+//go:embed migrations/023_chat_timed_mute.sql
+var chatTimedMuteSQL string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return fmt.Errorf("postgres pool is nil")
@@ -183,6 +186,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err = tx.Exec(ctx, storyViewsSQL); err != nil {
 		return fmt.Errorf("apply story views migration: %w", err)
+	}
+	if _, err = tx.Exec(ctx, chatTimedMuteSQL); err != nil {
+		return fmt.Errorf("apply chat timed mute migration: %w", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit migrations: %w", err)

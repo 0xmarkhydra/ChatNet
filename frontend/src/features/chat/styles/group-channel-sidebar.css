@@ -160,14 +160,6 @@
     width: 100%;
   }
 }
-@media (min-width: 1420px) {
-  .modern-shell.app-layout .social-chat-layout.group-channel-workspace.details-open > .conversation-info-panel.social-chat-details {
-    grid-column: 3;
-    grid-row: 1;
-    min-width: 0;
-    min-height: 0;
-  }
-}
 @media (max-width: 760px) {
   .modern-shell.app-layout .social-chat-layout.group-channel-workspace > .group-channel-sidebar {
     position: absolute;

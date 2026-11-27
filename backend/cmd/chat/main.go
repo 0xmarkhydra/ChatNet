@@ -72,6 +72,8 @@ type conversation struct {
 	OtherUsername  string     `json:"otherUsername,omitempty"`
 	MemberCount    int        `json:"memberCount"`
 	UnreadCount    int        `json:"unreadCount"`
+	ManualUnread   bool       `json:"manualUnread"`
+	Wallpaper      string     `json:"wallpaper,omitempty"`
 	LastMessage    string     `json:"lastMessage"`
 	LastMessageAt  *time.Time `json:"lastMessageAt,omitempty"`
 	AvatarURL      string     `json:"avatarUrl,omitempty"`
@@ -157,6 +159,10 @@ func main() {
 	mux.Handle("POST /api/users/nearby", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.findNearby)))
 	mux.Handle("DELETE /api/users/nearby", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.stopNearby)))
 	mux.Handle("GET /api/friends", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listFriends)))
+	mux.Handle("GET /api/contacts/{id}/common-groups", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listCommonGroups)))
+	mux.Handle("GET /api/chat/quick-replies", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listQuickReplies)))
+	mux.Handle("PUT /api/chat/quick-replies/{key}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.mutateQuickReply)))
+	mux.Handle("DELETE /api/chat/quick-replies/{key}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.mutateQuickReply)))
 	mux.Handle("GET /api/contacts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listContactMetadata)))
 	mux.Handle("PUT /api/contacts/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateContactMetadata)))
 	mux.Handle("GET /api/friends/requests", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listFriendRequests)))
@@ -226,6 +232,8 @@ func main() {
 	mux.Handle("GET /api/messages/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessageReactionUsers)))
 	mux.Handle("PUT /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
 	mux.Handle("DELETE /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
+	mux.Handle("PUT /api/conversations/{id}/wallpaper", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setChatWallpaper)))
+	mux.Handle("PUT /api/conversations/{id}/read-state", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setConversationReadState)))
 	mux.Handle("POST /api/conversations/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markRead)))
 	mux.Handle("PATCH /api/conversations/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroup)))
 	mux.Handle("GET /api/conversations/{id}/members", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupMembers)))
@@ -647,7 +655,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := s.db.Query(r.Context(), `
-		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,cm.pinned_at,
+		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,cm.pinned_at,cm.manual_unread,cm.chat_wallpaper,
 		       COALESCE((SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id=c.id),0),
 		       COALESCE((
 		           SELECT CASE
@@ -693,7 +701,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
                ORDER BY CASE WHEN avatar_member.user_id=$1 THEN 1 ELSE 0 END, avatar_member.user_id
                LIMIT 3
              ) ELSE ARRAY[]::text[] END,
-             COALESCE((SELECT NOT p.message_notifications
+             COALESCE((SELECT NOT p.message_notifications OR COALESCE(p.muted_until>NOW(),FALSE)
                FROM group_notification_preferences p
                WHERE p.conversation_id=c.id AND p.user_id=$1),FALSE)
 
@@ -711,7 +719,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
           ))
           AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
 		  AND ($8::text='' OR c.type=$8)
-		  AND ($7::boolean=FALSE OR EXISTS (
+		  AND ($7::boolean=FALSE OR cm.manual_unread OR EXISTS (
 		    SELECT 1 FROM messages unread
 		    WHERE unread.conversation_id=c.id
               AND unread.id>CASE WHEN c.type='group' THEN COALESCE((
@@ -754,7 +762,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		var lastRead, memberCount, unreadCount int64
 		var groupAvatarRef string
 		var lastMessageAt time.Time
-		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef, &c.AvatarMembers, &c.Muted); err != nil {
+		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &c.ManualUnread, &c.Wallpaper, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef, &c.AvatarMembers, &c.Muted); err != nil {
 			log.Printf("list conversations scan failed: %v", err)
 			httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 			return
@@ -771,11 +779,14 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			var username, displayName string
 			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status,
+				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(meta.nickname),''),NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status,
 				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=$2 AND b.blocked_id=u.id),
 				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=u.id AND b.blocked_id=$2)
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
+				LEFT JOIN friend_contact_metadata meta ON meta.owner_id=$2 AND meta.contact_id=u.id
+				  AND EXISTS (SELECT 1 FROM friend_connections fc WHERE fc.user_low=LEAST($2::bigint,u.id)
+				    AND fc.user_high=GREATEST($2::bigint,u.id) AND fc.status='accepted')
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
 				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline, &c.BlockedByMe, &c.BlockedByOther)
 			if err == nil {
@@ -1856,6 +1867,12 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if tag, err := s.db.Exec(r.Context(), `UPDATE conversation_members SET manual_unread=FALSE WHERE conversation_id=$1 AND user_id=$2 AND manual_unread`, conversationID, claims.UserID); err != nil {
+		httpx.Error(w, 500, "cannot clear unread marker")
+		return
+	} else if tag.RowsAffected() > 0 {
+		s.publishConversationEvent(r.Context(), []int64{claims.UserID}, realtimeEvent{Type: "conversation.updated", ConversationID: conversationID})
+	}
 	lastReadID := previousReadID
 	if maxID > previousReadID {
 		if err := s.db.QueryRow(r.Context(), `

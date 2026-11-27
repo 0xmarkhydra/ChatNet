@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
-import type { Message } from '../types'
 import { getCommunity, getNotificationSettings, saveNotificationSettings, updateCommunity } from '../api/community'
-import { listSharedFiles } from '../api/search'
 import { useLatest } from '../../../shared/hooks/useLatest'
 
-export type GroupManagementSection = 'details' | 'rules' | 'notifications' | 'files'
+export type GroupManagementSection = 'details' | 'rules' | 'notifications'
 export type Community = {
   id: number
   name: string
@@ -21,7 +19,6 @@ export type GroupManagementDetailsProps = {
   canEdit: boolean
   request: (path: string, init?: RequestInit) => Promise<Response>
   notify: (text: string) => void
-  onOpenShared: () => void
 }
 const initialCommunity: Community = {
   id: 0, name: '', description: '', topic: '', rules: '', visibility: 'private', memberCount: 0,
@@ -29,11 +26,10 @@ const initialCommunity: Community = {
 const initialPreferences: Preferences = { messageNotifications: true, mentionNotifications: true }
 
 
-export function useGroupManagementDetails({ conversationId, section, canEdit, request, notify }: Omit<GroupManagementDetailsProps, 'onOpenShared'>) {
+export function useGroupManagementDetails({ conversationId, section, canEdit, request, notify }: GroupManagementDetailsProps) {
   const requestRef = useLatest(request)
   const [community, setCommunity] = useState<Community>(initialCommunity)
   const [preferences, setPreferences] = useState<Preferences>(initialPreferences)
-  const [files, setFiles] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -44,9 +40,7 @@ export function useGroupManagementDetails({ conversationId, section, canEdit, re
     // Initial loading/error state already applies to each new mount.
     const load = section === 'details' || section === 'rules'
       ? getCommunity
-      : section === 'notifications'
-        ? getNotificationSettings
-        : listSharedFiles
+      : getNotificationSettings
     void load(requestRef.current, conversationId, ctrl.signal).then(async response => {
       if (!response.ok) throw new Error('Không thể tải dữ liệu của mục này.')
       const data = await response.json() as unknown
@@ -60,11 +54,8 @@ export function useGroupManagementDetails({ conversationId, section, canEdit, re
           topic: entry.topic || '',
           rules: entry.rules || '',
         })
-      } else if (section === 'notifications') {
-        setPreferences({ ...initialPreferences, ...(data as Preferences) })
       } else {
-        const entries = (data as { items?: Message[] }).items
-        setFiles(Array.isArray(entries) ? entries : [])
+        setPreferences({ ...initialPreferences, ...(data as Preferences) })
       }
     }).catch(() => {
       if (!ctrl.signal.aborted) setError('Không tải được dữ liệu. Hãy thử mở lại mục này.')
@@ -111,5 +102,5 @@ export function useGroupManagementDetails({ conversationId, section, canEdit, re
     }
   }
 
-  return { community, setCommunity, preferences, setPreferences, files, loading, busy, error, saveCommunity, saveNotifications }
+  return { community, setCommunity, preferences, setPreferences, loading, busy, error, saveCommunity, saveNotifications }
 }

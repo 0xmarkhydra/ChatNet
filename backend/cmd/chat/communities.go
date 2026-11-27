@@ -213,6 +213,7 @@ func (s *server) joinPublicCommunity(w http.ResponseWriter, r *http.Request) {
 type groupNotificationPreferences struct {
 	MessageNotifications bool `json:"messageNotifications"`
 	MentionNotifications bool `json:"mentionNotifications"`
+	MuteMinutes          int  `json:"muteMinutes,omitempty"`
 }
 
 func (s *server) getGroupNotificationPreferences(w http.ResponseWriter, r *http.Request) {
@@ -222,12 +223,12 @@ func (s *server) getGroupNotificationPreferences(w http.ResponseWriter, r *http.
 		return
 	}
 	var member bool
-    if err := s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2)`, id, claims.UserID).Scan(&member); err != nil || !member {
-        httpx.Error(w, 403, "not a conversation member")
-        return
-    }
+	if err := s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2)`, id, claims.UserID).Scan(&member); err != nil || !member {
+		httpx.Error(w, 403, "not a conversation member")
+		return
+	}
 	v := groupNotificationPreferences{MessageNotifications: true, MentionNotifications: true}
-	err := s.db.QueryRow(r.Context(), `SELECT message_notifications,mention_notifications FROM group_notification_preferences WHERE conversation_id=$1 AND user_id=$2`, id, claims.UserID).Scan(&v.MessageNotifications, &v.MentionNotifications)
+	err := s.db.QueryRow(r.Context(), `SELECT message_notifications AND NOT COALESCE(muted_until>NOW(),FALSE),mention_notifications FROM group_notification_preferences WHERE conversation_id=$1 AND user_id=$2`, id, claims.UserID).Scan(&v.MessageNotifications, &v.MentionNotifications)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, 500, "cannot load preferences")
 		return
@@ -245,11 +246,18 @@ func (s *server) putGroupNotificationPreferences(w http.ResponseWriter, r *http.
 		httpx.Error(w, 400, "invalid preferences")
 		return
 	}
-	tag, err := s.db.Exec(r.Context(), `INSERT INTO group_notification_preferences(conversation_id,user_id,message_notifications,mention_notifications)
-  SELECT cm.conversation_id,cm.user_id,$3,$4 FROM conversation_members cm
+	if v.MuteMinutes != 0 && v.MuteMinutes != 60 && v.MuteMinutes != 240 && v.MuteMinutes != 1440 && v.MuteMinutes != 10080 {
+		httpx.Error(w, 400, "invalid mute duration")
+		return
+	}
+	if v.MuteMinutes > 0 {
+		v.MessageNotifications = true
+	}
+	tag, err := s.db.Exec(r.Context(), `INSERT INTO group_notification_preferences(conversation_id,user_id,message_notifications,mention_notifications,muted_until)
+  SELECT cm.conversation_id,cm.user_id,$3,$4,CASE WHEN $5::int>0 THEN NOW()+make_interval(mins=>$5::int) ELSE NULL END FROM conversation_members cm
   WHERE cm.conversation_id=$1 AND cm.user_id=$2
   ON CONFLICT(conversation_id,user_id) DO UPDATE SET message_notifications=EXCLUDED.message_notifications,
-  mention_notifications=EXCLUDED.mention_notifications,updated_at=NOW()`, id, claims.UserID, v.MessageNotifications, v.MentionNotifications)
+  mention_notifications=EXCLUDED.mention_notifications,muted_until=EXCLUDED.muted_until,updated_at=NOW()`, id, claims.UserID, v.MessageNotifications, v.MentionNotifications, v.MuteMinutes)
 	if err != nil {
 		httpx.Error(w, 500, "cannot save preferences")
 		return
@@ -258,6 +266,10 @@ func (s *server) putGroupNotificationPreferences(w http.ResponseWriter, r *http.
 		httpx.Error(w, 403, "not a group member")
 		return
 	}
+	if v.MuteMinutes > 0 {
+		v.MessageNotifications = false
+	}
+	s.publishConversationEvent(r.Context(), []int64{claims.UserID}, realtimeEvent{Type: "conversation.updated", ConversationID: id})
 	httpx.JSON(w, 200, v)
 }
 
@@ -284,22 +296,28 @@ func (s *server) groupPushRecipients(ctx context.Context, conversationID int64, 
 		return []int64{}
 	}
 	if !group {
-        rows, err := s.db.Query(ctx, `SELECT cm.user_id FROM conversation_members cm
+		rows, err := s.db.Query(ctx, `SELECT cm.user_id FROM conversation_members cm
           LEFT JOIN group_notification_preferences p ON p.conversation_id=cm.conversation_id AND p.user_id=cm.user_id
           WHERE cm.conversation_id=$1 AND cm.user_id=ANY($2::bigint[])
-            AND COALESCE(p.message_notifications,TRUE)`, conversationID, candidates)
-        if err != nil { return []int64{} }
-        defer rows.Close()
-        result := []int64{}
-        for rows.Next() {
-            var uid int64
-            if rows.Scan(&uid) != nil { return []int64{} }
-            result = append(result, uid)
-        }
-        if rows.Err() != nil { return []int64{} }
-        return result
+            AND (COALESCE(p.message_notifications,TRUE) AND NOT COALESCE(p.muted_until>NOW(),FALSE))`, conversationID, candidates)
+		if err != nil {
+			return []int64{}
+		}
+		defer rows.Close()
+		result := []int64{}
+		for rows.Next() {
+			var uid int64
+			if rows.Scan(&uid) != nil {
+				return []int64{}
+			}
+			result = append(result, uid)
+		}
+		if rows.Err() != nil {
+			return []int64{}
+		}
+		return result
 	}
-	rows, err := s.db.Query(ctx, `SELECT u.id,u.username,COALESCE(p.message_notifications,TRUE),COALESCE(p.mention_notifications,TRUE)
+	rows, err := s.db.Query(ctx, `SELECT u.id,u.username,(COALESCE(p.message_notifications,TRUE) AND NOT COALESCE(p.muted_until>NOW(),FALSE)),COALESCE(p.mention_notifications,TRUE)
   FROM conversation_members cm JOIN users u ON u.id=cm.user_id
   LEFT JOIN group_notification_preferences p ON p.conversation_id=cm.conversation_id AND p.user_id=cm.user_id
   LEFT JOIN group_channel_notification_preferences cp ON cp.conversation_id=cm.conversation_id

@@ -148,8 +148,6 @@
    Restore the original stable right-hand information/management sheet size
    by positioning it against the whole conversation layout instead. */
 @media (min-width: 1420px) {
-  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.group-channel-workspace.details-open
-  > .conversation-info-panel.social-chat-details,
   .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.group-channel-workspace.group-sidebar-open
   > .group-settings-sidebar {
     display: flex !important;

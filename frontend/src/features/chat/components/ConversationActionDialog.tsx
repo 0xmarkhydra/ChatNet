@@ -1,4 +1,5 @@
-import { Bell, BellOff, Pin, PinOff, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Bell, BellOff, Pin, PinOff, Trash2, Tag, Check, Mail, MailOpen } from "lucide-react";
 import { type SetStateAction } from "react";
 import { type Conversation } from "../types";
 import type { Dispatch } from "react";
@@ -7,10 +8,14 @@ export type ConversationActionDialogProps = {
   activeConversationAction: Conversation;
   conversationMenuPosition: { x: number; y: number; } | null;
   pinBusy: boolean;
+  onSetUnread?: (conversation: Conversation, unread: boolean) => Promise<void>;
   notificationBusy: boolean;
   historyActionBusy: boolean;
-  toggleConversationNotifications: (conversation: Conversation) => Promise<void>;
   clearSelectedConversationHistory: (conversation: Conversation) => Promise<void>;
+  onToggleNotifications: (conversation: Conversation, muteMinutes?: number) => Promise<void>;
+  categories: { id: number; name: string; color: string }[];
+  categoryBusy: boolean;
+  onAssignCategory: (id: number, categoryId: number | null) => Promise<boolean>;
   setConversationActionId: Dispatch<SetStateAction<number | null>>;
   toggleConversationPin: (conversation: Conversation) => Promise<void>;
 };
@@ -19,13 +24,14 @@ export default function ConversationActionDialog({
   activeConversationAction,
   conversationMenuPosition,
   pinBusy,
-  notificationBusy,
   historyActionBusy,
-  toggleConversationNotifications,
   clearSelectedConversationHistory,
   setConversationActionId,
-  toggleConversationPin,
+  onSetUnread, toggleConversationPin, notificationBusy, onToggleNotifications, categories, categoryBusy, onAssignCategory,
 }: ConversationActionDialogProps) {
+  const [classifying, setClassifying] = useState(false);
+  const [muting, setMuting] = useState(false);
+  const close = () => setConversationActionId(null);
   return (
       <div className={conversationMenuPosition ? 'conversation-context-backdrop' : 'message-context-backdrop'}
             role="dialog" aria-modal="true"
@@ -38,7 +44,8 @@ export default function ConversationActionDialog({
               className={conversationMenuPosition ? 'conversation-context-menu' : 'message-context-sheet'}
               style={conversationMenuPosition ? {
                 left: Math.max(8, Math.min(conversationMenuPosition.x, window.innerWidth - 252)),
-                top: Math.max(8, Math.min(conversationMenuPosition.y, window.innerHeight - 152)),
+                top: Math.max(8, Math.min(conversationMenuPosition.y, window.innerHeight - 220)),
+                maxHeight: "calc(100dvh - 16px)", overflowY: "auto",
               } : undefined}
             >
               {!conversationMenuPosition && (
@@ -56,19 +63,35 @@ export default function ConversationActionDialog({
                   <span aria-hidden="true">{activeConversationAction.pinnedAt ? <PinOff size={19} /> : <Pin size={19} />}</span>
                   <b>{activeConversationAction.pinnedAt ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}</b>
                 </button>
-                <button type="button" disabled={notificationBusy} onClick={() => {
-                  setConversationActionId(null)
-                  void toggleConversationNotifications(activeConversationAction)
-                }}>
+                {onSetUnread && <button type="button" onClick={() => { close(); void onSetUnread(activeConversationAction, !(activeConversationAction.unreadCount || activeConversationAction.manualUnread)); }}>
+                  <span aria-hidden="true">{activeConversationAction.unreadCount || activeConversationAction.manualUnread ? <MailOpen size={19}/> : <Mail size={19}/>}</span>
+                  <b>{activeConversationAction.unreadCount || activeConversationAction.manualUnread ? 'Đánh dấu đã đọc' : 'Đánh dấu chưa đọc'}</b>
+                </button>}
+                <button type="button" disabled={notificationBusy} onClick={() => { close(); void onToggleNotifications(activeConversationAction); }}>
                   <span aria-hidden="true">{activeConversationAction.muted ? <Bell size={19} /> : <BellOff size={19} />}</span>
                   <b>{activeConversationAction.muted ? 'Bật thông báo' : 'Tắt thông báo'}</b>
                 </button>
-                <button type="button" disabled={historyActionBusy} onClick={() => {
-                  setConversationActionId(null)
-                  void clearSelectedConversationHistory(activeConversationAction)
-                }}>
-                  <span aria-hidden="true"><Trash2 size={19} className="text-danger" /></span>
-                  <b className="text-danger">Xóa lịch sử trò chuyện</b>
+                {!activeConversationAction.muted && <>
+                  <button type="button" disabled={notificationBusy} aria-expanded={muting} onClick={() => setMuting(value => !value)}>
+                    <span aria-hidden="true"><BellOff size={19} /></span><b>Tắt theo thời hạn</b>
+                  </button>
+                  {muting && [[60, '1 giờ'], [240, '4 giờ'], [1440, '24 giờ'], [10080, '7 ngày']].map(([minutes, label]) => (
+                    <button type="button" key={minutes} disabled={notificationBusy} onClick={() => { close(); void onToggleNotifications(activeConversationAction, Number(minutes)); }}><span aria-hidden="true"><BellOff size={16}/></span><b>{label}</b></button>
+                  ))}
+                </>}
+                <button type="button" aria-expanded={classifying} disabled={categoryBusy} onClick={() => setClassifying(value => !value)}>
+                  <span aria-hidden="true"><Tag size={19} /></span><b>Phân loại hội thoại</b>
+                </button>
+                {classifying && [{ id: 0, name: 'Chưa phân loại', color: 'slate' }, ...categories].map(category => (
+                  <button type="button" key={category.id} disabled={categoryBusy}
+                    aria-pressed={(activeConversationAction.categoryId || 0) === category.id}
+                    onClick={async () => { if (await onAssignCategory(activeConversationAction.id, category.id || null)) close(); }}>
+                    <span aria-hidden="true">{(activeConversationAction.categoryId || 0) === category.id ? <Check size={18} /> : <Tag size={18} />}</span>
+                    <b>{category.name}</b>
+                  </button>
+                ))}
+                <button type="button" disabled={historyActionBusy} onClick={() => { close(); void clearSelectedConversationHistory(activeConversationAction) }}>
+                  <span aria-hidden="true"><Trash2 size={19} className="text-danger" /></span><b className="text-danger">Xóa lịch sử trò chuyện</b>
                 </button>
               </div>
               {!conversationMenuPosition && (

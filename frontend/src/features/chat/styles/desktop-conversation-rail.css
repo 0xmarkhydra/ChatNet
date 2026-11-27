@@ -299,7 +299,7 @@
     bottom: 17px;
     right: 17px;
     z-index: 21;
-    width: min(345px, 40%);
+    width: min(345px, calc(100% - 34px));
     height: auto;
     min-height: 0;
     grid-column: auto;
@@ -785,5 +785,24 @@
   .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout:not(.desktop-channel-panel-open),
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout > .desktop-conversation-rail {
     transition: none !important;
+  }
+}
+/* Personal, group and channel details use the same fixed geometry. The
+   absolute panel is anchored to the whole chat, never a third grid track. */
+@media (min-width: 1420px) {
+  .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.details-open > .conversation-info-panel.social-chat-details {
+    display: flex;
+    position: absolute;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    inset: 0 0 0 auto;
+    box-sizing: border-box;
+    width: 292px;
+    min-width: 292px;
+    max-width: 292px;
+    height: auto;
+    z-index: 65;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 }
