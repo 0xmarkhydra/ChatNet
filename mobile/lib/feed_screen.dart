@@ -80,6 +80,12 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   void initState() {
     super.initState();
     _load();
+    if (widget.openPostRequest > 0 && widget.openPostId != null) {
+      final id = widget.openPostId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.openPostId == id) _openOriginalPost({'id': id});
+      });
+    }
   }
 
   @override

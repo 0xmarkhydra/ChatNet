@@ -29,7 +29,9 @@ List<MobileNotification> buildMobileNotifications({
 }) {
   final notifications = <MobileNotification>[
     for (final friend in requests)
-      if (friend['direction'] == 'incoming' && friend['id'] is num)
+      if (friend['direction'] == 'incoming' &&
+          (friend['status'] == null || friend['status'] == 'pending') &&
+          friend['id'] is num)
         MobileNotification(
           key: 'friend:${friend['id']}',
           kind: 'friend',
@@ -73,8 +75,11 @@ List<MobileNotification> buildMobileNotifications({
           data: mention,
         ),
   ];
-  notifications.sort((a, b) => b.date.compareTo(a.date));
-  return notifications;
+  final unique = {
+    for (final item in notifications) item.key: item,
+  }.values.toList();
+  unique.sort((a, b) => b.date.compareTo(a.date));
+  return unique;
 }
 
 List<MobileNotification> filterMobileNotifications(

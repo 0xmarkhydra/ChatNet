@@ -62,6 +62,10 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.newFriendRequest > 0) {
+      contactTab = 2;
+      invitationTab = 'incoming';
+    }
     _load();
     if (widget.query.trim().isNotEmpty) {
       _scheduleSearch(widget.query);

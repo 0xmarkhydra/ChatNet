@@ -75,10 +75,12 @@ export default function ConversationAvatarRail({
     }}>
         {items.map(conversation => {
           const category = categories.find(item => item.id === conversation.categoryId)
+          const unreadLabel = conversation.unreadCount > 99 ? '99+' : conversation.unreadCount || '•'
+          const hasUnread = conversation.unreadCount > 0 || conversation.manualUnread
           const entryClass = desktop ? 'desktop-conversation-rail-entry' : 'conversation-avatar-rail-item'
           const entry = <button type="button" key={conversation.id}
             className={`${entryClass}${selectedId === conversation.id ? ' selected' : ''}`}
-            aria-label={`Mở ${conversation.type === 'group' ? 'nhóm' : desktop ? 'tin nhắn' : 'cuộc trò chuyện'} ${conversation.name}${conversation.unreadCount ? `, ${conversation.unreadCount}${desktop ? ' chưa đọc' : ' tin chưa đọc'}` : ''}`}
+            aria-label={`Mở ${conversation.type === 'group' ? 'nhóm' : desktop ? 'tin nhắn' : 'cuộc trò chuyện'} ${conversation.name}${conversation.unreadCount ? `, ${conversation.unreadCount}${desktop ? ' chưa đọc' : ' tin chưa đọc'}` : conversation.manualUnread ? ', đánh dấu chưa đọc' : ''}`}
             aria-current={selectedId === conversation.id ? 'page' : undefined}
             title={conversation.name} onClick={() => onSelect(conversation)}
             onPointerEnter={event => { if (event.pointerType === 'mouse' && selectedId !== conversation.id) onPrefetch?.(conversation) }}
@@ -87,7 +89,10 @@ export default function ConversationAvatarRail({
             onPointerUp={onEntryPointerEnd} onPointerCancel={onEntryPointerEnd} onPointerLeave={onEntryPointerEnd}
             onContextMenu={event => onEntryContextMenu(conversation, event)}>
             <span className={desktop ? "desktop-conversation-rail-marker" : "conversation-avatar-rail-indicator"} aria-hidden="true" />
-            <ConversationAvatar conversation={conversation} className={desktop ? "desktop-conversation-rail-avatar" : "conversation-avatar conversation-avatar-rail-photo"} />
+            <span className="conversation-rail-avatar-anchor">
+              <ConversationAvatar conversation={conversation} className={desktop ? "desktop-conversation-rail-avatar" : "conversation-avatar conversation-avatar-rail-photo"} />
+              {hasUnread && <span className="conversation-rail-compact-unread" aria-hidden="true">{unreadLabel}</span>}
+            </span>
             {selectedId === conversation.id && <span className={`${prefix}-selected-check`} aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
             {!expanded && (conversation.muted || category) && (
               <span className="conversation-rail-compact-status" aria-hidden="true">
@@ -106,9 +111,9 @@ export default function ConversationAvatarRail({
                 <small>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</small>
               </span>
             </span>
-            {(conversation.unreadCount > 0 || conversation.manualUnread) && (
+            {hasUnread && (
               <span className={desktop ? "desktop-conversation-rail-unread" : "conversation-avatar-rail-count"} aria-hidden="true">
-                {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount || '•'}
+                {unreadLabel}
               </span>
             )}
           </button>

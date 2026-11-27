@@ -13,8 +13,8 @@ const request: FriendConnection = {
   status: 'pending', direction: 'incoming', updatedAt: '2026-11-14T00:00:00Z',
 }
 
-describe('notification local read state isolation', () => {
-  it('does not carry local read state across account changes, including A → B → A', async () => {
+describe('server-backed notification state', () => {
+  it('keeps pending invitations unread until the server state changes, including account switches', async () => {
     const previousAct = (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     const host = document.createElement('div')
@@ -42,13 +42,13 @@ describe('notification local read state isolation', () => {
       await act(async () => root.render(<Probe session={sessions.A} />))
       expect(hint()).toContain('1 thông báo')
       await act(async () => (host.querySelector('.np-notification-row') as HTMLButtonElement).click())
-      expect(hint()).toBe(null)
+      expect(hint()).toContain('1 thông báo')
 
       sessionRef.current = sessions.B
       await act(async () => root.render(<Probe session={sessions.B} />))
       expect(hint()).toContain('1 thông báo')
       await act(async () => (host.querySelector('.np-notification-row') as HTMLButtonElement).click())
-      expect(hint()).toBe(null)
+      expect(hint()).toContain('1 thông báo')
 
       sessionRef.current = sessions.A
       await act(async () => root.render(<Probe session={sessions.A} />))

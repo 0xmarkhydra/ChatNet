@@ -104,6 +104,20 @@ describe('post mentions session and polling lifecycle', () => {
       expect(probe.request).toHaveBeenCalledWith('/api/feed/mentions/8/read', { method: 'POST' })
     } finally { await probe.close() }
   })
+  it('refreshes on realtime and cannot let an older GET undo a confirmed read', async () => {
+    const probe = setup()
+    try {
+      await probe.render('A')
+      await act(async () => probe.pending[0].resolve(Response.json([mention(7)])))
+      await act(async () => window.dispatchEvent(new Event('chatnet:feed-notification-updated')))
+      let action!: Promise<void>
+      await act(async () => { action = probe.current.readPostMention(7) })
+      await act(async () => probe.pending[2].resolve(new Response(null, { status: 204 })))
+      await action
+      await act(async () => probe.pending[1].resolve(Response.json([mention(7)])))
+      expect(probe.host.textContent).toBe('7:true')
+    } finally { await probe.close() }
+  })
   it('does not report a pending read error after the owner unmounts', async () => {
     const probe = setup()
     let closed = false
