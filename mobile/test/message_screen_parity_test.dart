@@ -227,6 +227,9 @@ void main() {
       find.descendant(of: own, matching: find.byType(UserAvatar)),
       findsNothing,
     );
+    // The visible timeline can render before its read acknowledgement and channel refresh finish.
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('hamburger remains available for group picker without arrow', (
@@ -303,9 +306,7 @@ void main() {
     expect(find.text('Tắt thông báo nhóm'), findsOneWidget);
   });
 
-  testWidgets('Like and Send share a fixed composer action', (
-    tester,
-  ) async {
+  testWidgets('Like and Send share a fixed composer action', (tester) async {
     final api = DemoApi();
     await openChatParityDemo(tester, api);
     await tester.tap(find.text('Linh Nguyễn').first);

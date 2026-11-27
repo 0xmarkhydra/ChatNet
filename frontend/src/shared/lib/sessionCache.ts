@@ -37,6 +37,29 @@ export class SessionResponseCache {
  invalidate(tags: string[]) {
   for (const [key, entry] of this.entries) if (tags.includes(entry.tag)) { entry.valid = false; this.entries.delete(key) }
  }
+ consumeWarm(scope: string, path: string, signal: AbortSignal): Promise<Response> | undefined {
+  this.setScope(scope)
+  const url = new URL(path, 'http://cache.local'); url.searchParams.sort()
+  const key = url.pathname + url.search
+  const entry = this.entries.get(key)
+  if (!entry?.warm || !entry.valid || (!entry.pending && (!entry.response || entry.expires <= Date.now()))) return undefined
+  if (signal.aborted) return Promise.reject(signal.reason)
+  // Only the first consumer can use a warm entry; invalidation still sees a pending entry.
+  entry.warm = false
+  const response = entry.pending || Promise.resolve(entry.response!)
+  return new Promise<Response>((resolve, reject) => {
+   const abort = () => reject(signal.reason)
+   signal.addEventListener('abort', abort, { once: true })
+   response.then(value => {
+    if (signal.aborted) reject(signal.reason)
+    else if (this.scope !== scope || !entry.valid) reject(new SessionCacheInvalidatedError())
+    else resolve(value.clone())
+   }, reject).finally(() => {
+    signal.removeEventListener('abort', abort)
+    if (this.entries.get(key) === entry) this.entries.delete(key)
+   })
+  })
+ }
  async read(scope: string, path: string, load: () => Promise<Response>, force = false, warm = false): Promise<Response> {
   this.setScope(scope)
   const rule = policy(path)

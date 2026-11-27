@@ -201,6 +201,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             key: const ValueKey('chat'),
             api: widget.api,
             query: tab == SocoTab.chat ? search : '',
+            visible: tab == SocoTab.chat,
             requestedConversation: requestedConversation,
             openConversationRequest: openConversationRequest,
             createRequest: createChatRequest,

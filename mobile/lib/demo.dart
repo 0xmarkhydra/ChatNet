@@ -312,6 +312,14 @@ class DemoApi extends Api {
 
   @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (path == '/api/conversations/unread') {
+      return {
+        'unreadCount': rooms.fold<int>(
+          0,
+          (sum, room) => sum + ((room['unreadCount'] as num?)?.toInt() ?? 0),
+        ),
+      };
+    }
     if (path == '/api/translate') {
       return {
         'translatedText':
@@ -321,7 +329,9 @@ class DemoApi extends Api {
     // Membership/group prefetch is instantaneous in demo mode so that
     // unawaited refreshes cannot leave fake timers after a widget is removed.
     if (!path.startsWith('/api/conversations?type=group&') &&
-        path != '/api/conversations?limit=100') {
+        path != '/api/conversations?limit=100' &&
+        !path.endsWith('/read') &&
+        !path.endsWith('/channel-read')) {
       await Future<void>.delayed(const Duration(milliseconds: 160));
     }
     final uri = Uri.parse(path);
@@ -537,8 +547,22 @@ class DemoApi extends Api {
         }
         return {...room};
       }
+      if (parts[3] == 'channel-read') {
+        final channel = (data['channelId'] as num?)?.toInt() ?? 0;
+        final selected = channels[id]
+            ?.where((item) => item['id'] == channel)
+            .firstOrNull;
+        final count = (selected?['unreadCount'] as num?)?.toInt() ?? 0;
+        if (selected != null) selected['unreadCount'] = 0;
+        room['unreadCount'] =
+            ((room['unreadCount'] as num?)?.toInt() ?? 0) - count;
+        if ((room['unreadCount'] as num) < 0) room['unreadCount'] = 0;
+        room['manualUnread'] = false;
+        return {};
+      }
       if (parts[3] == 'read') {
         room['unreadCount'] = 0;
+        room['manualUnread'] = false;
         return {};
       }
       if (parts[3] == 'members') {
@@ -597,6 +621,14 @@ class DemoApi extends Api {
       }
       if (parts[3] == 'messages') {
         if (method == 'POST') {
+          final previous = messages[id]
+              ?.where(
+                (m) =>
+                    data['clientId'] != null &&
+                    m['clientId'] == data['clientId'],
+              )
+              .firstOrNull;
+          if (previous != null) return {...previous};
           final m = message(
             ++serial,
             id,
@@ -625,6 +657,7 @@ class DemoApi extends Api {
         final from = uri.queryParameters['from'] ?? '';
         final to = uri.queryParameters['to'] ?? '';
         final before = int.tryParse(uri.queryParameters['before'] ?? '');
+        final after = int.tryParse(uri.queryParameters['after'] ?? '');
         final limit = int.tryParse(uri.queryParameters['limit'] ?? '');
         if (uri.queryParameters.containsKey('limit')) {
           messageSearchRequests.add(path);
@@ -665,6 +698,9 @@ class DemoApi extends Api {
               '${date.day.toString().padLeft(2, '0')}';
           if (from.isNotEmpty && day.compareTo(from) < 0) return false;
           if (to.isNotEmpty && day.compareTo(to) > 0) return false;
+          if (after != null && ((item['id'] as num?)?.toInt() ?? 0) <= after) {
+            return false;
+          }
           if (before != null &&
               ((item['id'] as num?)?.toInt() ?? 0) >= before) {
             return false;
@@ -677,7 +713,10 @@ class DemoApi extends Api {
             (a['id'] as num?)?.toInt() ?? 0,
           ),
         );
-        return filtered.take(limit).toList();
+        final page = (after == null
+            ? filtered.take(limit).toList().reversed
+            : filtered.reversed.take(limit));
+        return page.map((row) => Map<String, dynamic>.from(row)).toList();
       }
     }
     if (parts[1] == 'messages') {

@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/app.dart';
+import 'package:soco/api.dart';
 import 'package:soco/demo.dart';
 import 'package:soco/feed_post_links.dart';
 
@@ -17,7 +19,229 @@ Future<void> openDirectChat(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+class RealtimeDemoApi extends DemoApi {
+  final updates = StreamController<void>.broadcast();
+  int readCount = 0;
+  int historyCount = 0;
+  @override
+  Stream<void> events() => updates.stream;
+  void emit(Json event) {
+    lastRealtimeEvent = event;
+    updates.add(null);
+  }
+
+  @override
+  Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (method == 'POST' &&
+        (path.endsWith('/read') || path.endsWith('/channel-read'))) {
+      readCount++;
+    }
+    if (method == 'GET' && path.contains('/messages?')) historyCount++;
+    return super.request(method, path, body);
+  }
+}
+
+class RetryDemoApi extends RealtimeDemoApi {
+  bool loseResponse = true;
+  final attempts = <String>[];
+  @override
+  Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (method == 'POST' && path == '/api/conversations/2/messages') {
+      attempts.add(body!['clientId'] as String);
+      final response = await super.request(method, path, body);
+      if (loseResponse) throw const ApiError('Mất kết nối sau khi gửi');
+      return response;
+    }
+    return super.request(method, path, body);
+  }
+}
+
 void main() {
+  testWidgets(
+    'realtime ignores unrelated events and does not repeat read acknowledgements in hidden chat',
+    (tester) async {
+      final api = RealtimeDemoApi()..preferences['autoTranslate'] = false;
+      await openMobile(tester, api);
+      await openDirectChat(tester);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      final reads = api.readCount;
+      final history = api.historyCount;
+      expect(reads, greaterThan(0));
+      api.emit({'type': 'feed.notification.updated', 'conversationId': 0});
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+      expect(api.historyCount, history);
+      api.emit({
+        'type': 'conversation.read',
+        'conversationId': 2,
+        'readerId': 1,
+      });
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+      expect(api.readCount, reads);
+      tester.view.physicalSize = const Size(1000, 844);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('nav-contacts')));
+      await tester.pumpAndSettle();
+      final hiddenHistory = api.historyCount;
+      final message = api.message(
+        999,
+        2,
+        2,
+        'Linh Nguyễn',
+        'Tin khi đang ở danh bạ',
+      );
+      api.messages[2]!.add(message);
+      api.emit({'type': 'message', 'conversationId': 2, 'message': message});
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+      expect(api.historyCount, hiddenHistory);
+      expect(api.readCount, reads);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await api.updates.close();
+    },
+  );
+
+  testWidgets('drafts stay isolated between direct chats and group channels', (
+    tester,
+  ) async {
+    final api = DemoApi()..preferences['autoTranslate'] = false;
+    await openMobile(tester, api);
+    await openDirectChat(tester);
+    Finder composer() => find.byType(TextField).last;
+    String text() => tester.widget<TextField>(composer()).controller!.text;
+    await tester.enterText(composer(), 'Nháp riêng Linh');
+    await tester.tap(find.byTooltip('Quay lại'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alex Chen').first);
+    await tester.pumpAndSettle();
+    expect(text(), '');
+    await tester.enterText(composer(), 'Nháp riêng Alex');
+    await tester.tap(find.byTooltip('Quay lại'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SocCO Design Team').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thiết kế UI'));
+    await tester.pumpAndSettle();
+    expect(text(), '');
+    await tester.enterText(composer(), 'Nháp kênh UI');
+    await tester.tap(find.byTooltip('Quay lại'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thảo luận chung'));
+    await tester.pumpAndSettle();
+    expect(text(), '');
+    await tester.enterText(composer(), 'Nháp kênh chung');
+    await tester.tap(find.byTooltip('Quay lại'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thiết kế UI'));
+    await tester.pumpAndSettle();
+    expect(text(), 'Nháp kênh UI');
+    await tester.tap(find.byTooltip('Quay lại'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thảo luận chung'));
+    await tester.pumpAndSettle();
+    expect(text(), 'Nháp kênh chung');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'ambiguous offline send retries with the same client ID without duplicating',
+    (tester) async {
+      final api = RetryDemoApi()..preferences['autoTranslate'] = false;
+      await openMobile(tester, api);
+      await openDirectChat(tester);
+      final before = api.messages[2]!.length;
+      await tester.enterText(
+        find.byType(TextField).last,
+        'Tin offline thử lại',
+      );
+      await tester.pump();
+      await tester.tap(find.byTooltip('Gửi tin nhắn'));
+      await tester.pumpAndSettle();
+      expect(find.text('Chờ kết nối'), findsOneWidget);
+      expect(api.messages[2]!.length, before + 1);
+      api.loseResponse = false;
+      api.emit({'type': 'reconnect'});
+      await tester.pump();
+      for (
+        var i = 0;
+        i < 12 && find.text('Chờ kết nối').evaluate().isNotEmpty;
+        i++
+      ) {
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(find.text('Chờ kết nối'), findsNothing);
+      expect(api.attempts.length, 2);
+      expect(api.attempts.toSet().length, 1);
+      expect(api.messages[2]!.length, before + 1);
+      expect(find.text('Tin offline thử lại'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await api.updates.close();
+    },
+  );
+
+  testWidgets('unread total covers chats outside the first conversation page', (
+    tester,
+  ) async {
+    final api = DemoApi();
+    for (var i = 10; i < 45; i++) {
+      api.rooms.add({
+        'id': i,
+        'type': 'direct',
+        'name': 'Old $i',
+        'unreadCount': 3,
+        'lastMessageAt': '2025-01-01T00:00:00Z',
+      });
+    }
+    await openMobile(tester, api);
+    final tab = find.byKey(const ValueKey('nav-chat'));
+    expect(
+      find.descendant(of: tab, matching: find.text('99+')),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('loads older history beyond the initial 200 messages', (
+    tester,
+  ) async {
+    final api = DemoApi()..preferences['autoTranslate'] = false;
+    api.messages[2] = List.generate(
+      240,
+      (i) => api.message(i + 1000, 2, 2, 'Linh Nguyễn', 'Lịch sử $i'),
+    );
+    await openMobile(tester, api);
+    await openDirectChat(tester);
+    final list = find.byType(ListView).last;
+    for (var i = 0; i < 35; i++) {
+      if (api.messageSearchRequests.any(
+        (path) => Uri.parse(path).queryParameters['before'] != null,
+      )) {
+        break;
+      }
+      await tester.drag(list, const Offset(0, 2200));
+      await tester.pumpAndSettle();
+    }
+    expect(
+      api.messageSearchRequests.any(
+        (path) => Uri.parse(path).queryParameters['before'] == '1040',
+      ),
+      isTrue,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   testWidgets(
     'collapsed avatar rail keeps unread badges inside compact viewport',
     (tester) async {
@@ -140,7 +364,7 @@ void main() {
     await openMobile(tester, api);
     await openDirectChat(tester);
 
-    final bubble = find.textContaining('Bản dịch minh họa.');
+    final bubble = find.byKey(const ValueKey('chat-message-20'));
     await tester.longPress(bubble);
     await tester.pumpAndSettle();
     expect(find.text('Ghim / Bỏ ghim tin nhắn'), findsOneWidget);
@@ -278,7 +502,7 @@ void main() {
     expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
     await tester.enterText(find.byType(TextField).last, 'Tin nhắn của kênh UI');
     await tester.pump();
-    await tester.tap(find.byTooltip('Gửi'));
+    await tester.tap(find.byTooltip('Gửi tin nhắn'));
     await tester.pumpAndSettle();
 
     expect(api.messages[1]!.last['channelId'], 5);
@@ -309,7 +533,7 @@ void main() {
     final composer = tester.widget<TextField>(input);
     expect(composer.controller!.text, 'Xin chào @hoangnam ');
 
-    await tester.tap(find.byTooltip('Gửi'));
+    await tester.tap(find.byTooltip('Gửi tin nhắn'));
     await tester.pumpAndSettle();
     expect(api.messages[1]!.last['text'], 'Xin chào @hoangnam');
 
