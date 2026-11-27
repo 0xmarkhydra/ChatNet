@@ -1,3 +1,4 @@
+import { conversationPreview } from '../utils/conversationPreview'
 import type { ReactNode, MouseEvent, PointerEvent } from 'react'
 import { Pin } from 'lucide-react'
 import ConversationRailStatus from './ConversationRailStatus'
@@ -95,7 +96,7 @@ export default function ConversationAvatarRail({
                 <time>{formatTime(conversation.lastMessageAt)}</time>
               </span>
               <span className="conversation-avatar-rail-meta-bottom">
-                <small>{conversation.lastMessage || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</small>
+                <small>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</small>
               </span>
             </span>
             {conversation.unreadCount > 0 && (

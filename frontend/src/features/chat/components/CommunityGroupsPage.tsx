@@ -1,3 +1,4 @@
+import { conversationPreview } from '../utils/conversationPreview'
 import { useEffect, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { ArrowLeft, ArrowRight, Bell, Check, Clock3, FileText, Image as ImageIcon, MessageCircle, MoreHorizontal, PencilLine, Plus, Search, Send, Settings, ShieldCheck, Users, UserPlus, Video, X } from 'lucide-react'
 import type { Conversation, GroupMember, Message } from '../types'
@@ -276,7 +277,7 @@ export default function CommunityGroupsPage({
       <header className="cg-card-head"><h3>Cộng đồng của bạn</h3><small>{shownGroups.length} nhóm đã tham gia</small></header>
       <label className="cg-search"><Search size={18}/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm tên nhóm..." aria-label="Tìm nhóm"/></label>
       <div className="cg-group-list">{shownGroups.map(group=><div className="cg-group-row" key={group.id}>
-        <span className="cg-group-icon"><Users size={23}/></span><div><strong>{group.name}</strong><small>{group.memberCount} thành viên · {group.unreadCount} tin chưa đọc</small><p>{group.lastMessage||'Bắt đầu trao đổi với nhóm của bạn.'}</p></div>
+        <span className="cg-group-icon"><Users size={23}/></span><div><strong>{group.name}</strong><small>{group.memberCount} thành viên · {group.unreadCount} tin chưa đọc</small><p>{conversationPreview(group.lastMessage)||'Bắt đầu trao đổi với nhóm của bạn.'}</p></div>
         <button type="button" className="cg-secondary" onClick={()=>select(group.id,'manage')}><Settings size={16}/>Quản trị</button>
         <button type="button" className="cg-primary" onClick={()=>select(group.id,'channel')}>Thảo luận<ArrowRight size={16}/></button>
       </div>)}{shownGroups.length===0&&<p className="cg-empty">{query?'Không tìm thấy nhóm phù hợp.':'Chưa có nhóm. Hãy tạo cộng đồng mới hoặc tải thêm.'}</p>}</div>

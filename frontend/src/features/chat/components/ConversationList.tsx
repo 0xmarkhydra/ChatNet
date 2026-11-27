@@ -1,3 +1,4 @@
+import { conversationPreview } from '../utils/conversationPreview'
 import { Plus, Search, Pin, RefreshCw, X } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
 import UserAvatar from "../../../shared/ui/UserAvatar";
@@ -238,7 +239,7 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                           <time>{formatTime(conversation.lastMessageAt) || (conversation.online ? 'online' : '')}</time>
                         </div>
                         <div>
-                          <span>{conversation.lastMessage || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
+                          <span>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
                           {conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</b>}
                         </div>
                       </div>

@@ -11,6 +11,7 @@ import { GroupActivityMarker } from "./GroupActivities";
 import { messageTextParts, messageLinkHref } from "../lib/messageClipboard";
 import { getMessageGroupPosition } from "../utils/messageGrouping";
 import LinkPreview from "./LinkPreview";
+import { replyPreview } from "../utils/conversationPreview";
 import { isGiphyMedia } from "../api/giphy";
 import MediaAttachmentsView from "../../../shared/ui/MediaAttachmentsView";
 import type { ChatSectionProps } from "./ChatSectionProps";
@@ -182,7 +183,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                           {message.replyToMessageId && (
                             <div className="message-reply-quote">
                               <strong>{userLabel(message.replyToDisplayName, message.replyToSender)}</strong>
-                              <span>{message.replyToText || 'Tin nhắn đã thu hồi'}</span>
+                              <span>{replyPreview(message.replyToText || '') || 'Tin nhắn đã thu hồi'}</span>
                             </div>
                           )}
                           {message.deleted ? (
@@ -320,7 +321,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                       <article className="message mine outgoing-preview chat-outbox-message" key={item.clientId} aria-busy={item.status !== 'failed'}>
                         {item.replyToMessageId && (
                           <div className="message-reply-quote">
-                            <strong>{item.replyToSender || 'Trả lời'}</strong><span>{item.replyToText}</span>
+                            <strong>{item.replyToSender || 'Trả lời'}</strong><span>{replyPreview(item.replyToText || '')}</span>
                           </div>
                         )}
                         {item.text && (isGiphyMedia(item.text.trim()) ? <img src={item.text.trim()} alt="Sticker GIPHY" referrerPolicy="no-referrer" className="block h-auto max-h-48 w-40 max-w-full object-contain" /> : <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>)}

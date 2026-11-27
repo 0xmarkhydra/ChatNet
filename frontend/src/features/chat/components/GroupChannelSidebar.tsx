@@ -1,3 +1,4 @@
+import { conversationPreview } from '../utils/conversationPreview'
 import { useMemo, useState } from 'react'
 import { BellOff, Search, X } from 'lucide-react'
 import type { GroupChannel } from '../utils/groupChannels'
@@ -119,7 +120,7 @@ export default function GroupChannelSidebar({
                   {channel.description || 'Chưa đặt chủ đề'}
                 </span>
                 <span className="group-channel-sidebar-meta-row">
-                  <small title={channel.lastMessage || 'Chưa có tin nhắn'}>{channel.lastMessage || 'Chưa có tin nhắn'}</small>
+                  <small title={conversationPreview(channel.lastMessage) || 'Chưa có tin nhắn'}>{conversationPreview(channel.lastMessage) || 'Chưa có tin nhắn'}</small>
                   {channel.unreadCount > 0 && <b className="group-channel-unread" aria-label={`${channel.unreadCount} tin chưa đọc`}>
                     {channel.unreadCount > 99 ? '99+' : channel.unreadCount}
                   </b>}
