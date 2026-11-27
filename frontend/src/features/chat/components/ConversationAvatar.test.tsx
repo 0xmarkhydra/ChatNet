@@ -22,7 +22,7 @@ describe('ConversationAvatar', () => {
     const html = renderToStaticMarkup(
       <ConversationAvatar conversation={conversation({ avatarMembers: ['linh', 'an', 'binh', 'minh'] })} className="conversation-avatar" />,
     )
-    expect(html.match(/class="conversation-avatar-member/g)).toHaveLength(3)
+    expect(html.match(/\bconversation-avatar-member\b/g)).toHaveLength(3)
     expect(html).toContain('/api/users/linh/avatar')
     expect(html).toContain('/api/users/an/avatar')
     expect(html).toContain('/api/users/binh/avatar')

@@ -12,6 +12,8 @@ import 'presentation/mobile_reverse_scroll_region.dart';
 import 'presentation/conversation_avatar.dart';
 import 'presentation/chat_information_sheet.dart';
 import 'presentation/conversation_photo_editor.dart';
+import 'presentation/chat_rich_actions.dart';
+import 'presentation/chat_rich_media.dart';
 import 'presentation/contact_metadata_editor.dart';
 import 'presentation/conversation_list_presenter.dart';
 import 'models/navigation_models.dart';
@@ -3185,6 +3187,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Future<void> _showConversationExtras(Json room, {required bool board}) async {
+    if (board) {
+      await showGroupActivities(
+        context,
+        api: widget.api,
+        roomId: (room['id'] as num).toInt(),
+      );
+      return;
+    }
     try {
       final data = await widget.api.request(
         'GET',
@@ -4503,6 +4513,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _conversationPane() {
     final room = active!;
     final visibleMessages = _filteredMessages();
+    final groupSnapshot = room['type'] == 'group'
+        ? ref
+              .watch(groupActivitySnapshotProvider((room['id'] as num).toInt()))
+              .value
+        : null;
+    final activities = objects(groupSnapshot?['activities']);
+    final activityEvents = objects(groupSnapshot?['events']);
+    final pinnedActivities = activities
+        .where(
+          (item) =>
+              item['pinnedAt'] != null &&
+              item['pinnedAt'].toString().isNotEmpty,
+        )
+        .toList();
     final selectedChannel = selectedChannelId == 0
         ? null
         : channels.where((item) => item['id'] == selectedChannelId).firstOrNull;
@@ -4669,12 +4693,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               if (room['type'] == 'direct') _friendBar(),
               if (searchingMessages) _messageSearchPanel(),
               _pinnedPanel(),
+              if (pinnedActivities.isNotEmpty)
+                Material(
+                  color: Colors.white,
+                  child: ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.push_pin_outlined,
+                      color: socoBlue,
+                    ),
+                    title: Text(
+                      pinnedActivities.first['body']?.toString().isNotEmpty ==
+                              true
+                          ? pinnedActivities.first['body'].toString()
+                          : activityLabel(
+                              pinnedActivities.first['kind'].toString(),
+                            ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '${pinnedActivities.length} hoạt động đã ghim',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => showGroupActivities(
+                      context,
+                      api: widget.api,
+                      roomId: (room['id'] as num).toInt(),
+                      focusId: (pinnedActivities.first['id'] as num).toInt(),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: ColoredBox(
                   color: _wallpapers[room['wallpaper']] ?? Colors.transparent,
                   child: loading
                       ? const Center(child: CircularProgressIndicator())
-                      : visibleMessages.isEmpty
+                      : visibleMessages.isEmpty && activityEvents.isEmpty
                       ? EmptyState(
                           icon: searchingMessages
                               ? Icons.search_off_rounded
@@ -4686,7 +4741,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                               ? 'Thử thay đổi từ khóa hoặc bộ lọc.'
                               : 'Gửi tin nhắn đầu tiên ngay bây giờ.',
                         )
-                      : _messageTimeline(visibleMessages),
+                      : _messageTimeline(
+                          visibleMessages,
+                          activities: activities,
+                          events: searchingMessages ? const [] : activityEvents,
+                        ),
                 ),
               ),
               _outboxPreview(),
@@ -4705,43 +4764,156 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         )
       : const SizedBox.shrink();
 
-  Widget _messageTimeline(List<Json> rows) {
+  Widget _messageTimeline(
+    List<Json> rows, {
+    List<Json> activities = const [],
+    List<Json> events = const [],
+  }) {
+    final byId = {for (final activity in activities) activity['id']: activity};
+    final ordered =
+        events.where((event) => byId.containsKey(event['activityId'])).toList()
+          ..sort(
+            (a, b) => (a['createdAt']?.toString() ?? '').compareTo(
+              b['createdAt']?.toString() ?? '',
+            ),
+          );
+    final beforeEvents = <dynamic, List<Json>>{};
+    var cursor = 0;
+    for (final row in rows) {
+      final time = DateTime.tryParse(row['createdAt']?.toString() ?? '');
+      if (time == null) continue;
+      while (cursor < ordered.length) {
+        final event = ordered[cursor];
+        final stamp = DateTime.tryParse(event['createdAt']?.toString() ?? '');
+        if (stamp == null) {
+          cursor++;
+          continue;
+        }
+        if (stamp.isAfter(time)) break;
+        beforeEvents.putIfAbsent(row['id'], () => []).add(event);
+        cursor++;
+      }
+    }
+    final tail = ordered.skip(cursor).toList();
+    Widget activityMarker(Json event) {
+      final activity = byId[event['activityId']]!;
+      final label = activityLabel(activity['kind']?.toString() ?? '');
+      final verb = event['kind'] == 'created'
+          ? 'đã tạo'
+          : event['kind'] == 'voted'
+          ? 'đã bình chọn trong'
+          : 'đã thay đổi bình chọn trong';
+      return Center(
+        child: TextButton.icon(
+          key: ValueKey('group-event-${event['id']}'),
+          icon: const Icon(Icons.assignment_outlined, size: 17),
+          label: Text(
+            '${event['actorName'] ?? ''} $verb $label · ${activity['body'] ?? ''}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          onPressed: () => showGroupActivities(
+            context,
+            api: widget.api,
+            roomId: (active!['id'] as num).toInt(),
+            focusId: (activity['id'] as num).toInt(),
+          ),
+        ),
+      );
+    }
+
+    Widget tailEvents() =>
+        Column(children: [for (final event in tail) activityMarker(event)]);
     final anchor = centeredTimeline
         ? rows.indexWhere((m) => m['id'] == unreadMessageId)
         : -1;
     final centered = anchor >= 0;
-    Widget row(Json message, {bool marker = false}) => Column(
-      key: ValueKey(message['id']),
-      children: [
-        if (message['id'] == messageGapBefore && !searchingMessages)
-          TextButton(
-            onPressed: gapLoading ? null : _loadMessageGap,
-            child: Text(gapLoading ? 'Đang tải…' : 'Tải tin nhắn ở giữa'),
-          ),
-        if (marker)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              children: [
-                Expanded(child: Divider()),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    'Tin nhắn chưa đọc',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF64748B),
+    final indices = {for (var i = 0; i < rows.length; i++) rows[i]['id']: i};
+    bool joins(Json? earlier, Json? later) {
+      if (earlier == null ||
+          later == null ||
+          earlier['senderId'] != later['senderId'] ||
+          later['id'] == messageGapBefore ||
+          later['id'] == unreadMessageId ||
+          (beforeEvents[later['id']]?.isNotEmpty ?? false)) {
+        return false;
+      }
+      final a = DateTime.tryParse(
+        earlier['createdAt']?.toString() ?? '',
+      )?.toLocal();
+      final b = DateTime.tryParse(
+        later['createdAt']?.toString() ?? '',
+      )?.toLocal();
+      if (a == null || b == null || !DateUtils.isSameDay(a, b)) return false;
+      final d = b.difference(a);
+      return !d.isNegative && d <= const Duration(minutes: 5);
+    }
+
+    String? dateLabel(Json message, Json? previous) {
+      final date = DateTime.tryParse(
+        message['createdAt']?.toString() ?? '',
+      )?.toLocal();
+      final prior = DateTime.tryParse(
+        previous?['createdAt']?.toString() ?? '',
+      )?.toLocal();
+      if (date == null || DateUtils.isSameDay(date, prior)) return null;
+      final now = DateTime.now();
+      if (DateUtils.isSameDay(now, date)) return 'Hôm nay';
+      if (DateUtils.isSameDay(
+        DateTime(now.year, now.month, now.day - 1),
+        date,
+      )) {
+        return 'Hôm qua';
+      }
+      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    }
+
+    Widget row(Json message, {bool marker = false}) {
+      final index = indices[message['id']]!;
+      final previous = index > 0 ? rows[index - 1] : null;
+      final next = index + 1 < rows.length ? rows[index + 1] : null;
+      final day = dateLabel(message, previous);
+      return Column(
+        key: ValueKey(message['id']),
+        children: [
+          if (message['id'] == messageGapBefore && !searchingMessages)
+            TextButton(
+              onPressed: gapLoading ? null : _loadMessageGap,
+              child: Text(gapLoading ? 'Đang tải…' : 'Tải tin nhắn ở giữa'),
+            ),
+          if (day != null) _dayDivider(day),
+          for (final event in beforeEvents[message['id']] ?? <Json>[])
+            activityMarker(event),
+          if (marker)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'Tin nhắn chưa đọc',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                   ),
-                ),
-                Expanded(child: Divider()),
-              ],
+                  Expanded(child: Divider()),
+                ],
+              ),
             ),
+          _messageBubble(
+            message,
+            joinsPrevious: joins(previous, message),
+            joinsNext: joins(message, next),
           ),
-        _messageBubble(message),
-      ],
-    );
+        ],
+      );
+    }
+
     return Stack(
       children: [
         Positioned.fill(
@@ -4758,7 +4930,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       sliver: SliverList.builder(
                         itemCount: anchor + 1,
                         itemBuilder: (_, i) => i == anchor
-                            ? Column(children: [_olderControl(), _dayDivider()])
+                            ? _olderControl()
                             : row(rows[anchor - 1 - i]),
                       ),
                     ),
@@ -4766,9 +4938,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       key: unreadCenterKey,
                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
                       sliver: SliverList.builder(
-                        itemCount: rows.length - anchor,
-                        itemBuilder: (_, i) =>
-                            row(rows[anchor + i], marker: i == 0),
+                        itemCount:
+                            rows.length - anchor + (tail.isNotEmpty ? 1 : 0),
+                        itemBuilder: (_, i) => i == rows.length - anchor
+                            ? tailEvents()
+                            : row(rows[anchor + i], marker: i == 0),
                       ),
                     ),
                   ],
@@ -4783,14 +4957,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     horizontal: 14,
                     vertical: 16,
                   ),
-                  itemCount: rows.length + 1,
-                  itemBuilder: (_, i) => i == rows.length
-                      ? Column(children: [_olderControl(), _dayDivider()])
-                      : row(rows[rows.length - 1 - i]),
+                  itemCount: rows.length + 1 + (tail.isNotEmpty ? 1 : 0),
+                  itemBuilder: (_, i) {
+                    if (tail.isNotEmpty && i == 0) return tailEvents();
+                    final index = i - (tail.isNotEmpty ? 1 : 0);
+                    return index == rows.length
+                        ? _olderControl()
+                        : row(rows[rows.length - 1 - index]);
+                  },
                   findChildIndexCallback: (key) {
                     if (key is! ValueKey) return null;
                     final index = rows.indexWhere((m) => m['id'] == key.value);
-                    return index < 0 ? null : rows.length - 1 - index;
+                    return index < 0
+                        ? null
+                        : rows.length - 1 - index + (tail.isNotEmpty ? 1 : 0);
                   },
                 ),
         ),
@@ -4847,10 +5027,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
-  Widget _dayDivider() {
+  Widget _dayDivider([String label = 'Cuộc trò chuyện']) {
     return Center(
       child: Container(
-        key: const ValueKey('conversation-day-divider'),
+        key: ValueKey('conversation-day-divider-$label'),
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
         decoration: BoxDecoration(
@@ -4865,9 +5045,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ),
           ],
         ),
-        child: const Text(
-          'Cuộc trò chuyện',
-          style: TextStyle(color: Color(0xFF7D8998), fontSize: 11),
+        child: Text(
+          label,
+          style: const TextStyle(color: Color(0xFF7D8998), fontSize: 11),
         ),
       ),
     );
@@ -4950,12 +5130,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
-  Widget _messageBubble(Json message) {
+  Widget _messageBubble(
+    Json message, {
+    bool joinsPrevious = false,
+    bool joinsNext = false,
+  }) {
     final mine = message['senderId'] == widget.api.user['id'];
     final deleted = message['deleted'] == true;
     final translated = message['translatedText']?.toString() ?? '';
     final showOriginal = message['_showOriginal'] == true;
     final reactions = objects(message['reactions']);
+    final rawText = message['text']?.toString().trim() ?? '';
+    final gif = !deleted && isGiphyMedia(rawText);
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -4964,7 +5150,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         child: Container(
           constraints: const BoxConstraints(maxWidth: 520),
           margin: EdgeInsets.only(
-            bottom: 12,
+            bottom: joinsNext ? 3 : 12,
             left: mine ? 48 : 0,
             right: mine ? 0 : 48,
           ),
@@ -4981,7 +5167,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     style: TextStyle(color: socoMuted, fontSize: 11),
                   ),
                 ),
-              if (!mine && active?['type'] == 'group')
+              if (!mine && active?['type'] == 'group' && !joinsPrevious)
                 Padding(
                   padding: const EdgeInsets.only(left: 4, bottom: 5),
                   child: Row(
@@ -5030,47 +5216,64 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     style: const TextStyle(fontSize: 12, color: socoMuted),
                   ),
                 ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  gradient: mine && !deleted ? socoGradient : null,
-                  color: mine && !deleted ? null : Colors.white,
-                  border: mine
-                      ? null
-                      : Border.all(color: const Color(0xFFE3E9F5)),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(18),
-                    topRight: const Radius.circular(18),
-                    bottomLeft: Radius.circular(mine ? 18 : 6),
-                    bottomRight: Radius.circular(mine ? 6 : 18),
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x0D25376C),
-                      blurRadius: 14,
-                      offset: Offset(0, 5),
+              if (gif)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    rawText,
+                    width: 160,
+                    height: 150,
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Sticker GIPHY',
+                    errorBuilder: (_, _, _) => const SizedBox(
+                      width: 160,
+                      height: 150,
+                      child: Center(child: Icon(Icons.broken_image_outlined)),
                     ),
-                  ],
-                ),
-                child: ChatMentionText(
-                  text: deleted
-                      ? 'Tin nhắn đã được thu hồi'
-                      : translated.isNotEmpty && !showOriginal
-                      ? translated
-                      : message['text']?.toString() ?? '',
-                  members: mentionMembers,
-                  onMemberTap: _showMentionProfile,
-                  style: TextStyle(
-                    color: mine && !deleted ? Colors.white : socoText,
-                    fontStyle: deleted ? FontStyle.italic : FontStyle.normal,
-                    fontSize: 14,
-                    height: 1.46,
+                  ),
+                )
+              else if (deleted || rawText.isNotEmpty || translated.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: mine && !deleted ? socoGradient : null,
+                    color: mine && !deleted ? null : Colors.white,
+                    border: mine
+                        ? null
+                        : Border.all(color: const Color(0xFFE3E9F5)),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(!mine && joinsPrevious ? 6 : 18),
+                      topRight: Radius.circular(mine && joinsPrevious ? 6 : 18),
+                      bottomLeft: Radius.circular(!mine && joinsNext ? 6 : 18),
+                      bottomRight: Radius.circular(mine && joinsNext ? 6 : 18),
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0D25376C),
+                        blurRadius: 14,
+                        offset: Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: ChatMentionText(
+                    text: deleted
+                        ? 'Tin nhắn đã được thu hồi'
+                        : translated.isNotEmpty && !showOriginal
+                        ? translated
+                        : message['text']?.toString() ?? '',
+                    members: mentionMembers,
+                    onMemberTap: _showMentionProfile,
+                    style: TextStyle(
+                      color: mine && !deleted ? Colors.white : socoText,
+                      fontStyle: deleted ? FontStyle.italic : FontStyle.normal,
+                      fontSize: 14,
+                      height: 1.46,
+                    ),
                   ),
                 ),
-              ),
               if (!deleted && translated.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -5110,13 +5313,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       ),
                   ],
                 ),
-              Padding(
-                padding: const EdgeInsets.only(top: 3, left: 5, right: 5),
-                child: Text(
-                  '${displayTime(message['createdAt'])}${message['editedAt'] != null ? ' · đã sửa' : ''}${mine && ((message['readByUserIds'] as List?)?.isNotEmpty ?? false) ? ' · Đã xem' : ''}',
-                  style: Theme.of(context).textTheme.bodySmall,
+              if (!joinsNext || message['editedAt'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3, left: 5, right: 5),
+                  child: Text(
+                    '${displayTime(message['createdAt'])}${message['editedAt'] != null ? ' · đã sửa' : ''}${mine && ((message['readByUserIds'] as List?)?.isNotEmpty ?? false) ? ' · Đã xem' : ''}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -5132,7 +5336,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         runSpacing: 6,
         children: [
           for (final item in items)
-            if (item['kind'] == 'image' && item['url'] is String)
+            if (item['kind'] == 'audio' && item['url'] is String)
+              ChatAudioAttachment(
+                key: ValueKey(item['storageRef'] ?? item['url']),
+                url: item['url'],
+                name: item['name']?.toString() ?? 'Tin nhắn thoại',
+              )
+            else if (item['kind'] == 'image' && item['url'] is String)
               InkWell(
                 onTap: () => openAttachment(context, item),
                 child: ClipRRect(
@@ -5142,7 +5352,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     width: 210,
                     height: 150,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    errorBuilder: (_, _, _) => const SizedBox(
+                      width: 210,
+                      height: 150,
+                      child: Center(child: Icon(Icons.broken_image_outlined)),
+                    ),
                   ),
                 ),
               )
@@ -5397,140 +5611,183 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
+  Future<void> _addGeneratedMedia(
+    String name,
+    String mime,
+    Future<Uint8List?> Function() choose,
+  ) async {
+    final roomId = active?['id'];
+    final channel = selectedChannelId;
+    final epoch = widget.api.generation;
+    if (roomId == null ||
+        uploading ||
+        sending ||
+        conversationBlocked ||
+        pendingAttachments.length >= 10) {
+      return;
+    }
+    bool current() =>
+        mounted &&
+        active?['id'] == roomId &&
+        selectedChannelId == channel &&
+        widget.api.generation == epoch;
+    var ownUpload = false;
+    try {
+      final data = await choose();
+      if (data == null || !current()) return;
+      ownUpload = true;
+      setState(() => uploading = true);
+      final attachment = await widget.api.upload('chat', name, mime, data);
+      if (current()) {
+        setState(() => pendingAttachments.add(attachment));
+        _saveDraftSoon();
+      }
+    } catch (e) {
+      if (current()) _show(e.toString());
+    } finally {
+      if (ownUpload && mounted && widget.api.generation == epoch && uploading) {
+        setState(() => uploading = false);
+      }
+    }
+  }
+
   Future<void> _showComposerMenu() async {
-    const emoji = [
-      '😀',
-      '😃',
-      '😄',
-      '😁',
-      '😆',
-      '😅',
-      '😂',
-      '🤣',
-      '😊',
-      '😍',
-      '🥰',
-      '😘',
-      '😎',
-      '🤩',
-      '🥳',
-      '🤔',
-      '😮',
-      '😢',
-      '😭',
-      '🥺',
-      '😡',
-      '👍',
-      '👎',
-      '👏',
-      '🙌',
-      '🙏',
-      '💪',
-      '👋',
-      '🤝',
-      '❤️',
-      '🧡',
-      '💛',
-      '💚',
-      '💙',
-      '💜',
-      '🖤',
-      '💯',
-      '🎉',
-      '🔥',
-      '✨',
-      '🌹',
-      '🌞',
-      '🌈',
-      '🎂',
-      '🎁',
-      '🐱',
-      '🐶',
-      '🍀',
-    ];
-    await showModalBottomSheet<void>(
+    final room = active;
+    if (room == null || conversationBlocked) return;
+    final roomId = (room['id'] as num).toInt();
+    final channel = selectedChannelId;
+    final epoch = widget.api.generation;
+    bool current() =>
+        mounted &&
+        active?['id'] == roomId &&
+        selectedChannelId == channel &&
+        epoch == widget.api.generation;
+    final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      builder: (ctx) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: .8,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
             children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.attach_file_rounded, color: socoBlue),
-                title: const Text('Tệp tin'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _pickAttachment();
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(
-                  Icons.collections_outlined,
-                  color: socoBlue,
-                ),
-                title: const Text('Ảnh / Video'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _pickAttachment(mediaOnly: true);
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.flash_on_outlined, color: socoBlue),
-                title: const Text('Tin nhắn nhanh'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _showQuickReplies();
-                },
-              ),
-              const Divider(height: 1),
-              const Padding(
-                padding: EdgeInsets.only(top: 14, bottom: 9),
-                child: Text(
-                  'Emoji',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: socoNavy,
-                  ),
+              const Text(
+                'Tùy chọn soạn tin',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: socoNavy,
                 ),
               ),
-              SizedBox(
-                height: 220,
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 8,
-                    mainAxisSpacing: 4,
-                    crossAxisSpacing: 4,
-                  ),
-                  itemCount: emoji.length,
-                  itemBuilder: (_, index) => InkWell(
-                    borderRadius: BorderRadius.circular(9),
-                    onTap: () {
-                      _insertEmoji(emoji[index]);
-                      Navigator.pop(sheetContext);
-                    },
-                    child: Center(
-                      child: Text(
-                        emoji[index],
-                        style: const TextStyle(fontSize: 26),
+              for (final item in <(String, String, IconData)>[
+                ('file', 'Tệp tin', Icons.attach_file_rounded),
+                ('media', 'Ảnh / Video', Icons.collections_outlined),
+                ('voice', 'Tin nhắn thoại', Icons.mic_none_rounded),
+                ('sticker', 'Sticker', Icons.emoji_emotions_outlined),
+                ('gif', 'GIF / Sticker động', Icons.gif_box_outlined),
+                ('quick', 'Tin nhắn nhanh', Icons.flash_on_outlined),
+                ('schedule', 'Hẹn giờ gửi', Icons.schedule),
+                if (room['type'] == 'group') ...[
+                  ('poll', 'Bình chọn', Icons.poll_outlined),
+                  ('note', 'Ghi chú nhóm', Icons.description_outlined),
+                  ('reminder', 'Nhắc hẹn nhóm', Icons.event_outlined),
+                ],
+              ])
+                ListTile(
+                  visualDensity: VisualDensity.compact,
+                  leading: Icon(item.$3, color: socoBlue),
+                  title: Text(item.$2),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pop(ctx, item.$1),
+                ),
+              const Divider(),
+              const Text(
+                'Emoji',
+                style: TextStyle(fontWeight: FontWeight.w800, color: socoNavy),
+              ),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 8,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                children: [
+                  for (final emoji in chatStickers)
+                    InkWell(
+                      onTap: () => Navigator.pop(ctx, 'emoji:$emoji'),
+                      child: Center(
+                        child: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 26),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                ],
               ),
             ],
           ),
         ),
       ),
     );
+    if (!mounted || action == null || !current()) return;
+    if (action.startsWith('emoji:')) {
+      _insertEmoji(action.substring(6));
+      return;
+    }
+    switch (action) {
+      case 'file':
+        await _pickAttachment();
+      case 'media':
+        await _pickAttachment(mediaOnly: true);
+      case 'quick':
+        await _showQuickReplies();
+      case 'voice':
+        if (!mounted) return;
+        await _addGeneratedMedia(
+          'voice.wav',
+          'audio/wav',
+          () => showVoiceRecorder(context),
+        );
+      case 'sticker':
+        if (!mounted) return;
+        await _addGeneratedMedia('sticker.png', 'image/png', () async {
+          if (!mounted) return null;
+          final choice = await showStickerPicker(context);
+          return choice == null ? null : await createStickerPng(choice);
+        });
+      case 'gif':
+        if (!mounted) return;
+        final url = await showGiphyPicker(context);
+        if (url != null && current() && isGiphyMedia(url)) {
+          final old = messageController.text;
+          messageController.text = old.isEmpty ? url : '$old\n$url';
+          messageController.selection = TextSelection.collapsed(
+            offset: messageController.text.length,
+          );
+          setState(() {});
+          _saveDraftSoon();
+        }
+      case 'schedule':
+        if (!mounted) return;
+        await showScheduledChat(
+          context,
+          api: widget.api,
+          roomId: roomId,
+          channelId: channel,
+          draft: messageController.text,
+        );
+      case 'poll':
+      case 'note':
+      case 'reminder':
+        if (!mounted) return;
+        await showGroupActivities(
+          context,
+          api: widget.api,
+          roomId: roomId,
+          createKind: action,
+        );
+    }
   }
 
   Widget _composer() {

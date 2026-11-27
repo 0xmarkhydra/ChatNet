@@ -90,6 +90,9 @@ class DemoApi extends Api {
   bool nearbyEnabled = false;
   final Map<int, Json> notificationSettings = {};
   final Set<int> pinnedMessageIds = {};
+  final Map<int, List<Json>> scheduledChats = {};
+  final Map<int, List<Json>> groupActivities = {};
+  final Map<int, List<Json>> groupActivityEvents = {};
   final List<String> messageSearchRequests = [];
   final Map<int, List<Json>> channels = {
     1: [
@@ -618,6 +621,96 @@ class DemoApi extends Api {
             });
           }).toList(),
         };
+      }
+      if (parts[3] == 'scheduled-messages') {
+        final queue = scheduledChats.putIfAbsent(id, () => []);
+        if (parts.length == 4) {
+          if (method == 'GET') return queue.map((row) => {...row}).toList();
+          if (method == 'POST') {
+            final existing = queue
+                .where((row) => row['clientId'] == data['clientId'])
+                .firstOrNull;
+            if (existing != null) return {...existing};
+            final row = {'id': ++serial, ...data, 'state': 'pending'};
+            queue.add(row);
+            return {...row};
+          }
+        } else {
+          final row = queue
+              .where((item) => item['id'].toString() == parts[4])
+              .firstOrNull;
+          if (row == null) throw const ApiError('Không tìm thấy lịch gửi', 404);
+          if (method == 'PATCH') {
+            row.addAll(data);
+            return {...row};
+          }
+          if (method == 'DELETE') {
+            queue.remove(row);
+            return null;
+          }
+        }
+      }
+      if (parts[3] == 'activities') {
+        if (room['type'] != 'group') {
+          throw const ApiError('Chỉ dùng trong nhóm', 403);
+        }
+        final list = groupActivities.putIfAbsent(id, () => []);
+        final events = groupActivityEvents.putIfAbsent(id, () => []);
+        void addEvent(Json row, String kind) {
+          events.add({
+            'id': ++serial,
+            'activityId': row['id'],
+            'kind': kind,
+            'actorName': user['displayName'],
+            'createdAt': DateTime.now().toIso8601String(),
+          });
+        }
+
+        if (parts.length == 4) {
+          if (method == 'GET') {
+            return {
+              'activities': list.map((item) => {...item}).toList(),
+              'events': events.map((item) => {...item}).toList(),
+            };
+          }
+          if (method == 'POST') {
+            final opts = (data['options'] as List?) ?? [];
+            final row = {
+              'id': ++serial,
+              ...data,
+              'counts': List<int>.filled(opts.length, 0),
+              'myVote': null,
+              'createdAt': DateTime.now().toIso8601String(),
+              'creatorName': user['displayName'],
+              if (data['pin'] == true)
+                'pinnedAt': DateTime.now().toIso8601String(),
+            };
+            list.insert(0, row);
+            addEvent(row, 'created');
+            return {...row};
+          }
+        } else if (parts.length == 6) {
+          final row = list.firstWhere(
+            (item) => item['id'].toString() == parts[4],
+          );
+          if (parts[5] == 'pin') {
+            if (method == 'PUT') {
+              row['pinnedAt'] = DateTime.now().toIso8601String();
+            } else {
+              row.remove('pinnedAt');
+            }
+          } else if (parts[5] == 'vote') {
+            final counts = List<int>.from(row['counts'] as List);
+            final old = row['myVote'] as int?;
+            final next = data['optionIndex'] as int;
+            if (old != null) counts[old]--;
+            counts[next]++;
+            row['counts'] = counts;
+            row['myVote'] = next;
+            addEvent(row, old == null ? 'voted' : 'vote_changed');
+          }
+          return {...row};
+        }
       }
       if (parts[3] == 'messages') {
         if (method == 'POST') {
