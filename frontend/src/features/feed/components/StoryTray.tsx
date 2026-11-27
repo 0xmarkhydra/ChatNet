@@ -89,7 +89,7 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
           </div>
         ) : (
         <button data-slot="story-card" type="button" disabled={busy} onClick={event => activate(event, onCreate)} aria-label="Tạo Story mới"
-          className="group focus-visible:outline-none relative flex h-46 w-28 flex-none cursor-pointer flex-col overflow-hidden rounded-ui-md border border-border bg-card p-0 text-left disabled:cursor-not-allowed disabled:opacity-60">
+          className="group focus-visible:outline-none relative flex h-46 w-28 flex-none cursor-pointer flex-col items-stretch overflow-hidden rounded-ui-md border border-border bg-card p-0 text-left disabled:cursor-not-allowed disabled:opacity-60">
           <span className="grid flex-1 place-items-center overflow-hidden bg-(image:--soco-gradient)">
             <UserAvatar username={username} name={displayName} className="size-full text-ui-page font-black [--avatar-radius:0px]" />
           </span>
