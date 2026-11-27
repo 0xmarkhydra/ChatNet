@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ClipboardList, Pencil, Trash2, X } from 'lucide-react'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Textarea } from '@/shared/ui/textarea'
@@ -14,25 +15,29 @@ export default function QuickReplyPanel({ request, query, managing, onClose, onS
   const [items, setItems] = useState<Reply[]>([])
   const [key, setKey] = useState('')
   const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const returnFocus = useRef<HTMLElement | null>(null)
   const opened = managing || query !== null
+  // Both reset on every opening. loadError is null while loading, then '' or the message.
+  const opening = opened ? 'open' : null
+  const [loadError, setLoadError] = useScopedState<string | null>(opening, null)
+  const [saveError, setSaveError] = useScopedState(opening, '')
+  const busy = saving || (opened && loadError === null)
+  const error = saveError || loadError || ''
   useEffect(() => {
     if (!opened) return
     let cancelled = false
-    setBusy(true); setError('')
     void request('/api/chat/quick-replies', { cache: 'no-store' }).then(async response => {
       if (!response.ok) throw new Error('Không tải được tin nhắn nhanh. Backend cần được cập nhật.')
       const data = await response.json()
       if (!Array.isArray(data)) throw new Error('Dữ liệu không hợp lệ.')
-      if (!cancelled) setItems(data)
-    }).catch(e => { if (!cancelled) setError(e.message) }).finally(() => { if (!cancelled) setBusy(false) })
+      if (!cancelled) { setItems(data); setLoadError('') }
+    }).catch(e => { if (!cancelled) setLoadError(e.message) })
     return () => { cancelled = true }
-  }, [opened, request])
+  }, [opened, request, setLoadError])
   async function mutate(remove: boolean, shortcut: string) {
     if (busy || !/^[a-z0-9_-]{1,32}$/.test(shortcut) || (!remove && !text.trim())) return
-    setBusy(true); setError('')
+    setSaving(true); setSaveError(''); setLoadError('')
     try {
       const response = await request('/api/chat/quick-replies/' + shortcut, {
         method: remove ? 'DELETE' : 'PUT',
@@ -41,8 +46,8 @@ export default function QuickReplyPanel({ request, query, managing, onClose, onS
       if (!response.ok) throw new Error('Không cập nhật được tin nhắn nhanh.')
       setItems(previous => [...previous.filter(item => item.key !== shortcut), ...(!remove ? [{ key: shortcut, text: text.trim() }] : [])].sort((a,b) => a.key.localeCompare(b.key)))
       setKey(''); setText('')
-    } catch (e) { setError(e instanceof Error ? e.message : 'Không cập nhật được tin nhắn nhanh.') }
-    finally { setBusy(false) }
+    } catch (e) { setSaveError(e instanceof Error ? e.message : 'Không cập nhật được tin nhắn nhanh.') }
+    finally { setSaving(false) }
   }
   const matches = items.filter(item => managing || item.key.startsWith(query?.toLowerCase() ?? ''))
   const status = <>

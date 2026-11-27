@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ArrowLeft, ImagePlus, Send } from 'lucide-react'
 import { STORY_MEDIA_ACCEPT } from '../utils/storyMedia'
 
@@ -15,12 +15,13 @@ type Props = {
 }
 
 export default function StoryComposer({ file, busy, onPublish, onBack, onChangeFile }: Props) {
-  const [preview, setPreview] = useState('')
   const [publishFailed, setPublishFailed] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  useEffect(() => {
+  // The object URL lives exactly as long as the preview element showing this file.
+  const showFile = useCallback((media: HTMLImageElement | HTMLVideoElement | null) => {
+    if (!media) return
     const url = URL.createObjectURL(file)
-    setPreview(url)
+    media.src = url
     return () => URL.revokeObjectURL(url)
   }, [file])
 
@@ -34,9 +35,9 @@ export default function StoryComposer({ file, busy, onPublish, onBack, onChangeF
           if (selected) { setPublishFailed(false); onChangeFile(selected) }
         }} />
       <div className="smart-story-frame grid max-h-[min(62dvh,32.5rem)] min-h-55 w-full place-items-center overflow-hidden rounded-[0.8125rem] bg-story-frame">
-        {preview && (isVideo
-          ? <video className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" src={preview} controls playsInline preload="metadata" aria-label="Video Story đã chọn" />
-          : <img className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" src={preview} alt="Xem trước ảnh Story đã chọn" />)}
+        {isVideo
+          ? <video ref={showFile} className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" controls playsInline preload="metadata" aria-label="Video Story đã chọn" />
+          : <img ref={showFile} className="block max-h-[min(62dvh,32.5rem)] max-w-full object-contain" alt="Xem trước ảnh Story đã chọn" />}
       </div>
       <p className={note + ' break-all'}>{file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB</p>
       <p className={note}>Story sẽ hiển thị trong 24 giờ. Kiểm tra ảnh hoặc video trước khi đăng.</p>

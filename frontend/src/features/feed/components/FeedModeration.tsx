@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import { ShieldCheck, RefreshCw } from 'lucide-react'
 import '../styles/feed-moderation.css'
 
@@ -27,30 +28,39 @@ export default function FeedModeration({ request, onRemoved }: Props) {
   const [hasMore, setHasMore] = useState(false)
   const [busy, setBusy] = useState<number | null>(null)
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  // The first load starts on mount, and the panel is hidden until it has confirmed access.
+  const [loading, setLoading] = useState(true)
+  const latestRequest = useLatest(request)
 
-  async function load() {
-    setLoading(true)
-    setError('')
-    try {
-      const meRes = await request('/api/feed/moderation/me')
-      if (!meRes.ok) { setAllowed(false); return }
+  const fetchReports = useCallback(() => {
+    const check = async () => {
+      const meRes = await latestRequest.current('/api/feed/moderation/me')
+      if (!meRes.ok) return null
       const me = await meRes.json() as { moderator: boolean }
-      if (!me.moderator) { setAllowed(false); return }
+      if (!me.moderator) return null
       setAllowed(true)
 
-      const response = await request('/api/feed/moderation/reports?limit=30')
-      if (response.status === 403) { setAllowed(false); return }
+      const response = await latestRequest.current('/api/feed/moderation/reports?limit=30')
+      if (response.status === 403) return null
       if (!response.ok) throw new Error('Không tải được báo cáo. Vui lòng thử lại.')
-      const items = await response.json() as Report[]
+      return await response.json() as Report[]
+    }
+    return check().then((items) => {
+      if (!items) { setAllowed(false); return }
       setReports(items)
       setHasMore(items.length === 30)
-    } catch {
+    }).catch(() => {
       setError('Không tải được báo cáo. Vui lòng thử lại.')
-    } finally { setLoading(false) }
+    }).finally(() => setLoading(false))
+  }, [latestRequest])
+
+  function load() {
+    setLoading(true)
+    setError('')
+    return fetchReports()
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => { void fetchReports() }, [fetchReports])
 
   async function loadMore() {
     if (loading || !hasMore || !reports.length) return

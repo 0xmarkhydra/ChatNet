@@ -5,9 +5,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CallSession, CallRequest } from '../lib/calls'
 import { useCallRoomLifecycle } from './useCallRoomLifecycle'
 
-const { handlers, disconnect } = vi.hoisted(() => ({
+const { handlers, disconnect, joinCall } = vi.hoisted(() => ({
   handlers: new Map<string, () => void>(),
   disconnect: vi.fn(async () => {}),
+  joinCall: vi.fn(async () => ({ serverUrl: 'wss://example.test', token: 'test' })),
 }))
 
 vi.mock('livekit-client', () => ({
@@ -30,7 +31,7 @@ vi.mock('livekit-client', () => ({
   },
 }))
 vi.mock('../lib/calls', () => ({
-  joinCall: async () => ({ serverUrl: 'wss://example.test', token: 'test' }),
+  joinCall,
   publishE2EEPublicKey: async () => {},
   endCall: async () => {},
   leaveCall: async () => {},
@@ -52,6 +53,66 @@ describe('call room lifecycle cleanup', () => {
   afterEach(() => {
     handlers.clear()
     disconnect.mockClear()
+    joinCall.mockClear()
+  })
+
+  function mountLifecycle() {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    vi.stubGlobal('Worker', class { terminate() {} })
+    vi.stubGlobal('isSecureContext', true)
+    const root = createRoot(document.createElement('div'))
+    const call = { id: 'call-78', createdBy: 1, mediaType: 'audio', conversationId: 7, status: 'active', createdAt: '' } as CallSession
+    const noop = vi.fn()
+    const request = noop as unknown as CallRequest
+
+    function Probe({ autoPublish, onClosed }: { autoPublish: boolean; onClosed: () => void }) {
+      useCallRoomLifecycle({
+        call: { ...call }, request, userId: 1, autoPublish, onError: noop, onClosed,
+        setPhase: noop, setDetail: noop, setRuntime: noop, setRevision: noop,
+        setMicOn: noop, setCameraOn: noop, setScreenOn: noop, setMediaPermissionError: noop,
+      })
+      return null
+    }
+
+    return {
+      render: (autoPublish: boolean, onClosed: () => void) =>
+        act(async () => root.render(<Probe autoPublish={autoPublish} onClosed={onClosed} />)),
+      unmount: async () => {
+        await act(async () => root.unmount())
+        vi.unstubAllGlobals()
+      },
+    }
+  }
+
+  it('does not rejoin a live call when onClosed or autoPublish changes', async () => {
+    const lifecycle = mountLifecycle()
+    try {
+      await lifecycle.render(false, vi.fn())
+      await lifecycle.render(false, vi.fn())
+      await lifecycle.render(true, vi.fn())
+      expect(joinCall).toHaveBeenCalledTimes(1)
+      expect(disconnect).not.toHaveBeenCalled()
+    } finally {
+      await lifecycle.unmount()
+    }
+  })
+
+  it('closes through the latest onClosed when a pending join fails', async () => {
+    let fail: ((error: Error) => void) | undefined
+    joinCall.mockImplementationOnce(() => new Promise((_, reject) => { fail = reject }))
+    const first = vi.fn()
+    const latest = vi.fn()
+    const lifecycle = mountLifecycle()
+    try {
+      await lifecycle.render(false, first)
+      await lifecycle.render(false, latest)
+      await act(async () => fail!(new Error('join failed')))
+      expect(joinCall).toHaveBeenCalledTimes(1)
+      expect(latest).toHaveBeenCalledTimes(1)
+      expect(first).not.toHaveBeenCalled()
+    } finally {
+      await lifecycle.unmount()
+    }
   })
 
   it('ignores late LiveKit reconnect events after cleanup', async () => {

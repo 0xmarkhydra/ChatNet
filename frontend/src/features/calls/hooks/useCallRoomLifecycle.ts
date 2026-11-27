@@ -2,6 +2,7 @@ import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import {
   ExternalE2EEKeyProvider, isE2EESupported, Room, RoomEvent,
 } from 'livekit-client'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import {
   endCall, joinCall, leaveCall, publishE2EEPublicKey,
   type CallJoinCredentials, type CallRequest, type CallSession,
@@ -48,9 +49,13 @@ export function useCallRoomLifecycle({
 }: CallRoomLifecycleArgs) {
   const lastEnvelopeGeneration = useRef('')
   const hostWrappedKeys = useRef(new Map<number, string>())
+  // Read through refs: a new onClosed or autoPublish must never reconnect a live call.
+  const latestOnClosed = useLatest(onClosed)
+  const latestAutoPublish = useLatest(autoPublish)
   useEffect(() => {
     // Effect-local cancellation: StrictMode cleanup must not be undone by the next setup.
     let disposed = false
+    const publishOnConnect = latestAutoPublish.current
     let hostSyncTimer = 0
     let participantSyncTimer = 0
     let localRuntime: RoomRuntime | null = null
@@ -132,7 +137,7 @@ export function useCallRoomLifecycle({
         setPhase('connected')
         setDetail('Mã hóa đầu cuối đang bật')
 
-        if (autoPublish) {
+        if (publishOnConnect) {
           try {
             await room.localParticipant.setMicrophoneEnabled(true)
             if (disposed) { await room.disconnect(); return }
@@ -192,7 +197,7 @@ export function useCallRoomLifecycle({
           await localRuntime.room.disconnect().catch(() => undefined)
           localRuntime.worker.terminate()
         }
-        onClosed()
+        latestOnClosed.current()
       }
     }
 
@@ -206,6 +211,7 @@ export function useCallRoomLifecycle({
         localRuntime.worker.terminate()
       }
     }
-  }, [call.id, call.createdBy, call.mediaType, onError, request, userId])
+  }, [call.id, call.createdBy, call.mediaType, onError, request, userId, latestAutoPublish, latestOnClosed,
+    setCameraOn, setDetail, setMediaPermissionError, setMicOn, setPhase, setRevision, setRuntime, setScreenOn])
 
 }

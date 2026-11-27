@@ -12,6 +12,7 @@ import { CallHeaderActions } from './CallManager'
 import { getCallHistory, type CallHistoryEntry, type CallRequest } from '../lib/calls'
 import { callOutcome, formatCallDate, formatDuration, latestCallDuration } from '../utils/call-history'
 import { useLatest } from '../../../shared/hooks/useLatest'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 import '../styles/call-center.css'
 
 type View = 'history' | 'directory' | 'settings'
@@ -58,9 +59,11 @@ export default function CallCenter({ request, userId, token, conversations, targ
   const { hostRef: filterPillSetHost, activeRef: filterPillSetActive, pillRef: filterPillSetPill } = useSlidingPill<HTMLDivElement>(filter)
   const [query, setQuery] = useState('')
   const [entries, setEntries] = useState<CallHistoryEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [refreshId, setRefreshId] = useState(0)
+  // null while the current request is in flight, then '' or its error message.
+  const [loadResult, setLoadResult] = useScopedState<string | null>(`${token}:${refreshId}`, null)
+  const loading = loadResult === null
+  const error = loadResult ?? ''
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const [isMobileLayout, setIsMobileLayout] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches)
@@ -85,18 +88,17 @@ export default function CallCenter({ request, userId, token, conversations, targ
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError('')
     getCallHistory(requestRef.current).then((items) => {
       if (!cancelled) {
         if (!Array.isArray(items)) throw new Error('Dữ liệu lịch sử cuộc gọi không hợp lệ.')
         setEntries(items)
+        setLoadResult('')
       }
     }).catch((cause) => {
-      if (!cancelled) setError(cause instanceof Error ? cause.message : 'Không thể tải lịch sử cuộc gọi.')
-    }).finally(() => { if (!cancelled) setLoading(false) })
+      if (!cancelled) setLoadResult(cause instanceof Error ? cause.message : 'Không thể tải lịch sử cuộc gọi.')
+    })
     return () => { cancelled = true }
-  }, [token, refreshId, requestRef])
+  }, [token, refreshId, requestRef, setLoadResult])
 
   useEffect(() => {
     let cancelled = false

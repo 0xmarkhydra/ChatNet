@@ -155,6 +155,25 @@ describe('NearbyExplorer location fallback', () => {
     expect(host.textContent).not.toContain('Đang tải địa điểm')
   })
 
+  it('clears the place error and shows loading while retrying', async () => {
+    let finish: ((items: Awaited<ReturnType<typeof loadNearbyPlaces>>) => void) | undefined
+    loadPlaces.mockRejectedValueOnce(new Error('Mất kết nối OSM'))
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    geo.mockResolvedValue({ coords: { latitude: 21, longitude: 105 } } as GeolocationPosition)
+    await act(async () => root.render(<NearbyExplorer {...props} />))
+    await act(async () => button('Địa điểm')?.click())
+    await act(async () => button('Dùng vị trí hiện tại')?.click())
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Mất kết nối OSM')
+    expect(host.textContent).not.toContain('Đang tải địa điểm')
+    await act(async () => button('Thử lại')?.click())
+    expect(loadPlaces).toHaveBeenCalledTimes(2)
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Đang tải địa điểm')
+    await act(async () => finish?.([]))
+    expect(host.textContent).not.toContain('Đang tải địa điểm')
+    expect(host.textContent).toContain('Chưa tìm thấy địa điểm')
+  })
+
   it('replaces stale location results after a successful retry with identical criteria', async () => {
     const oldPlace = { id: 'cafe:old', name: 'Địa điểm trước', category: 'cafe' as const,
       kind: 'Cafe', latitude: 21, longitude: 105, distanceKm: 0.4 }
