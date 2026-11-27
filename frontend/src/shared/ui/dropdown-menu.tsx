@@ -54,6 +54,21 @@ function DropdownMenuCheckboxItem({ className, children, checked, ...props }: Re
   );
 }
 
+function DropdownMenuRadioItem({ className, children, ...props }: React.ComponentProps<typeof DropdownPrimitive.RadioItem>) {
+  return (
+    <DropdownPrimitive.RadioItem
+      data-slot="dropdown-menu-radio-item"
+      className={cn("relative flex min-h-control-touch cursor-default select-none items-center justify-between gap-3 rounded-ui-sm px-3 py-2 text-ui-body outline-none focus:bg-accent data-[state=checked]:bg-secondary data-[state=checked]:font-semibold data-[state=checked]:text-primary data-[disabled]:opacity-50", className)}
+      {...props}
+    >
+      {children}
+      <span className="flex size-4 shrink-0 items-center justify-center">
+        <DropdownPrimitive.ItemIndicator><Check size={16} aria-hidden="true" /></DropdownPrimitive.ItemIndicator>
+      </span>
+    </DropdownPrimitive.RadioItem>
+  );
+}
+
 function DropdownMenuSubTrigger({ className, children, inset, ...props }: React.ComponentProps<typeof DropdownPrimitive.SubTrigger> & { inset?: boolean }) {
   return (
     <DropdownPrimitive.SubTrigger
@@ -71,6 +86,6 @@ const DropdownMenuSubContent = DropdownPrimitive.SubContent;
 export {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuGroup,
-  DropdownMenuCheckboxItem, DropdownMenuRadioGroup, DropdownMenuSub,
+  DropdownMenuCheckboxItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSub,
   DropdownMenuSubTrigger, DropdownMenuSubContent,
 };
