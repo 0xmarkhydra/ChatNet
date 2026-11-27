@@ -597,9 +597,6 @@
     outline: 2px solid #5b8cdd;
     outline-offset: 1px;
   }
-  .modern-shell.app-layout .desktop-conversation-rail-meta-top time {
-    margin-right: 24px;
-  }
   .modern-shell.app-layout .desktop-conversation-rail-meta-top > .conversation-category-badge {
     flex: 0 0 auto;
   }
@@ -805,4 +802,57 @@
     overflow-x: hidden;
     overflow-y: auto;
   }
+}
+/* The timestamp and overflow menu share one stationary slot. The split picker
+   animates a DOM attribute without changing railListOpen, so keep both mounted. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .desktop-conversation-rail-row {
+    --conversation-time-slot: 58px;
+    --conversation-time-inset: 13px;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-time-space {
+    flex: 0 0 var(--conversation-time-slot);
+    height: 22px;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-time-actions {
+    position: absolute;
+    z-index: 3;
+    top: 5px;
+    right: var(--conversation-time-inset);
+    display: grid;
+    place-items: center end;
+    width: var(--conversation-time-slot);
+    height: 24px;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-time-actions > time {
+    grid-area: 1 / 1;
+    font-size: 10px;
+    line-height: 1;
+    color: #8d9cb0;
+    white-space: nowrap;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-time-actions > .desktop-conversation-rail-more-action {
+    grid-area: 1 / 1;
+    width: 28px;
+    height: 24px;
+    border-radius: 6px;
+    visibility: hidden;
+    pointer-events: none;
+    color: #597aaf;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail.is-expanded .desktop-conversation-rail-time-actions,
+  .modern-shell.app-layout .social-chat-layout[data-split-expanded="true"] > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-time-actions {
+    visibility: visible;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-row:is(:hover, :has(:focus-visible)) .desktop-conversation-rail-time-actions > time {
+    visibility: hidden;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail.is-expanded .desktop-conversation-rail-row:is(:hover, :has(:focus-visible)) .desktop-conversation-rail-more-action,
+  .modern-shell.app-layout .social-chat-layout[data-split-expanded="true"] > .desktop-conversation-rail.is-revealing .desktop-conversation-rail-row:is(:hover, :has(:focus-visible)) .desktop-conversation-rail-more-action {
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .modern-shell.app-layout .desktop-conversation-rail-more-action:hover { background: #dce9ff; color: #2a67cd; }
 }

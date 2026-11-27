@@ -98,7 +98,7 @@ export default function ConversationAvatarRail({
                   <strong>{conversation.pinnedAt && <Pin className="conversation-rail-pin" size={12} aria-label="Đã ghim" />} {conversation.name}</strong>
                   <ConversationRailStatus category={category} muted={conversation.muted} />
                 </span>
-                <time>{formatTime(conversation.lastMessageAt)}</time>
+                {desktop ? <span className="desktop-conversation-rail-time-space" aria-hidden="true" /> : <time>{formatTime(conversation.lastMessageAt)}</time>}
               </span>
               <span className={`${prefix}-meta-bottom`}>
                 <small>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</small>
@@ -110,7 +110,20 @@ export default function ConversationAvatarRail({
               </span>
             )}
           </button>
-          return desktop ? <div key={conversation.id} className="desktop-conversation-rail-row">{entry}{expanded && <button type="button" className="absolute top-1 right-1.5 z-[3] grid size-6 place-items-center rounded-ui-sm border-0 bg-transparent text-muted-foreground hover:bg-accent hover:text-primary focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Tùy chọn cuộc trò chuyện ${conversation.name}`} aria-haspopup="dialog" title="Tùy chọn cuộc trò chuyện" onClick={event => onEntryContextMenu(conversation, event)}><Ellipsis size={18} aria-hidden="true"/></button>}</div> : entry
+          return desktop ? (
+            <div key={conversation.id} className="desktop-conversation-rail-row">
+              {entry}
+              <div className="desktop-conversation-rail-time-actions">
+                <time>{formatTime(conversation.lastMessageAt)}</time>
+                <button type="button" className="desktop-conversation-rail-more-action"
+                  aria-label={`Tùy chọn cuộc trò chuyện ${conversation.name}`} aria-haspopup="dialog"
+                  title="Tùy chọn cuộc trò chuyện"
+                  onClick={event => onEntryContextMenu(conversation, event)}>
+                  <Ellipsis size={18} aria-hidden="true"/>
+                </button>
+              </div>
+            </div>
+          ) : entry
         })}
         {loadError && expanded && <p className={`${prefix}-empty`} role="alert">{loadError}</p>}
         {loadError && <button type="button" className={desktop ? "desktop-conversation-rail-load" : "conversation-avatar-rail-more"} title="Không tải được hội thoại. Thử lại" aria-label="Thử tải lại các cuộc hội thoại" onClick={() => void onRetry()}><RefreshCw size={desktop ? 18 : 17} aria-hidden="true" /></button>}
