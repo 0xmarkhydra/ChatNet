@@ -83,6 +83,8 @@ export type ChatSectionProps = {
   hasMoreConversations: boolean;
   hasMoreMessages: boolean;
   historyActionBusy: boolean;
+  notificationBusyId: number | null;
+  toggleConversationNotifications: (conversation: Conversation) => Promise<void>;
   inviteGroupMembers: () => Promise<void>;
   isProfileDesktop: boolean;
   languageOptions: LanguageOption[];

@@ -55,7 +55,6 @@ import ConversationHeader from "./ConversationHeader";
 import MessageTimeline from "./MessageTimeline";
 import PinnedItemsPanel from "./PinnedItemsPanel";
 import type { ChatSectionProps } from "./ChatSectionProps";
-import { useConversationNotificationToggle } from "../hooks/useConversationNotificationToggle";
 import { useChatDragSurface } from "../hooks/useChatDragSurface";
 import { useChatSectionPanels } from "../hooks/useChatSectionPanels";
 import { useMessageLongPress } from "../hooks/useMessageLongPress";
@@ -133,6 +132,8 @@ export default function ChatSection({
   hasMoreConversations,
   hasMoreMessages,
   historyActionBusy,
+  notificationBusyId,
+  toggleConversationNotifications,
   inviteGroupMembers,
   isProfileDesktop,
   languageOptions,
@@ -385,9 +386,6 @@ export default function ChatSection({
     cancelSplitTransitionFrames();
     cancelQueuedRailNavigation();
   }, []);
-  const { notificationBusyId, toggleConversationNotifications } = useConversationNotificationToggle({
-    apiFetch, setConversations, setNotice,
-  });
   const [desktopChannelPanelOpen, setDesktopChannelPanelOpen] = useState(false);
   const [channelSidebarOpen, setChannelSidebarOpen] = useState(false);
   const [mobileChannelSelected, setMobileChannelSelected] = useState(false);
@@ -662,8 +660,9 @@ export default function ChatSection({
                 event.preventDefault();
                 cancelConversationLongPress();
                 const touchMenu = 'pointerType' in event.nativeEvent && event.nativeEvent.pointerType !== 'mouse';
-                if (touchMenu) suppressConversationClickRef.current = conversation.id;
-                setConversationMenuPosition(touchMenu ? null : { x: event.clientX, y: event.clientY });
+                if (touchMenu && event.type !== 'click') suppressConversationClickRef.current = conversation.id;
+                const rect = event.currentTarget.getBoundingClientRect();
+                setConversationMenuPosition(event.type === 'click' ? { x: rect.right - 244, y: rect.bottom + 4 } : touchMenu ? null : { x: event.clientX, y: event.clientY });
                 setConversationActionId(conversation.id);
               }}
               onEntryPointerDown={(conversation, event) => {

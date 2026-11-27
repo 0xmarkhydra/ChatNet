@@ -23,7 +23,8 @@ func (s *server) clearConversationHistory(w http.ResponseWriter, r *http.Request
 	var cutoff int64
 	err := s.db.QueryRow(r.Context(), `
 		UPDATE conversation_members cm
-		SET cleared_through_message_id=GREATEST(cm.cleared_through_message_id,
+		SET history_hidden=TRUE,
+		    cleared_through_message_id=GREATEST(cm.cleared_through_message_id,
 		    COALESCE((SELECT MAX(m.id) FROM messages m WHERE m.conversation_id=cm.conversation_id),0)),
 		    last_read_message_id=GREATEST(cm.last_read_message_id,
 		    COALESCE((SELECT MAX(m.id) FROM messages m WHERE m.conversation_id=cm.conversation_id),0))
@@ -39,5 +40,8 @@ func (s *server) clearConversationHistory(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	httpx.JSON(w, http.StatusOK, map[string]int64{"clearedThroughMessageId": cutoff})
+	httpx.JSON(w, http.StatusOK, struct {
+		ClearedThroughMessageID int64 `json:"clearedThroughMessageId"`
+		HistoryHidden           bool  `json:"historyHidden"`
+	}{cutoff, true})
 }

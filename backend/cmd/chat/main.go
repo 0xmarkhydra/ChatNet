@@ -702,6 +702,13 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
         WHERE cm.user_id=$1
           AND ($5::bigint=0 OR c.id=$5)
+          AND (NOT cm.history_hidden OR EXISTS (
+            SELECT 1 FROM messages visible_message
+            WHERE visible_message.conversation_id=c.id AND visible_message.id>cm.cleared_through_message_id
+              AND (visible_message.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=visible_message.channel_id AND active_channel.deleted_at IS NULL))
+              AND (c.type='direct' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+                (b.blocker_id=$1 AND b.blocked_id=visible_message.user_id) OR (b.blocked_id=$1 AND b.blocker_id=visible_message.user_id)))
+          ))
           AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
 		  AND ($8::text='' OR c.type=$8)
 		  AND ($7::boolean=FALSE OR EXISTS (
@@ -785,6 +792,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	httpx.JSON(w, http.StatusOK, items)
 }
 
@@ -851,6 +859,12 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, http.StatusInternalServerError, "cannot add member")
 			return
 		}
+	}
+
+	// Explicitly reopening a direct chat restores it only for the requester.
+	if _, err := tx.Exec(r.Context(), `UPDATE conversation_members SET history_hidden=FALSE WHERE conversation_id=$1 AND user_id=$2`, id, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot reopen conversation")
+		return
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {

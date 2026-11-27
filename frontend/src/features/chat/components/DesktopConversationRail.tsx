@@ -1,6 +1,6 @@
 import { conversationPreview } from '../utils/conversationPreview'
 import type { ReactNode, MouseEvent, PointerEvent } from 'react'
-import { Pin } from 'lucide-react'
+import { Ellipsis, Pin } from 'lucide-react'
 import ConversationRailStatus from './ConversationRailStatus'
 import ConversationRailMenu from './ConversationRailMenu'
 import { Search, RefreshCw, Check } from 'lucide-react'
@@ -103,6 +103,12 @@ export default function DesktopConversationRail({
             {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
           </span>}
         </button>
+        {expanded && <button type="button"
+          className="absolute top-1 right-1.5 z-[3] grid size-6 place-items-center rounded-ui-sm border-0 bg-transparent text-muted-foreground hover:bg-accent hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+          aria-label={`Tùy chọn cuộc trò chuyện ${conversation.name}`} aria-haspopup="dialog"
+          title="Tùy chọn cuộc trò chuyện" onClick={event => onEntryContextMenu(conversation, event)}>
+          <Ellipsis size={18} aria-hidden="true" />
+        </button>}
         </div>
       ))}
       {loadError && expanded && <p className="desktop-conversation-rail-empty" role="alert">{loadError}</p>}

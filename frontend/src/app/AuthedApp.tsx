@@ -289,6 +289,7 @@ import { useMessageReactions } from "../features/chat/hooks/useMessageReactions"
 import { useMessageSender } from "../features/chat/hooks/useMessageSender";
 import { useOutboxDelivery } from "../features/chat/hooks/useOutboxDelivery";
 import { useConversationHistory } from "../features/chat/hooks/useConversationHistory";
+import { useConversationNotificationToggle } from "../features/chat/hooks/useConversationNotificationToggle";
 import { useGroupChannels } from "../features/chat/hooks/useGroupChannels";
 import { useGroupChannelLiveSync } from "../features/chat/hooks/useGroupChannelLiveSync";
 import { useChatMessageJumpFocus } from "../features/chat/hooks/useChatMessageJumpFocus";
@@ -598,6 +599,7 @@ export default function AuthedApp({
     conversationOffset,
     reconcileConversationMemberships,
     refreshConversations,
+    removeClearedConversation,
     loadMoreConversations,
   } = useConversationData({
     session,
@@ -968,7 +970,7 @@ export default function AuthedApp({
       ].find((item) => item.id === visibleActivePostId) || null
     : null;
   const activeConversationAction = conversationActionId
-    ? displayConversations.find((item) => item.id === conversationActionId) || null : null;
+    ? displayConversations.find((item) => item.id === conversationActionId) || conversationListSearch.items.find((item) => item.id === conversationActionId) || conversationCategories.items.find((item) => item.id === conversationActionId) || null : null;
   const activeMessageAction = messageActionId
     ? messages.find((item) => item.id === messageActionId) || null
     : null;
@@ -1014,7 +1016,13 @@ export default function AuthedApp({
   const { addComment, manageFeedComment, reportFeedComment, setCommentLike } = usePostComments({ actionLocks, feedRevisionRef: feedRevision, followingFeed, name, postSearch, setPendingComments, setPosts, setProfilePosts, setSavedPosts, syncFeedPost });
   const { closeFeedPostDetails, openFeedPostDetails } = usePostDetailNavigation({ setActivePostId });
 
-  const { clearActiveConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
+  const { clearActiveConversationHistory, clearSelectedConversationHistory } = useConversationHistory({ activeConversationId, activeConversationIdRef, conversations, historyActionBusy, refreshConversations, onHistoryCleared: (id) => {
+    if (routeConversationId === id) navigate(TAB_PATH.chat, { replace: true });
+    removeClearedConversation(id);
+    conversationCategories.removeClearedConversation(id);
+    conversationListSearch.retry();
+  }, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
+  const { notificationBusyId, toggleConversationNotifications } = useConversationNotificationToggle({ apiFetch, setConversations, setNotice });
   const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setReplyingTo });
   const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
   const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
@@ -2377,6 +2385,8 @@ export default function AuthedApp({
           chatOutbox={chatOutbox}
           nextChatSearchJumpRevision={nextChatSearchJumpRevision}
           clearActiveConversationHistory={clearActiveConversationHistory}
+          notificationBusyId={notificationBusyId}
+          toggleConversationNotifications={toggleConversationNotifications}
           conversationBlocked={conversationBlocked}
           conversationCategories={conversationCategories}
           conversationDetailsOpen={conversationDetailsOpen}
@@ -2677,6 +2687,10 @@ export default function AuthedApp({
           pinBusy={pinBusy}
           setConversationActionId={setConversationActionId}
           toggleConversationPin={toggleConversationPin}
+          notificationBusy={notificationBusyId !== null}
+          historyActionBusy={historyActionBusy}
+          toggleConversationNotifications={toggleConversationNotifications}
+          clearSelectedConversationHistory={clearSelectedConversationHistory}
         />
         )}
 

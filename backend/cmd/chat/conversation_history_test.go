@@ -63,6 +63,7 @@ func TestClearConversationHistoryIntegration(t *testing.T) {
 	}
 	s := &server{db: db}
 	mux := http.NewServeMux()
+	mux.Handle("GET /api/conversations", authx.Middleware("test", http.HandlerFunc(s.listConversations)))
 	mux.Handle("DELETE /api/conversations/{id}/history", authx.Middleware("test", http.HandlerFunc(s.clearConversationHistory)))
 	mux.Handle("GET /api/conversations/{id}/messages", authx.Middleware("test", http.HandlerFunc(s.listMessages)))
 	mux.Handle("GET /api/conversations/{id}/shared", authx.Middleware("test", http.HandlerFunc(s.listSharedContent)))
@@ -87,6 +88,19 @@ func TestClearConversationHistoryIntegration(t *testing.T) {
 			t.Fatalf("user %d saw %d messages, want %d", user, len(messages), want)
 		}
 	}
+	listed := func(user int, want int) {
+		t.Helper()
+		req := httptest.NewRequest("GET", fmt.Sprintf("/api/conversations?id=%d", conversationID), nil)
+		req.Header.Set("Authorization", "Bearer "+tokens[user])
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+		var items []conversation
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &items) != nil || len(items) != want {
+			t.Fatalf("user %d list: got %d items, want %d: %s", user, len(items), want, w.Body.String())
+		}
+	}
+	listed(0, 1)
+	listed(1, 1)
 	readCount(0, 2)
 	readCount(1, 2)
 	// Existing messages can have NULL channel_id; shared content still belongs
@@ -102,6 +116,8 @@ func TestClearConversationHistoryIntegration(t *testing.T) {
 	request(0, "DELETE", "history", 200)
 	readCount(0, 0)
 	readCount(1, 2)
+	listed(0, 0)
+	listed(1, 1)
 	var shared sharedContentPage
 	if err := json.Unmarshal(request(0, "GET", "shared?kind=links", 200).Body.Bytes(), &shared); err != nil {
 		t.Fatal(err)
@@ -114,6 +130,9 @@ func TestClearConversationHistoryIntegration(t *testing.T) {
 	}
 	readCount(0, 1)
 	readCount(1, 3)
+	listed(0, 1)
+	listed(1, 1)
 	request(0, "DELETE", "history", 200)
 	readCount(0, 0)
+	listed(0, 0)
 }
