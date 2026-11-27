@@ -1,6 +1,6 @@
 import { useQuickReplyVisibility } from "../hooks/useQuickReplyVisibility";
 import QuickReplyPanel from "./QuickReplyPanel";
-import { Images, X } from "lucide-react";
+import { Images, ThumbsUp, X } from "lucide-react";
 import ChatComposerPlusMenu from "./ChatComposerPlusMenu";
 import ScheduledMessageQueue from "./ScheduledMessageQueue";
 import type { ApiRequest } from "@/shared/types/api";
@@ -19,9 +19,9 @@ import type { RefObject } from "react";
 
 const CHAT_ATTACHMENT_ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip';
 
-type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[]; chatFileInputRef: RefObject<HTMLInputElement | null>; apiFetch: ApiRequest; canSchedule: boolean };
+type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "canSendLike" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "sendLike" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[]; chatFileInputRef: RefObject<HTMLInputElement | null>; apiFetch: ApiRequest; canSchedule: boolean };
 
-export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, apiFetch, canSchedule, canSend, chatFileInputRef, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, groupMembers }: Props) {
+export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, apiFetch, canSchedule, canSend, canSendLike, chatFileInputRef, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, sendLike, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, groupMembers }: Props) {
   const quickReplies = useQuickReplyVisibility(`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`, messageText);
   function openAttachmentPicker(mediaOnly: boolean) {
     const input = chatFileInputRef.current;
@@ -134,6 +134,9 @@ export default function MessageComposer({ activeConversation, activeConversation
                         void addChatFiles(files)
                       }}
                     />
+                    <button className="ghost-action chat-quick-like" type="button" disabled={!canSendLike} aria-label="Gửi Like" title="Gửi Like" onClick={() => void sendLike()}>
+                      <ThumbsUp size={21} fill="currentColor" strokeWidth={1.5} aria-hidden="true"/>
+                    </button>
                     <button className="send-button polished-send" type="submit" disabled={!canSend} aria-label="Gửi tin nhắn">
                       <><span className="send-label">Gửi</span><UiIcon name="send" size={19} /></>
                     </button>

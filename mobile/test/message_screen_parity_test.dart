@@ -193,6 +193,24 @@ void main() {
     expect(find.text('Tắt thông báo nhóm'), findsOneWidget);
   });
 
+  testWidgets('quick Like sends alone and preserves the composed text', (tester) async {
+    final api = DemoApi();
+    await openChatParityDemo(tester, api);
+    await tester.tap(find.text('Linh Nguyễn').first);
+    await tester.pumpAndSettle();
+    final like = find.byKey(const ValueKey('composer-quick-like'));
+    expect(like, findsOneWidget);
+    final input = find.byType(TextField).last;
+    await tester.enterText(input, 'Bản nháp');
+    await tester.tap(like);
+    await tester.pumpAndSettle();
+    expect(find.text('👍'), findsOneWidget);
+    expect(tester.widget<TextField>(input).controller?.text, 'Bản nháp');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('composer exposes PWA separate file, media and emoji actions', (
     tester,
   ) async {

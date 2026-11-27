@@ -1215,9 +1215,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     widget.onConversationChanged(false);
   }
 
-  Future<void> _send({List<Json> attachments = const []}) async {
-    final text = messageController.text.trim();
-    final outgoingAttachments = [...pendingAttachments, ...attachments];
+  Future<void> _send({
+    List<Json> attachments = const [],
+    bool quickLike = false,
+  }) async {
+    final text = quickLike ? '👍' : messageController.text.trim();
+    final outgoingAttachments = quickLike
+        ? <Json>[]
+        : [...pendingAttachments, ...attachments];
     if (active == null ||
         conversationBlocked ||
         sending ||
@@ -1225,11 +1230,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         (text.isEmpty && outgoingAttachments.isEmpty)) {
       return;
     }
+    final roomId = active!['id'];
+    final channelId = selectedChannelId;
     final body = <String, dynamic>{
       'text': text,
       'clientId': DateTime.now().microsecondsSinceEpoch.toString(),
       if (active?['type'] == 'group') 'channelId': selectedChannelId,
-      if (replyingTo != null) 'replyToMessageId': replyingTo!['id'],
+      if (!quickLike && replyingTo != null)
+        'replyToMessageId': replyingTo!['id'],
       if (outgoingAttachments.isNotEmpty) 'attachments': outgoingAttachments,
     };
     setState(() => sending = true);
@@ -1237,17 +1245,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final result = object(
         await widget.api.request(
           'POST',
-          '/api/conversations/${active!['id']}/messages',
+          '/api/conversations/$roomId/messages',
           body,
         ),
       );
       if (!mounted) return;
-      setState(() {
-        messages = [...messages, result];
-        messageController.clear();
-        pendingAttachments = [];
-        replyingTo = null;
-      });
+      if (active?['id'] == roomId && selectedChannelId == channelId) {
+        setState(() {
+          messages = [...messages, result];
+          if (!quickLike) {
+            messageController.clear();
+            pendingAttachments = [];
+            replyingTo = null;
+          }
+        });
+      }
       // Scroll after the new bubble has been laid out, not against the old
       // maxScrollExtent. Otherwise freshly sent mentions can sit under the composer.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -4709,7 +4721,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   ),
                 ),
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 4),
+              IconButton(
+                key: const ValueKey('composer-quick-like'),
+                tooltip: 'Gửi Like',
+                style: IconButton.styleFrom(
+                  foregroundColor: socoBlue,
+                  minimumSize: const Size.square(40),
+                  maximumSize: const Size.square(40),
+                  padding: EdgeInsets.zero,
+                ),
+                onPressed: sending || uploading || conversationBlocked
+                    ? null
+                    : () => _send(quickLike: true),
+                icon: const Icon(Icons.thumb_up_rounded, size: 23),
+              ),
+              const SizedBox(width: 4),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: socoGradient,

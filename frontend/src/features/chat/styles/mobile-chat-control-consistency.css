@@ -267,7 +267,7 @@
 
   .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
   > .conversation-panel > .media-composer.compact-chat-composer
-  > button:is(.chat-plus-trigger, .voice-record-trigger, .send-button) {
+  > button:is(.chat-plus-trigger, .voice-record-trigger, .send-button, .chat-quick-like) {
     flex: 0 0 44px;
     width: 44px;
     min-width: 44px;
@@ -277,7 +277,7 @@
 
   .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
   > .conversation-panel > .media-composer.compact-chat-composer
-  > button:is(.chat-plus-trigger, .voice-record-trigger) {
+  > button:is(.chat-plus-trigger, .voice-record-trigger, .chat-quick-like) {
     border: 0;
     background: transparent;
     color: var(--soco-blue);
@@ -285,7 +285,7 @@
 
   .modern-shell.app-layout .social-chat-layout.mobile-rail-chat-view
   > .conversation-panel > .media-composer.compact-chat-composer
-  > button:is(.chat-plus-trigger, .voice-record-trigger):is(:hover, :focus-visible, [aria-expanded="true"]) {
+  > button:is(.chat-plus-trigger, .voice-record-trigger, .chat-quick-like):is(:hover, :focus-visible, [aria-expanded="true"]) {
     background: var(--soco-soft-blue);
   }
 
@@ -301,3 +301,10 @@
     flex: 1 0 100%;
   }
 }
+/* A compact, independent Like action alongside the existing send control. */
+.social-chat-layout .media-composer > .chat-quick-like {
+  display: grid; place-items: center; flex: 0 0 40px; width: 40px; min-width: 40px;
+  height: 44px; padding: 0; border: 0; background: transparent; color: var(--soco-blue);
+}
+.social-chat-layout .media-composer > .chat-quick-like:hover:not(:disabled) { background: var(--soco-soft-blue); }
+.social-chat-layout .media-composer > .chat-quick-like:disabled { opacity: .45; cursor: not-allowed; }

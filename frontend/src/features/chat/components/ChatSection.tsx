@@ -82,6 +82,7 @@ export default function ChatSection({
   canInviteActiveGroup,
   canManageActiveGroup,
   canSend,
+  canSendLike,
   changeAutoTranslate,
   changeGroupMemberRole,
   changeTargetLanguage,
@@ -177,6 +178,7 @@ export default function ChatSection({
   selectedChannelId,
   selectGroupChannel,
   sendMessage,
+  sendLike,
   session,
   setActiveConversationId,
   setChatCreateError,
@@ -1015,6 +1017,7 @@ export default function ChatSection({
                 apiFetch={apiFetch}
                 canSchedule={activeConversation.type !== 'direct' || mlsPilotMode === 'legacy'}
                 canSend={canSend}
+                canSendLike={canSendLike}
                 chatFileInputRef={chatFileInputRef}
                 groupMembers={groupMembers}
                 mediaUploading={mediaUploading}
@@ -1025,6 +1028,7 @@ export default function ChatSection({
                 replyingTo={replyingTo}
                 selectedChannelId={selectedChannelId}
                 sendMessage={sendMessage}
+                sendLike={sendLike}
                 session={session}
                 setGroupActivityCreateKind={setGroupActivityCreateKind}
                 setMessageAttachments={setMessageAttachments}
