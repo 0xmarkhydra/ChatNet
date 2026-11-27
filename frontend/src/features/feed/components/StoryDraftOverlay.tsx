@@ -5,7 +5,6 @@ import type { StoryDraft, TextStoryInput } from '../types'
 import StoryComposer from './StoryComposer'
 import StoryTextComposer from './StoryTextComposer'
 import { STORY_MEDIA_ACCEPT, storyMediaError } from '../utils/storyMedia'
-import '../styles/story-text.css'
 
 export type StoryDraftOverlayProps = {
   createStory: (input: { file: File } | TextStoryInput) => Promise<boolean>

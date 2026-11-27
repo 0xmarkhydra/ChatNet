@@ -152,8 +152,6 @@
 .modern-shell .soco-feed-section-label strong { font-size: 16px; font-weight: 800; letter-spacing: -.35px; }
 .modern-shell .soco-feed-section-label small { color: #8590aa; font-size: 11px; }
 .modern-shell .soco-feed-posts-label { margin-top: 26px; margin-bottom: 12px; }
-.modern-shell .stories-row { scrollbar-width: none; overscroll-behavior-x: contain; }
-.modern-shell .stories-row::-webkit-scrollbar { display: none; }
 .modern-shell .zalo-post-composer {
   min-width: 0;
   border: 1px solid var(--soco-hairline);

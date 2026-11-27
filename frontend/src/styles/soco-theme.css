@@ -402,13 +402,6 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   background: var(--soco-gradient);
   box-shadow: 0 8px 23px rgba(37, 99, 235, .17);
 }
-.stories-row { gap: 11px; padding: 0 2px 12px; border-bottom: 0; background: transparent; }
-.story-card {
-  border-radius: 19px;
-  border-color: #e3e9f7;
-  box-shadow: 0 6px 16px rgba(37,56,110,.055);
-}
-.story-visual { border-radius: 16px; }
 .profile-view { background: var(--soco-canvas); }
 .profile-hero {
   background: #fff;
@@ -545,10 +538,6 @@ button { transition: background-color .18s ease, color .18s ease, border-color .
   .simple-view-title { padding: 21px 17px 12px; }
   .simple-view-title strong { font-size: 23px; }
   .zalo-feed-view { padding: 10px 12px max(18px, env(safe-area-inset-bottom)); }
-  .modern-shell .stories-row { padding: 0 0 10px; gap: 9px; background: transparent; border-bottom: 0; }
-  .modern-shell .story-card { width: 80px; flex: 0 0 80px; gap: 3px; border-radius: 17px; }
-  .modern-shell .story-visual { height: 106px; border-radius: 15px; }
-  .modern-shell .story-card > span { font-size: 10px; }
   .zalo-post-composer { margin: 0 0 12px; border-radius: 19px; padding: 11px; }
   .profile-hero { margin: 10px 11px 0; border-radius: 20px; }
   .contact-shortcuts, .contacts-suggestions { margin-inline: 11px; border-radius: 19px; }

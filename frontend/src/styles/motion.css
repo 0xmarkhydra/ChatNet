@@ -96,8 +96,6 @@
     transition: transform var(--soco-motion-standard) var(--soco-motion-ease),
       box-shadow var(--soco-motion-standard) var(--soco-motion-ease);
   }
-  .modern-shell .story-card:not(:disabled):hover { transform: translateY(-3px); }
-  .modern-shell .story-card:not(:disabled):active { transform: scale(.965); }
 }
 
 /* Shared Liquid Pill Indicator for Mobile & Tablet BottomNavigation */
