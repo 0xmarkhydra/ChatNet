@@ -22,6 +22,11 @@ type Props = {
 export default function StoryActivity({ request, storyId, open, onOpenChange, onOpenMessages }: Props) {
   const trUi = useUiTranslation()
   const locale = useUiLocale()
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const [viewers, setViewers] = useState<StoryViewerEntry[] | null>(null)
   const [total, setTotal] = useState(0)
@@ -107,7 +112,7 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
                         <UserAvatar username={viewer.username} name={label} className="box-border size-10 flex-none text-ui-label font-black" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-ui-body font-semibold">{label}</span>
-                          {viewer.viewedAt && <time dateTime={viewer.viewedAt} className="block text-ui-caption text-muted-foreground">{relativeStoryTime(viewer.viewedAt, trUi('feed.justNow'), Date.now(), locale)}</time>}
+                          {viewer.viewedAt && <time dateTime={viewer.viewedAt} className="block text-ui-caption text-muted-foreground">{relativeStoryTime(viewer.viewedAt, trUi('feed.justNow'), now, locale)}</time>}
                         </span>
                         {viewer.emoji && <span role="img" aria-label={reactionLabel(viewer.emoji, trUi)} data-slot="reaction" className="flex-none text-xl leading-none">{viewer.emoji}</span>}
                       </li>

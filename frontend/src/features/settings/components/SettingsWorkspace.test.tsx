@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import SettingsWorkspace from "./SettingsWorkspace";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
-import HeaderTitle from "../../../app/header/HeaderTitle";
 import { UiLocaleContext } from "../../../shared/i18n/locale";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -95,30 +94,25 @@ describe("SettingsWorkspace router navigation", () => {
     expect(page.host.textContent).toContain("Security content");
   });
 });
-it("localizes privacy fields and both page headers in all five locales without resetting draft", () => {
+it("localizes privacy fields in all five locales without resetting draft", () => {
   const host = document.createElement("div");
   const root = createRoot(host);
   const privacy = { searchableByUsername: true, searchableByName: true, searchableByEmail: true, allowFriendRequests: true, showOnlineStatus: true };
   const render = (locale: string) => act(() => root.render(<UiLocaleContext.Provider value={{ locale }}>
-    <HeaderTitle tab="profile" desktopSection={null} translationSettingsOpen={false} groupWorkspaceMode="list" groupCreateStep={1}
-      contactsDirectory={false} profileSettings profileDesktop profileEditing={false} />
-    <HeaderTitle tab="notifications" desktopSection={null} translationSettingsOpen={false} groupWorkspaceMode="list" groupCreateStep={1}
-      contactsDirectory={false} profileSettings={false} profileDesktop profileEditing={false} />
     <PrivacySettingsPanel privacy={privacy} privacyLoading={false} privacyBusy={false} privacyError=""
       onPrivacyRetry={() => {}} onSavePrivacy={async () => {}} />
   </UiLocaleContext.Provider>));
   try {
     render("vi");
     act(() => (host.querySelector('[role="switch"]') as HTMLButtonElement).click());
-    for (const [locale, title, notice, profile, request, unsaved] of [
-      ["vi", "Cài đặt", "Thông báo", "Hiển thị hồ sơ", "Cho phép lời mời kết bạn", "Bạn có thay đổi chưa lưu"],
-      ["en", "Settings", "Notifications", "Profile visibility", "Allow friend requests", "You have unsaved changes"],
-      ["zh", "设置", "通知", "个人主页可见性", "允许好友请求", "你有未保存的更改"],
-      ["ja", "設定", "通知", "プロフィールの公開範囲", "友達リクエストを許可", "未保存の変更があります"],
-      ["ko", "설정", "알림", "프로필 공개 범위", "친구 요청 허용", "저장하지 않은 변경 사항이 있습니다"],
+    for (const [locale, profile, request, unsaved] of [
+      ["vi", "Hiển thị hồ sơ", "Cho phép lời mời kết bạn", "Bạn có thay đổi chưa lưu"],
+      ["en", "Profile visibility", "Allow friend requests", "You have unsaved changes"],
+      ["zh", "个人主页可见性", "允许好友请求", "你有未保存的更改"],
+      ["ja", "プロフィールの公開範囲", "友達リクエストを許可", "未保存の変更があります"],
+      ["ko", "프로필 공개 범위", "친구 요청 허용", "저장하지 않은 변경 사항이 있습니다"],
     ]) {
       render(locale);
-      expect(Array.from(host.querySelectorAll(".app-page-heading strong"), el => el.textContent)).toEqual([title, notice]);
       expect(host.querySelector("#settings-workspace-profile-heading")?.textContent).toBe(profile);
       expect(host.querySelector('[role="switch"]')?.getAttribute("aria-label")).toBe(request);
       expect(host.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("false");

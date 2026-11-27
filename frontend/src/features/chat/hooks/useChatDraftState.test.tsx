@@ -89,6 +89,15 @@ describe("useChatDraftState", () => {
     expect(app.render(8).messageText).toBe("direct");
   });
 
+  it("restores channel text after reload without persisting attachments", () => {
+    sessionStorage.setItem("chatnet:channel-drafts:v1:21", JSON.stringify({"8:2":{text:"saved channel"}}));
+    const app=mountDrafts();
+    expect(app.render(8,2).messageText).toBe("saved channel");
+    const state=app.render(8,2);
+    act(()=>state.setChannelDrafts({"8:2":{text:"changed",attachments:[{id:"ignored"}] as never}}));
+    expect(JSON.parse(sessionStorage.getItem("chatnet:channel-drafts:v1:21") || "{}")).toEqual({"8:2":{text:"changed"}});
+    expect(app.render(8,3).messageText).toBe("");
+  });
   it("does not write drafts for an invalid user", () => {
     const app = mountDrafts(0);
     const state = app.render(5);

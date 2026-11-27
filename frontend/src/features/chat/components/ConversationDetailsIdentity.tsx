@@ -33,7 +33,7 @@ export default function ConversationDetailsIdentity({
               ? <UserAvatar name={displayName} className="conversation-info-panel-avatar social-chat-details-avatar" group imageUrl={displayAvatar} />
               : <ConversationAvatar conversation={conversation} className="conversation-info-panel-avatar social-chat-details-avatar" />}
 
-            {isGroup && canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
+            {isGroup && canEditGroupPhotos && (!isChannel || channel.id === selectedChannelId) && <button type="button" className="group-photo-trigger" disabled={photoBusy}
               aria-label={isChannel ? trUi("chat.changeChannelPhoto") : trUi("chat.changeGroupPhoto")} title={isChannel ? trUi("chat.changeChannelPhoto") : trUi("chat.changeGroupPhoto")}
               onClick={() => onEditPhoto({ name: displayName, avatarUrl: displayAvatar,
                 kind: isChannel ? 'channel' : 'group', channelId: isChannel ? selectedChannelId : undefined })}>

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'presentation/notification_presenter.dart';
+import 'presentation/notification_store.dart';
+import 'presentation/conversation_avatar.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
 Future<void> showNotificationSheet(
   BuildContext context,
   Api api, {
+  required NotificationStore store,
   ValueChanged<Json>? onOpenConversation,
   ValueChanged<int>? onOpenPost,
   VoidCallback? onOpenInvitations,
@@ -19,6 +22,7 @@ Future<void> showNotificationSheet(
     showDragHandle: true,
     builder: (context) => _NotificationSheet(
       api: api,
+      store: store,
       onOpenConversation: onOpenConversation,
       onOpenPost: onOpenPost,
       onOpenInvitations: onOpenInvitations,
@@ -29,12 +33,14 @@ Future<void> showNotificationSheet(
 class _NotificationSheet extends StatefulWidget {
   const _NotificationSheet({
     required this.api,
+    required this.store,
     this.onOpenConversation,
     this.onOpenPost,
     this.onOpenInvitations,
   });
 
   final Api api;
+  final NotificationStore store;
   final ValueChanged<Json>? onOpenConversation;
   final ValueChanged<int>? onOpenPost;
   final VoidCallback? onOpenInvitations;
@@ -45,9 +51,8 @@ class _NotificationSheet extends StatefulWidget {
 
 class _NotificationSheetState extends State<_NotificationSheet> {
   final searchController = TextEditingController();
-  final readKeys = <String>{};
-  List<MobileNotification> notifications = [];
-  bool loading = true;
+  List<MobileNotification> get notifications => widget.store.items;
+  bool get loading => widget.store.loading;
   int? busyFriendId;
   int? busyMentionId;
   String filter = 'all';
@@ -56,47 +61,26 @@ class _NotificationSheetState extends State<_NotificationSheet> {
   @override
   void initState() {
     super.initState();
-    _load();
+    widget.store.addListener(_onStoreChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    widget.store.removeListener(_onStoreChanged);
     searchController.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
-    setState(() {
-      loading = true;
-      error = '';
-    });
-    final failures = <String>[];
-    Future<List<Json>> source(String path, String label) async {
-      try {
-        return objects(await widget.api.request('GET', path));
-      } catch (_) {
-        failures.add(label);
-        return [];
-      }
-    }
-
-    final results = await Future.wait([
-      source('/api/friends/requests', 'lời mời kết bạn'),
-      source('/api/conversations?limit=100', 'tin nhắn'),
-      source('/api/feed/mentions', 'gắn thẻ'),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      notifications = buildMobileNotifications(
-        requests: results[0],
-        conversations: results[1],
-        mentions: results[2],
-      );
-      loading = false;
-      error = failures.isEmpty
-          ? ''
-          : 'Chưa tải được: ${failures.join(', ')}. Kéo xuống để thử lại.';
-    });
+    if (mounted) setState(() => error = '');
+    await widget.store.refresh();
   }
 
   Future<void> _friendAction(
@@ -114,9 +98,7 @@ class _NotificationSheetState extends State<_NotificationSheet> {
             : '/api/friends/$id/accept',
       );
       if (mounted) {
-        setState(() {
-          notifications.removeWhere((candidate) => candidate.key == item.key);
-        });
+        widget.store.removeFriend(id);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -143,7 +125,7 @@ class _NotificationSheetState extends State<_NotificationSheet> {
           await widget.api.request('POST', '/api/feed/mentions/$id/read');
         }
         if (!mounted) return;
-        setState(() => readKeys.add(item.key));
+        widget.store.readMention(id);
         _navigate(() => widget.onOpenPost?.call(postId));
       } catch (cause) {
         if (mounted) {
@@ -158,7 +140,6 @@ class _NotificationSheetState extends State<_NotificationSheet> {
       _navigate(widget.onOpenInvitations);
       return;
     }
-    readKeys.add(item.key);
     _navigate(() => widget.onOpenConversation?.call(item.data));
   }
 
@@ -173,12 +154,10 @@ class _NotificationSheetState extends State<_NotificationSheet> {
       notifications,
       filter: filter,
       query: searchController.text,
-      locallyRead: readKeys,
     );
     final unread = filterMobileNotifications(
       notifications,
       filter: 'unread',
-      locallyRead: readKeys,
     ).length;
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * .84,
@@ -259,13 +238,16 @@ class _NotificationSheetState extends State<_NotificationSheet> {
               ],
             ),
           ),
-          if (error.isNotEmpty)
+          if (error.isNotEmpty || widget.store.error.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 17),
-              child: Text(error, style: const TextStyle(color: Colors.red)),
+              child: Text(
+                error.isNotEmpty ? error : widget.store.error,
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
           Expanded(
-            child: loading
+            child: loading && notifications.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: _load,
@@ -291,16 +273,22 @@ class _NotificationSheetState extends State<_NotificationSheet> {
                               children: [
                                 ListTile(
                                   onTap: () => _open(item),
-                                  leading: CircleAvatar(
-                                    backgroundColor: socoSoftBlue,
-                                    foregroundColor: socoBlue,
-                                    child: Icon(switch (item.kind) {
-                                      'friend' => Icons.person_add_alt_rounded,
-                                      'mention' =>
-                                        Icons.alternate_email_rounded,
-                                      _ => Icons.chat_bubble_outline_rounded,
-                                    }),
-                                  ),
+                                  leading: item.kind == 'message'
+                                      ? ConversationAvatarView(
+                                          room: item.data,
+                                          size: 42,
+                                          fetchProfileImage: !widget.api.isDemo,
+                                        )
+                                      : UserAvatar(
+                                          name: item.title,
+                                          username:
+                                              (item.kind == 'friend'
+                                                      ? item.data['username']
+                                                      : item.data['author'])
+                                                  ?.toString(),
+                                          size: 42,
+                                          fetchProfileImage: !widget.api.isDemo,
+                                        ),
                                   title: Text(
                                     item.title,
                                     maxLines: 1,
@@ -309,10 +297,22 @@ class _NotificationSheetState extends State<_NotificationSheet> {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  subtitle: Text(item.subtitle),
-                                  trailing:
-                                      item.serverRead ||
-                                          readKeys.contains(item.key)
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(item.subtitle),
+                                      if (item.date.isNotEmpty)
+                                        Text(
+                                          displayTime(item.date),
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: socoMuted,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  trailing: item.serverRead
                                       ? null
                                       : const Icon(
                                           Icons.circle,

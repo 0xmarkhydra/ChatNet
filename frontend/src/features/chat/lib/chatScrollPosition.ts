@@ -36,13 +36,22 @@ export function resetChatFollowBottom(refs: Pick<ChatScrollRefs, "messageScrollA
   refs.messageScrollAtBottom.current = true;
 }
 
+export function resetChatScrollRestore(refs: Pick<ChatScrollRefs, "pendingMessageScrollRestore">) {
+  refs.pendingMessageScrollRestore.current = null;
+}
+
 /** Set the initial position exactly once without smooth-scroll layout jumps. */
 export function positionAtUnread(unreadMessageId: number | null | undefined, refs: ChatScrollRefs): boolean {
   const container = refs.messagesScrollRef.current;
-  const marker = unreadMessageId && container?.querySelector<HTMLElement>(`[data-unread-message-id="${unreadMessageId}"]`);
-  if (!container || !marker) return false;
+  if (!container || !scrollToUnreadMarker(container, unreadMessageId)) return false;
   refs.pendingMessageScrollRestore.current = null;
-  container.scrollTop += marker.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
   refs.messageScrollAtBottom.current = container.scrollHeight - container.scrollTop - container.clientHeight < 96;
+  return true;
+}
+/** Shared initial anchor for mounted and newly revealed timelines. */
+export function scrollToUnreadMarker(container: HTMLDivElement, unreadMessageId: number | null | undefined): boolean {
+  const marker = unreadMessageId && container.querySelector<HTMLElement>(`[data-unread-message-id="${unreadMessageId}"]`);
+  if (!marker) return false;
+  container.scrollTop += marker.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
   return true;
 }

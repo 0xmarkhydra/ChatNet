@@ -237,4 +237,10 @@ expect('/api/conversations/5/avatar', { method: 'PUT', headers: JSON_HEADERS, bo
 await avatar.saveGroupAvatar(request, 5, null)
 assert.equal(last().init.body, '{"attachment":null}', 'removing the avatar sends a null attachment')
 
+await avatar.getGroupAvatarCapability(request, 5, 12)
+expect('/api/conversations/5/channels/12/avatar', { method: 'GET', cache: 'no-store' })
+await avatar.saveGroupAvatar(request, 5, { storageRef: 'x' }, 12)
+expect('/api/conversations/5/channels/12/avatar', { method: 'PUT', headers: JSON_HEADERS, body: '{"attachment":{"storageRef":"x"}}' })
+await avatar.saveGroupAvatar(request, 5, null, 12)
+expect('/api/conversations/5/channels/12/avatar', { method: 'PUT', headers: JSON_HEADERS, body: '{"attachment":null}' })
 console.log('PASS: chat API requests (paths, methods, headers, bodies, signals) are unchanged')

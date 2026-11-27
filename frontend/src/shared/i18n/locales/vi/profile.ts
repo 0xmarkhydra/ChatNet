@@ -45,5 +45,10 @@ export default {
   "profile.profileInfo": "Thông tin hồ sơ",
   "profile.profileInfoHint": "Thay đổi tên, tên người dùng, tiểu sử, thành phố và ảnh hồ sơ trong trang chỉnh sửa.",
   "profile.optionsSettings": "TÙY CHỌN & CÀI ĐẶT",
-  "profile.desktopNotificationPrivacy": "Ẩn nội dung và tên người gửi. Nhận khi SocCO còn chạy; thoát hẳn sẽ dừng thông báo."
+  "profile.desktopNotificationPrivacy": "Ẩn nội dung và tên người gửi. Nhận khi SocCO còn chạy; thoát hẳn sẽ dừng thông báo.",
+  "profile.noLoadedPhotos": "Chưa có ảnh trong các bài viết đã tải.",
+  "profile.noLoadedVideos": "Chưa có video trong các bài viết đã tải.",
+  "profile.noSharedPhotos": "Chưa có ảnh được chia sẻ với bạn.",
+  "profile.noSharedVideos": "Chưa có video được chia sẻ với bạn.",
+  "profile.loadOlderPosts": "Tải thêm bài viết cũ hơn"
 } as const

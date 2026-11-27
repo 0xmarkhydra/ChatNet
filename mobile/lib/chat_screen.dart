@@ -5,11 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'state/app_providers.dart';
+import 'data/chat_local_state.dart';
 import 'presentation/mobile_avatar_channel_split.dart';
 import 'presentation/mobile_channel_picker.dart';
 import 'presentation/mobile_reverse_scroll_region.dart';
 import 'presentation/conversation_avatar.dart';
 import 'presentation/chat_information_sheet.dart';
+import 'presentation/conversation_photo_editor.dart';
+import 'presentation/chat_rich_actions.dart';
+import 'presentation/chat_rich_media.dart';
 import 'presentation/contact_metadata_editor.dart';
 import 'presentation/conversation_list_presenter.dart';
 import 'models/navigation_models.dart';
@@ -37,6 +41,7 @@ class ChatScreen extends ConsumerStatefulWidget {
     this.openConversationRequest = 0,
     this.createRequest = 0,
     this.resetRequest = 0,
+    this.visible = true,
     this.onUnreadChanged,
     this.onMobileScroll,
     this.onMobileReverseScroll,
@@ -49,6 +54,7 @@ class ChatScreen extends ConsumerStatefulWidget {
   final int openConversationRequest;
   final int createRequest;
   final int resetRequest;
+  final bool visible;
   final ValueChanged<int>? onUnreadChanged;
 
   /// Forward only the visible inbox/channel scrollers to the shared chrome.
@@ -62,7 +68,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final messageController = TextEditingController();
   final messageFocus = FocusNode();
   List<MentionCandidate> mentionMembers = [];
@@ -75,6 +81,109 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final scrollController = ScrollController(keepScrollOffset: false);
   final showLatest = ValueNotifier<bool>(false);
   int messageLoadGeneration = 0;
+  bool hasOlderMessages = false, olderLoading = false;
+  int unreadRequestRevision = 0;
+  final readAcknowledged = <String, int>{};
+  final readInFlight = <String>{};
+  bool get appForeground =>
+      WidgetsBinding.instance.lifecycleState == null ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+  bool get chatVisible =>
+      widget.visible &&
+      (WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed);
+  late ChatLocalState localChat;
+  bool localReady = false, draining = false;
+  String? enqueuingScope;
+  Timer? draftTimer, retryTimer, reconcileTimer;
+  bool reconciling = false;
+  final pendingEvents = <Json>[];
+  String? get draftScope => active == null
+      ? null
+      : ChatLocalState.scope(active!['id'], selectedChannelId);
+  List<Json> get pendingOutgoing => localChat.outbox
+      .where(
+        (row) =>
+            row['roomId'] == active?['id'] &&
+            row['channelId'] == selectedChannelId,
+      )
+      .toList();
+
+  void _captureDraft() {
+    final key = draftScope;
+    if (key == null || key == enqueuingScope) return;
+    if (messageController.text.isEmpty &&
+        pendingAttachments.isEmpty &&
+        replyingTo == null) {
+      localChat.drafts.remove(key);
+    } else {
+      localChat.drafts[key] = {
+        'text': messageController.text,
+        'attachments': pendingAttachments.map((item) => {...item}).toList(),
+        'reply': replyingTo,
+      };
+    }
+  }
+
+  void _restoreDraft(Json room, int channel) {
+    final draft = localChat.drafts[ChatLocalState.scope(room['id'], channel)];
+    final text = draft?['text']?.toString() ?? '';
+    messageController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    pendingAttachments = objects(draft?['attachments']);
+    replyingTo = draft?['reply'] is Map ? object(draft?['reply']) : null;
+  }
+
+  void _saveDraftSoon() {
+    _captureDraft();
+    draftTimer?.cancel();
+    if (!localReady || widget.api.isDemo) return;
+    draftTimer = Timer(const Duration(milliseconds: 350), () {
+      unawaited(_persistDraft());
+    });
+  }
+
+  Future<void> _persistDraft() async {
+    try {
+      await localChat.persist();
+    } catch (_) {
+      if (mounted) _show('Không lưu được bản nháp trên thiết bị.');
+    }
+  }
+
+  Future<void> _initLocal() async {
+    final state = localChat;
+    try {
+      await state.restore();
+    } catch (_) {
+      if (mounted) _show('Không khôi phục được bản nháp hoặc hàng đợi.');
+    }
+    if (!mounted || !identical(state, localChat) || !state.current) return;
+    setState(() {
+      localReady = true;
+      if (active != null &&
+          messageController.text.isEmpty &&
+          pendingAttachments.isEmpty &&
+          replyingTo == null) {
+        _restoreDraft(active!, selectedChannelId);
+      }
+    });
+    unawaited(_drainOutbox());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _queueRealtime(const {'type': 'reconnect'});
+      unawaited(_drainOutbox());
+    } else if (localReady) {
+      _captureDraft();
+      unawaited(_persistDraft());
+    }
+  }
+
   bool initialTimelinePending = true;
   int? unreadMessageId;
   int? messageGapBefore;
@@ -93,8 +202,119 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   DateTime? lastGroupPrefetch;
   bool groupPrefetchBusy = false;
   List<Json> messages = [];
+  // In-memory, session-bound history for very recent revisits only.
+  final recentHistory = <String, ({DateTime at, List<Json> rows})>{};
+  int historyCacheRevision = 0;
+  String _historyKey(Json room, int channel, String language) =>
+      '${widget.api.generation}:${widget.api.user['id']}:${room['id']}:$channel:$language';
+  void _rememberHistory(
+    Json room,
+    int channel,
+    String language,
+    List<Json> rows,
+  ) {
+    final key = _historyKey(room, channel, language);
+    recentHistory.remove(key);
+    recentHistory[key] = (
+      at: DateTime.now(),
+      rows: rows.reversed
+          .take(200)
+          .toList()
+          .reversed
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(),
+    );
+    while (recentHistory.length > 6) {
+      recentHistory.remove(recentHistory.keys.first);
+    }
+  }
+
+  List<Json>? _warmHistory(Json room, int channel) {
+    if (room['blockedByMe'] == true ||
+        room['blockedByOther'] == true ||
+        ((room['unreadCount'] as num?)?.toInt() ?? 0) > 0) {
+      return null;
+    }
+    final cached = recentHistory.remove(
+      _historyKey(room, channel, targetLanguage),
+    );
+    if (cached == null ||
+        DateTime.now().difference(cached.at) > const Duration(seconds: 5)) {
+      return null;
+    }
+    return cached.rows.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
   List<Json> pendingAttachments = [];
   List<Json> channels = [];
+  final channelWarm = <String, ({DateTime at, List<Json> rows})>{};
+  final channelRequests = <String, Future<List<Json>>>{};
+  int channelCacheRevision = 0;
+  String _channelKey(dynamic roomId) =>
+      '${widget.api.generation}:${widget.api.user['id']}:$roomId';
+  void _invalidateChannelWarm() {
+    channelCacheRevision++;
+    channelWarm.clear();
+    channelRequests.clear();
+  }
+
+  List<Json>? _takeWarmChannels(dynamic roomId) {
+    final value = channelWarm.remove(_channelKey(roomId));
+    if (value == null ||
+        DateTime.now().difference(value.at) > const Duration(seconds: 3)) {
+      return null;
+    }
+    return value.rows;
+  }
+
+  Future<List<Json>> _requestChannels(
+    dynamic roomId, {
+    bool warm = false,
+  }) async {
+    final key = _channelKey(roomId);
+    final pending = channelRequests[key];
+    if (pending != null) return pending;
+    final revision = channelCacheRevision;
+    final future = widget.api
+        .request('GET', '/api/conversations/$roomId/channels')
+        .then(objects);
+    channelRequests[key] = future;
+    try {
+      final rows = await future;
+      if (mounted &&
+          warm &&
+          revision == channelCacheRevision &&
+          key == _channelKey(roomId) &&
+          pickerGroup?['id'] != roomId) {
+        channelWarm[key] = (at: DateTime.now(), rows: rows);
+        while (channelWarm.length > 4) {
+          channelWarm.remove(channelWarm.keys.first);
+        }
+      }
+      return rows;
+    } finally {
+      if (identical(channelRequests[key], future)) channelRequests.remove(key);
+    }
+  }
+
+  Future<void> _warmRecentGroup() async {
+    if (active != null ||
+        pickerGroup != null ||
+        channelRequests.isNotEmpty ||
+        channelWarm.isNotEmpty) {
+      return;
+    }
+    final group = conversations
+        .where((room) => room['type'] == 'group')
+        .firstOrNull;
+    if (group == null) return;
+    try {
+      await _requestChannels(group['id'], warm: true);
+    } catch (_) {
+      /* best effort */
+    }
+  }
+
   Json? generalChannel;
   List<Json> pinnedMessages = [];
   bool pinBusy = false;
@@ -136,11 +356,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    localChat = ChatLocalState(widget.api);
+    unawaited(_initLocal());
+    if (!widget.api.isDemo) {
+      retryTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (appForeground) unawaited(_drainOutbox());
+      });
+    }
     railSplitController = AnimationController(
       vsync: this,
       value: 1,
-      duration: const Duration(milliseconds: 380),
-      reverseDuration: const Duration(milliseconds: 380),
+      duration: const Duration(milliseconds: 220),
+      reverseDuration: const Duration(milliseconds: 260),
     );
     _refresh();
     scrollController.addListener(_syncMessageScroll);
@@ -151,6 +379,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void didUpdateWidget(covariant ChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.api, widget.api)) {
+      recentHistory.clear();
+      _invalidateChannelWarm();
+      readAcknowledged.clear();
+      localChat = ChatLocalState(widget.api);
+      localReady = false;
+      messageController.clear();
+      pendingAttachments = [];
+      replyingTo = null;
+      unawaited(_initLocal());
+    }
+    if (widget.visible && !oldWidget.visible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _queueRealtime(const {'type': 'reconnect'});
+      });
+    }
     final requested = widget.requestedConversation;
     if (requested != null &&
         (widget.openConversationRequest != oldWidget.openConversationRequest ||
@@ -167,6 +411,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       });
     }
     if (widget.resetRequest != oldWidget.resetRequest) {
+      _cancelGroupSwitch();
       railNavigationGeneration++;
       railExpandedTarget = true;
       railSplitController.value = 1;
@@ -212,14 +457,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         loading = false;
         error = '';
       });
-      widget.onUnreadChanged?.call(
-        conversations.fold<int>(
-          0,
-          (total, room) =>
-              total + ((room['unreadCount'] as num?)?.toInt() ?? 0),
-        ),
-      );
+      await _refreshUnread();
       unawaited(_prefetchOlderGroups());
+      unawaited(_warmRecentGroup());
       if (active != null) {
         final replacement = conversations.where(
           (item) => item['id'] == active!['id'],
@@ -323,32 +563,211 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
-  Future<void> _reconcile() async {
-    await _refresh();
-    if (active != null) {
-      final room = active!;
-      await _loadMessages(room, channelId: selectedChannelId);
-      await _refreshPins(room);
+  Future<void> _refreshUnread() async {
+    final revision = ++unreadRequestRevision;
+    final epoch = widget.api.generation;
+    try {
+      final result = object(
+        await widget.api.request('GET', '/api/conversations/unread'),
+      );
+      final count = result['unreadCount'];
+      if (mounted &&
+          epoch == widget.api.generation &&
+          revision == unreadRequestRevision &&
+          count is num &&
+          count >= 0) {
+        widget.onUnreadChanged?.call(count.toInt());
+      }
+    } catch (_) {
+      /* Keep last confirmed count rather than guessing from a page. */
     }
   }
 
-  Future<void> _loadMessages(Json conversation, {int channelId = 0}) async {
+  void _queueRealtime(Json event) {
+    if (!mounted) return;
+    final type = event['type'];
+    if (type == 'reconnect') unawaited(_drainOutbox());
+    if (![
+      'reconnect',
+      'message',
+      'message.updated',
+      'conversation.read',
+      'conversation.created',
+      'conversation.updated',
+      'conversation.removed',
+      'pins.updated',
+      'privacy.updated',
+      'friend.updated',
+      'category.updated',
+      'group.activity',
+    ].contains(type)) {
+      return;
+    }
+    pendingEvents.add(event);
+    if (reconciling) return;
+    reconcileTimer?.cancel();
+    reconcileTimer = Timer(const Duration(milliseconds: 120), () {
+      if (mounted) unawaited(_reconcile());
+    });
+  }
+
+  Future<void> _reconcile() async {
+    if (!mounted || reconciling || pendingEvents.isEmpty) return;
+    reconciling = true;
+    final events = [...pendingEvents];
+    pendingEvents.clear();
+    final epoch = widget.api.generation;
+    final roomId = active?['id'];
+    final channel = selectedChannelId;
+    final pickerId = pickerGroup?['id'];
+    bool matches(Json event, dynamic id) =>
+        id != null &&
+        (event['conversationId'] ??
+                object(event['message'])['conversationId']) ==
+            id;
+    final privacyChanged = events.any(
+      (event) =>
+          event['type'] == 'privacy.updated' ||
+          event['type'] == 'friend.updated',
+    );
+    final full = events.any(
+      (event) => [
+        'reconnect',
+        'privacy.updated',
+        'friend.updated',
+      ].contains(event['type']),
+    );
+    final removed = events.any(
+      (event) =>
+          event['type'] == 'conversation.removed' &&
+          (matches(event, roomId) || matches(event, pickerId)),
+    );
+    final history =
+        full ||
+        events.any((event) {
+          if (!matches(event, roomId)) return false;
+          if (event['type'] == 'conversation.read') return true;
+          if (!['message', 'message.updated'].contains(event['type'])) {
+            return false;
+          }
+          final message = object(event['message']);
+          return (message['channelId'] as num?)?.toInt() == channel ||
+              (message['channelId'] == null && channel == 0) ||
+              message.isEmpty;
+        });
+    try {
+      historyCacheRevision++;
+      recentHistory.clear();
+      if (privacyChanged && active != null) {
+        setState(() {
+          messages = [];
+          hasOlderMessages = false;
+          messageGapBefore = null;
+          unreadMessageId = null;
+          initialTimelinePending = true;
+        });
+      }
+      _invalidateChannelWarm();
+      if (events.any((event) => event['type'] == 'conversation.removed')) {
+        setState(() {
+          conversations.removeWhere(
+            (room) => events.any(
+              (event) =>
+                  event['type'] == 'conversation.removed' &&
+                  matches(event, room['id']),
+            ),
+          );
+        });
+        if (removed) {
+          _closeConversation();
+          setState(() {
+            pickerGroup = null;
+            channels = [];
+          });
+        }
+      }
+      await _refresh();
+      if (!mounted || epoch != widget.api.generation) return;
+      if (pickerId != null &&
+          pickerGroup?['id'] == pickerId &&
+          (full || events.any((event) => matches(event, pickerId)))) {
+        final replacement = conversations
+            .where((item) => item['id'] == pickerId)
+            .firstOrNull;
+        if (replacement != null) setState(() => pickerGroup = replacement);
+        try {
+          await _reloadGroupChannels((pickerId as num).toInt());
+        } catch (_) {}
+      }
+      if (!mounted || epoch != widget.api.generation) return;
+      if (!removed &&
+          roomId != null &&
+          active?['id'] == roomId &&
+          selectedChannelId == channel) {
+        if (history && chatVisible) {
+          await _loadMessages(
+            active!,
+            channelId: channel,
+            resetHistory: privacyChanged,
+          );
+        }
+        if (mounted &&
+            active?['id'] == roomId &&
+            (full ||
+                events.any(
+                  (event) =>
+                      event['type'] == 'pins.updated' && matches(event, roomId),
+                ))) {
+          await _refreshPins(active!);
+        }
+      }
+    } finally {
+      reconciling = false;
+      if (mounted && pendingEvents.isNotEmpty) {
+        reconcileTimer?.cancel();
+        reconcileTimer = Timer(const Duration(milliseconds: 120), () {
+          if (mounted) unawaited(_reconcile());
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMessages(
+    Json conversation, {
+    int channelId = 0,
+    bool resetHistory = false,
+  }) async {
     final changedConversation =
         active?['id'] != conversation['id'] || selectedChannelId != channelId;
+    if (changedConversation) {
+      readAcknowledged.remove(
+        ChatLocalState.scope(conversation['id'], channelId),
+      );
+      _captureDraft();
+      if (localReady) unawaited(_persistDraft());
+    }
     final generation = ++messageLoadGeneration;
+    final cacheRevision = historyCacheRevision;
+    final accountGeneration = widget.api.generation;
     final wasAtLatest = !showLatest.value;
     bool current() =>
         mounted &&
         generation == messageLoadGeneration &&
+        accountGeneration == widget.api.generation &&
         active?['id'] == conversation['id'] &&
         selectedChannelId == channelId;
+    final warm = changedConversation
+        ? _warmHistory(conversation, channelId)
+        : null;
     if (changedConversation) showLatest.value = false;
     setState(() {
       active = conversation;
       selectedChannelId = channelId;
       if (conversation['type'] == 'group') pickerGroup = conversation;
       if (changedConversation) {
-        messages = [];
+        messages = warm ?? [];
+        hasOlderMessages = false;
+        olderLoading = false;
         unreadMessageId = null;
         initialTimelinePending = true;
         messageGapBefore = null;
@@ -358,7 +777,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           mentionRoomId = null;
         }
         pinnedMessages = [];
-        pendingAttachments = [];
+        _restoreDraft(conversation, channelId);
         pinnedExpanded = false;
         searchingMessages = false;
         searchSenderId = null;
@@ -371,15 +790,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         searchLoading = false;
       }
       gapLoading = false;
-      loading = changedConversation || messages.isEmpty;
-      if (changedConversation) replyingTo = null;
+      loading = messages.isEmpty;
+      if (changedConversation) error = '';
       if (changedConversation) {
         friendConnection = null;
         friendLoading = conversation['type'] == 'direct';
         friendError = '';
       }
     });
-    widget.onConversationChanged(true);
+    if (widget.visible) widget.onConversationChanged(true);
     if (conversation['type'] == 'group' &&
         mentionRoomId != (conversation['id'] as num?)?.toInt()) {
       unawaited(_loadMentionMembers(conversation));
@@ -391,6 +810,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       var target = targetLanguage;
       var shouldAutoTranslate = autoTranslate;
       var locale = appLocale;
+      final initialTarget = target;
+      String historyPath(String language) =>
+          '/api/conversations/${conversation['id']}/messages'
+          '?target=${Uri.encodeQueryComponent(language)}&channelId=$channelId';
+      // Start both independent reads immediately; only use speculative history
+      // if the confirmed translation preference still matches its language.
+      final historyRequest = widget.api
+          .request('GET', '${historyPath(initialTarget)}&limit=200')
+          .then(
+            (value) => (data: value, failure: null as Object?),
+            onError: (Object error) => (data: null, failure: error),
+          );
       try {
         final preferences = object(
           await widget.api.request('GET', '/api/preferences'),
@@ -403,12 +834,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       } catch (_) {
         // Keep last known preferences when only the preference request fails.
       }
-      final path =
-          '/api/conversations/${conversation['id']}/messages'
-          '?target=${Uri.encodeQueryComponent(target)}&channelId=$channelId';
-      final recent = objects(
-        await widget.api.request('GET', '$path&limit=200'),
-      );
+      if (!current()) return;
+      final path = historyPath(target);
+      final result = target == initialTarget
+          ? await historyRequest
+          : (
+              data: await widget.api.request('GET', '$path&limit=200'),
+              failure: null,
+            );
+      if (result.failure != null) throw result.failure!;
+      final recent = objects(result.data)
+        ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
       if (!current()) return;
       final opening = initialTimelinePending;
       final snapshot = opening
@@ -417,13 +853,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final anchor = snapshot != null && snapshot > 0 ? snapshot : null;
       var data = recent;
       int? gap;
+      var more = recent.length == 200;
       if (anchor != null && !recent.any((m) => m['id'] == anchor)) {
         final windows = await Future.wait([
           widget.api.request('GET', '$path&limit=20&before=$anchor'),
           widget.api.request('GET', '$path&limit=80&after=${anchor - 1}'),
         ]);
         if (!current()) return;
-        final around = [...objects(windows[0]), ...objects(windows[1])];
+        final older = objects(windows[0]);
+        more = older.length == 20;
+        final around = [...older, ...objects(windows[1])]
+          ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
         if (around.isNotEmpty &&
             recent.length == 200 &&
             (around.last['id'] as num) < (recent.first['id'] as num)) {
@@ -435,14 +875,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         data = byId.values.toList()
           ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
       }
+      if (!opening &&
+          !resetHistory &&
+          !changedConversation &&
+          messages.isNotEmpty &&
+          data.isNotEmpty) {
+        final first = (data.first['id'] as num).toInt();
+        final recentStart = recent.isEmpty
+            ? first
+            : (recent.first['id'] as num).toInt();
+        final preserved = messages.where(
+          (row) => (row['id'] as num) < recentStart,
+        );
+        final byId = {
+          for (final row in [...preserved, ...data]) row['id']: row,
+        };
+        data = byId.values.toList()
+          ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
+        more = hasOlderMessages;
+        gap = messageGapBefore ?? gap;
+      }
       for (final message in data) {
         if (message['translationLanguage'] != target) {
           message.remove('translatedText');
         }
       }
       if (!current()) return;
+      if (cacheRevision == historyCacheRevision &&
+          anchor == null &&
+          gap == null &&
+          conversation['blockedByMe'] != true &&
+          conversation['blockedByOther'] != true) {
+        _rememberHistory(conversation, channelId, target, data);
+      }
       setState(() {
         messages = data;
+        hasOlderMessages = more;
+        olderLoading = false;
         unreadMessageId = anchor;
         initialTimelinePending = false;
         messageGapBefore = gap;
@@ -459,37 +928,81 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         }
         _syncMessageScroll();
       });
-      try {
-        final group = conversation['type'] == 'group';
-        await widget.api.request(
-          'POST',
-          '/api/conversations/${conversation['id']}/${group ? 'channel-read' : 'read'}',
-          group ? {'channelId': channelId} : <String, dynamic>{},
-        );
-      } catch (_) {
-        // History remains visible even when a read receipt could not be sent.
+      if (chatVisible && !conversationBlocked && current()) {
+        await _acknowledgeRead(conversation, channelId, data);
       }
       if (!current()) return;
       if (changedConversation) {
         unawaited(_refreshPins(conversation));
       }
       if (shouldAutoTranslate) {
-        final userId = widget.api.user['id'];
-        await Future.wait([
-          for (final message in data)
-            if (message['senderId'] != userId &&
-                (message['text']?.toString().trim().isNotEmpty ?? false) &&
-                (message['translatedText']?.toString().isEmpty ?? true))
-              _translate(message, target: target, silent: true),
-        ]);
+        await _translateHistoryInBatches(data, target, current);
       }
     } catch (value) {
       if (current()) {
         setState(() {
           error = value.toString();
           loading = false;
+          if (warm != null ||
+              (value is ApiError && [401, 403, 404].contains(value.status))) {
+            messages = [];
+          }
         });
       }
+    }
+  }
+
+  Future<void> _acknowledgeRead(Json room, int channel, List<Json> rows) async {
+    if (!chatVisible ||
+        active?['id'] != room['id'] ||
+        selectedChannelId != channel) {
+      return;
+    }
+    final scope = ChatLocalState.scope(room['id'], channel);
+    final latest = rows.fold<int>(
+      0,
+      (max, row) =>
+          (row['id'] as num).toInt() > max ? (row['id'] as num).toInt() : max,
+    );
+    if (readInFlight.contains(scope) ||
+        (readAcknowledged[scope] == latest && room['manualUnread'] != true)) {
+      return;
+    }
+    final epoch = widget.api.generation;
+    readInFlight.add(scope);
+    try {
+      final group = room['type'] == 'group';
+      await widget.api.request(
+        'POST',
+        '/api/conversations/${room['id']}/${group ? 'channel-read' : 'read'}',
+        {if (group) 'channelId': channel},
+      );
+      if (!mounted || epoch != widget.api.generation) return;
+      readAcknowledged[scope] = latest;
+      if (!group) {
+        setState(() {
+          conversations = conversations
+              .map(
+                (item) => item['id'] == room['id']
+                    ? {...item, 'unreadCount': 0, 'manualUnread': false}
+                    : item,
+              )
+              .toList();
+          if (active?['id'] == room['id']) {
+            active = {...active!, 'unreadCount': 0, 'manualUnread': false};
+          }
+        });
+      } else if (pickerGroup?['id'] == room['id']) {
+        _invalidateChannelWarm();
+        try {
+          await _reloadGroupChannels((room['id'] as num).toInt());
+        } catch (_) {}
+      }
+      await _refreshUnread();
+    } catch (_) {
+      /* retain badge until confirmed */
+    } finally {
+      readInFlight.remove(scope);
     }
   }
 
@@ -747,27 +1260,89 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   bool railExpandedTarget = true;
+  Json? _pendingGroupSwitch;
+  int _groupSwitchRevision = 0;
+  void _cancelGroupSwitch() {
+    _groupSwitchRevision++;
+    _pendingGroupSwitch = null;
+  }
+
+  static const _railCurve = Cubic(.22, 1, .36, 1);
+  Future<void> _animateRail(bool expanded) async {
+    railExpandedTarget = expanded;
+    final target = expanded ? 1.0 : 0.0;
+    final remaining = (target - railSplitController.value).abs();
+    final ms = ((expanded ? 220 : 260) * remaining).round();
+    if (ms == 0 || MediaQuery.maybeOf(context)?.disableAnimations == true) {
+      railSplitController.value = target;
+      return;
+    }
+    // animateTo starts at the live value, even when reversing midway.
+    try {
+      await railSplitController
+          .animateTo(
+            target,
+            duration: Duration(milliseconds: ms),
+            curve: _railCurve,
+          )
+          .orCancel;
+    } on TickerCanceled {
+      /* a newer target owns the controller */
+    }
+  }
 
   void _toggleAvatarSplit() {
     if (pickerGroup == null || active != null) return;
-    railExpandedTarget = !railExpandedTarget;
-    if (railExpandedTarget) {
-      railSplitController.forward();
-    } else {
-      railSplitController.reverse();
-    }
+    _cancelGroupSwitch();
+    unawaited(_animateRail(!railExpandedTarget));
   }
 
   /// The picker shares one animated seam with the avatar dock, matching PWA.
   /// Keep both rails mounted and retain their scroll state while it moves.
+  Future<void> _prefetchSwitchChannels(Json room) async {
+    try {
+      await _requestChannels(room['id'], warm: true);
+    } catch (_) {
+      /* foreground load handles errors */
+    }
+  }
+
   Future<void> _openRoom(Json room) async {
+    if (_pendingGroupSwitch != null) {
+      if (room['id'] == pickerGroup?['id']) {
+        _cancelGroupSwitch();
+        unawaited(_animateRail(false));
+        return;
+      }
+      if (room['type'] == 'group') {
+        _pendingGroupSwitch = room;
+        unawaited(_prefetchSwitchChannels(room));
+        return;
+      }
+      _cancelGroupSwitch();
+    }
+    // Reversing the same picker must not invalidate its pending API result.
+    if (room['type'] == 'group' &&
+        pickerGroup?['id'] == room['id'] &&
+        active == null) {
+      _toggleAvatarSplit();
+      return;
+    }
+    if (room['type'] == 'group' && pickerGroup != null && active == null) {
+      _pendingGroupSwitch = room;
+      final revision = ++_groupSwitchRevision;
+      unawaited(_prefetchSwitchChannels(room));
+      // Retract the old pane from its current position, then reveal the new
+      // group. The API request proceeds concurrently with the animation.
+      await _animateRail(true);
+      if (!mounted || revision != _groupSwitchRevision) return;
+      final next = _pendingGroupSwitch;
+      _pendingGroupSwitch = null;
+      if (next == null) return;
+      room = next;
+    }
     final navigation = ++railNavigationGeneration;
     if (room['type'] != 'group') {
-      if (pickerGroup != null && active == null && !railExpandedTarget) {
-        railExpandedTarget = true;
-        await railSplitController.forward();
-        if (!mounted || navigation != railNavigationGeneration) return;
-      }
       setState(() {
         pickerGroup = null;
         channels = [];
@@ -780,39 +1355,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       return;
     }
 
-    if (pickerGroup?['id'] == room['id'] && active == null) {
-      _toggleAvatarSplit();
-      return;
-    }
-
-    if (pickerGroup != null && active == null && !railExpandedTarget) {
-      railExpandedTarget = true;
-      await railSplitController.forward();
-      if (!mounted || navigation != railNavigationGeneration) return;
-    }
+    // The outgoing pane has retracted; reveal the new group immediately.
+    if (pickerGroup == null || active != null) railSplitController.value = 1;
     railExpandedTarget = false;
+    final cachedChannels = _takeWarmChannels(room['id']);
+    _captureDraft();
+    if (localReady) unawaited(_persistDraft());
     setState(() {
       active = null;
+      messageLoadGeneration++;
       pickerGroup = room;
-      channels = [];
-      generalChannel = null;
+      channels = (cachedChannels ?? <Json>[])
+          .where((item) => (item['id'] as num?)?.toInt() != 0)
+          .toList();
+      generalChannel = cachedChannels
+          ?.where((item) => (item['id'] as num?)?.toInt() == 0)
+          .firstOrNull;
       channelSearchController.clear();
-      channelsLoading = true;
+      channelsLoading = cachedChannels == null;
     });
     widget.onConversationChanged(false);
     // The fixed-width channel pane is already mounted when the seam starts.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && pickerGroup?['id'] == room['id'] && !railExpandedTarget) {
-        railSplitController.reverse();
+        unawaited(_animateRail(false));
       }
     });
     try {
-      final data = objects(
-        await widget.api.request(
-          'GET',
-          '/api/conversations/${room['id']}/channels',
-        ),
-      );
+      final data = await _requestChannels(room['id']);
       if (!mounted ||
           navigation != railNavigationGeneration ||
           pickerGroup?['id'] != room['id']) {
@@ -1202,6 +1772,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   void _closeConversation() {
+    _captureDraft();
+    if (localReady) unawaited(_persistDraft());
     setState(() {
       active = null;
       messageLoadGeneration++;
@@ -1211,6 +1783,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       pinnedMessages = [];
       pendingAttachments = [];
       replyingTo = null;
+      messageController.clear();
     });
     widget.onConversationChanged(false);
   }
@@ -1227,50 +1800,207 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         conversationBlocked ||
         sending ||
         uploading ||
+        !localReady ||
         (text.isEmpty && outgoingAttachments.isEmpty)) {
       return;
     }
-    final roomId = active!['id'];
-    final channelId = selectedChannelId;
-    final body = <String, dynamic>{
-      'text': text,
-      'clientId': DateTime.now().microsecondsSinceEpoch.toString(),
-      if (active?['type'] == 'group') 'channelId': selectedChannelId,
-      if (!quickLike && replyingTo != null)
-        'replyToMessageId': replyingTo!['id'],
-      if (outgoingAttachments.isNotEmpty) 'attachments': outgoingAttachments,
+    if (localChat.outbox.length >= 100) {
+      _show('Hàng đợi đã đầy. Thử gửi lại tin nhắn đang chờ.');
+      return;
+    }
+    final room = active!;
+    final channel = selectedChannelId;
+    final scope = draftScope;
+    final state = localChat;
+    final id = ChatLocalState.clientId();
+    final row = <String, dynamic>{
+      'clientId': id,
+      'roomId': room['id'],
+      'channelId': channel,
+      'status': 'queued',
+      'body': <String, dynamic>{
+        'text': text,
+        'clientId': id,
+        if (room['type'] == 'group') 'channelId': channel,
+        if (!quickLike && replyingTo != null)
+          'replyToMessageId': replyingTo!['id'],
+        if (outgoingAttachments.isNotEmpty) 'attachments': outgoingAttachments,
+      },
     };
-    setState(() => sending = true);
+    _captureDraft();
+    final originalDraft = state.drafts[scope];
+    setState(() {
+      sending = true;
+      enqueuingScope = quickLike ? null : scope;
+      state.outbox.add(row);
+      if (!quickLike && scope != null) state.drafts.remove(scope);
+    });
     try {
-      final result = object(
-        await widget.api.request(
-          'POST',
-          '/api/conversations/$roomId/messages',
-          body,
-        ),
-      );
-      if (!mounted) return;
-      if (active?['id'] == roomId && selectedChannelId == channelId) {
+      await state.persist();
+      if (!mounted || !identical(state, localChat) || !state.current) return;
+      if (!quickLike && draftScope == scope) {
         setState(() {
-          messages = [...messages, result];
-          if (!quickLike) {
-            messageController.clear();
-            pendingAttachments = [];
-            replyingTo = null;
-          }
+          messageController.clear();
+          pendingAttachments = [];
+          replyingTo = null;
         });
       }
-      // Scroll after the new bubble has been laid out, not against the old
-      // maxScrollExtent. Otherwise freshly sent mentions can sit under the composer.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _scrollToBottom();
-      });
-      await _refresh();
-    } catch (value) {
-      _show(value.toString());
+    } catch (_) {
+      state.outbox.remove(row);
+      if (scope != null && originalDraft != null) {
+        state.drafts[scope] = originalDraft;
+        if (mounted && draftScope == scope && active != null) {
+          setState(() => _restoreDraft(active!, selectedChannelId));
+        }
+      }
+      if (mounted) _show('Không lưu được hàng đợi. Tin nhắn chưa được gửi.');
+      return;
     } finally {
+      enqueuingScope = null;
       if (mounted) setState(() => sending = false);
     }
+    unawaited(_drainOutbox());
+  }
+
+  Future<void> _drainOutbox() async {
+    if (!mounted ||
+        !localReady ||
+        draining ||
+        sending ||
+        !appForeground ||
+        !localChat.current ||
+        localChat.outbox.isEmpty) {
+      return;
+    }
+    final state = localChat;
+    draining = true;
+    try {
+      final attempted = <String>{};
+      var sentAny = false;
+      while (true) {
+        final row = state.outbox
+            .where(
+              (item) =>
+                  item['status'] != 'failed' &&
+                  !attempted.contains(item['clientId']),
+            )
+            .firstOrNull;
+        if (row == null) break;
+        attempted.add(row['clientId'] as String);
+        if (!mounted ||
+            !identical(state, localChat) ||
+            !state.current ||
+            !appForeground) {
+          break;
+        }
+        final roomId = row['roomId'];
+        final channel = row['channelId'];
+        setState(() => row['status'] = 'sending');
+        try {
+          final result = object(
+            await widget.api.request(
+              'POST',
+              '/api/conversations/$roomId/messages',
+              object(row['body']),
+            ),
+          );
+          if (!state.current || !identical(state, localChat)) return;
+          if (result['id'] is! num ||
+              (result['conversationId'] != null &&
+                  result['conversationId'] != roomId) ||
+              ((result['channelId'] as num?)?.toInt() ?? 0) != channel) {
+            throw const ApiError('Chưa xác nhận được tin nhắn.');
+          }
+          state.outbox.remove(row);
+          sentAny = true;
+          if (mounted) {
+            setState(() {
+              if (active?['id'] == roomId && selectedChannelId == channel) {
+                final byId = {
+                  for (final item in [...messages, result]) item['id']: item,
+                };
+                messages = byId.values.toList()
+                  ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
+              }
+            });
+            recentHistory.clear();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted &&
+                  active?['id'] == roomId &&
+                  selectedChannelId == channel) {
+                unawaited(_scrollToBottom());
+              }
+            });
+          }
+          try {
+            await state.persist();
+          } catch (_) {
+            /* same clientId is safe to retry after restore */
+          }
+        } catch (error) {
+          if (!state.current || !identical(state, localChat)) return;
+          final status = error is ApiError ? error.status : null;
+          final permanent =
+              status != null &&
+              status >= 400 &&
+              status < 500 &&
+              status != 408 &&
+              status != 429;
+          row['status'] = permanent ? 'failed' : 'queued';
+          if (mounted) setState(() {});
+          try {
+            await state.persist();
+          } catch (_) {}
+          if (!permanent) break;
+        }
+      }
+      if (mounted && state.current && sentAny) await _refresh();
+    } finally {
+      draining = false;
+    }
+  }
+
+  Widget _outboxPreview() {
+    final rows = pendingOutgoing;
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 144),
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          for (final row in rows)
+            ListTile(
+              key: ValueKey('outbox-${row['clientId']}'),
+              dense: true,
+              title: Text(
+                object(row['body'])['text']?.toString().isNotEmpty == true
+                    ? object(row['body'])['text'].toString()
+                    : 'Tệp đính kèm',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                row['status'] == 'sending'
+                    ? 'Đang gửi…'
+                    : row['status'] == 'failed'
+                    ? 'Không gửi được'
+                    : 'Chờ kết nối',
+              ),
+              trailing: row['status'] == 'sending'
+                  ? null
+                  : IconButton(
+                      tooltip: 'Gửi lại',
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () {
+                        setState(() => row['status'] = 'queued');
+                        unawaited(_drainOutbox());
+                      },
+                    ),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickAttachment({bool mediaOnly = false}) async {
@@ -1310,11 +2040,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           active?['id'] == roomId &&
           selectedChannelId == channelId) {
         setState(() => pendingAttachments.addAll(staged));
+        _saveDraftSoon();
       }
     } catch (value) {
       _show(value.toString());
     } finally {
       if (mounted) setState(() => uploading = false);
+    }
+  }
+
+  Future<void> _translateHistoryInBatches(
+    List<Json> rows,
+    String target,
+    bool Function() current,
+  ) async {
+    final candidates = rows.reversed
+        .where(
+          (message) =>
+              message['senderId'] != widget.api.user['id'] &&
+              (message['text']?.toString().trim().isNotEmpty ?? false) &&
+              (message['translatedText']?.toString().isEmpty ?? true),
+        )
+        .toList();
+    // Prioritize recent messages; avoid starting hundreds of translations at once.
+    for (var offset = 0; offset < candidates.length && current(); offset += 4) {
+      await Future.wait(
+        candidates
+            .skip(offset)
+            .take(4)
+            .map(
+              (message) => _translate(message, target: target, silent: true),
+            ),
+      );
     }
   }
 
@@ -1324,6 +2081,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     bool silent = false,
   }) async {
     final language = target ?? targetLanguage;
+    final visit = messageLoadGeneration;
     try {
       final result = object(
         await widget.api.request('POST', '/api/translate', {
@@ -1332,7 +2090,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           'messageId': message['id'],
         }),
       );
-      if (!mounted) return;
+      if (!mounted ||
+          visit != messageLoadGeneration ||
+          language != targetLanguage) {
+        return;
+      }
       setState(() {
         message['translatedText'] = result['translatedText'];
         message['translationLanguage'] = language;
@@ -1365,14 +2127,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           }
         }
       });
+      recentHistory.clear();
       if (autoTranslate) {
-        await Future.wait([
-          for (final message in messages)
-            if (message['senderId'] != widget.api.user['id'] &&
-                (message['text']?.toString().trim().isNotEmpty ?? false) &&
-                (message['translatedText']?.toString().isEmpty ?? true))
-              _translate(message, target: targetLanguage, silent: true),
-        ]);
+        final visit = messageLoadGeneration;
+        final language = targetLanguage;
+        await _translateHistoryInBatches(
+          messages,
+          language,
+          () =>
+              mounted &&
+              visit == messageLoadGeneration &&
+              language == targetLanguage &&
+              autoTranslate,
+        );
       }
     } catch (value) {
       _show(value.toString());
@@ -1741,6 +2508,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               onTap: () {
                 Navigator.pop(context);
                 setState(() => replyingTo = message);
+                _saveDraftSoon();
               },
             ),
             if (message['text']?.toString().isNotEmpty ?? false)
@@ -1873,6 +2641,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (!mounted || !scrollController.hasClients) return;
     final position = scrollController.position;
     if (!position.hasContentDimensions) return;
+    final olderDistance = centeredTimeline
+        ? position.extentBefore
+        : position.extentAfter;
+    if (olderDistance < 120 &&
+        hasOlderMessages &&
+        !olderLoading &&
+        !loading &&
+        !searchingMessages) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_loadOlderMessages());
+      });
+    }
     showLatest.value =
         (centeredTimeline ? position.extentAfter : position.extentBefore) >= 96;
   }
@@ -1903,6 +2683,48 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       await WidgetsBinding.instance.endOfFrame;
     }
     _syncMessageScroll();
+  }
+
+  Future<void> _loadOlderMessages() async {
+    final room = active;
+    if (room == null ||
+        messages.isEmpty ||
+        !hasOlderMessages ||
+        olderLoading ||
+        searchingMessages) {
+      return;
+    }
+    final generation = messageLoadGeneration;
+    final channel = selectedChannelId;
+    final before = messages.first['id'];
+    setState(() => olderLoading = true);
+    try {
+      final data = objects(
+        await widget.api.request(
+          'GET',
+          '/api/conversations/${room['id']}/messages?target=${Uri.encodeQueryComponent(targetLanguage)}&channelId=$channel&limit=80&before=$before',
+        ),
+      );
+      if (!mounted || generation != messageLoadGeneration) return;
+      final byId = {
+        for (final item in [...data, ...messages]) item['id']: item,
+      };
+      setState(() {
+        messages = byId.values.toList()
+          ..sort((a, b) => (a['id'] as num).compareTo(b['id'] as num));
+        hasOlderMessages =
+            data.length == 80 &&
+            data.any((item) => (item['id'] as num) < (before as num));
+      });
+    } catch (_) {
+      if (mounted && generation == messageLoadGeneration) {
+        _show('Không tải được tin nhắn cũ.');
+      }
+    } finally {
+      if (mounted && generation == messageLoadGeneration) {
+        setState(() => olderLoading = false);
+      }
+    }
   }
 
   Future<void> _loadMessageGap() async {
@@ -1955,8 +2777,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Future<void> _focusConversationSearch() async {
     // Keep the group picker mounted while the shared avatar boundary expands.
     if (pickerGroup != null && active == null && !railExpandedTarget) {
-      railExpandedTarget = true;
-      await railSplitController.forward();
+      await _animateRail(true);
     }
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2054,10 +2875,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   );
 
   Future<void> _reloadGroupChannels(int roomId) async {
-    final data = objects(
-      await widget.api.request('GET', '/api/conversations/$roomId/channels'),
-    );
-    if (!mounted || pickerGroup?['id'] != roomId) return;
+    final epoch = widget.api.generation;
+    final navigation = railNavigationGeneration;
+    final data = await _requestChannels(roomId);
+    if (!mounted ||
+        pickerGroup?['id'] != roomId ||
+        epoch != widget.api.generation ||
+        navigation != railNavigationGeneration) {
+      return;
+    }
     setState(() {
       generalChannel = data
           .where((item) => (item['id'] as num?)?.toInt() == 0)
@@ -2065,6 +2891,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       channels = data
           .where((item) => (item['id'] as num?)?.toInt() != 0)
           .toList();
+      if (data.isNotEmpty && data.every((item) => item['unreadCount'] is num)) {
+        final total = data.fold<int>(
+          0,
+          (sum, item) => sum + (item['unreadCount'] as num).toInt(),
+        );
+        conversations = conversations
+            .map(
+              (item) =>
+                  item['id'] == roomId ? {...item, 'unreadCount': total} : item,
+            )
+            .toList();
+        pickerGroup = {...pickerGroup!, 'unreadCount': total};
+        if (active?['id'] == roomId) {
+          active = {...active!, 'unreadCount': total};
+        }
+      }
     });
   }
 
@@ -2282,6 +3124,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
     if (confirmed != true || !mounted) return;
     try {
+      recentHistory.clear();
       await widget.api.request('DELETE', '/api/conversations/$roomId/history');
       if (!mounted) return;
       if (active?['id'] == roomId) {
@@ -2344,6 +3187,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Future<void> _showConversationExtras(Json room, {required bool board}) async {
+    if (board) {
+      await showGroupActivities(
+        context,
+        api: widget.api,
+        roomId: (room['id'] as num).toInt(),
+      );
+      return;
+    }
     try {
       final data = await widget.api.request(
         'GET',
@@ -2510,6 +3361,55 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
+  Future<void> _editConversationPhoto(
+    Json room,
+    int channelId,
+    Json? channel,
+  ) async {
+    final roomId = (room['id'] as num).toInt();
+    final accountGeneration = widget.api.generation;
+    final source = channelId == 0 ? room : channel;
+    if (source == null) return;
+    final updated = await showConversationPhotoEditor(
+      context,
+      api: widget.api,
+      groupId: roomId,
+      channelId: channelId,
+      name: source['name']?.toString() ?? '',
+      avatarUrl: source['avatarUrl']?.toString() ?? '',
+    );
+    if (!mounted ||
+        updated == null ||
+        accountGeneration != widget.api.generation) {
+      return;
+    }
+    _invalidateChannelWarm();
+    final avatar = updated['avatarUrl']?.toString() ?? '';
+    setState(() {
+      if (channelId == 0) {
+        conversations = conversations
+            .map(
+              (item) =>
+                  item['id'] == roomId ? {...item, 'avatarUrl': avatar} : item,
+            )
+            .toList();
+        if (active?['id'] == roomId) active = {...active!, 'avatarUrl': avatar};
+        if (pickerGroup?['id'] == roomId) {
+          pickerGroup = {...pickerGroup!, 'avatarUrl': avatar};
+        }
+      } else if (pickerGroup?['id'] == roomId) {
+        channels = channels
+            .map(
+              (item) => item['id'] == channelId
+                  ? {...item, 'avatarUrl': avatar}
+                  : item,
+            )
+            .toList();
+      }
+    });
+    _show(channelId == 0 ? 'Đã cập nhật ảnh nhóm.' : 'Đã cập nhật ảnh kênh.');
+  }
+
   Future<void> _showConversationInformation(Json room) async {
     final roomId = (room['id'] as num?)?.toInt();
     final isGroup = room['type'] == 'group';
@@ -2521,6 +3421,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               .firstOrNull;
     var canManageChannel = false;
     var canCreateChannel = false;
+    var canEditPhoto = false;
+    final accountGeneration = widget.api.generation;
     if (isGroup && roomId != null) {
       try {
         final members = objects(
@@ -2536,7 +3438,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         // membership information is temporarily unavailable.
       }
     }
-    if (!mounted || active?['id'] != room['id']) return;
+    if (isGroup && roomId != null && (channelId == 0 || channel != null)) {
+      try {
+        final permission = object(
+          await widget.api.request(
+            'GET',
+            '/api/conversations/$roomId${channelId == 0 ? '' : '/channels/$channelId'}/avatar',
+          ),
+        );
+        canEditPhoto = permission['canUpdateAvatar'] == true;
+      } catch (_) {
+        /* only offer editing when permitted by the backend */
+      }
+    }
+    if (!mounted ||
+        active?['id'] != room['id'] ||
+        selectedChannelId != channelId ||
+        accountGeneration != widget.api.generation) {
+      return;
+    }
     final action = await showChatInformationSheet(
       context,
       conversation: room,
@@ -2544,10 +3464,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       selectedChannel: channel,
       isDemo: widget.api.isDemo,
       canManageChannel: canManageChannel,
+      canEditPhoto: canEditPhoto,
       canCreateChannel: canCreateChannel,
     );
-    if (!mounted || active?['id'] != room['id'] || action == null) return;
+    if (!mounted ||
+        active?['id'] != room['id'] ||
+        selectedChannelId != channelId ||
+        accountGeneration != widget.api.generation ||
+        action == null) {
+      return;
+    }
     switch (action) {
+      case ChatInfoAction.editPhoto:
+        if (canEditPhoto && roomId != null) {
+          await _editConversationPhoto(room, channelId, channel);
+        }
       case ChatInfoAction.shared:
         await showSharedContent(
           context,
@@ -2592,6 +3523,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Future<void> _openGroupSettings(Json room) async {
     final left = await showGroupSettings(context, widget.api, room);
     if (left) {
+      _cancelGroupSwitch();
+      _invalidateChannelWarm();
       railNavigationGeneration++;
       railExpandedTarget = true;
       railSplitController.value = 1;
@@ -2606,6 +3539,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    draftTimer?.cancel();
+    retryTimer?.cancel();
+    reconcileTimer?.cancel();
+    _captureDraft();
+    if (localReady && localChat.current) {
+      unawaited(localChat.persist().catchError((Object _) {}));
+    }
     searchDebounce?.cancel();
     messageController.dispose();
     messageFocus.dispose();
@@ -2624,9 +3565,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<int>>(realtimeRevisionProvider, (previous, next) {
+    ref.listen<AsyncValue<Json>>(realtimeEventProvider, (previous, next) {
       if (next.hasValue && next.value != previous?.value) {
-        unawaited(_reconcile());
+        _queueRealtime(next.value!);
       }
     });
     final filtered = filterConversations(
@@ -2711,7 +3652,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                           key: const ValueKey('mobile-chat-search'),
                           controller: chatSearchController,
                           focusNode: chatSearchFocus,
-                          onChanged: (_) => setState(() {}),
+                          onChanged: (_) {
+                            setState(() {});
+                            _saveDraftSoon();
+                          },
                           decoration: InputDecoration(
                             hintText: 'Tìm hội thoại...',
                             hintStyle: const TextStyle(
@@ -2851,21 +3795,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                         if (unread > 0 ||
                                             room['manualUnread'] == true)
                                           Positioned(
-                                            right: -6,
-                                            top: -3,
-                                            child: CircleAvatar(
-                                              radius: 10,
-                                              backgroundColor: socoBlue,
-                                              child: Text(
-                                                unread > 99
-                                                    ? '99+'
-                                                    : unread == 0
-                                                    ? '•'
-                                                    : '$unread',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 8,
-                                                  fontWeight: FontWeight.w800,
+                                            left: -2,
+                                            top: -2,
+                                            child: Semantics(
+                                              label: unread > 0
+                                                  ? '$unread tin chưa đọc'
+                                                  : 'Đánh dấu chưa đọc',
+                                              child: Container(
+                                                key: ValueKey(
+                                                  'rail-unread-${room['id']}',
+                                                ),
+                                                constraints:
+                                                    const BoxConstraints(
+                                                      minWidth: 18,
+                                                    ),
+                                                height: 18,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 3,
+                                                    ),
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: socoBlue,
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 1.5,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  unread > 99
+                                                      ? '99+'
+                                                      : unread == 0
+                                                      ? '•'
+                                                      : '$unread',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w800,
+                                                    height: 1,
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -3543,6 +4513,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _conversationPane() {
     final room = active!;
     final visibleMessages = _filteredMessages();
+    final groupSnapshot = room['type'] == 'group'
+        ? ref
+              .watch(groupActivitySnapshotProvider((room['id'] as num).toInt()))
+              .value
+        : null;
+    final activities = objects(groupSnapshot?['activities']);
+    final activityEvents = objects(groupSnapshot?['events']);
+    final pinnedActivities = activities
+        .where(
+          (item) =>
+              item['pinnedAt'] != null &&
+              item['pinnedAt'].toString().isNotEmpty,
+        )
+        .toList();
     final selectedChannel = selectedChannelId == 0
         ? null
         : channels.where((item) => item['id'] == selectedChannelId).firstOrNull;
@@ -3709,12 +4693,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               if (room['type'] == 'direct') _friendBar(),
               if (searchingMessages) _messageSearchPanel(),
               _pinnedPanel(),
+              if (pinnedActivities.isNotEmpty)
+                Material(
+                  color: Colors.white,
+                  child: ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.push_pin_outlined,
+                      color: socoBlue,
+                    ),
+                    title: Text(
+                      pinnedActivities.first['body']?.toString().isNotEmpty ==
+                              true
+                          ? pinnedActivities.first['body'].toString()
+                          : activityLabel(
+                              pinnedActivities.first['kind'].toString(),
+                            ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '${pinnedActivities.length} hoạt động đã ghim',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => showGroupActivities(
+                      context,
+                      api: widget.api,
+                      roomId: (room['id'] as num).toInt(),
+                      focusId: (pinnedActivities.first['id'] as num).toInt(),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: ColoredBox(
                   color: _wallpapers[room['wallpaper']] ?? Colors.transparent,
                   child: loading
                       ? const Center(child: CircularProgressIndicator())
-                      : visibleMessages.isEmpty
+                      : visibleMessages.isEmpty && activityEvents.isEmpty
                       ? EmptyState(
                           icon: searchingMessages
                               ? Icons.search_off_rounded
@@ -3726,9 +4741,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                               ? 'Thử thay đổi từ khóa hoặc bộ lọc.'
                               : 'Gửi tin nhắn đầu tiên ngay bây giờ.',
                         )
-                      : _messageTimeline(visibleMessages),
+                      : _messageTimeline(
+                          visibleMessages,
+                          activities: activities,
+                          events: searchingMessages ? const [] : activityEvents,
+                        ),
                 ),
               ),
+              _outboxPreview(),
               _composer(),
             ],
           ),
@@ -3737,43 +4757,163 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
-  Widget _messageTimeline(List<Json> rows) {
+  Widget _olderControl() => hasOlderMessages && !searchingMessages
+      ? TextButton(
+          onPressed: olderLoading ? null : _loadOlderMessages,
+          child: Text(olderLoading ? 'Đang tải…' : 'Tải thêm tin nhắn cũ'),
+        )
+      : const SizedBox.shrink();
+
+  Widget _messageTimeline(
+    List<Json> rows, {
+    List<Json> activities = const [],
+    List<Json> events = const [],
+  }) {
+    final byId = {for (final activity in activities) activity['id']: activity};
+    final ordered =
+        events.where((event) => byId.containsKey(event['activityId'])).toList()
+          ..sort(
+            (a, b) => (a['createdAt']?.toString() ?? '').compareTo(
+              b['createdAt']?.toString() ?? '',
+            ),
+          );
+    final beforeEvents = <dynamic, List<Json>>{};
+    var cursor = 0;
+    for (final row in rows) {
+      final time = DateTime.tryParse(row['createdAt']?.toString() ?? '');
+      if (time == null) continue;
+      while (cursor < ordered.length) {
+        final event = ordered[cursor];
+        final stamp = DateTime.tryParse(event['createdAt']?.toString() ?? '');
+        if (stamp == null) {
+          cursor++;
+          continue;
+        }
+        if (stamp.isAfter(time)) break;
+        beforeEvents.putIfAbsent(row['id'], () => []).add(event);
+        cursor++;
+      }
+    }
+    final tail = ordered.skip(cursor).toList();
+    Widget activityMarker(Json event) {
+      final activity = byId[event['activityId']]!;
+      final label = activityLabel(activity['kind']?.toString() ?? '');
+      final verb = event['kind'] == 'created'
+          ? 'đã tạo'
+          : event['kind'] == 'voted'
+          ? 'đã bình chọn trong'
+          : 'đã thay đổi bình chọn trong';
+      return Center(
+        child: TextButton.icon(
+          key: ValueKey('group-event-${event['id']}'),
+          icon: const Icon(Icons.assignment_outlined, size: 17),
+          label: Text(
+            '${event['actorName'] ?? ''} $verb $label · ${activity['body'] ?? ''}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          onPressed: () => showGroupActivities(
+            context,
+            api: widget.api,
+            roomId: (active!['id'] as num).toInt(),
+            focusId: (activity['id'] as num).toInt(),
+          ),
+        ),
+      );
+    }
+
+    Widget tailEvents() =>
+        Column(children: [for (final event in tail) activityMarker(event)]);
     final anchor = centeredTimeline
         ? rows.indexWhere((m) => m['id'] == unreadMessageId)
         : -1;
     final centered = anchor >= 0;
-    Widget row(Json message, {bool marker = false}) => Column(
-      key: ValueKey(message['id']),
-      children: [
-        if (message['id'] == messageGapBefore && !searchingMessages)
-          TextButton(
-            onPressed: gapLoading ? null : _loadMessageGap,
-            child: Text(gapLoading ? 'Đang tải…' : 'Tải tin nhắn ở giữa'),
-          ),
-        if (marker)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              children: [
-                Expanded(child: Divider()),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    'Tin nhắn chưa đọc',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF64748B),
+    final indices = {for (var i = 0; i < rows.length; i++) rows[i]['id']: i};
+    bool joins(Json? earlier, Json? later) {
+      if (earlier == null ||
+          later == null ||
+          earlier['senderId'] != later['senderId'] ||
+          later['id'] == messageGapBefore ||
+          later['id'] == unreadMessageId ||
+          (beforeEvents[later['id']]?.isNotEmpty ?? false)) {
+        return false;
+      }
+      final a = DateTime.tryParse(
+        earlier['createdAt']?.toString() ?? '',
+      )?.toLocal();
+      final b = DateTime.tryParse(
+        later['createdAt']?.toString() ?? '',
+      )?.toLocal();
+      if (a == null || b == null || !DateUtils.isSameDay(a, b)) return false;
+      final d = b.difference(a);
+      return !d.isNegative && d <= const Duration(minutes: 5);
+    }
+
+    String? dateLabel(Json message, Json? previous) {
+      final date = DateTime.tryParse(
+        message['createdAt']?.toString() ?? '',
+      )?.toLocal();
+      final prior = DateTime.tryParse(
+        previous?['createdAt']?.toString() ?? '',
+      )?.toLocal();
+      if (date == null || DateUtils.isSameDay(date, prior)) return null;
+      final now = DateTime.now();
+      if (DateUtils.isSameDay(now, date)) return 'Hôm nay';
+      if (DateUtils.isSameDay(
+        DateTime(now.year, now.month, now.day - 1),
+        date,
+      )) {
+        return 'Hôm qua';
+      }
+      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    }
+
+    Widget row(Json message, {bool marker = false}) {
+      final index = indices[message['id']]!;
+      final previous = index > 0 ? rows[index - 1] : null;
+      final next = index + 1 < rows.length ? rows[index + 1] : null;
+      final day = dateLabel(message, previous);
+      return Column(
+        key: ValueKey(message['id']),
+        children: [
+          if (message['id'] == messageGapBefore && !searchingMessages)
+            TextButton(
+              onPressed: gapLoading ? null : _loadMessageGap,
+              child: Text(gapLoading ? 'Đang tải…' : 'Tải tin nhắn ở giữa'),
+            ),
+          if (day != null) _dayDivider(day),
+          for (final event in beforeEvents[message['id']] ?? <Json>[])
+            activityMarker(event),
+          if (marker)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'Tin nhắn chưa đọc',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                   ),
-                ),
-                Expanded(child: Divider()),
-              ],
+                  Expanded(child: Divider()),
+                ],
+              ),
             ),
+          _messageBubble(
+            message,
+            joinsPrevious: joins(previous, message),
+            joinsNext: joins(message, next),
           ),
-        _messageBubble(message),
-      ],
-    );
+        ],
+      );
+    }
+
     return Stack(
       children: [
         Positioned.fill(
@@ -3790,7 +4930,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       sliver: SliverList.builder(
                         itemCount: anchor + 1,
                         itemBuilder: (_, i) => i == anchor
-                            ? _dayDivider()
+                            ? _olderControl()
                             : row(rows[anchor - 1 - i]),
                       ),
                     ),
@@ -3798,9 +4938,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       key: unreadCenterKey,
                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
                       sliver: SliverList.builder(
-                        itemCount: rows.length - anchor,
-                        itemBuilder: (_, i) =>
-                            row(rows[anchor + i], marker: i == 0),
+                        itemCount:
+                            rows.length - anchor + (tail.isNotEmpty ? 1 : 0),
+                        itemBuilder: (_, i) => i == rows.length - anchor
+                            ? tailEvents()
+                            : row(rows[anchor + i], marker: i == 0),
                       ),
                     ),
                   ],
@@ -3815,14 +4957,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     horizontal: 14,
                     vertical: 16,
                   ),
-                  itemCount: rows.length + 1,
-                  itemBuilder: (_, i) => i == rows.length
-                      ? _dayDivider()
-                      : row(rows[rows.length - 1 - i]),
+                  itemCount: rows.length + 1 + (tail.isNotEmpty ? 1 : 0),
+                  itemBuilder: (_, i) {
+                    if (tail.isNotEmpty && i == 0) return tailEvents();
+                    final index = i - (tail.isNotEmpty ? 1 : 0);
+                    return index == rows.length
+                        ? _olderControl()
+                        : row(rows[rows.length - 1 - index]);
+                  },
                   findChildIndexCallback: (key) {
                     if (key is! ValueKey) return null;
                     final index = rows.indexWhere((m) => m['id'] == key.value);
-                    return index < 0 ? null : rows.length - 1 - index;
+                    return index < 0
+                        ? null
+                        : rows.length - 1 - index + (tail.isNotEmpty ? 1 : 0);
                   },
                 ),
         ),
@@ -3879,10 +5027,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
-  Widget _dayDivider() {
+  Widget _dayDivider([String label = 'Cuộc trò chuyện']) {
     return Center(
       child: Container(
-        key: const ValueKey('conversation-day-divider'),
+        key: ValueKey('conversation-day-divider-$label'),
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
         decoration: BoxDecoration(
@@ -3897,9 +5045,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ),
           ],
         ),
-        child: const Text(
-          'Cuộc trò chuyện',
-          style: TextStyle(color: Color(0xFF7D8998), fontSize: 11),
+        child: Text(
+          label,
+          style: const TextStyle(color: Color(0xFF7D8998), fontSize: 11),
         ),
       ),
     );
@@ -3982,12 +5130,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
-  Widget _messageBubble(Json message) {
+  Widget _messageBubble(
+    Json message, {
+    bool joinsPrevious = false,
+    bool joinsNext = false,
+  }) {
     final mine = message['senderId'] == widget.api.user['id'];
     final deleted = message['deleted'] == true;
     final translated = message['translatedText']?.toString() ?? '';
     final showOriginal = message['_showOriginal'] == true;
     final reactions = objects(message['reactions']);
+    final rawText = message['text']?.toString().trim() ?? '';
+    final gif = !deleted && isGiphyMedia(rawText);
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -3996,7 +5150,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         child: Container(
           constraints: const BoxConstraints(maxWidth: 520),
           margin: EdgeInsets.only(
-            bottom: 12,
+            bottom: joinsNext ? 3 : 12,
             left: mine ? 48 : 0,
             right: mine ? 0 : 48,
           ),
@@ -4013,7 +5167,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     style: TextStyle(color: socoMuted, fontSize: 11),
                   ),
                 ),
-              if (!mine && active?['type'] == 'group')
+              if (!mine && active?['type'] == 'group' && !joinsPrevious)
                 Padding(
                   padding: const EdgeInsets.only(left: 4, bottom: 5),
                   child: Row(
@@ -4062,47 +5216,64 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     style: const TextStyle(fontSize: 12, color: socoMuted),
                   ),
                 ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  gradient: mine && !deleted ? socoGradient : null,
-                  color: mine && !deleted ? null : Colors.white,
-                  border: mine
-                      ? null
-                      : Border.all(color: const Color(0xFFE3E9F5)),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(18),
-                    topRight: const Radius.circular(18),
-                    bottomLeft: Radius.circular(mine ? 18 : 6),
-                    bottomRight: Radius.circular(mine ? 6 : 18),
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x0D25376C),
-                      blurRadius: 14,
-                      offset: Offset(0, 5),
+              if (gif)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    rawText,
+                    width: 160,
+                    height: 150,
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Sticker GIPHY',
+                    errorBuilder: (_, _, _) => const SizedBox(
+                      width: 160,
+                      height: 150,
+                      child: Center(child: Icon(Icons.broken_image_outlined)),
                     ),
-                  ],
-                ),
-                child: ChatMentionText(
-                  text: deleted
-                      ? 'Tin nhắn đã được thu hồi'
-                      : translated.isNotEmpty && !showOriginal
-                      ? translated
-                      : message['text']?.toString() ?? '',
-                  members: mentionMembers,
-                  onMemberTap: _showMentionProfile,
-                  style: TextStyle(
-                    color: mine && !deleted ? Colors.white : socoText,
-                    fontStyle: deleted ? FontStyle.italic : FontStyle.normal,
-                    fontSize: 14,
-                    height: 1.46,
+                  ),
+                )
+              else if (deleted || rawText.isNotEmpty || translated.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: mine && !deleted ? socoGradient : null,
+                    color: mine && !deleted ? null : Colors.white,
+                    border: mine
+                        ? null
+                        : Border.all(color: const Color(0xFFE3E9F5)),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(!mine && joinsPrevious ? 6 : 18),
+                      topRight: Radius.circular(mine && joinsPrevious ? 6 : 18),
+                      bottomLeft: Radius.circular(!mine && joinsNext ? 6 : 18),
+                      bottomRight: Radius.circular(mine && joinsNext ? 6 : 18),
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0D25376C),
+                        blurRadius: 14,
+                        offset: Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: ChatMentionText(
+                    text: deleted
+                        ? 'Tin nhắn đã được thu hồi'
+                        : translated.isNotEmpty && !showOriginal
+                        ? translated
+                        : message['text']?.toString() ?? '',
+                    members: mentionMembers,
+                    onMemberTap: _showMentionProfile,
+                    style: TextStyle(
+                      color: mine && !deleted ? Colors.white : socoText,
+                      fontStyle: deleted ? FontStyle.italic : FontStyle.normal,
+                      fontSize: 14,
+                      height: 1.46,
+                    ),
                   ),
                 ),
-              ),
               if (!deleted && translated.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -4142,13 +5313,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       ),
                   ],
                 ),
-              Padding(
-                padding: const EdgeInsets.only(top: 3, left: 5, right: 5),
-                child: Text(
-                  '${displayTime(message['createdAt'])}${message['editedAt'] != null ? ' · đã sửa' : ''}${mine && ((message['readByUserIds'] as List?)?.isNotEmpty ?? false) ? ' · Đã xem' : ''}',
-                  style: Theme.of(context).textTheme.bodySmall,
+              if (!joinsNext || message['editedAt'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3, left: 5, right: 5),
+                  child: Text(
+                    '${displayTime(message['createdAt'])}${message['editedAt'] != null ? ' · đã sửa' : ''}${mine && ((message['readByUserIds'] as List?)?.isNotEmpty ?? false) ? ' · Đã xem' : ''}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -4164,7 +5336,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         runSpacing: 6,
         children: [
           for (final item in items)
-            if (item['kind'] == 'image' && item['url'] is String)
+            if (item['kind'] == 'audio' && item['url'] is String)
+              ChatAudioAttachment(
+                key: ValueKey(item['storageRef'] ?? item['url']),
+                url: item['url'],
+                name: item['name']?.toString() ?? 'Tin nhắn thoại',
+              )
+            else if (item['kind'] == 'image' && item['url'] is String)
               InkWell(
                 onTap: () => openAttachment(context, item),
                 child: ClipRRect(
@@ -4174,7 +5352,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     width: 210,
                     height: 150,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    errorBuilder: (_, _, _) => const SizedBox(
+                      width: 210,
+                      height: 150,
+                      child: Center(child: Icon(Icons.broken_image_outlined)),
+                    ),
                   ),
                 ),
               )
@@ -4207,6 +5389,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       selection: TextSelection.collapsed(offset: start + emoji.length),
     );
     setState(() {});
+    _saveDraftSoon();
   }
 
   Future<void> _showQuickReplies({String? query}) async {
@@ -4428,143 +5611,189 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
+  Future<void> _addGeneratedMedia(
+    String name,
+    String mime,
+    Future<Uint8List?> Function() choose,
+  ) async {
+    final roomId = active?['id'];
+    final channel = selectedChannelId;
+    final epoch = widget.api.generation;
+    if (roomId == null ||
+        uploading ||
+        sending ||
+        conversationBlocked ||
+        pendingAttachments.length >= 10) {
+      return;
+    }
+    bool current() =>
+        mounted &&
+        active?['id'] == roomId &&
+        selectedChannelId == channel &&
+        widget.api.generation == epoch;
+    var ownUpload = false;
+    try {
+      final data = await choose();
+      if (data == null || !current()) return;
+      ownUpload = true;
+      setState(() => uploading = true);
+      final attachment = await widget.api.upload('chat', name, mime, data);
+      if (current()) {
+        setState(() => pendingAttachments.add(attachment));
+        _saveDraftSoon();
+      }
+    } catch (e) {
+      if (current()) _show(e.toString());
+    } finally {
+      if (ownUpload && mounted && widget.api.generation == epoch && uploading) {
+        setState(() => uploading = false);
+      }
+    }
+  }
+
   Future<void> _showComposerMenu() async {
-    const emoji = [
-      '😀',
-      '😃',
-      '😄',
-      '😁',
-      '😆',
-      '😅',
-      '😂',
-      '🤣',
-      '😊',
-      '😍',
-      '🥰',
-      '😘',
-      '😎',
-      '🤩',
-      '🥳',
-      '🤔',
-      '😮',
-      '😢',
-      '😭',
-      '🥺',
-      '😡',
-      '👍',
-      '👎',
-      '👏',
-      '🙌',
-      '🙏',
-      '💪',
-      '👋',
-      '🤝',
-      '❤️',
-      '🧡',
-      '💛',
-      '💚',
-      '💙',
-      '💜',
-      '🖤',
-      '💯',
-      '🎉',
-      '🔥',
-      '✨',
-      '🌹',
-      '🌞',
-      '🌈',
-      '🎂',
-      '🎁',
-      '🐱',
-      '🐶',
-      '🍀',
-    ];
-    await showModalBottomSheet<void>(
+    final room = active;
+    if (room == null || conversationBlocked) return;
+    final roomId = (room['id'] as num).toInt();
+    final channel = selectedChannelId;
+    final epoch = widget.api.generation;
+    bool current() =>
+        mounted &&
+        active?['id'] == roomId &&
+        selectedChannelId == channel &&
+        epoch == widget.api.generation;
+    final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      builder: (ctx) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: .8,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
             children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.attach_file_rounded, color: socoBlue),
-                title: const Text('Tệp tin'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _pickAttachment();
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(
-                  Icons.collections_outlined,
-                  color: socoBlue,
-                ),
-                title: const Text('Ảnh / Video'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _pickAttachment(mediaOnly: true);
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.flash_on_outlined, color: socoBlue),
-                title: const Text('Tin nhắn nhanh'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _showQuickReplies();
-                },
-              ),
-              const Divider(height: 1),
-              const Padding(
-                padding: EdgeInsets.only(top: 14, bottom: 9),
-                child: Text(
-                  'Emoji',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: socoNavy,
-                  ),
+              const Text(
+                'Tùy chọn soạn tin',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: socoNavy,
                 ),
               ),
-              SizedBox(
-                height: 220,
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 8,
-                    mainAxisSpacing: 4,
-                    crossAxisSpacing: 4,
-                  ),
-                  itemCount: emoji.length,
-                  itemBuilder: (_, index) => InkWell(
-                    borderRadius: BorderRadius.circular(9),
-                    onTap: () {
-                      _insertEmoji(emoji[index]);
-                      Navigator.pop(sheetContext);
-                    },
-                    child: Center(
-                      child: Text(
-                        emoji[index],
-                        style: const TextStyle(fontSize: 26),
+              for (final item in <(String, String, IconData)>[
+                ('file', 'Tệp tin', Icons.attach_file_rounded),
+                ('media', 'Ảnh / Video', Icons.collections_outlined),
+                ('voice', 'Tin nhắn thoại', Icons.mic_none_rounded),
+                ('sticker', 'Sticker', Icons.emoji_emotions_outlined),
+                ('gif', 'GIF / Sticker động', Icons.gif_box_outlined),
+                ('quick', 'Tin nhắn nhanh', Icons.flash_on_outlined),
+                ('schedule', 'Hẹn giờ gửi', Icons.schedule),
+                if (room['type'] == 'group') ...[
+                  ('poll', 'Bình chọn', Icons.poll_outlined),
+                  ('note', 'Ghi chú nhóm', Icons.description_outlined),
+                  ('reminder', 'Nhắc hẹn nhóm', Icons.event_outlined),
+                ],
+              ])
+                ListTile(
+                  visualDensity: VisualDensity.compact,
+                  leading: Icon(item.$3, color: socoBlue),
+                  title: Text(item.$2),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pop(ctx, item.$1),
+                ),
+              const Divider(),
+              const Text(
+                'Emoji',
+                style: TextStyle(fontWeight: FontWeight.w800, color: socoNavy),
+              ),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 8,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                children: [
+                  for (final emoji in chatStickers)
+                    InkWell(
+                      onTap: () => Navigator.pop(ctx, 'emoji:$emoji'),
+                      child: Center(
+                        child: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 26),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                ],
               ),
             ],
           ),
         ),
       ),
     );
+    if (!mounted || action == null || !current()) return;
+    if (action.startsWith('emoji:')) {
+      _insertEmoji(action.substring(6));
+      return;
+    }
+    switch (action) {
+      case 'file':
+        await _pickAttachment();
+      case 'media':
+        await _pickAttachment(mediaOnly: true);
+      case 'quick':
+        await _showQuickReplies();
+      case 'voice':
+        if (!mounted) return;
+        await _addGeneratedMedia(
+          'voice.wav',
+          'audio/wav',
+          () => showVoiceRecorder(context),
+        );
+      case 'sticker':
+        if (!mounted) return;
+        await _addGeneratedMedia('sticker.png', 'image/png', () async {
+          if (!mounted) return null;
+          final choice = await showStickerPicker(context);
+          return choice == null ? null : await createStickerPng(choice);
+        });
+      case 'gif':
+        if (!mounted) return;
+        final url = await showGiphyPicker(context);
+        if (url != null && current() && isGiphyMedia(url)) {
+          final old = messageController.text;
+          messageController.text = old.isEmpty ? url : '$old\n$url';
+          messageController.selection = TextSelection.collapsed(
+            offset: messageController.text.length,
+          );
+          setState(() {});
+          _saveDraftSoon();
+        }
+      case 'schedule':
+        if (!mounted) return;
+        await showScheduledChat(
+          context,
+          api: widget.api,
+          roomId: roomId,
+          channelId: channel,
+          draft: messageController.text,
+        );
+      case 'poll':
+      case 'note':
+      case 'reminder':
+        if (!mounted) return;
+        await showGroupActivities(
+          context,
+          api: widget.api,
+          roomId: roomId,
+          createKind: action,
+        );
+    }
   }
 
   Widget _composer() {
+    final hasMessageContent =
+        messageController.text.trim().isNotEmpty ||
+        pendingAttachments.isNotEmpty;
     return Container(
       padding: EdgeInsets.fromLTRB(
         11,
@@ -4597,7 +5826,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     ),
                   ),
                   IconButton(
-                    onPressed: () => setState(() => replyingTo = null),
+                    onPressed: () {
+                      setState(() => replyingTo = null);
+                      _saveDraftSoon();
+                    },
                     icon: const Icon(Icons.close_rounded, size: 17),
                   ),
                 ],
@@ -4628,9 +5860,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     ),
                     onDeleted: sending || uploading
                         ? null
-                        : () => setState(
-                            () => pendingAttachments.removeAt(index),
-                          ),
+                        : () {
+                            setState(() => pendingAttachments.removeAt(index));
+                            _saveDraftSoon();
+                          },
                   );
                 },
               ),
@@ -4687,7 +5920,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 child: TextField(
                   controller: messageController,
                   focusNode: messageFocus,
-                  enabled: !sending,
+                  enabled: !sending && localReady,
                   minLines: 1,
                   maxLines: 5,
                   maxLength: 4000,
@@ -4723,53 +5956,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               ),
               const SizedBox(width: 4),
               IconButton(
-                key: const ValueKey('composer-quick-like'),
-                tooltip: 'Gửi Like',
+                key: const ValueKey('composer-primary-action'),
+                tooltip: hasMessageContent ? 'Gửi tin nhắn' : 'Gửi Like',
                 style: IconButton.styleFrom(
                   foregroundColor: socoBlue,
-                  minimumSize: const Size.square(40),
-                  maximumSize: const Size.square(40),
+                  backgroundColor: Colors.transparent,
+                  minimumSize: const Size.square(44),
+                  maximumSize: const Size.square(44),
                   padding: EdgeInsets.zero,
+                  shape: const CircleBorder(),
                 ),
-                onPressed: sending || uploading || conversationBlocked
+                onPressed:
+                    sending || uploading || conversationBlocked || !localReady
                     ? null
+                    : hasMessageContent
+                    ? () => _send()
                     : () => _send(quickLike: true),
-                icon: const Icon(Icons.thumb_up_rounded, size: 23),
-              ),
-              const SizedBox(width: 4),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: socoGradient,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: IconButton(
-                  tooltip: 'Gửi',
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.square(44),
-                    maximumSize: const Size.square(44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed:
-                      sending ||
-                          uploading ||
-                          (messageController.text.trim().isEmpty &&
-                              pendingAttachments.isEmpty)
-                      ? null
-                      : _send,
-                  icon: sending
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const SocoIcon(SocoIconType.send, size: 20),
-                ),
+                icon: hasMessageContent
+                    ? const SocoIcon(SocoIconType.send, size: 21)
+                    : const Icon(Icons.thumb_up_rounded, size: 21),
               ),
             ],
           ),

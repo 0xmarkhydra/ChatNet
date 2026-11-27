@@ -41,6 +41,7 @@ export type ChatSectionProps = {
   chatFriend: { id: number; username: string; displayName: string; online: boolean; } | null;
   chatFriendRelationship: "accepted" | "incoming" | "outgoing" | "none";
   chatListConversations: Conversation[];
+  prefetchConversation?: (conversation: Conversation) => void;
   allChatConversations: Conversation[];
   chatListFilter: "all" | "unread" | "groups";
   chatListQuery: string;
@@ -55,7 +56,7 @@ export type ChatSectionProps = {
   conversationLoadingMore: boolean;
   conversationListError: string;
   refreshConversations: () => Promise<void>;
-  onContactSaved?: (id: number, metadata: import('../../contacts/utils/contactMetadata').PersonalContactMetadata) => void;
+  onContactSaved?: (id: number, metadata: import('../../contacts').PersonalContactMetadata) => void;
   copyInviteLink: () => Promise<void>;
   createDirect: (event: FormEvent) => Promise<void>;
   createGroupChannel: (name: string, description: string) => Promise<boolean>;
@@ -77,6 +78,7 @@ export type ChatSectionProps = {
   groupChannelBusy: boolean;
   groupChannels: GroupChannel[];
   refreshGroupChannels: () => Promise<void>;
+  updateChannelAvatar: (groupId: number, channelId: number, avatarUrl?: string) => void;
   groupChannelUnreadAvailable: boolean;
   groupInviteCandidates: FriendConnection[];
   groupInviteSearch: string;
@@ -109,6 +111,8 @@ export type ChatSectionProps = {
   messageHistoryError: boolean;
   retryMessageHistory: () => void;
   messagesScrollRef: RefObject<HTMLDivElement | null>;
+  chatScrollRefs: import('../lib/chatScrollPosition').ChatScrollRefs;
+  outgoingMessage: Message | null;
   messageText: string;
   newChatMode: NewChatMode;
   openConnectSurface: (query?: string) => void;

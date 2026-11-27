@@ -550,5 +550,10 @@ export default {
   "common.ui.screenSource": "공유할 화면 선택",
   "common.ui.screenHint": "선택한 화면 또는 창의 영상만 공유합니다. 시스템 오디오는 공유하지 않습니다.",
   "common.ui.screenExpired": "공유 요청이 만료되거나 취소되었습니다. 이 창을 닫고 다시 시도하세요.",
-  "common.ui.cancelShare": "공유 취소"
+  "common.ui.cancelShare": "공유 취소",
+  "common.ui.encryptionChecking": "암호화 확인 중…",
+  "common.ui.profileNavigation": "프로필 탐색",
+  "common.ui.accountMenu": "계정 메뉴",
+  "common.ui.storyUnseen": "읽지 않은 스토리가 있습니다",
+  "common.ui.storySeen": "확인한 스토리"
 } as const

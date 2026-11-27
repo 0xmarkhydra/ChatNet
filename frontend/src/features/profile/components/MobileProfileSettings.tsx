@@ -19,10 +19,10 @@ export function MobileProfileScreen({ title, onBack, backDisabled = false, child
     screen.current?.scrollIntoView?.({ block: 'start', behavior: 'auto' })
     heading.current?.focus({ preventScroll: true })
   }, [title])
-  return <section ref={screen} className="flex min-w-0 flex-1 flex-col bg-background pb-[var(--bottom-nav-space,84px)] text-foreground">
+  return <section ref={screen} className="flex min-w-0 flex-1 flex-col [--profile-switch-off:color-mix(in_srgb,var(--soco-muted)_28%,var(--soco-soft-blue))] [--profile-note-ink:color-mix(in_srgb,var(--soco-blue)_55%,var(--soco-navy))] bg-background pb-[var(--bottom-nav-space,84px)] text-foreground">
     <header className="sticky top-0 z-10 grid h-14 grid-cols-[var(--soco-control-touch)_minmax(0,1fr)_var(--soco-control-touch)] items-center border-0 border-b border-solid border-border bg-card px-ui-2">
       <button type="button" aria-label={trUi("common.back")} disabled={backDisabled} onClick={onBack} className="grid size-control-touch place-items-center rounded-ui-md border-0 bg-transparent text-foreground focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"><ArrowLeft size={22} aria-hidden="true" /></button>
-      <h2 ref={heading} tabIndex={-1} className="m-0 text-center text-ui-subtitle font-bold leading-tight text-foreground focus:outline-none">{title}</h2>
+      <h2 ref={heading} tabIndex={-1} className="m-0 text-center text-[length:calc((var(--soco-type-subtitle)+var(--soco-type-section))/2)] font-bold leading-tight text-foreground focus:outline-none">{title}</h2>
     </header>
     <div className="grid min-w-0 content-start gap-ui-4 p-ui-3">{children}</div>
   </section>
@@ -47,7 +47,7 @@ export function MobileProfileMenu({ username, displayName, friendCount, onEdit, 
     <div className="flex min-w-0 items-center gap-ui-3 rounded-ui-lg bg-card p-ui-4">
       <UserAvatar username={username} name={displayName} className="size-16 shrink-0 rounded-full" />
       <div className="min-w-0 wrap-anywhere">
-        <strong className="text-ui-subtitle font-bold">{displayName}</strong>
+        <strong className="text-[length:calc((var(--soco-type-subtitle)+var(--soco-type-section))/2)] font-bold">{displayName}</strong>
         <p className="m-0 text-ui-label text-foreground/75">@{username}</p>
         {friendCount > 0 && <p className="m-0 text-ui-label text-foreground/75">{friendCount.toLocaleString('vi-VN')} người bạn</p>}
       </div>
@@ -56,8 +56,8 @@ export function MobileProfileMenu({ username, displayName, friendCount, onEdit, 
       <h3 className="m-0 mb-ui-2 px-ui-1 text-ui-label font-bold uppercase text-foreground/75">{group.title}</h3>
       <div className="overflow-hidden rounded-ui-lg bg-card px-ui-3">
         {group.rows.map(({ label, hint, Icon, action }) => <button key={label} type="button" onClick={action} className="flex min-h-15 w-full min-w-0 items-center gap-ui-3 border-0 border-b border-solid border-border bg-card py-ui-2 text-left text-foreground last:border-b-0 focus-visible:outline-2 focus-visible:outline-primary">
-          <span className="grid size-9 shrink-0 place-items-center rounded-ui-md bg-secondary text-primary"><Icon size={18} aria-hidden="true" /></span>
-          <span className="min-w-0 flex-1 wrap-anywhere"><strong className="block text-ui-subtitle font-semibold">{label}</strong><small className="block text-ui-caption leading-normal text-foreground/75">{hint}</small></span>
+          <span className="grid size-control-sm shrink-0 place-items-center rounded-[calc((var(--soco-radius-sm)+var(--soco-radius-md))/2)] bg-secondary text-primary"><Icon size={18} aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1 wrap-anywhere"><strong className="block text-[length:calc((var(--soco-type-body)+var(--soco-type-subtitle))/2)] font-semibold">{label}</strong><small className="block text-ui-caption leading-normal text-foreground/75">{hint}</small></span>
           <ChevronRight size={18} className="shrink-0 text-foreground/75" aria-hidden="true" />
         </button>)}
       </div>
@@ -87,13 +87,13 @@ export function MobileProfilePrivacy({ privacy, loading, busy, error, onRetry, o
       {privacyGroups.map(group => <section key={group.title} className="rounded-ui-lg bg-card p-ui-3">
         <h3 className="m-0 px-ui-1 pb-ui-2 text-ui-subtitle font-bold">{group.title}</h3>
         {group.rows.map(([key, label, hint]) => <div key={key} className="flex min-w-0 items-center gap-ui-3 border-0 border-t border-solid border-border py-ui-3">
-          <div className="min-w-0 flex-1"><strong className="block text-ui-subtitle font-semibold">{label}</strong><small className="block text-ui-caption leading-normal text-foreground/75">{hint}</small></div>
+          <div className="min-w-0 flex-1"><strong className="block text-[length:calc((var(--soco-type-body)+var(--soco-type-subtitle))/2)] font-semibold">{label}</strong><small className="block text-ui-caption leading-normal text-foreground/75">{hint}</small></div>
           <button type="button" role="switch" aria-label={label} aria-checked={privacy[key]} disabled={busy || loading} onClick={() => void onSave({ ...privacy, [key]: !privacy[key] })} className="grid min-h-control-touch w-12 shrink-0 place-items-center border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60">
-            <span aria-hidden="true" className={`flex h-7 w-12 items-center rounded-full p-0.5 box-border ${privacy[key] ? 'justify-end bg-primary' : 'justify-start bg-foreground/20'}`}><span className="size-6 rounded-full bg-white" /></span>
+            <span aria-hidden="true" className={`flex h-7 w-12 items-center rounded-full p-0.5 box-border ${privacy[key] ? 'justify-end bg-primary' : 'justify-start bg-[var(--profile-switch-off)]'}`}><span className="size-6 rounded-full bg-white" /></span>
           </button>
         </div>)}
       </section>)}
-      <p className="m-0 rounded-ui-md bg-secondary p-ui-3 text-ui-label text-primary">Thay đổi có hiệu lực ngay. Quyền xem bài viết và Story được chọn riêng khi đăng.</p>
+      <p className="m-0 rounded-ui-md bg-secondary p-ui-3 text-ui-label text-[var(--profile-note-ink)]">Thay đổi có hiệu lực ngay. Quyền xem bài viết và Story được chọn riêng khi đăng.</p>
     </>}
   </>
 }

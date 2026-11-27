@@ -219,5 +219,16 @@ export default {
   "chat.messageSendFailed": "전송 실패",
   "chat.groupMessages": "그룹 메시지",
   "chat.sharedDocuments": "공유 문서",
-  "chat.groupVideoCall": "그룹 영상 통화"
+  "chat.groupVideoCall": "그룹 영상 통화",
+  "chat.manualUnread": "읽지 않음으로 표시",
+  "chat.edited": "수정됨",
+  "chat.today": "오늘",
+  "chat.yesterday": "어제",
+  "chat.seen": "읽음",
+  "chat.forwardedOne": "메시지 1개 전달함",
+  "chat.recalledFull": "메시지가 회수되었습니다",
+  "chat.translationWorking": "메시지 번역 중…",
+  "chat.translatedShort": "번역",
+  "chat.originalShort": "원문",
+  "chat.originalText": "원문"
 } as const

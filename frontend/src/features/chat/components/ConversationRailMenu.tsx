@@ -58,18 +58,18 @@ export default function ConversationRailMenu({
       ? layout?.dataset.splitExpanded === 'true' : expanded
     run(() => {
       if (!isExpanded) onExpand()
-      // A closed native popover restores focus to its trigger, and the
-      // initially clipped group input becomes focusable after the seam moves.
-      // Focus after that transition instead of racing either operation.
-      const delay = pickerOpen &&
-        !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 440 : 30
-      window.setTimeout(() => {
+      // Focus after the actual transition, not an arbitrary delay. Reduced
+      // motion or an already expanded picker can focus on the next frame.
+      requestAnimationFrame(async () => {
+        const rail = layout?.querySelector(window.matchMedia('(max-width: 760px)').matches ? '.conversation-avatar-rail' : '.desktop-conversation-rail')
+        if (pickerOpen && !isExpanded && rail) await Promise.allSettled(rail.getAnimations().map(animation => animation.finished))
+        if (pickerOpen && layout?.dataset.splitExpanded !== 'true') return
         const selector = window.matchMedia('(max-width: 760px)').matches
           ? '.conversation-avatar-rail-search-field input'
           : '.desktop-conversation-rail-search-field input'
         const input = layout?.querySelector<HTMLInputElement>(selector)
         input?.focus({ preventScroll: true })
-      }, delay)
+      })
     })
   }
 
@@ -116,7 +116,7 @@ export default function ConversationRailMenu({
           onClick={() => run(onCreate)}>
           <MessageSquarePlus size={18} aria-hidden="true" />{trUi("chat.newConversation")}</button>
         <button type="button" className="conversation-rail-menu-item"
-          onClick={() => run(expanded ? onCollapse : onExpand)}>
+          onClick={() => run(visuallyExpanded ? onCollapse : onExpand)}>
           <ChevronsLeftRight size={18} aria-hidden="true" />
           {visuallyExpanded ? 'Thu gọn cột avatar' : 'Mở rộng cột avatar'}
         </button>

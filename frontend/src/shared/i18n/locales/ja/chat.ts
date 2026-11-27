@@ -219,5 +219,16 @@ export default {
   "chat.messageSendFailed": "送信に失敗しました",
   "chat.groupMessages": "グループメッセージ",
   "chat.sharedDocuments": "共有ドキュメント",
-  "chat.groupVideoCall": "グループビデオ通話"
+  "chat.groupVideoCall": "グループビデオ通話",
+  "chat.manualUnread": "未読に設定",
+  "chat.edited": "編集済み",
+  "chat.today": "今日",
+  "chat.yesterday": "昨日",
+  "chat.seen": "既読",
+  "chat.forwardedOne": "メッセージを転送しました",
+  "chat.recalledFull": "メッセージが取り消されました",
+  "chat.translationWorking": "メッセージを翻訳中…",
+  "chat.translatedShort": "翻訳",
+  "chat.originalShort": "原文",
+  "chat.originalText": "原文"
 } as const

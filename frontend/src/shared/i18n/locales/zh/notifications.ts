@@ -136,5 +136,9 @@ export default {
   "notifications.system.pushSyncFailed": "无法保存通知订阅。",
   "notifications.system.pushTestSent": "测试通知已发送至 {count} 台设备。",
   "notifications.system.pushInitFailed": "无法初始化推送通知：{detail}",
-  "notifications.system.postShared": "帖子已发送至 {name}。"
+  "notifications.system.postShared": "帖子已发送至 {name}。",
+  "notifications.repostedPost": "被转发的帖子",
+  "notifications.quotedPost": "被引用的帖子",
+  "notifications.posterProfile": "查看发布者的个人主页",
+  "notifications.readMessageHint": "打开并阅读消息以更新未读状态。"
 } as const

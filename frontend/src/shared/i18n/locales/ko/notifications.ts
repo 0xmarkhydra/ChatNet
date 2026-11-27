@@ -136,5 +136,9 @@ export default {
   "notifications.system.pushSyncFailed": "알림 구독을 저장할 수 없습니다.",
   "notifications.system.pushTestSent": "기기 {count}대에 테스트 알림을 보냈습니다.",
   "notifications.system.pushInitFailed": "푸시 알림을 초기화할 수 없습니다: {detail}",
-  "notifications.system.postShared": "{name}에게 게시물을 보냈습니다."
+  "notifications.system.postShared": "{name}에게 게시물을 보냈습니다.",
+  "notifications.repostedPost": "재게시된 게시물",
+  "notifications.quotedPost": "인용된 게시물",
+  "notifications.posterProfile": "작성자의 프로필 보기",
+  "notifications.readMessageHint": "메시지를 열고 읽어 읽지 않음 상태를 업데이트하세요."
 } as const

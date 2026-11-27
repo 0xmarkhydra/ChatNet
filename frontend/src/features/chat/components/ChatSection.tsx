@@ -90,6 +90,7 @@ export default function ChatSection({
   chatCreateError,
   chatFriend,
   chatFriendRelationship,
+  prefetchConversation,
   allChatConversations,
   chatListConversations,
   chatListFilter,
@@ -110,6 +111,7 @@ export default function ChatSection({
   createDirect,
   createGroupChannel,
   refreshGroupChannels,
+  updateChannelAvatar,
   directUsername,
   effectiveAutoTranslate,
   effectiveTargetLanguage,
@@ -159,6 +161,8 @@ export default function ChatSection({
   messageHistoryError,
   retryMessageHistory,
   messagesScrollRef,
+  chatScrollRefs,
+  outgoingMessage,
   messageText,
   newChatMode,
   openConnectSurface,
@@ -309,89 +313,63 @@ export default function ChatSection({
   const railSelectedLocally = useRef<number | null>(null);
   const splitLayoutRef = useRef<HTMLDivElement>(null);
   const splitExpandedRef = useRef(false);
-  const splitTransitionFrames = useRef<number[]>([]);
-  const queuedRailNavigationRef = useRef<Conversation | null>(null);
-  const railNavigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  function cancelQueuedRailNavigation() {
-    if (railNavigationTimerRef.current !== null) {
-      clearTimeout(railNavigationTimerRef.current);
-      railNavigationTimerRef.current = null;
-    }
-    queuedRailNavigationRef.current = null;
+  const splitEntryPending = useRef(false);
+  const groupSwitchRevision = useRef(0);
+  const pendingGroupSwitch = useRef<Conversation | null>(null);
+  function cancelGroupSwitch() {
+    groupSwitchRevision.current++;
+    pendingGroupSwitch.current = null;
   }
-  function cancelSplitTransitionFrames() {
-    splitTransitionFrames.current.forEach(cancelAnimationFrame);
-    splitTransitionFrames.current = [];
+  const splitFrame = useRef(0);
+  function cancelSplitEntry() {
+    cancelAnimationFrame(splitFrame.current);
+    splitFrame.current = 0;
+    splitEntryPending.current = false;
     splitLayoutRef.current?.removeAttribute('data-split-priming');
   }
-  /** Purely visual panel switch. Do not update ChatSection state: both rails,
-   * their search inputs, channel data and chat stay mounted throughout. */
+  /** One target controls both viewports. No data or React updates per frame. */
   function setSplitExpanded(expanded: boolean) {
     splitExpandedRef.current = expanded;
     const layout = splitLayoutRef.current;
     if (!layout) return;
     layout.dataset.splitExpanded = String(expanded);
-    const ariaLabel = expanded ? 'Thu gọn cột avatar' : 'Mở rộng cột avatar';
-    layout.querySelectorAll<HTMLButtonElement>(
-      '.desktop-conversation-rail-expand-toggle, .conversation-avatar-rail-expand-toggle',
-    ).forEach(button => {
-      button.setAttribute('aria-expanded', String(expanded));
-      button.setAttribute('aria-label', ariaLabel);
-      button.title = ariaLabel;
-    });
+    // The clipped-out pane must not receive keyboard focus or pointer input.
+    const picker = layout.querySelector<HTMLElement>('.group-channel-sidebar');
+    if (picker) picker.inert = expanded;
+    for (const input of layout.querySelectorAll<HTMLInputElement>('.desktop-conversation-rail-search-field input, .conversation-avatar-rail-search-field input')) {
+      input.tabIndex = expanded || !layout.classList.contains('group-channel-workspace') ? 0 : -1;
+    }
   }
   function toggleGroupSplit() {
-    cancelSplitTransitionFrames();
+    cancelGroupSwitch();
+    cancelSplitEntry();
     setSplitExpanded(!splitExpandedRef.current);
   }
   function openPickerFromExpandedRail() {
-    // Keep the shared divider at the far RIGHT until the new group and its
-    // channel picker have actually rendered. Two immediate animation frames
-    // can finish before an async conversation lookup supplies the group, which
-    // makes direct-chat → group appear to jump with no sliding transition.
-    cancelSplitTransitionFrames();
-    if (splitLayoutRef.current) splitLayoutRef.current.dataset.splitPriming = 'true';
+    cancelSplitEntry();
+    splitEntryPending.current = true;
     setSplitExpanded(true);
+    if (splitLayoutRef.current) splitLayoutRef.current.dataset.splitPriming = 'true';
     setRailListOpen(false);
-    const startedAt = performance.now();
-    const waitForPicker = () => {
-      const layout = splitLayoutRef.current;
-      const isDesktop = window.matchMedia('(min-width: 761px)').matches;
-      const pickerReady = layout?.classList.contains('group-channel-workspace') &&
-        layout.classList.contains(isDesktop ? 'desktop-channel-panel-open' : 'mobile-rail-picker-view') &&
-        Boolean(layout.querySelector('.group-channel-sidebar'));
-      if (!pickerReady) {
-        if (performance.now() - startedAt < 3000) {
-          splitTransitionFrames.current = [requestAnimationFrame(waitForPicker)];
-        } else {
-          splitTransitionFrames.current = [];
-          splitLayoutRef.current?.removeAttribute('data-split-priming');
-          setSplitExpanded(false);
-        }
-        return;
-      }
-      // Commit the fully-expanded geometry before starting the 500ms
-      // reciprocal reveal. Once the panes are mounted, only a DOM attribute
-      // changes; no React state update or data request drives the animation.
-      splitTransitionFrames.current = [requestAnimationFrame(() => {
-        splitTransitionFrames.current = [requestAnimationFrame(() => {
-          // Initial group geometry is now committed at full avatar width.
-          // Turn transitions on first, then change the single split variable
-          // on the next frame so the browser animates FROM full width.
-          splitLayoutRef.current?.removeAttribute('data-split-priming');
-          splitTransitionFrames.current = [requestAnimationFrame(() => {
-            splitTransitionFrames.current = [];
-            setSplitExpanded(false);
-          })];
-        })];
-      })];
-    };
-    splitTransitionFrames.current = [requestAnimationFrame(waitForPicker)];
   }
-  useEffect(() => () => {
-    cancelSplitTransitionFrames();
-    cancelQueuedRailNavigation();
-  }, []);
+  // Wait for the actual committed picker, not a polling loop or the API.
+  useLayoutEffect(() => {
+    const layout = splitLayoutRef.current;
+    if (!splitEntryPending.current || activeConversation?.type !== 'group' ||
+        !layout?.querySelector('.group-channel-sidebar')) return;
+    splitEntryPending.current = false;
+    setSplitExpanded(true);
+    // Establish the initial geometry once, then let the browser interpolate.
+    layout.getBoundingClientRect();
+    layout.removeAttribute('data-split-priming');
+    splitFrame.current = requestAnimationFrame(() => {
+      splitFrame.current = 0;
+      setSplitExpanded(false);
+    });
+    return () => cancelAnimationFrame(splitFrame.current);
+  }, [activeConversationId, activeConversation?.type]);
+  useEffect(() => () => { cancelGroupSwitch(); cancelSplitEntry(); }, []);
+
   const [desktopChannelPanelOpen, setDesktopChannelPanelOpen] = useState(false);
   const [channelSidebarOpen, setChannelSidebarOpen] = useState(false);
   const [mobileChannelSelected, setMobileChannelSelected] = useState(false);
@@ -432,27 +410,19 @@ export default function ChatSection({
       if (conversationType) railSelectedLocally.current = null;
       return;
     }
-    // External/deep-link selections still initialize the appropriate view.
+    // External/deep-link selections initialize the target synchronously.
+    cancelGroupSwitch();
+    cancelSplitEntry();
     const isDesktop = window.matchMedia('(min-width: 761px)').matches;
-    let secondFrame = 0;
-    const firstFrame = requestAnimationFrame(() => {
-      setChannelSidebarOpen(false);
-      setMobileChannelSelected(false);
-      setRailListOpen(!activeConversationId || (isDesktop && conversationType === 'direct'));
-      setDesktopChannelPanelOpen(isDesktop && conversationType === 'group');
-      if (!isDesktop && conversationType === 'group') {
-        secondFrame = requestAnimationFrame(() => setChannelSidebarOpen(true));
-      }
-    });
-    return () => {
-      cancelAnimationFrame(firstFrame);
-      cancelAnimationFrame(secondFrame);
-    };
+    setSplitExpanded(false);
+    setChannelSidebarOpen(conversationType === 'group');
+    setMobileChannelSelected(false);
+    setRailListOpen(!activeConversationId || (isDesktop && conversationType === 'direct'));
+    setDesktopChannelPanelOpen(conversationType === 'group');
   }, [activeConversationId, conversationType]);
   function activateConversationFromRail(conversation: Conversation) {
     // The avatar rail also contains historical/membership-recovered chats
-    // that may not be in the first active-conversations API page. Hydrate
-    // only after the outgoing group's panel has finished retracting.
+    // that may not be in the first active-conversations API page. Hydrate immediately.
     setConversations(current => current.some(item => item.id === conversation.id)
       ? current : [...current, conversation]);
     setChatSearchJump(null);
@@ -465,7 +435,8 @@ export default function ChatSection({
       setMobileChannelSelected(false);
       openPickerFromExpandedRail();
     } else {
-      cancelSplitTransitionFrames();
+      cancelSplitEntry();
+      setSplitExpanded(true);
       // Expanded direct chat occupies its own desktop grid column.
       setRailListOpen(window.matchMedia('(min-width: 761px)').matches);
     }
@@ -480,41 +451,52 @@ export default function ChatSection({
       suppressConversationClickRef.current = null;
       return;
     }
-    // Switching away from a group, whether to a different group or to a
-    // private chat, retracts the existing channel pane before navigation.
-    // This preserves the original mutually exclusive sliding transition.
-    if (queuedRailNavigationRef.current) {
+    if (pendingGroupSwitch.current) {
       if (conversation.id === activeConversationId) {
-        cancelQueuedRailNavigation();
+        cancelGroupSwitch();
         setSplitExpanded(false);
-      } else {
-        queuedRailNavigationRef.current = conversation;
+        return;
       }
-      return;
+      if (conversation.type === 'group') {
+        pendingGroupSwitch.current = conversation;
+        prefetchConversation?.(conversation);
+        return;
+      }
+      cancelGroupSwitch();
     }
-    if (conversation.id === activeConversationId && conversation.type === 'group' &&
-        !mobileChannelSelected) {
-      toggleGroupSplit();
-      return;
+    if (conversation.id === activeConversationId) {
+      if (conversation.type === 'direct') return;
+      if (!mobileChannelSelected) {
+        toggleGroupSplit();
+        return;
+      }
     }
-    if (activeConversation?.type === 'group' &&
-        conversation.id !== activeConversationId && !mobileChannelSelected &&
-        !splitExpandedRef.current && splitLayoutRef.current) {
-      cancelSplitTransitionFrames();
-      queuedRailNavigationRef.current = conversation;
-      setSplitExpanded(true);
-      const commit = () => {
-        railNavigationTimerRef.current = null;
-        const next = queuedRailNavigationRef.current;
-        queuedRailNavigationRef.current = null;
-        if (next) activateConversationFromRail(next);
-      };
-      // Let the channel pane finish its 380ms retraction before switching
-      // the active conversation. Both destinations use the same behavior.
-      railNavigationTimerRef.current = setTimeout(commit,
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 410);
-      return;
+    // For group-to-group navigation, retract the current pane and reveal
+    // the new one. Use actual transition completion instead of a timer.
+    if (conversation.type === 'group' && activeConversation?.type === 'group' &&
+        !mobileChannelSelected && splitLayoutRef.current) {
+      const layout = splitLayoutRef.current;
+      const pane = layout.querySelector<HTMLElement>('.group-channel-sidebar');
+      if (pane) {
+        cancelSplitEntry();
+        pendingGroupSwitch.current = conversation;
+        const revision = ++groupSwitchRevision.current;
+        prefetchConversation?.(conversation);
+        setSplitExpanded(true);
+        // Flush styles once so getAnimations observes the current transition,
+        // including an interrupted or reversed animation.
+        pane.getBoundingClientRect();
+        const animations = pane.getAnimations();
+        void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
+          if (revision !== groupSwitchRevision.current) return;
+          const next = pendingGroupSwitch.current;
+          pendingGroupSwitch.current = null;
+          if (next) activateConversationFromRail(next);
+        });
+        return;
+      }
     }
+    cancelGroupSwitch();
     activateConversationFromRail(conversation);
   }
   const selectedGroupChannel = activeConversation?.type === 'group'
@@ -535,39 +517,37 @@ export default function ChatSection({
     if (target.kind === 'channel' && (!channelId || channelId < 1)) return false;
     if (!activeConversation || activeConversation.type !== 'group' || !canEditGroup || groupPhotoBusy) return false;
     const groupId = activeConversation.id;
+    const photoLabel = channelId ? 'ảnh kênh' : 'ảnh nhóm';
     setGroupPhotoBusy(true);
     try {
-      const capabilityResponse = channelId
-        ? await apiFetch(`/api/conversations/${groupId}/channels/${channelId}/avatar`, { cache: 'no-store' })
-        : await getGroupAvatarCapability(apiFetch, groupId);
+      const capabilityResponse = await getGroupAvatarCapability(apiFetch, groupId, channelId);
       const capability = await capabilityResponse.json().catch(() => null) as
         { canUpdateAvatar?: boolean; error?: string } | null;
       if (capabilityResponse.status === 404 || capabilityResponse.status === 405 ||
           (capabilityResponse.ok && capability?.canUpdateAvatar !== true)) {
-        throw new Error('Backend hiện tại chưa hỗ trợ lưu ảnh nhóm. Cần cập nhật backend Railway trước khi đổi ảnh.');
+        throw new Error(`Backend hiện tại chưa hỗ trợ lưu ${photoLabel}. Cần cập nhật backend Railway trước khi đổi ảnh.`);
       }
       if (!capabilityResponse.ok) throw new Error(capability?.error ||
-        'Không kiểm tra được quyền đổi ảnh nhóm (HTTP ' + capabilityResponse.status + ').');
+        'Không kiểm tra được quyền đổi ' + photoLabel + ' (HTTP ' + capabilityResponse.status + ').');
 
       const [attachment] = file ? await uploadMediaFiles([file], 'profile') : [null];
       if (file && !attachment) throw new Error('Không tải được ảnh.');
-      const response = channelId
-        ? await apiFetch(`/api/conversations/${groupId}/channels/${channelId}/avatar`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ attachment: attachment ? attachmentRequestBody(attachment) : null }),
-          })
-        : await saveGroupAvatar(apiFetch, groupId, attachment ? attachmentRequestBody(attachment) : null);
+      const response = await saveGroupAvatar(apiFetch, groupId, attachment ? attachmentRequestBody(attachment) : null, channelId);
       const data = await response.json().catch(() => null) as
-        { conversationId?: number; avatarUrl?: string; avatarSet?: boolean; error?: string } | null;
+        { conversationId?: number; channelId?: number; avatarUrl?: string; avatarSet?: boolean; error?: string } | null;
       if (response.status === 404 || response.status === 405) {
-        throw new Error('Backend chưa hỗ trợ lưu ảnh nhóm hoặc nhóm không còn tồn tại. Hãy kiểm tra bản triển khai Railway.');
+        throw new Error(`Không tìm thấy nơi lưu ${photoLabel}. Hãy kiểm tra bản triển khai Railway.`);
       }
       if (!response.ok) throw new Error(data?.error ||
-        'Không lưu được ảnh nhóm (HTTP ' + response.status + ').');
-      if (data?.conversationId !== groupId || typeof data.avatarSet !== 'boolean') {
-        throw new Error('Phản hồi lưu ảnh nhóm không hợp lệ. Vui lòng thử lại.');
+        'Không lưu được ' + photoLabel + ' (HTTP ' + response.status + ').');
+      if (data?.conversationId !== groupId || (channelId && data.channelId !== channelId) || typeof data.avatarSet !== 'boolean') {
+        throw new Error(`Phản hồi lưu ${photoLabel} không hợp lệ. Vui lòng thử lại.`);
       }
-      if (channelId) await refreshGroupChannels();
+      if (channelId) {
+        updateChannelAvatar(groupId, channelId, data.avatarUrl || undefined);
+        // Saving succeeded; a failed background refresh must not turn it into a failed upload.
+        void refreshGroupChannels().catch(() => {});
+      }
       else setConversations(current => current.map(item =>
         item.id === groupId ? { ...item, avatarUrl: data.avatarUrl || undefined } : item,
       ));
@@ -583,6 +563,7 @@ export default function ChatSection({
 
   const railProps: Omit<ConversationRailProps, 'keepDetailsMounted' | 'onSearchCompact' | 'onCollapse'> = {
     conversations: railConversations,
+    onPrefetch: prefetchConversation,
     visibleConversationIds: railVisibleConversationIds,
     loadError: conversationListError,
     onRetry: refreshConversations,
@@ -910,19 +891,20 @@ export default function ChatSection({
                       }}
                     />
                   )}
-                  {activeConversation.type === 'direct' && mlsPilotMode !== 'unknown' && (
-                    <div role="status" className="flex min-w-0 shrink-0 justify-center gap-1.5 px-3 py-1 text-xs leading-4 text-foreground">
-                      <ShieldAlert size={14} className="mt-px shrink-0" aria-hidden="true" />
-                      <span className="min-w-0 wrap-break-word">
+                  {activeConversation.type === 'direct' && !conversationBlocked && (
+                    <div role="status" className="chat-encryption-notice relative flex min-w-0 shrink-0 justify-center gap-1.5 px-3 py-1 text-xs leading-4 text-foreground" aria-live="polite">
+                      <ShieldAlert size={14} className="mt-px shrink-0" style={mlsPilotMode === 'unknown' ? { visibility: 'hidden' } : undefined} aria-hidden="true" />
+                      <span className="min-w-0 wrap-break-word" style={mlsPilotMode === 'unknown' ? { visibility: 'hidden' } : undefined} aria-hidden={mlsPilotMode === 'unknown'}>
                         <strong className="font-semibold">
-                          {mlsPilotMode === 'legacy'
+                          {(mlsPilotMode === 'legacy' || mlsPilotMode === 'unknown')
                             ? 'Hội thoại chưa mã hóa đầu cuối'
                             : 'Tin nhắn cũ chưa mã hóa đầu cuối'}
                         </strong>{' · '}
-                        {mlsPilotMode === 'legacy'
+                        {(mlsPilotMode === 'legacy' || mlsPilotMode === 'unknown')
                           ? 'Tin nhắn mới vẫn có thể được lưu trên máy chủ.'
                           : 'Tin nhắn mới chỉ được gửi khi phiên MLS sẵn sàng.'}
                       </span>
+                      {mlsPilotMode === 'unknown' && <span className="absolute inset-0 flex items-center justify-center px-3 text-xs text-muted-foreground">{trUi('common.ui.encryptionChecking')}</span>}
                     </div>
                   )}
                   <MessageTimeline
@@ -955,6 +937,8 @@ export default function ChatSection({
                     messageHistoryError={messageHistoryError}
                     retryMessageHistory={retryMessageHistory}
                     messagesScrollRef={messagesScrollRef}
+                    chatScrollRefs={chatScrollRefs}
+                    outgoingMessage={outgoingMessage}
                     moveMessageLongPress={moveMessageLongPress}
                     openMessageActions={openMessageActions}
                     openMessageReactions={openMessageReactions}

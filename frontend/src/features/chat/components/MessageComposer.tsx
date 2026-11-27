@@ -63,6 +63,7 @@ export default function MessageComposer({ activeConversation, activeConversation
   }
 
   const replySticker = replyingTo && !replyingTo.deleted ? stickerPreviewUrl(replyingTo.text) : "";
+  const hasMessageContent = messageText.trim().length > 0 || messageAttachments.length > 0;
 
   return (
     <form className="composer media-composer compact-chat-composer" onSubmit={(event) => {
@@ -137,11 +138,15 @@ export default function MessageComposer({ activeConversation, activeConversation
                         void addChatFiles(files)
                       }}
                     />
-                    <button className="ghost-action chat-quick-like" type="button" disabled={!canSendLike} aria-label={trUi("chat.sendLike")} title={trUi("chat.sendLike")} onClick={() => void sendLike()}>
-                      <ThumbsUp size={21} fill="currentColor" strokeWidth={1.5} aria-hidden="true"/>
-                    </button>
-                    <button className="send-button polished-send" type="submit" disabled={!canSend} aria-label={trUi("common.ui.sendMessage")}>
-                      <><span className="send-label">{trUi("common.send")}</span><UiIcon name="send" size={19} /></>
+                    <button
+                      className="send-button chat-composer-primary"
+                      type={hasMessageContent ? "submit" : "button"}
+                      disabled={hasMessageContent ? !canSend : !canSendLike}
+                      aria-label={trUi(hasMessageContent ? "common.ui.sendMessage" : "chat.sendLike")}
+                      title={trUi(hasMessageContent ? "common.ui.sendMessage" : "chat.sendLike")}
+                      onClick={hasMessageContent ? undefined : () => void sendLike()}
+                    >
+                      {hasMessageContent ? <UiIcon name="send" size={21} /> : <ThumbsUp size={21} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />}
                     </button>
                   </form>
   );

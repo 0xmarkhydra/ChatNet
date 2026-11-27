@@ -219,5 +219,16 @@ export default {
   "chat.messageSendFailed": "发送失败",
   "chat.groupMessages": "群组消息",
   "chat.sharedDocuments": "共享文档",
-  "chat.groupVideoCall": "群组视频通话"
+  "chat.groupVideoCall": "群组视频通话",
+  "chat.manualUnread": "标记未读",
+  "chat.edited": "已编辑",
+  "chat.today": "今天",
+  "chat.yesterday": "昨天",
+  "chat.seen": "已读",
+  "chat.forwardedOne": "已转发一条消息",
+  "chat.recalledFull": "消息已撤回",
+  "chat.translationWorking": "正在翻译消息…",
+  "chat.translatedShort": "译文",
+  "chat.originalShort": "原文",
+  "chat.originalText": "原文"
 } as const

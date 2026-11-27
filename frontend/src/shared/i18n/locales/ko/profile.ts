@@ -45,5 +45,10 @@ export default {
   "profile.profileInfo": "프로필 정보",
   "profile.profileInfoHint": "편집 화면에서 이름, 사용자 이름, 소개, 도시 및 프로필 사진을 변경하세요.",
   "profile.optionsSettings": "옵션 및 설정",
-  "profile.desktopNotificationPrivacy": "내용과 보낸 사람 이름을 숨깁니다. SocCO 실행 중에만 알림을 받고 완전히 종료하면 알림이 중지됩니다."
+  "profile.desktopNotificationPrivacy": "내용과 보낸 사람 이름을 숨깁니다. SocCO 실행 중에만 알림을 받고 완전히 종료하면 알림이 중지됩니다.",
+  "profile.noLoadedPhotos": "불러온 게시물에 사진이 없습니다.",
+  "profile.noLoadedVideos": "불러온 게시물에 동영상이 없습니다.",
+  "profile.noSharedPhotos": "나에게 공유된 사진이 없습니다.",
+  "profile.noSharedVideos": "나에게 공유된 동영상이 없습니다.",
+  "profile.loadOlderPosts": "이전 게시물 더 불러오기"
 } as const

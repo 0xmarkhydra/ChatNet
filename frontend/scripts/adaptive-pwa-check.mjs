@@ -215,13 +215,13 @@ try {
         const pickerBefore = await page.locator('.social-chat-layout').evaluate(layout => ({
           expanded: layout.getAttribute('data-split-expanded'),
           priming: layout.getAttribute('data-split-priming'),
-          railWidth: layout.querySelector('.conversation-avatar-rail')?.getBoundingClientRect().width,
+          railWidth: layout.querySelector('.group-channel-sidebar')?.getBoundingClientRect().left - layout.getBoundingClientRect().left,
           classes: layout.className,
         }))
         assert.ok(pickerBefore.railWidth < width / 2,
           width + 'px: selecting a group must show the compact avatar dock and channel picker')
         assert.equal(await bottom.isVisible(), true, width + 'px: group channel picker must preserve bottom tabs')
-        await groupAvatar.click()
+        await groupAvatar.locator('.conversation-avatar-rail-photo').click()
         await page.waitForTimeout(500)
         const pickerAfter = await page.locator('.social-chat-layout').evaluate(layout => ({
           expanded: layout.getAttribute('data-split-expanded'),

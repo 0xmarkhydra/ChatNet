@@ -124,6 +124,25 @@ class Api {
     session = value;
   }
 
+  String? get chatStateStorageKey {
+    if (isDemo) return null;
+    try {
+      final token = session?['token'] as String;
+      final claims = object(
+        jsonDecode(
+          utf8.decode(
+            base64Url.decode(base64Url.normalize(token.split('.')[1])),
+          ),
+        ),
+      );
+      final sid = claims['sid'];
+      if (sid is! String || sid.isEmpty) return null;
+      return 'soco.chat.${user['id']}.$sid';
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> logout() async {
     // Clear locally only after server acknowledges revocation.
     if (session != null) {
@@ -131,9 +150,17 @@ class Api {
         'refreshToken': session!['refreshToken'],
       });
     }
-    await storage.delete(key: 'soco.session');
+    final chatKey = chatStateStorageKey;
     generation++;
     session = null;
+    await storage.delete(key: 'soco.session');
+    if (chatKey != null) {
+      try {
+        await storage.delete(key: chatKey);
+      } catch (_) {
+        /* revoked session cannot restore it */
+      }
+    }
   }
 
   Future<void> refreshToken() {
@@ -344,8 +371,10 @@ class Api {
     };
   }
 
+  Json lastRealtimeEvent = const {'type': 'reconnect'};
   Stream<void> events() async* {
-    while (session != null) {
+    final eventGeneration = generation;
+    while (session != null && generation == eventGeneration) {
       final streamClient = http.Client();
       try {
         final req = http.Request('GET', uri('/api/events'));
@@ -354,16 +383,28 @@ class Api {
         final response = await streamClient
             .send(req)
             .timeout(const Duration(seconds: 30));
+        if (generation != eventGeneration || session == null) return;
         if (response.statusCode == 401) {
           await refreshToken();
         } else if (response.statusCode == 200) {
+          lastRealtimeEvent = const {'type': 'reconnect'};
           yield null; // Reconcile on every connect: server has no replay cursor.
           await for (final line
               in response.stream
                   .transform(utf8.decoder)
                   .transform(const LineSplitter())
                   .timeout(const Duration(seconds: 50))) {
-            if (line.startsWith('data:')) yield null;
+            if (generation != eventGeneration || session == null) return;
+            if (line.startsWith('data:')) {
+              try {
+                final data = object(jsonDecode(line.substring(5).trim()));
+                if (data['type'] is! String) continue;
+                lastRealtimeEvent = data;
+                yield null;
+              } catch (_) {
+                /* ignore malformed frames */
+              }
+            }
           }
         }
       } catch (_) {

@@ -10,7 +10,10 @@
     --desktop-chat-split: var(--avatar-rail-w);
     grid-template-columns: minmax(0, var(--desktop-chat-workspace)) minmax(0, 1fr) !important;
     gap: var(--chat-rail-gap, 12px);
-    transition: --desktop-chat-split 380ms cubic-bezier(.4,0,.2,1);
+    transition: none;
+    --split-duration: 260ms;
+    --split-ease: cubic-bezier(.22,1,.36,1);
+    --split-travel: calc(var(--desktop-chat-workspace) - var(--avatar-rail-w));
   }
   .modern-shell.app-layout .modern-messenger.social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open.avatar-rail-expanded {
     --desktop-chat-split: var(--desktop-chat-workspace);
@@ -23,8 +26,9 @@
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail {
     grid-column: 1;
     grid-row: 1;
-    width: var(--desktop-chat-split) !important;
-    max-width: var(--desktop-chat-split) !important;
+    width: var(--desktop-chat-workspace) !important;
+    max-width: var(--desktop-chat-workspace) !important;
+    clip-path: inset(0 var(--split-travel) 0 0 round 18px 0 0 18px);
     min-width: 0 !important;
     border-right: 0 !important;
     border-radius: 18px 0 0 18px !important;
@@ -37,9 +41,9 @@
     inset: auto !important;
     top: 14px !important;
     bottom: 17px !important;
-    left: calc(13px + var(--desktop-chat-split)) !important;
-    width: calc(var(--desktop-chat-workspace) - var(--desktop-chat-split)) !important;
-    max-width: calc(var(--desktop-chat-workspace) - var(--desktop-chat-split)) !important;
+    left: calc(13px + var(--avatar-rail-w)) !important;
+    width: var(--split-travel) !important;
+    max-width: var(--split-travel) !important;
     min-width: 0 !important;
     height: auto !important;
     border-left: 0 !important;
@@ -47,8 +51,8 @@
     overflow: hidden !important;
     opacity: 1 !important;
     visibility: visible !important;
-    transform: none !important;
-    transition: none !important;
+    transform: translate3d(0,0,0) !important;
+    clip-path: inset(0 0 0 0 round 0 18px 18px 0);
     pointer-events: auto !important;
     box-shadow: none !important;
   }
@@ -64,7 +68,8 @@
     z-index: 42;
     top: 14px;
     bottom: 17px;
-    left: calc(13px + var(--desktop-chat-split) - 1px);
+    left: calc(13px + var(--avatar-rail-w) - 1px);
+    transform: translate3d(0,0,0);
     width: 1px;
     background: #e4ebf6;
     pointer-events: none;
@@ -101,12 +106,12 @@
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar {
     top: 10px !important;
     bottom: 10px !important;
-    left: calc(10px + var(--desktop-chat-split)) !important;
+    left: calc(10px + var(--avatar-rail-w)) !important;
   }
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open::after {
     top: 10px;
     bottom: 10px;
-    left: calc(10px + var(--desktop-chat-split) - 1px);
+    left: calc(10px + var(--avatar-rail-w) - 1px);
   }
 }
 /* Entering a group from an inactive rail starts with the avatar expanded.
@@ -165,4 +170,18 @@
     overflow-x: hidden !important;
     overflow-y: auto !important;
   }
+}
+/* Fixed-size layers: only clip and translate the moving seam. */
+@media (min-width: 761px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .desktop-conversation-rail { transition: clip-path var(--split-duration) var(--split-ease) !important; }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > .group-channel-sidebar { transition: transform var(--split-duration) var(--split-ease), clip-path var(--split-duration) var(--split-ease) !important; }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open::after { transition: transform var(--split-duration) var(--split-ease); }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open[data-split-expanded="true"] { --split-duration: 220ms; }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open[data-split-expanded="true"] > .desktop-conversation-rail { clip-path: inset(0 0 0 0 round 18px); }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open[data-split-expanded="true"] > .group-channel-sidebar { transform: translate3d(var(--split-travel),0,0) !important; clip-path: inset(0 100% 0 0); pointer-events: none !important; }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open[data-split-expanded="true"]::after { transform: translate3d(var(--split-travel),0,0); }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open[data-split-priming="true"] > :is(.desktop-conversation-rail,.group-channel-sidebar), .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open[data-split-priming="true"]::after { transition: none !important; }
+}
+@media (min-width: 761px) and (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open > :is(.desktop-conversation-rail,.group-channel-sidebar), .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.desktop-channel-panel-open::after { transition: none !important; }
 }

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/app.dart';
 import 'package:soco/demo.dart';
+import 'package:soco/api.dart';
 import 'package:soco/presentation/channel_list_presenter.dart';
 import 'package:soco/presentation/conversation_avatar.dart';
 import 'package:soco/widgets.dart';
@@ -14,7 +16,115 @@ Future<void> openChatParityDemo(WidgetTester tester, DemoApi api) async {
   await tester.pumpAndSettle();
 }
 
+class _SlowPreferencesApi extends DemoApi {
+  final preferencesGate = Completer<void>();
+  bool delayPreferences = false;
+  int historyStarts = 0;
+
+  @override
+  Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (delayPreferences && method == 'GET' && path == '/api/preferences') {
+      await preferencesGate.future;
+    }
+    if (delayPreferences &&
+        method == 'GET' &&
+        RegExp(r'/api/conversations/\d+/messages\?').hasMatch(path)) {
+      historyStarts++;
+    }
+    return super.request(method, path, body);
+  }
+}
+
+class _WarmHistoryApi extends DemoApi {
+  final secondLoad = Completer<void>();
+  int historyReads = 0;
+  @override
+  Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (method == 'GET' && path.startsWith('/api/conversations/2/messages?')) {
+      historyReads++;
+      if (historyReads == 2) await secondLoad.future;
+    }
+    return super.request(method, path, body);
+  }
+}
+
 void main() {
+  testWidgets('channel photo editor removes only the selected channel avatar', (
+    tester,
+  ) async {
+    final api = DemoApi();
+    api.rooms.first['avatarUrl'] = 'https://example.invalid/group.png';
+    api.channels[1]!.last['avatarUrl'] = 'https://example.invalid/channel.png';
+    api.preferences['autoTranslate'] = false;
+    await openChatParityDemo(tester, api);
+    await tester.tap(find.text('SocCO Design Team').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mobile-channel-5')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('chat-more-actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Đổi ảnh kênh'));
+    await tester.pumpAndSettle();
+    expect(find.text('Đổi ảnh kênh'), findsOneWidget);
+    await tester.tap(find.text('Gỡ ảnh'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lưu ảnh'));
+    await tester.pumpAndSettle();
+    expect(api.channels[1]!.last['avatarUrl'], '');
+    expect(api.rooms.first['avatarUrl'], 'https://example.invalid/group.png');
+    expect(find.text('Đổi ảnh kênh'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'recent conversation remains visible during history revalidation',
+    (tester) async {
+      final api = _WarmHistoryApi();
+      api.preferences['autoTranslate'] = false;
+      api.rooms.firstWhere((room) => room['id'] == 2)['unreadCount'] = 0;
+      for (final message in api.messages[2]!) {
+        message.remove('firstUnreadMessageId');
+      }
+      await openChatParityDemo(tester, api);
+      await tester.tap(find.text('Linh Nguyễn').first);
+      await tester.pumpAndSettle();
+      final latestMessage = api.messages[2]!.last['text'].toString();
+      expect(find.text(latestMessage), findsOneWidget);
+      await tester.tap(find.byTooltip('Quay lại'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Linh Nguyễn').first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 220));
+      expect(api.historyReads, 2);
+      expect(find.text(latestMessage), findsOneWidget);
+      api.secondLoad.complete();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('conversation history starts before slow preferences finish', (
+    tester,
+  ) async {
+    final api = _SlowPreferencesApi();
+    api.preferences['autoTranslate'] = false;
+    await openChatParityDemo(tester, api);
+    api.delayPreferences = true;
+    await tester.tap(find.text('Linh Nguyễn').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(api.historyStarts, greaterThan(0));
+    api.preferencesGate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   test(
     'PWA channel search includes topic and latest message, not name alone',
     () {
@@ -117,6 +227,9 @@ void main() {
       find.descendant(of: own, matching: find.byType(UserAvatar)),
       findsNothing,
     );
+    // The visible timeline can render before its read acknowledgement and channel refresh finish.
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('hamburger remains available for group picker without arrow', (
@@ -193,19 +306,39 @@ void main() {
     expect(find.text('Tắt thông báo nhóm'), findsOneWidget);
   });
 
-  testWidgets('quick Like sends alone and preserves the composed text', (tester) async {
+  testWidgets('Like and Send share a fixed composer action', (tester) async {
     final api = DemoApi();
     await openChatParityDemo(tester, api);
     await tester.tap(find.text('Linh Nguyễn').first);
     await tester.pumpAndSettle();
-    final like = find.byKey(const ValueKey('composer-quick-like'));
-    expect(like, findsOneWidget);
+    final action = find.byKey(const ValueKey('composer-primary-action'));
     final input = find.byType(TextField).last;
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
+    expect(find.byTooltip('Gửi tin nhắn'), findsNothing);
+    final initialSize = tester.getSize(action);
+    final initialPosition = tester.getTopLeft(action);
+    await tester.enterText(input, '   ');
+    await tester.pump();
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
     await tester.enterText(input, 'Bản nháp');
-    await tester.tap(like);
+    await tester.pump();
+    expect(find.byTooltip('Gửi Like'), findsNothing);
+    expect(find.byTooltip('Gửi tin nhắn'), findsOneWidget);
+    expect(tester.getSize(action), initialSize);
+    expect(tester.getTopLeft(action), initialPosition);
+    await tester.enterText(input, '');
+    await tester.pump();
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
+    await tester.tap(action);
     await tester.pumpAndSettle();
     expect(find.text('👍'), findsOneWidget);
-    expect(tester.widget<TextField>(input).controller?.text, 'Bản nháp');
+    await tester.enterText(input, 'Bản nháp');
+    await tester.pump();
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.text('Bản nháp'), findsOneWidget);
+    expect(tester.widget<TextField>(input).controller?.text, isEmpty);
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();

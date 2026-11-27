@@ -83,11 +83,12 @@ export type MessagePageQuery = {
   after?: number;
 };
 
-export function listMessages(request: ApiRequest, query: MessagePageQuery) {
+export function listMessages(request: ApiRequest, query: MessagePageQuery, signal?: AbortSignal) {
   const before = query.before === undefined ? "" : `&before=${query.before}`;
   const after = query.after === undefined ? "" : `&after=${query.after}`;
   return request(
     `/api/conversations/${query.conversationId}/messages?target=${encodeURIComponent(query.target)}&channelId=${query.channelId}&limit=${query.limit}${before}${after}`,
+    signal ? { signal } : undefined,
   );
 }
 

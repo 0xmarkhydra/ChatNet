@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -660,7 +661,7 @@ func (s *server) addComment(w http.ResponseWriter, r *http.Request) {
 			if err := s.push.SendToSubscriptions(ctx, subscriptionIDs, onesignalx.Notification{
 				Title: "ChatNet",
 				Body:  "Có người vừa bình luận bài viết của bạn.",
-				URL:   "https://chat.codelocal.cloud/?tab=feed",
+				URL:   fmt.Sprintf("https://chat.codelocal.cloud/?tab=feed&post=%d", id),
 				Data:  map[string]any{"type": "post.comment", "postId": id},
 			}); err != nil {
 				log.Printf("onesignal comment notification failed: %v", err)

@@ -45,5 +45,10 @@ export default {
   "profile.profileInfo": "プロフィール情報",
   "profile.profileInfoHint": "編集画面で名前、ユーザー名、自己紹介、都市、プロフィール写真を変更します。",
   "profile.optionsSettings": "オプションと設定",
-  "profile.desktopNotificationPrivacy": "内容と送信者名を非表示にします。SocCO の実行中に通知を受信し、完全に終了すると停止します。"
+  "profile.desktopNotificationPrivacy": "内容と送信者名を非表示にします。SocCO の実行中に通知を受信し、完全に終了すると停止します。",
+  "profile.noLoadedPhotos": "読み込んだ投稿に写真がありません。",
+  "profile.noLoadedVideos": "読み込んだ投稿に動画がありません。",
+  "profile.noSharedPhotos": "あなたに共有された写真はありません。",
+  "profile.noSharedVideos": "あなたに共有された動画はありません。",
+  "profile.loadOlderPosts": "以前の投稿を読み込む"
 } as const

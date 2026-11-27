@@ -14,17 +14,7 @@ export type UIMessageKey = keyof typeof coreVi
 export type UIBundleKey = UIMessageKey | CopyBundleKey
 export type UIBundle = Record<UIBundleKey, string>
 const coreDictionaries: Record<AppLocale, Record<UIMessageKey, string>> = { vi: coreVi, en: coreEn, zh: coreZh, ja: coreJa, ko: coreKo }
-const APP_LOCALE_KEY = 'chatnet-app-locale'
-
-export function loadAppLocalePreference(): AppLocale {
-  try { return normalizeAppLocale(localStorage.getItem(APP_LOCALE_KEY)) }
-  catch { return normalizeAppLocale(null) }
-}
-
-export function saveAppLocalePreference(locale: string) {
-  try { localStorage.setItem(APP_LOCALE_KEY, normalizeAppLocale(locale)) }
-  catch { /* Storage is optional; app locale remains in React state. */ }
-}
+export { loadAppLocalePreference, saveAppLocalePreference } from '../../../shared/i18n/supportedLocales'
 
 export function resolveEffectiveLocale(preference: string, _valid?: (code: string) => boolean): AppLocale {
   return normalizeAppLocale(preference)

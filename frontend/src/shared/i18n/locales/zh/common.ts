@@ -550,5 +550,10 @@ export default {
   "common.ui.screenSource": "选择共享源",
   "common.ui.screenHint": "仅共享所选屏幕或窗口的视频，不共享系统声音。",
   "common.ui.screenExpired": "共享请求已过期或取消，请关闭此面板后重试。",
-  "common.ui.cancelShare": "取消共享"
+  "common.ui.cancelShare": "取消共享",
+  "common.ui.encryptionChecking": "正在检查加密…",
+  "common.ui.profileNavigation": "个人主页导航",
+  "common.ui.accountMenu": "账户菜单",
+  "common.ui.storyUnseen": "有未查看的快拍",
+  "common.ui.storySeen": "已查看快拍"
 } as const

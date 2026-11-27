@@ -12,7 +12,7 @@ import ProfileAvatarMenu from './ProfileAvatarMenu'
 import ProfileHero from './ProfileHero'
 import ProfileTabs from './ProfileTabs'
 
-type Section = 'posts' | 'media' | 'about' | 'friends'
+type Section = 'posts' | 'image' | 'video' | 'about' | 'friends'
 
 type Props = {
   highlights?: ReactNode
@@ -69,7 +69,8 @@ export default function ProfilePage({
     .map((attachment, index) => ({ postId: post.id, attachment, index }))), [posts])
   const tabs: { id: Section; label: string }[] = [
     { id: 'posts', label: 'Bài viết' },
-    { id: 'media', label: 'Ảnh & video' },
+    { id: 'image', label: 'Ảnh' },
+    { id: 'video', label: 'Video' },
     { id: 'about', label: 'Giới thiệu' },
     { id: 'friends', label: 'Bạn bè' },
   ]
@@ -95,7 +96,7 @@ export default function ProfilePage({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={onCreatePost}><Plus size={18} aria-hidden="true" />Đăng bài mới</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSection('media')}><ImageIcon size={18} aria-hidden="true" />{trUi("common.photoAmpVideo")}</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSection('image')}><ImageIcon size={18} aria-hidden="true" />{trUi("common.photos")}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
         </>} />
@@ -106,9 +107,9 @@ export default function ProfilePage({
         )} />
 
       <div className="profile-page-columns">
-        <ProfileSidebar username={username} email={email} bio={bio} city={city} friends={acceptedFriends} media={media}
+        <ProfileSidebar username={username} email={email} bio={bio} city={city} friends={acceptedFriends} media={media.filter(item => item.attachment.kind === "image")}
           highlights={highlights}
-          onEditProfile={onEditProfile} onShowMedia={() => setSection('media')} onShowFriends={() => setSection('friends')}
+          onEditProfile={onEditProfile} onShowMedia={() => setSection('image')} onShowFriends={() => setSection('friends')}
           onViewFriend={onViewFriend} onOpenPost={onOpenPost} />
         <section className="profile-page-main" aria-label={trUi("profile.profileContent")}>
           <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel app-desktop:flex app-desktop:min-w-0 app-desktop:flex-col app-desktop:gap-4">
@@ -135,12 +136,11 @@ export default function ProfilePage({
                 {hasMorePosts && <button className="profile-page-more-posts app-desktop:mt-[15px] app-desktop:flex app-desktop:min-h-[42px] app-desktop:w-full app-desktop:cursor-pointer app-desktop:items-center app-desktop:justify-center app-desktop:gap-2 app-desktop:rounded-[11px] app-desktop:border app-desktop:border-[#dde7fa] app-desktop:bg-[#f5f7ff] app-desktop:text-xs app-desktop:font-bold app-desktop:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>{trUi("profile.olderPosts") + ' '}<ArrowRight size={16} aria-hidden="true" /></button>}
               </>
             )}
-            {section === 'media' && (
+            {(section === 'image' || section === 'video') && (
               <div className="profile-page-subsection">
-                <h2>{trUi("common.photoAmpVideo")}</h2>
-                <p>Ảnh và video từ các bài viết đã tải của bạn.</p>
-                <ProfileMediaGallery items={media} emptyText="Chưa có ảnh hoặc video trong các bài viết đã tải." postsBusy={postsBusy} onOpenPost={onOpenPost} onCreatePost={onCreatePost} />
-                {hasMorePosts && <button className="profile-page-more-posts app-desktop:mt-[15px] app-desktop:flex app-desktop:min-h-[42px] app-desktop:w-full app-desktop:cursor-pointer app-desktop:items-center app-desktop:justify-center app-desktop:gap-2 app-desktop:rounded-[11px] app-desktop:border app-desktop:border-[#dde7fa] app-desktop:bg-[#f5f7ff] app-desktop:text-xs app-desktop:font-bold app-desktop:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>Tải thêm bài viết để xem ảnh cũ hơn</button>}
+                <h2>{trUi(section === "image" ? "common.photos" : "common.ui.video")}</h2>
+                <ProfileMediaGallery items={media.filter(item => item.attachment.kind === section)} emptyText={trUi(section === "image" ? "profile.noLoadedPhotos" : "profile.noLoadedVideos")} postsBusy={postsBusy} onOpenPost={onOpenPost} onCreatePost={onCreatePost} />
+                {hasMorePosts && <button className="profile-page-more-posts app-desktop:mt-[15px] app-desktop:flex app-desktop:min-h-[42px] app-desktop:w-full app-desktop:cursor-pointer app-desktop:items-center app-desktop:justify-center app-desktop:gap-2 app-desktop:rounded-[11px] app-desktop:border app-desktop:border-[#dde7fa] app-desktop:bg-[#f5f7ff] app-desktop:text-xs app-desktop:font-bold app-desktop:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>{trUi("profile.loadOlderPosts")}</button>}
               </div>
             )}
             {section === 'about' && (

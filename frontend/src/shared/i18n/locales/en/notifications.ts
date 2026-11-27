@@ -136,5 +136,9 @@ export default {
   "notifications.system.pushSyncFailed": "Could not save notification subscription.",
   "notifications.system.pushTestSent": "Test notification sent to {count} devices.",
   "notifications.system.pushInitFailed": "Could not initialize push notifications: {detail}",
-  "notifications.system.postShared": "Post sent to {name}."
+  "notifications.system.postShared": "Post sent to {name}.",
+  "notifications.repostedPost": "Reposted post",
+  "notifications.quotedPost": "Quoted post",
+  "notifications.posterProfile": "View author's profile",
+  "notifications.readMessageHint": "Open and read messages to update unread status."
 } as const

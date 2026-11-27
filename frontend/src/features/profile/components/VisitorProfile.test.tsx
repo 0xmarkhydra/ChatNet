@@ -61,7 +61,7 @@ describe('VisitorProfile session isolation', () => {
   })
 })
 describe('VisitorProfile data-driven sections', () => {
-  it('hides missing tabs and only shows media from loaded posts', async () => {
+  it('keeps media tabs available and separates images from videos', async () => {
     const environment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     const previous = environment.IS_REACT_ACT_ENVIRONMENT
     environment.IS_REACT_ACT_ENVIRONMENT = true
@@ -88,7 +88,8 @@ describe('VisitorProfile data-driven sections', () => {
       expect(element.querySelector('.profile-page-main[role="tabpanel"]')).not.toBeNull()
       expect(element.textContent).not.toContain('Chỉnh sửa thông tin')
       expect(element.textContent).not.toContain('Email chỉ hiển thị với bạn')
-      expect(element.textContent).not.toContain('Ảnh & video')
+      expect(element.querySelector('#visitor-profile-tab-image')).not.toBeNull()
+      expect(element.querySelector('#visitor-profile-tab-video')).not.toBeNull()
       expect(element.textContent).not.toContain('Giới thiệu')
       expect(element.textContent).not.toContain('Bạn chung')
       expect(element.textContent).not.toContain('Khoảnh khắc nổi bật')
@@ -103,18 +104,26 @@ describe('VisitorProfile data-driven sections', () => {
         createdAt: '2026-01-01', attachments: [{
           kind: 'image', storageRef: 'image-1', name: 'Ảnh thật', sizeBytes: 20,
           contentType: 'image/jpeg', url: '/media/real.jpg',
+        }, {
+          kind: 'video', storageRef: 'video-1', name: 'Video thật', sizeBytes: 30,
+          contentType: 'video/mp4', url: '/media/real.mp4',
         }],
       }])))
       await act(async () => root.render(<VisitorProfile {...props} token="new-session" />))
-      expect(element.textContent).toContain('Ảnh & video')
+      expect(element.querySelector('#visitor-profile-tab-image')).not.toBeNull()
+      expect(element.querySelector('#visitor-profile-tab-video')).not.toBeNull()
       expect(element.textContent).toContain('Giới thiệu')
-      const tab = [...element.querySelectorAll('button')].find(button => button.textContent === 'Ảnh & video')
+      const tab = [...element.querySelectorAll('button')].find(button => button.textContent === 'Ảnh' && button.getAttribute('role') === 'tab')
       await act(async () => tab?.click())
       expect(element.querySelector('.visitor-media-grid img')?.getAttribute('src')).toBe('/media/real.jpg')
+      expect(element.querySelector('.visitor-media-grid video')).toBeNull()
+      await act(async () => element.querySelector<HTMLButtonElement>('#visitor-profile-tab-video')?.click())
+      expect(element.querySelector('.visitor-media-grid video')?.getAttribute('src')).toBe('/media/real.mp4')
+      expect(element.querySelector('.visitor-media-grid img')).toBeNull()
       await act(async () => root.render(<VisitorProfile {...props} token="new-session" mobile />))
       expect(element.querySelector('[aria-label="Tải lại hồ sơ"]')).toBeNull()
       expect(element.textContent).not.toContain('Chỉnh sửa thông tin')
-      const all = [...element.querySelectorAll('button')].find(button => button.textContent === 'Tất cả')
+      const all = [...element.querySelectorAll('button')].find(button => button.textContent === 'Bài viết')
       await act(async () => all?.click())
       expect(element.textContent).toContain('Xem nhanh')
       expect(element.textContent).not.toContain('Email chỉ hiển thị với bạn')

@@ -45,5 +45,10 @@ export default {
   "profile.profileInfo": "个人主页信息",
   "profile.profileInfoHint": "在编辑页面更改姓名、用户名、简介、城市和个人主页照片。",
   "profile.optionsSettings": "选项与设置",
-  "profile.desktopNotificationPrivacy": "隐藏内容和发送者姓名。SocCO 运行时接收通知，完全退出后停止通知。"
+  "profile.desktopNotificationPrivacy": "隐藏内容和发送者姓名。SocCO 运行时接收通知，完全退出后停止通知。",
+  "profile.noLoadedPhotos": "已加载的帖子中没有照片。",
+  "profile.noLoadedVideos": "已加载的帖子中没有视频。",
+  "profile.noSharedPhotos": "没有与你分享的照片。",
+  "profile.noSharedVideos": "没有与你分享的视频。",
+  "profile.loadOlderPosts": "加载更多旧帖子"
 } as const

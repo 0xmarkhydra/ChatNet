@@ -136,5 +136,9 @@ export default {
   "notifications.system.pushSyncFailed": "Không lưu được đăng ký thông báo.",
   "notifications.system.pushTestSent": "Đã gửi thông báo test tới {count} thiết bị.",
   "notifications.system.pushInitFailed": "Không khởi tạo được Push Notification: {detail}",
-  "notifications.system.postShared": "Đã gửi bài viết đến {name}."
+  "notifications.system.postShared": "Đã gửi bài viết đến {name}.",
+  "notifications.repostedPost": "Bài viết được đăng lại",
+  "notifications.quotedPost": "Bài viết được trích dẫn",
+  "notifications.posterProfile": "Xem hồ sơ người đăng",
+  "notifications.readMessageHint": "Mở và đọc tin nhắn để cập nhật trạng thái chưa đọc."
 } as const

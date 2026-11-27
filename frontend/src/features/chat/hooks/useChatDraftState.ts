@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState, type RefObject } from "react";
 import { emptyDraft, type MessageDraft } from "../types";
-import { loadChatDrafts, saveChatDrafts } from "../lib/chatPersistence";
+import { loadChatDrafts, saveChatDrafts, loadChannelDrafts, saveChannelDrafts } from "../lib/chatPersistence";
 import type { Session } from "../../../shared/types/session";
 
 /**
  * Conversation drafts belong to Chat, not the app shell.
- * Preserve legacy lifetime: text survives a same-user tab reload, while
- * attachments and per-channel drafts remain memory-only.
+ * Text survives a same-user tab reload per room/channel; attachments remain memory-only.
  */
 export function useChatDraftState({
   userId,
@@ -35,7 +34,10 @@ export function useChatDraftState({
     }
   }, [userId, messageDrafts, sessionRef]);
 
-  const [channelDrafts, setChannelDrafts] = useState<Record<string, MessageDraft>>({});
+  const [channelDrafts, setChannelDrafts] = useState<Record<string, MessageDraft>>(() => Object.fromEntries(Object.entries(loadChannelDrafts(userId)).map(([key, item]) => [key,{text:item.text,attachments:[]}])));
+  useEffect(() => {
+    if (userId && sessionRef.current?.user.id === userId) saveChannelDrafts(userId, channelDrafts);
+  }, [userId, channelDrafts, sessionRef]);
   const channelDraftKey = `${activeConversationId ?? 0}:${selectedChannelId}`;
   const setMessageText = useCallback((text: string) => {
     if (!activeConversationId) return;

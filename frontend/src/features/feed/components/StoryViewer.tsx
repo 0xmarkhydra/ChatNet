@@ -16,6 +16,7 @@ import StoryActivity from './StoryActivity'
 import StoryHighlightEditor from './StoryHighlightEditor'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
+import { bindStoryVideoProgress } from '../lib/storyVideoProgress'
 
 type Props = {
   activeStory: Story
@@ -39,6 +40,11 @@ const STORY_DURATION = 7000
 export default function StoryViewer(props: Props) {
   const trUi = useUiTranslation()
   const locale = useUiLocale()
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const { activeStory, stories, setActiveStoryId } = props
   const highlight = props.mode === 'highlight' ? props : null
@@ -47,7 +53,6 @@ export default function StoryViewer(props: Props) {
   const authorLabel = userLabel(activeStory.authorDisplayName, activeStory.author)
   const [paused, setPaused] = useScopedState(activeStory.id, false)
   const [muted, setMuted] = useState(true)
-  const [videoProgress, setVideoProgress] = useScopedState(activeStory.id, 0)
   const [imageProgress, setImageProgress] = useScopedState(activeStory.id, 0)
   const [reply, setReply] = useScopedState(activeStory.id, '')
   const [replySending, setReplySending] = useScopedState(activeStory.id, false)
@@ -59,6 +64,7 @@ export default function StoryViewer(props: Props) {
   const replySequence = useRef(0)
   const activeStoryId = useLatest(activeStory.id)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const videoProgressRef = useRef<HTMLSpanElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const replyInputRef = useRef<HTMLInputElement>(null)
   const optionsButtonRef = useRef<HTMLButtonElement>(null)
@@ -115,6 +121,12 @@ export default function StoryViewer(props: Props) {
       imageElapsedRef.current = Math.min(duration, imageElapsedRef.current + performance.now() - started)
     }
   }, [activeStory.id, duration, isVideo, paused, menuOpen, replySending, activityOpen, nextId, setActiveStoryId, setImageProgress])
+
+  useEffect(() => {
+    const video = videoRef.current
+    const bar = videoProgressRef.current
+    if (isVideo && video && bar) return bindStoryVideoProgress(video, bar)
+  }, [activeStory.id, isVideo, attachment?.url])
 
   useEffect(() => {
     if (!isVideo || !videoRef.current) return
@@ -226,11 +238,11 @@ export default function StoryViewer(props: Props) {
                   aria-current={active ? 'true' : undefined}
                   onClick={() => setActiveStoryId(active ? activeStory.id : items[0].id)}>
                   <span className={'grid size-12 flex-none place-items-center overflow-hidden rounded-full p-0.75 ' + (active ? 'bg-(image:--soco-gradient)' : 'bg-white/30')}>
-                    <UserAvatar username={latest.author} name={label} className="box-border size-full border-2 border-story-canvas text-ui-label font-black" />
+                    <UserAvatar storyStatus="none" username={latest.author} name={label} className="box-border size-full border-2 border-story-canvas text-ui-label font-black" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block truncate text-ui-body">{label}</strong>
-                    <small className="block text-ui-caption text-white/70">{relativeStoryTime(latest.createdAt, trUi('feed.justPosted'), Date.now(), locale)}</small>
+                    <small className="block text-ui-caption text-white/70">{relativeStoryTime(latest.createdAt, trUi('feed.justPosted'), now, locale)}</small>
                   </span>
                   {items.length > 1 && <span className="grid min-w-6 flex-none place-items-center rounded-full bg-white/20 px-ui-1 text-ui-caption font-bold">{items.length}</span>}
                 </button>
@@ -251,11 +263,6 @@ export default function StoryViewer(props: Props) {
               <video key={activeStory.id} ref={videoRef} src={attachment.url} className="size-full object-contain"
                 autoPlay muted={muted} playsInline
                 onEnded={() => setActiveStoryId(nextId)}
-                onTimeUpdate={(event) => {
-                  const media = event.currentTarget
-                  setVideoProgress(Number.isFinite(media.duration) && media.duration > 0
-                    ? Math.min(100, media.currentTime / media.duration * 100) : 0)
-                }}
                 aria-label={attachment.name}
               />
             ) : (
@@ -283,8 +290,12 @@ export default function StoryViewer(props: Props) {
               aria-label={'Tin ' + (authorIndex + 1) + ' trên ' + authorStories.length}>
               {authorStories.map((story, index) => (
                 <span key={story.id} className="h-0.75 flex-1 overflow-hidden rounded-full bg-white/40">
-                  <span className="block h-full bg-white"
-                    style={{ width: index < authorIndex ? '100%' : index === authorIndex ? (isVideo ? videoProgress : imageProgress) + '%' : '0%' }} />
+                  {isVideo && index === authorIndex ? (
+                    <span key="video" ref={videoProgressRef} className="block h-full w-full origin-left bg-white [transform:scaleX(0)]" />
+                  ) : (
+                    <span key="static" className="block h-full bg-white"
+                      style={{ width: index < authorIndex ? '100%' : index === authorIndex ? imageProgress + '%' : '0%' }} />
+                  )}
                 </span>
               ))}
             </div>
@@ -292,18 +303,18 @@ export default function StoryViewer(props: Props) {
               {feed ? (
                 <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-ui-2 border-0 bg-transparent p-0 text-left text-white"
                   onClick={() => feed.onProfile(activeStory.author)} title={'Xem hồ sơ ' + authorLabel}>
-                  <UserAvatar username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
+                  <UserAvatar storyStatus="none" username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
                   <span className="min-w-0">
                     <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
-                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, trUi('feed.justPosted'), Date.now(), locale)}</time>
+                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, trUi('feed.justPosted'), now, locale)}</time>
                   </span>
                 </button>
               ) : (
                 <span className="flex min-w-0 flex-1 items-center gap-ui-2">
-                  <UserAvatar username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
+                  <UserAvatar storyStatus="none" username={activeStory.author} name={authorLabel} className="size-10.5 flex-none border-2 border-white text-ui-label font-black" />
                   <span className="min-w-0">
                     <strong className="block truncate text-ui-subtitle [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">{authorLabel}</strong>
-                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, trUi('feed.justPosted'), Date.now(), locale)}</time>
+                    <time dateTime={activeStory.createdAt} className="block text-ui-caption text-white/85">{relativeStoryTime(activeStory.createdAt, trUi('feed.justPosted'), now, locale)}</time>
                   </span>
                 </span>
               )}

@@ -45,5 +45,10 @@ export default {
   "profile.profileInfo": "Profile information",
   "profile.profileInfoHint": "Change your name, username, bio, city and profile photos in the editor.",
   "profile.optionsSettings": "OPTIONS & SETTINGS",
-  "profile.desktopNotificationPrivacy": "Hide content and sender names. Receive notifications while SocCO is running; fully quitting stops notifications."
+  "profile.desktopNotificationPrivacy": "Hide content and sender names. Receive notifications while SocCO is running; fully quitting stops notifications.",
+  "profile.noLoadedPhotos": "No photos in loaded posts.",
+  "profile.noLoadedVideos": "No videos in loaded posts.",
+  "profile.noSharedPhotos": "No photos shared with you.",
+  "profile.noSharedVideos": "No videos shared with you.",
+  "profile.loadOlderPosts": "Load older posts"
 } as const

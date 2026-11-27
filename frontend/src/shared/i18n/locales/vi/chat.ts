@@ -219,5 +219,16 @@ export default {
   "chat.messageSendFailed": "Gửi thất bại",
   "chat.groupMessages": "Tin nhắn nhóm",
   "chat.sharedDocuments": "Tài liệu chia sẻ",
-  "chat.groupVideoCall": "Gọi video nhóm"
+  "chat.groupVideoCall": "Gọi video nhóm",
+  "chat.manualUnread": "đánh dấu chưa đọc",
+  "chat.edited": "đã sửa",
+  "chat.today": "Hôm nay",
+  "chat.yesterday": "Hôm qua",
+  "chat.seen": "Đã xem",
+  "chat.forwardedOne": "Đã chuyển tiếp 1 tin nhắn",
+  "chat.recalledFull": "Tin nhắn đã được thu hồi",
+  "chat.translationWorking": "Đang dịch tin nhắn…",
+  "chat.translatedShort": "DỊCH",
+  "chat.originalShort": "GỐC",
+  "chat.originalText": "Nguyên văn"
 } as const

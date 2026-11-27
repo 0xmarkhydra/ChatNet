@@ -136,5 +136,9 @@ export default {
   "notifications.system.pushSyncFailed": "通知登録を保存できませんでした。",
   "notifications.system.pushTestSent": "{count} 台の端末にテスト通知を送信しました。",
   "notifications.system.pushInitFailed": "プッシュ通知を初期化できませんでした：{detail}",
-  "notifications.system.postShared": "{name} に投稿を送信しました。"
+  "notifications.system.postShared": "{name} に投稿を送信しました。",
+  "notifications.repostedPost": "再投稿された投稿",
+  "notifications.quotedPost": "引用された投稿",
+  "notifications.posterProfile": "投稿者のプロフィールを見る",
+  "notifications.readMessageHint": "メッセージを開いて読み、未読状態を更新してください。"
 } as const

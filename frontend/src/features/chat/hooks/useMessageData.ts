@@ -78,6 +78,10 @@ export function useMessageData({
     return () => { mounted.current = false }
   }, [])
   const historyGeneration = useRef(0)
+  const supplementalRequest = useRef<AbortController | null>(null)
+  const pageSignal = () => supplementalRequest.current
+    ? AbortSignal.any([supplementalRequest.current.signal, AbortSignal.timeout(30_000)])
+    : AbortSignal.timeout(30_000)
   // Freeze the server cursor before marking the room read. Never derive it from a changing badge.
   const unreadSnapshot = useRef<{ visit: typeof visit; id: number | null } | null>(null)
   const [unreadBoundary, setUnreadBoundary] = useState<{ visit: typeof visit; id: number | null } | null>(null)
@@ -169,6 +173,7 @@ export function useMessageData({
   useEffect(() => {
     const refresh = () => {
       historyGeneration.current += 1
+      supplementalRequest.current?.abort()
       setHistory(previous => ({ scope: previous.scope, rooms: new Map() }))
       unreadSnapshot.current = null
       setUnreadBoundary(null)
@@ -179,6 +184,8 @@ export function useMessageData({
       if (conversationId === undefined) return
       if (activeConversationIdRef.current === conversationId) {
         historyGeneration.current += 1
+        supplementalRequest.current?.abort()
+        supplementalRequest.current = null
         gapPagingBusy.current = false
         messagesPagingBusy.current = false
         setHasMoreMessages(false)
@@ -204,6 +211,9 @@ export function useMessageData({
     if (!token || !sessionId || userId === undefined || !conversationId || !translationPreferencesLoaded) return
     const generation = historyGeneration.current
     let cancelled = false
+    const controller = new AbortController()
+    supplementalRequest.current = controller
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)])
     const isCurrent = () => !cancelled && historyGeneration.current === generation && isCurrentVisit(visit)
     const { apiFetch, purgeConversation, refreshConversations, resetMessageChanges,
       pendingSend, setConversations, setMessageDrafts, setNotice, setTranslations } = callbacks.current
@@ -217,8 +227,8 @@ export function useMessageData({
     const pageSize = jump ? 80 : MESSAGE_PAGE_SIZE
     const page = { conversationId, target: targetLanguage, channelId }
     const requestedPages = [
-      listMessages(apiFetch, { ...page, limit: pageSize, before: jump ? jump.messageId + 1 : undefined }),
-      ...(jump ? [listMessages(apiFetch, { ...page, limit: 200 })] : []),
+      listMessages(apiFetch, { ...page, limit: pageSize, before: jump ? jump.messageId + 1 : undefined }, jump ? signal : undefined),
+      ...(jump ? [listMessages(apiFetch, { ...page, limit: 200 }, signal)] : []),
     ]
     Promise.all(requestedPages)
       .then(async (responses) => {
@@ -238,8 +248,8 @@ export function useMessageData({
         let unreadWindow: Message[] | null = null
         if (!jump && unreadId && !pages[0].some(item => item.id === unreadId)) {
           const windows = await Promise.all([
-            listMessages(apiFetch, { ...page, limit: 20, before: unreadId }),
-            listMessages(apiFetch, { ...page, limit: MESSAGE_PAGE_SIZE, after: unreadId - 1 }),
+            listMessages(apiFetch, { ...page, limit: 20, before: unreadId }, signal),
+            listMessages(apiFetch, { ...page, limit: MESSAGE_PAGE_SIZE, after: unreadId - 1 }, signal),
           ])
           if (!isCurrent()) return
           if (windows.some(response => !response.ok)) throw new Error('Không tải được tin nhắn chưa đọc')
@@ -324,6 +334,8 @@ export function useMessageData({
 
     return () => {
       cancelled = true
+      controller.abort()
+      if (supplementalRequest.current === controller) supplementalRequest.current = null
     }
   }, [activeConversationIdRef, activeConversationType, callbacks, historyRequest, isCurrentVisit, jumpToMessage,
     removeConversationHistory, setMessages, tabRef, token, translationPreferencesLoaded, visit])
@@ -370,7 +382,7 @@ export function useMessageData({
     gapPagingBusy.current = true
     setMessageGapLoading(true)
     try {
-      const response = await listMessages(apiFetch, { conversationId, target: targetLanguage, channelId: activeChannelId, limit: 80, before })
+      const response = await listMessages(apiFetch, { conversationId, target: targetLanguage, channelId: activeChannelId, limit: 80, before }, pageSignal())
       if (!response.ok) throw new Error('Không tải được tin nhắn ở giữa')
       const data = (await response.json()) as Message[]
       if (!isCurrentVisit(visit) || historyGeneration.current !== generation) return
@@ -409,7 +421,7 @@ export function useMessageData({
     messagesPagingBusy.current = true
     setMessagesLoadingMore(true)
     try {
-      const response = await listMessages(apiFetch, { conversationId, target: targetLanguage, channelId: activeChannelId, limit: MESSAGE_PAGE_SIZE, before })
+      const response = await listMessages(apiFetch, { conversationId, target: targetLanguage, channelId: activeChannelId, limit: MESSAGE_PAGE_SIZE, before }, pageSignal())
       if (!response.ok) throw new Error('Không tải thêm được lịch sử tin nhắn')
       const data = (await response.json()) as Message[]
       if (!isCurrentVisit(visit) || historyGeneration.current !== generation) return

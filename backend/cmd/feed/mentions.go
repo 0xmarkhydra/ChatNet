@@ -137,12 +137,17 @@ type postMention struct {
 func (s *server) listPostMentions(w http.ResponseWriter, r *http.Request) {
 	claims, _ := authx.ClaimsFromContext(r.Context())
 	rows, err := s.db.Query(r.Context(), `
+        WITH visible AS (
         SELECT m.id, m.post_id, u.username, u.display_name, m.created_at, m.read_at, m.kind
         FROM post_mentions m
         JOIN posts p ON p.id=m.post_id
         JOIN users u ON u.id=p.user_id
         WHERE m.user_id=$1 AND `+feedAccessSQL+`
-        ORDER BY m.id DESC LIMIT 50
+        )
+        SELECT id, post_id, username, display_name, created_at, read_at, kind
+        FROM visible
+        WHERE read_at IS NULL OR id IN (SELECT id FROM visible ORDER BY id DESC LIMIT 50)
+        ORDER BY id DESC
     `, claims.UserID, claims.UserID)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load post mentions")
@@ -184,11 +189,30 @@ func (s *server) readPostMention(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "mention not found")
 		return
 	}
+	s.publishFeedNotificationUpdate(r.Context(), []int64{claims.UserID})
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// Publish invalidation without exposing any post data to the event stream.
+func (s *server) publishFeedNotificationUpdate(ctx context.Context, recipients []int64) {
+	if s.redis == nil {
+		return
+	}
+	for _, id := range recipients {
+		if err := s.redis.Publish(ctx, fmt.Sprintf("chatnet:user:%d", id), `{"type":"feed.notification.updated","conversationId":0}`).Err(); err != nil {
+			log.Printf("feed notification invalidation failed: %v", err)
+		}
+	}
+}
+
 func (s *server) pushPostMentions(postID int64, authorName string, recipients []int64) {
-	if len(recipients) == 0 || s.push == nil || !s.push.Configured() {
+	if len(recipients) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	s.publishFeedNotificationUpdate(ctx, recipients)
+	cancel()
+	if s.push == nil || !s.push.Configured() {
 		return
 	}
 	ids := append([]int64(nil), recipients...)

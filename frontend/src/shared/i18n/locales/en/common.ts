@@ -550,5 +550,10 @@ export default {
   "common.ui.screenSource": "Choose what to share",
   "common.ui.screenHint": "Only video of the selected screen or window is shared. System audio is not shared.",
   "common.ui.screenExpired": "The sharing request expired or was cancelled. Close this panel and retry.",
-  "common.ui.cancelShare": "Cancel sharing"
+  "common.ui.cancelShare": "Cancel sharing",
+  "common.ui.encryptionChecking": "Checking encryption…",
+  "common.ui.profileNavigation": "Profile navigation",
+  "common.ui.accountMenu": "Account menu",
+  "common.ui.storyUnseen": "Unseen story",
+  "common.ui.storySeen": "Story viewed"
 } as const

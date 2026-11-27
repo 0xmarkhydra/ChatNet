@@ -18,6 +18,7 @@ export type ConversationRailProps = {
   /** Keep the rail search/rows stable while the shared splitter moves. */
   keepDetailsMounted?: boolean
   onSelect: (conversation: Conversation) => void
+  onPrefetch?: (conversation: Conversation) => void
   onCreate: () => void
   onSearchCompact: () => void
   onCollapse: () => void
@@ -41,7 +42,7 @@ export type ConversationRailProps = {
 
 /** Shared desktop and mobile rail; retain platform-specific layout classes and mounting behavior. */
 export default function ConversationAvatarRail({
-  conversations, selectedId, expanded, keepDetailsMounted = false, onSelect, onCreate, onSearchCompact, onCollapse,
+  conversations, selectedId, expanded, keepDetailsMounted = false, onSelect, onPrefetch, onCreate, onSearchCompact, onCollapse,
   hasMore, loadingMore, onLoadMore, loadError, onRetry, searchValue, onSearchChange, categoryControls, filter, onFilterChange, categories, visibleConversationIds,
   onEntryContextMenu, onEntryPointerDown, onEntryPointerMove, onEntryPointerEnd, desktop = false,
 }: ConversationRailProps & { desktop?: boolean }) {
@@ -77,18 +78,24 @@ export default function ConversationAvatarRail({
     }}>
         {items.map(conversation => {
           const category = categories.find(item => item.id === conversation.categoryId)
+          const unreadLabel = conversation.unreadCount > 99 ? '99+' : conversation.unreadCount || '•'
+          const hasUnread = conversation.unreadCount > 0 || conversation.manualUnread
           const entryClass = desktop ? 'desktop-conversation-rail-entry' : 'conversation-avatar-rail-item'
           const entry = <button type="button" key={conversation.id}
             className={`${entryClass}${selectedId === conversation.id ? ' selected' : ''}`}
-            aria-label={trUi("common.ui.openNamed", { v1: String(conversation.type === 'group' ? 'nhóm' : desktop ? 'tin nhắn' : 'cuộc trò chuyện'), v2: String(conversation.name), v3: String(conversation.unreadCount ? `, ${conversation.unreadCount}${desktop ? ' chưa đọc' : ' tin chưa đọc'}` : '') })}
+            aria-label={trUi("common.ui.openNamed", { v1: trUi(conversation.type === 'group' ? 'chat.group' : desktop ? 'chat.messages' : 'chat.conversation'), v2: String(conversation.name), v3: String(conversation.unreadCount ? `, ${trUi('common.ui.unreadCount', { v1: conversation.unreadCount })}` : conversation.manualUnread ? ', ' + trUi('chat.manualUnread') : '') })}
             aria-current={selectedId === conversation.id ? 'page' : undefined}
             title={conversation.name} onClick={() => onSelect(conversation)}
-            onPointerDown={event => onEntryPointerDown(conversation, event)}
+            onPointerEnter={event => { if (event.pointerType === 'mouse' && selectedId !== conversation.id) onPrefetch?.(conversation) }}
+            onPointerDown={event => { onPrefetch?.(conversation); onEntryPointerDown(conversation, event) }}
             onPointerMove={onEntryPointerMove}
             onPointerUp={onEntryPointerEnd} onPointerCancel={onEntryPointerEnd} onPointerLeave={onEntryPointerEnd}
             onContextMenu={event => onEntryContextMenu(conversation, event)}>
             <span className={desktop ? "desktop-conversation-rail-marker" : "conversation-avatar-rail-indicator"} aria-hidden="true" />
-            <ConversationAvatar conversation={conversation} className={desktop ? "desktop-conversation-rail-avatar" : "conversation-avatar conversation-avatar-rail-photo"} />
+            <span className="conversation-rail-avatar-anchor">
+              <ConversationAvatar conversation={conversation} className={desktop ? "desktop-conversation-rail-avatar" : "conversation-avatar conversation-avatar-rail-photo"} />
+              {hasUnread && <span className="conversation-rail-compact-unread" aria-hidden="true">{unreadLabel}</span>}
+            </span>
             {selectedId === conversation.id && <span className={`${prefix}-selected-check`} aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
             {!expanded && (conversation.muted || category) && (
               <span className="conversation-rail-compact-status" aria-hidden="true">
@@ -107,9 +114,9 @@ export default function ConversationAvatarRail({
                 <small>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : trUi("chat.startChat"))}</small>
               </span>
             </span>
-            {(conversation.unreadCount > 0 || conversation.manualUnread) && (
+            {hasUnread && (
               <span className={desktop ? "desktop-conversation-rail-unread" : "conversation-avatar-rail-count"} aria-hidden="true">
-                {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount || '•'}
+                {unreadLabel}
               </span>
             )}
           </button>

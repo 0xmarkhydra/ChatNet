@@ -550,5 +550,10 @@ export default {
   "common.ui.screenSource": "Chọn nguồn chia sẻ",
   "common.ui.screenHint": "Chỉ chia sẻ video của màn hình hoặc cửa sổ đã chọn. Không chia sẻ âm thanh hệ thống.",
   "common.ui.screenExpired": "Yêu cầu chia sẻ đã hết hạn hoặc bị hủy. Đóng bảng này rồi thử lại.",
-  "common.ui.cancelShare": "Hủy chia sẻ"
+  "common.ui.cancelShare": "Hủy chia sẻ",
+  "common.ui.encryptionChecking": "Đang kiểm tra mã hóa…",
+  "common.ui.profileNavigation": "Điều hướng trang cá nhân",
+  "common.ui.accountMenu": "Menu tài khoản",
+  "common.ui.storyUnseen": "Có Story chưa xem",
+  "common.ui.storySeen": "Đã xem Story"
 } as const

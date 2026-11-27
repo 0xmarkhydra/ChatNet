@@ -116,7 +116,9 @@ import ProfileIdentityForm from "../features/profile/components/ProfileIdentityF
 import BottomNavigation from "./navigation/BottomNavigation";
 import AppSidebar from "./navigation/AppSidebar";
 import { useDesktopScreenshot } from "./navigation/useDesktopScreenshot";
-import { countNotificationItems, formatNotificationBadge } from "../features/notifications/utils/notification-count";
+import { formatNotificationBadge } from "../features/notifications/utils/notification-count";
+import { useUnreadNotificationConversations } from "../features/notifications/hooks/useUnreadNotificationConversations";
+import { buildNotificationItems, countUnreadNotificationItems } from "../features/notifications/utils/notification-items";
 import NotificationsPage from "../features/notifications/components/NotificationsPage";
 import type { PostMentionNotification } from "../features/feed/utils/postMentionNotifications";
 import ConversationDetailsPanel from "../features/chat/components/ConversationDetailsPanel";
@@ -322,8 +324,8 @@ import { useFeedUiState } from "../features/feed/hooks/useFeedUiState";
 import { useChatPanelState } from "../features/chat/hooks/useChatPanelState";
 import { useScopedState } from "../shared/hooks/useScopedState";
 import { useGroupWorkspaceState } from "../features/chat/hooks/useGroupWorkspaceState";
+import { useChatPrefetch } from "../features/chat/hooks/useChatPrefetch";
 import { useChatDraftState } from "../features/chat/hooks/useChatDraftState";
-import { useChatScrollCoordinator } from "../features/chat/hooks/useChatScrollCoordinator";
 import { useConversationViewReset } from "../features/chat/hooks/useConversationViewReset";
 import { useIncomingMessageAutoTranslation } from "../features/chat/hooks/useIncomingMessageAutoTranslation";
 import { useChatOutboxState } from "../features/chat/hooks/useChatOutboxState";
@@ -354,7 +356,7 @@ export default function AuthedApp({
   setInstallPrompt,
 }: AuthedAppProps) {
   const { session, sessionRef } = useSession();
-  const { apiFetch, pendingRequests, mutationRequests } = useApi();
+  const { apiFetch, prefetchChat, pendingRequests, mutationRequests } = useApi();
   const { notice, setNotice, dismissNotice } = useNotice();
   const screenshot = useDesktopScreenshot(setNotice);
   const { chatCreateError, directUsername, groupCreateStep, groupWorkspaceMode, newChatMode, quickCreateOpen, setChatCreateError, setDirectUsername, setGroupCreateStep, setGroupWorkspaceMode, setNewChatMode, setQuickCreateOpen } = useGroupWorkspaceState({  });
@@ -784,6 +786,11 @@ export default function AuthedApp({
     purgeConversation,
     jumpToMessage: chatSearchJump,
   });
+  const prefetchConversation = useChatPrefetch({
+    request: prefetchChat, sessionId: session?.sessionId, enabled: tab === 'chat' && translationPreferencesLoaded,
+    conversations, activeConversationId, targetLanguage, overrides: conversationTranslationOverrides,
+  });
+
 
   const {
     groupSettingsOpen,
@@ -913,7 +920,7 @@ export default function AuthedApp({
         .map((activity) => ({ type: 'activity' as const, pinnedAt: activity.pinnedAt!, activity }))
       : []),
   ].sort((a, b) => Date.parse(b.pinnedAt) - Date.parse(a.pinnedAt));
-  const sortedGroupActivityEvents = groupActivities.events.slice().reverse();
+  const sortedGroupActivityEvents = useMemo(() => groupActivities.events.slice().reverse(), [groupActivities.events]);
   const viewedGroupActivity = groupActivities.activities.find(activity => activity.id === groupActivityViewedId) || null;
   const chatFriend =
     activeConversation?.type === "direct" &&
@@ -941,7 +948,7 @@ export default function AuthedApp({
     [posts, likePreviews],
   );
   const visibleMessages = useMemo(
-    () => messages.filter(message => (message.channelId || 0) === selectedChannelId).map((message) =>
+    () => messages.filter(message => message.conversationId === activeConversationId && (message.channelId || 0) === selectedChannelId).map((message) =>
       reactionPreviews[message.id]
         ? {
             ...message,
@@ -949,7 +956,7 @@ export default function AuthedApp({
           }
         : message,
     ),
-    [messages, selectedChannelId, reactionPreviews],
+    [messages, activeConversationId, selectedChannelId, reactionPreviews],
   );
   const visibleProfilePosts = useMemo(
     () => applyPostLikePreviews(profilePosts, likePreviews),
@@ -1026,7 +1033,7 @@ export default function AuthedApp({
     conversationListSearch.retry();
   }, responseCache, setActiveConversationId, setConversationDetailsOpen, setHasMoreMessages, setHistoryActionBusy, setMessageSearchOpen, setMessages, setReplyingTo, setSharedContentOpen, setTranslations });
   const { notificationBusyId, toggleConversationNotifications } = useConversationNotificationToggle({ apiFetch, setConversations, setNotice });
-  const { createGroupChannel, selectGroupChannel, refreshGroupChannels } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setReplyingTo });
+  const { createGroupChannel, selectGroupChannel, refreshGroupChannels, updateChannelAvatar } = useGroupChannels({ activeChannelIdRef, activeConversation, activeGroupMember, groupChannelBusy, groupChannels, messageScrollAtBottomRef: messageScrollAtBottom, setChannelSelection, setChatSearchJump, setConversationDetailsOpen, setGroupChannelBusy, setGroupChannelState, setHasMoreMessages, setMessageActionId, setMessageSearchOpen, setReplyingTo });
   const { createDirect, openDirectByUsername } = useDirectConversations({ actionLocks, directUsername, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setDesktopSection, setDirectUsername, setFriendQuery, setFriendResults, setGlobalSearch, setNewChatMode, setTab, setTranslations });
   const { createGroup } = useGroupCreation({ actionLocks, membershipEventSequenceRef: membershipEventSequence, membershipSnapshot, refreshConversations, revokedConversationIds, setActiveConversationId: selectRoutedConversation, setChatCreateError, setConversations, setFriendQuery, setNewChatMode, setTab });
 
@@ -1497,20 +1504,6 @@ export default function AuthedApp({
     refreshStories,
   });
 
-  useChatScrollCoordinator({
-    activeConversationId,
-    selectedChannelId,
-    unreadMessageId,
-    messageHistoryLoading,
-    messages,
-    outgoingMessage,
-    chatOutbox,
-    messagesScrollRef,
-    messageScrollAtBottom,
-    ownSendScrollConversation,
-    pendingMessageScrollRestore,
-  });
-
   useIncomingMessageAutoTranslation({
     enabled: effectiveAutoTranslate,
     preferencesLoaded: translationPreferencesLoaded,
@@ -1573,8 +1566,8 @@ export default function AuthedApp({
   });
 
   const unreadTotal = nativeNotifications.unreadCount ?? 0;
-  const notificationItemCount = countNotificationItems(friendRequests, conversations)
-    + postMentions.filter(mention => !mention.readAt).length;
+  const notificationConversations = useUnreadNotificationConversations({ sessionId: session?.sessionId ?? null, request: apiFetch, conversations, active: tab === 'notifications' });
+  const notificationItemCount = useMemo(() => countUnreadNotificationItems(buildNotificationItems(friendRequests, notificationConversations, postMentions)), [friendRequests, notificationConversations, postMentions]);
   const notificationBadgeText = formatNotificationBadge(notificationItemCount);
   const normalizedSearch = globalSearch.trim().toLocaleLowerCase("vi-VN");
   // The conversation sidebar is independent of the keyword. Only the dropdown searches.
@@ -2086,7 +2079,7 @@ export default function AuthedApp({
         ...createSecondaryPageSlots({
           notifications: {
             actOnFriend,
-            conversations,
+            conversations: notificationConversations,
             declineFriendRequest,
             friendBusyIds,
             friendRequests,
@@ -2366,6 +2359,7 @@ export default function AuthedApp({
           chatCreateError={chatCreateError}
           chatFriend={chatFriend}
           chatFriendRelationship={chatFriendRelationship}
+          prefetchConversation={prefetchConversation}
           allChatConversations={displayConversations}
           chatListConversations={chatListConversations}
           chatListFilter={chatListFilter}
@@ -2385,6 +2379,7 @@ export default function AuthedApp({
           createDirect={createDirect}
           createGroupChannel={createGroupChannel}
           refreshGroupChannels={refreshGroupChannels}
+          updateChannelAvatar={updateChannelAvatar}
           directUsername={directUsername}
           effectiveAutoTranslate={effectiveAutoTranslate}
           effectiveTargetLanguage={effectiveTargetLanguage}
@@ -2434,6 +2429,8 @@ export default function AuthedApp({
           messageHistoryError={messageHistoryError}
           retryMessageHistory={retryMessageHistory}
           messagesScrollRef={messagesScrollRef}
+          chatScrollRefs={{ messagesScrollRef, messageScrollAtBottom, ownSendScrollConversation, pendingMessageScrollRestore }}
+          outgoingMessage={outgoingMessage}
           messageText={messageText}
           newChatMode={newChatMode}
           openConnectSurface={openConnectSurface}

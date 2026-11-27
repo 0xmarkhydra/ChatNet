@@ -550,5 +550,10 @@ export default {
   "common.ui.screenSource": "共有する画面を選択",
   "common.ui.screenHint": "選択した画面またはウィンドウの映像のみ共有します。システム音声は共有しません。",
   "common.ui.screenExpired": "共有リクエストが期限切れまたはキャンセルされました。このパネルを閉じて再試行してください。",
-  "common.ui.cancelShare": "共有をキャンセル"
+  "common.ui.cancelShare": "共有をキャンセル",
+  "common.ui.encryptionChecking": "暗号化を確認中…",
+  "common.ui.profileNavigation": "プロフィールナビゲーション",
+  "common.ui.accountMenu": "アカウントメニュー",
+  "common.ui.storyUnseen": "未閲覧のストーリーがあります",
+  "common.ui.storySeen": "閲覧済みのストーリー"
 } as const

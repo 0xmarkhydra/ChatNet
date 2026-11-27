@@ -1,5 +1,5 @@
 import { createUiTranslator } from '@/shared/i18n/locale'
-import { loadAppLocalePreference } from '../features/i18n'
+import { loadAppLocalePreference } from '../shared/i18n/supportedLocales'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { desktopBridge, type DesktopScreenRequest } from './desktop'
 

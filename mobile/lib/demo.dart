@@ -90,6 +90,9 @@ class DemoApi extends Api {
   bool nearbyEnabled = false;
   final Map<int, Json> notificationSettings = {};
   final Set<int> pinnedMessageIds = {};
+  final Map<int, List<Json>> scheduledChats = {};
+  final Map<int, List<Json>> groupActivities = {};
+  final Map<int, List<Json>> groupActivityEvents = {};
   final List<String> messageSearchRequests = [];
   final Map<int, List<Json>> channels = {
     1: [
@@ -312,6 +315,14 @@ class DemoApi extends Api {
 
   @override
   Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (path == '/api/conversations/unread') {
+      return {
+        'unreadCount': rooms.fold<int>(
+          0,
+          (sum, room) => sum + ((room['unreadCount'] as num?)?.toInt() ?? 0),
+        ),
+      };
+    }
     if (path == '/api/translate') {
       return {
         'translatedText':
@@ -321,7 +332,9 @@ class DemoApi extends Api {
     // Membership/group prefetch is instantaneous in demo mode so that
     // unawaited refreshes cannot leave fake timers after a widget is removed.
     if (!path.startsWith('/api/conversations?type=group&') &&
-        path != '/api/conversations?limit=100') {
+        path != '/api/conversations?limit=100' &&
+        !path.endsWith('/read') &&
+        !path.endsWith('/channel-read')) {
       await Future<void>.delayed(const Duration(milliseconds: 160));
     }
     final uri = Uri.parse(path);
@@ -383,9 +396,15 @@ class DemoApi extends Api {
     if (parts[1] == 'conversations') {
       if (parts.length == 2) {
         final type = uri.queryParameters['type'];
-        final matching = type == null
-            ? rooms
-            : rooms.where((room) => room['type'] == type).toList();
+        final matching = rooms
+            .where(
+              (room) =>
+                  (type == null || room['type'] == type) &&
+                  (uri.queryParameters['unread'] != 'true' ||
+                      ((room['unreadCount'] as num?) ?? 0) > 0 ||
+                      room['manualUnread'] == true),
+            )
+            .toList();
         final offset = int.tryParse(uri.queryParameters['offset'] ?? '0') ?? 0;
         final limit =
             int.tryParse(uri.queryParameters['limit'] ?? '') ?? matching.length;
@@ -478,6 +497,32 @@ class DemoApi extends Api {
         }
         return {...settings};
       }
+      if ((parts[3] == 'avatar' && parts.length == 4) ||
+          (parts[3] == 'channels' &&
+              parts.length == 6 &&
+              parts[5] == 'avatar')) {
+        final channelId = parts.length == 6 ? int.tryParse(parts[4]) : 0;
+        final target = channelId == 0
+            ? room
+            : channels[id]
+                  ?.where((item) => item['id'] == channelId)
+                  .firstOrNull;
+        if (target == null) throw const ApiError('Không tìm thấy kênh.');
+        if (method == 'GET') return {'canUpdateAvatar': true};
+        if (method == 'PUT') {
+          final attachment = data['attachment'];
+          final url = attachment is Map
+              ? attachment['url']?.toString() ?? ''
+              : '';
+          target['avatarUrl'] = url;
+          return {
+            'conversationId': id,
+            if (channelId != 0) 'channelId': channelId,
+            'avatarUrl': url,
+            'avatarSet': url.isNotEmpty,
+          };
+        }
+      }
       if (parts[3] == 'channels') {
         return channels.putIfAbsent(
           id,
@@ -505,8 +550,22 @@ class DemoApi extends Api {
         }
         return {...room};
       }
+      if (parts[3] == 'channel-read') {
+        final channel = (data['channelId'] as num?)?.toInt() ?? 0;
+        final selected = channels[id]
+            ?.where((item) => item['id'] == channel)
+            .firstOrNull;
+        final count = (selected?['unreadCount'] as num?)?.toInt() ?? 0;
+        if (selected != null) selected['unreadCount'] = 0;
+        room['unreadCount'] =
+            ((room['unreadCount'] as num?)?.toInt() ?? 0) - count;
+        if ((room['unreadCount'] as num) < 0) room['unreadCount'] = 0;
+        room['manualUnread'] = false;
+        return {};
+      }
       if (parts[3] == 'read') {
         room['unreadCount'] = 0;
+        room['manualUnread'] = false;
         return {};
       }
       if (parts[3] == 'members') {
@@ -563,8 +622,106 @@ class DemoApi extends Api {
           }).toList(),
         };
       }
+      if (parts[3] == 'scheduled-messages') {
+        final queue = scheduledChats.putIfAbsent(id, () => []);
+        if (parts.length == 4) {
+          if (method == 'GET') return queue.map((row) => {...row}).toList();
+          if (method == 'POST') {
+            final existing = queue
+                .where((row) => row['clientId'] == data['clientId'])
+                .firstOrNull;
+            if (existing != null) return {...existing};
+            final row = {'id': ++serial, ...data, 'state': 'pending'};
+            queue.add(row);
+            return {...row};
+          }
+        } else {
+          final row = queue
+              .where((item) => item['id'].toString() == parts[4])
+              .firstOrNull;
+          if (row == null) throw const ApiError('Không tìm thấy lịch gửi', 404);
+          if (method == 'PATCH') {
+            row.addAll(data);
+            return {...row};
+          }
+          if (method == 'DELETE') {
+            queue.remove(row);
+            return null;
+          }
+        }
+      }
+      if (parts[3] == 'activities') {
+        if (room['type'] != 'group') {
+          throw const ApiError('Chỉ dùng trong nhóm', 403);
+        }
+        final list = groupActivities.putIfAbsent(id, () => []);
+        final events = groupActivityEvents.putIfAbsent(id, () => []);
+        void addEvent(Json row, String kind) {
+          events.add({
+            'id': ++serial,
+            'activityId': row['id'],
+            'kind': kind,
+            'actorName': user['displayName'],
+            'createdAt': DateTime.now().toIso8601String(),
+          });
+        }
+
+        if (parts.length == 4) {
+          if (method == 'GET') {
+            return {
+              'activities': list.map((item) => {...item}).toList(),
+              'events': events.map((item) => {...item}).toList(),
+            };
+          }
+          if (method == 'POST') {
+            final opts = (data['options'] as List?) ?? [];
+            final row = {
+              'id': ++serial,
+              ...data,
+              'counts': List<int>.filled(opts.length, 0),
+              'myVote': null,
+              'createdAt': DateTime.now().toIso8601String(),
+              'creatorName': user['displayName'],
+              if (data['pin'] == true)
+                'pinnedAt': DateTime.now().toIso8601String(),
+            };
+            list.insert(0, row);
+            addEvent(row, 'created');
+            return {...row};
+          }
+        } else if (parts.length == 6) {
+          final row = list.firstWhere(
+            (item) => item['id'].toString() == parts[4],
+          );
+          if (parts[5] == 'pin') {
+            if (method == 'PUT') {
+              row['pinnedAt'] = DateTime.now().toIso8601String();
+            } else {
+              row.remove('pinnedAt');
+            }
+          } else if (parts[5] == 'vote') {
+            final counts = List<int>.from(row['counts'] as List);
+            final old = row['myVote'] as int?;
+            final next = data['optionIndex'] as int;
+            if (old != null) counts[old]--;
+            counts[next]++;
+            row['counts'] = counts;
+            row['myVote'] = next;
+            addEvent(row, old == null ? 'voted' : 'vote_changed');
+          }
+          return {...row};
+        }
+      }
       if (parts[3] == 'messages') {
         if (method == 'POST') {
+          final previous = messages[id]
+              ?.where(
+                (m) =>
+                    data['clientId'] != null &&
+                    m['clientId'] == data['clientId'],
+              )
+              .firstOrNull;
+          if (previous != null) return {...previous};
           final m = message(
             ++serial,
             id,
@@ -593,6 +750,7 @@ class DemoApi extends Api {
         final from = uri.queryParameters['from'] ?? '';
         final to = uri.queryParameters['to'] ?? '';
         final before = int.tryParse(uri.queryParameters['before'] ?? '');
+        final after = int.tryParse(uri.queryParameters['after'] ?? '');
         final limit = int.tryParse(uri.queryParameters['limit'] ?? '');
         if (uri.queryParameters.containsKey('limit')) {
           messageSearchRequests.add(path);
@@ -633,6 +791,9 @@ class DemoApi extends Api {
               '${date.day.toString().padLeft(2, '0')}';
           if (from.isNotEmpty && day.compareTo(from) < 0) return false;
           if (to.isNotEmpty && day.compareTo(to) > 0) return false;
+          if (after != null && ((item['id'] as num?)?.toInt() ?? 0) <= after) {
+            return false;
+          }
           if (before != null &&
               ((item['id'] as num?)?.toInt() ?? 0) >= before) {
             return false;
@@ -645,7 +806,10 @@ class DemoApi extends Api {
             (a['id'] as num?)?.toInt() ?? 0,
           ),
         );
-        return filtered.take(limit).toList();
+        final page = (after == null
+            ? filtered.take(limit).toList().reversed
+            : filtered.reversed.take(limit));
+        return page.map((row) => Map<String, dynamic>.from(row)).toList();
       }
     }
     if (parts[1] == 'messages') {

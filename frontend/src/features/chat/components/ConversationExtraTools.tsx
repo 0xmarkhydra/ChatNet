@@ -7,8 +7,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } f
 import { SocoEmptyState } from '@/shared/ui/SocoUI'
 import UserAvatar from '@/shared/ui/UserAvatar'
 import { ConversationOptionRow } from './ConversationManagementSection'
-import { listContactMetadata, updateContactMetadata } from '../../contacts/api/contacts'
-import { toContactMetadataIndex, type PersonalContactMetadata } from '../../contacts/utils/contactMetadata'
+import { listContactMetadata, updateContactMetadata, toContactMetadataIndex, type PersonalContactMetadata } from '../../contacts'
 import type { Conversation } from '../types'
 import type { GroupActivity } from '../types/groupActivities'
 

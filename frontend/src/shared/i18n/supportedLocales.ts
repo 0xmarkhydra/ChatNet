@@ -22,3 +22,15 @@ export function normalizeAppLocale(value: string | null | undefined): AppLocale 
   }
   return 'vi'
 }
+
+const APP_LOCALE_KEY = 'chatnet-app-locale'
+
+export function loadAppLocalePreference(): AppLocale {
+  try { return normalizeAppLocale(localStorage.getItem(APP_LOCALE_KEY)) }
+  catch { return normalizeAppLocale(null) }
+}
+
+export function saveAppLocalePreference(locale: string) {
+  try { localStorage.setItem(APP_LOCALE_KEY, normalizeAppLocale(locale)) }
+  catch { /* Storage is optional; app locale remains in React state. */ }
+}

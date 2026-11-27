@@ -22,7 +22,9 @@
     --chatnet-picker-compact-width: 56px;
     /* No start delay: a reverse tap continues from the current frame without
        a brief pause at the divider. */
-    transition: --chatnet-picker-rail-width 380ms cubic-bezier(.4, 0, .2, 1);
+    transition: none;
+    --split-duration: 260ms;
+    --split-ease: cubic-bezier(.22,1,.36,1);
   }
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible.mobile-rail-list-view,
   .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.mobile-conversation-rail-visible.mobile-rail-picker-view.avatar-rail-expanded {
@@ -290,4 +292,18 @@
   .modern-shell.app-layout .social-chat-layout.mobile-conversation-rail-visible > .conversation-avatar-rail {
     transition: none !important;
   }
+}
+/* Keep the full avatar and compact channel layouts stable while sliding. */
+@media (max-width: 760px) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view { grid-template-columns: minmax(0,1fr) !important; --split-travel: calc(100% - var(--chatnet-picker-compact-width)); }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view > .conversation-avatar-rail { clip-path: inset(0 var(--split-travel) 0 0); transition: clip-path var(--split-duration) var(--split-ease) !important; }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view  > .group-channel-sidebar { grid-column: 1 / -1 !important; grid-row: 1 !important; position: absolute !important; inset: 0 0 0 var(--chatnet-picker-compact-width) !important; width: var(--split-travel) !important; max-width: var(--split-travel) !important; transform: translate3d(0,0,0) !important; clip-path: inset(0 0 0 0); transition: transform var(--split-duration) var(--split-ease), clip-path var(--split-duration) var(--split-ease) !important; }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view::after { left: calc(var(--chatnet-picker-compact-width) - 1px); transform: translate3d(0,0,0); transition: transform var(--split-duration) var(--split-ease); display: none; }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view[data-split-expanded="true"] { --split-duration: 220ms; }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view[data-split-expanded="true"] > .conversation-avatar-rail { clip-path: inset(0 0 0 0); }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view[data-split-expanded="true"] > .group-channel-sidebar { transform: translate3d(100%,0,0) !important; clip-path: inset(0 100% 0 0); pointer-events: none !important; }
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view[data-split-priming="true"] > :is(.conversation-avatar-rail,.group-channel-sidebar) { transition: none !important; }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .modern-shell.app-layout .social-chat-layout.avatar-rail-layout.group-channel-workspace.mobile-conversation-rail-visible.mobile-rail-picker-view > :is(.conversation-avatar-rail,.group-channel-sidebar) { transition: none !important; }
 }

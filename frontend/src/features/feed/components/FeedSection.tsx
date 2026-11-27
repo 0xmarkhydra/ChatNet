@@ -3,7 +3,7 @@ import { collapseQuickReposts } from "../utils/feedRequestState";
 import FeedModeration from "./FeedModeration";
 import { userLabel } from "../../../shared/utils/userLabel";
 import StoryTray from "./StoryTray";
-import { markStorySeen, useSeenStories } from "../utils/storySeen";
+import { useSeenStories } from "../utils/storySeen";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import SocialFeedComposer from "./SocialFeedComposer";
 import FeedFilters from "./FeedFilters";
@@ -17,7 +17,7 @@ import { type Conversation } from "../../chat";
 import { type PendingStoryView, type Post, type Story, type StoryDraft } from "../types";
 import type { ProfileMediaState } from "../../profile";
 import { type Session } from "../../../shared/types/session";
-import { useEffect, type SetStateAction } from "react";
+import type { SetStateAction } from "react";
 import type { Tab } from "../../../shared/types/navigation";
 import type { Dispatch, RefObject, ReactNode } from "react";
 
@@ -149,9 +149,6 @@ export default function FeedSection({
   const trUi = useUiTranslation()
 
   const seenStories = useSeenStories(session.sessionId);
-  useEffect(() => {
-    if (activeStoryId !== null) markStorySeen(session.sessionId, activeStoryId);
-  }, [activeStoryId, session.sessionId]);
   const storyDisplayName = userLabel(profileMedia?.displayName || session.user.displayName, name);
   return (
       <div

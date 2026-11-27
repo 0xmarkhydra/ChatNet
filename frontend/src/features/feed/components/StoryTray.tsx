@@ -94,7 +94,7 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
         <button data-slot="story-card" type="button" disabled={busy} onClick={event => activate(event, onCreate)} aria-label={trUi("common.ui.createNewStory")}
           className="group focus-visible:outline-none relative flex h-46 w-28 flex-none cursor-pointer flex-col items-stretch overflow-hidden rounded-ui-md border border-border bg-card p-0 text-left disabled:cursor-not-allowed disabled:opacity-60">
           <span className="grid flex-1 place-items-center overflow-hidden bg-(image:--soco-gradient)">
-            <UserAvatar username={username} name={displayName} className="size-full text-ui-page font-black [--avatar-radius:0px]" />
+            <UserAvatar username={username} name={displayName} storyStatus="none" className="size-full text-ui-page font-black [--avatar-radius:0px]" />
           </span>
           <span className="relative grid h-14 place-items-end pb-ui-2">
             <span className="absolute -top-4 left-1/2 grid size-8 -translate-x-1/2 place-items-center rounded-full border-3 border-card bg-primary text-primary-foreground">
@@ -111,8 +111,8 @@ export default function StoryTray({ username, displayName, stories, seen, busy, 
             className={cn('group focus-visible:outline-none relative h-46 w-28 flex-none cursor-pointer overflow-hidden rounded-ui-md border-0 bg-muted p-0 shadow-ui-sm', !group.hasUnseen && 'opacity-80')}>
             <StoryPreview story={group.latest} />
             <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-black/60 to-transparent" />
-            <span className={cn('absolute top-ui-2 left-ui-2 grid size-10 place-items-center overflow-hidden rounded-full p-0.75', group.hasUnseen ? 'bg-(image:--soco-gradient)' : 'bg-border')}>
-              <UserAvatar username={group.author} name={group.displayName} className="box-border size-full border-2 border-card text-ui-caption font-black" />
+            <span className="absolute top-ui-2 left-ui-2 grid size-10 place-items-center">
+              <UserAvatar username={group.author} name={group.displayName} storyStatus={group.hasUnseen ? 'unseen' : 'seen'} className="size-8.5 text-ui-caption font-black" />
             </span>
             <span className="absolute inset-x-ui-2 bottom-ui-2 line-clamp-2 text-left text-ui-label font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,.55)]">{group.own ? 'Tin của bạn' : group.displayName}</span>
             {focusRing}

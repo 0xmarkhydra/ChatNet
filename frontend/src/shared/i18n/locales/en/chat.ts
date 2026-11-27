@@ -219,5 +219,16 @@ export default {
   "chat.messageSendFailed": "Send failed",
   "chat.groupMessages": "Group messages",
   "chat.sharedDocuments": "Shared documents",
-  "chat.groupVideoCall": "Group video call"
+  "chat.groupVideoCall": "Group video call",
+  "chat.manualUnread": "marked unread",
+  "chat.edited": "edited",
+  "chat.today": "Today",
+  "chat.yesterday": "Yesterday",
+  "chat.seen": "Seen",
+  "chat.forwardedOne": "Forwarded a message",
+  "chat.recalledFull": "Message was recalled",
+  "chat.translationWorking": "Translating message…",
+  "chat.translatedShort": "TRANSLATED",
+  "chat.originalShort": "ORIGINAL",
+  "chat.originalText": "Original"
 } as const
