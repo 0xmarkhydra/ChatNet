@@ -168,7 +168,7 @@ try {
         composerMic: '.media-composer .voice-record-trigger',
         translationAction: '[data-message-id="3"] .chat-translation-action',
         photo: '.social-chat-layout .chat-message-photo img',
-        photoTime: '.social-chat-layout .chat-image-time',
+        photoTime: '[data-message-id="5"] > .message-stamp',
       }
       const rects = {}
       for (const [name,selector] of Object.entries(selectors)) {
@@ -267,7 +267,8 @@ try {
         assert.ok(rects.photo && rects.photo.width >= 200 && rects.photo.width <= 258 &&
           rects.photo.height >= 120 && rects.photo.height <= 150,
         'Photo must retain a readable size when the translation banner is removed')
-        assert.ok(rects.photoTime, 'photo time chip visible')
+        assert.ok(rects.photoTime, 'photo uses the normal message timestamp')
+        assert.equal(await page.locator('.chat-image-time').count(), 0, 'no timestamp overlay on images')
         const portraitMessage = page.locator('[data-message-id="5"]')
         await portraitMessage.scrollIntoViewIfNeeded()
         const portraitGeometry = await portraitMessage.evaluate(async message => {

@@ -311,7 +311,6 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                               {Boolean(message.attachments?.length) && (
                                 <div className={photoOnly ? 'chat-message-media chat-message-photo' : 'chat-message-media'}>
                                   <MediaAttachmentsView items={message.attachments} />
-                                  {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt)}</span>}
                                 </div>
                               )}
                               {(!message.text || giphyUrl) && reactionControls}
@@ -340,7 +339,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                               )}
                             </div>
                           )}
-                          <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
+                          <div className="message-stamp">
                             {formatTime(message.createdAt)}
                             {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
                             {activeConversation.type === 'direct' && mine && !message.deleted && latestDirectDelivery?.messageId === message.id

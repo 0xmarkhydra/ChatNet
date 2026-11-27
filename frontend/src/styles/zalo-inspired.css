@@ -3333,11 +3333,6 @@ select:focus-visible {
   box-shadow: 0 3px 10px rgba(26, 43, 72, .14);
 }
 
-.message-content:has(> .chat-message-photo) .chat-image-time {
-  right: auto;
-  left: 12px;
-}
-
 .reaction-chip {
   min-height: 28px;
   padding: 3px 8px;

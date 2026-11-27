@@ -32,12 +32,13 @@ it('keeps keyboard focus inside the media dialog and restores it on close', asyn
   })
   const dialog = document.querySelector('[role="dialog"]') as HTMLElement
   const controls = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button'))
-  expect(document.activeElement).toBe(controls[1])
+  expect(controls[1].getAttribute('aria-label')).toBe('Tải ảnh')
+  expect(document.activeElement).toBe(controls[2])
 
-  controls[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+  controls[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
   expect(document.activeElement).toBe(controls[0])
   controls[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))
-  expect(document.activeElement).toBe(controls[1])
+  expect(document.activeElement).toBe(controls[2])
 
   await act(async () => root.unmount())
   mounted.pop()

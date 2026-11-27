@@ -4,6 +4,7 @@ import { ModalPortalContext } from './modalPortalContext'
 import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react'
 import type { MediaAttachment } from '../utils/media'
 import './media-viewer.css'
+import ImageDownloadButton from './ImageDownloadButton'
 
 type PreviewMedia = MediaAttachment & { url: string }
 
@@ -104,6 +105,7 @@ export default function MediaViewer({
               <ExternalLink size={18} aria-hidden="true" />
               <span>Mở bản gốc</span>
             </a>
+            {item.kind === 'image' && <ImageDownloadButton key={item.url} image={item} />}
             <button ref={closeButton} type="button" onClick={onClose} aria-label="Đóng trình xem ảnh hoặc video">
               <X size={22} aria-hidden="true" />
             </button>
