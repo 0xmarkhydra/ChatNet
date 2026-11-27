@@ -5,17 +5,13 @@ Cross-platform SocCO client for mobile, tablet, web, and desktop.
 ## Run
 
 ```bash
-flutter pub get
-flutter run -d chrome --dart-define=SocCO_API_BASE_URL=http://localhost:3000
+flutter pub get --enforce-lockfile
+flutter run -d chrome --dart-define=API_URL=https://api-chat.codelocal.cloud --dart-define=WEB_URL=https://chat.codelocal.cloud
 ```
 
-Use the offline demo without a backend:
+Use `API_URL` to select the desired backend. The default is the existing production API; use dev or local APIs for test accounts and test data. `WEB_URL` controls canonical share/QR links. The in-memory `DemoApi` is used by widget tests, not the production entrypoint.
 
-```bash
-flutter run -d chrome --dart-define=SocCO_DEMO=true
-```
-
-The built web demo also accepts `?demo=1`.
+For release containers, Railway preview and production autodeploy settings, see [RAILWAY.md](RAILWAY.md).
 
 ## Verify
 

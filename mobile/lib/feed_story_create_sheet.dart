@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -86,13 +87,18 @@ class _FeedStoryCreateSheetState extends State<FeedStoryCreateSheet> {
       final previous = videoController;
       final ext = file.name.split('.').last.toLowerCase();
       final isVideo = {'mp4', 'mov', 'm4v', 'webm'}.contains(ext);
-      final video = isVideo && file.path != null
-          ? VideoPlayerController.file(File(file.path!))
+      final path = file.path;
+      final video = isVideo && path != null
+          ? (kIsWeb
+              ? VideoPlayerController.networkUrl(Uri.parse(path))
+              : VideoPlayerController.file(File(path)))
           : null;
       setState(() {
         selectedMedia = file;
         selectedSize = size;
-        previewImageBytes = !isVideo && file.path == null ? file.readAsBytes() : null;
+        previewImageBytes = !isVideo && (kIsWeb || path == null)
+            ? file.readAsBytes()
+            : null;
         videoController = video;
         initializingVideo = video?.initialize();
         error = '';
@@ -123,7 +129,7 @@ class _FeedStoryCreateSheetState extends State<FeedStoryCreateSheet> {
     final controller = videoController;
     final Widget content;
     if (!isVideo) {
-      content = file.path != null
+      content = !kIsWeb && file.path != null
           ? Image.file(File(file.path!), fit: BoxFit.contain,
               errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined, color: Colors.white, size: 64))
           : FutureBuilder<Uint8List>(
