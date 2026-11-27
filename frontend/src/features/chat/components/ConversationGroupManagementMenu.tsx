@@ -1,11 +1,10 @@
-import { Bell, BellOff, MoreHorizontal, Plus, ShieldCheck, Users } from 'lucide-react'
+import { Bell, BellOff, Plus, Users } from 'lucide-react'
 import type { Conversation } from '../types'
 import type { GroupChannel } from '../utils/groupChannels'
-import type { GroupActivityKind } from '../types/groupActivities'
 import type { GroupManagementSection } from './GroupSettingsPanel'
 import GroupChannelControls from './GroupChannelControls'
 import GroupChannelCreateForm from './GroupChannelCreateForm'
-import ConversationManagementSection from './ConversationManagementSection'
+import ConversationManagementSection, { ConversationOptionRow } from './ConversationManagementSection'
 
 type Props = {
   conversation: Conversation
@@ -14,14 +13,12 @@ type Props = {
   userId: number
   creatingChannel: boolean
   setCreatingChannel: (open: boolean) => void
-  canManageGroup: boolean
   canCreateChannel: boolean
   channelCreateBusy: boolean
   onCreateChannel: (name: string, description: string) => Promise<boolean>
   notificationBusy: boolean
   onToggleNotifications: () => void
   onGroupManagement: (section: GroupManagementSection) => void
-  onCreateGroupActivity: (kind: GroupActivityKind) => void
   canEditGroupPhotos: boolean
   canLeaveGroup: boolean
   request: (path: string, init?: RequestInit) => Promise<Response>
@@ -34,33 +31,24 @@ type Props = {
 
 export default function ConversationGroupManagementMenu({
   conversation, channel, selectedChannelId, userId, creatingChannel, setCreatingChannel,
-  canManageGroup, canCreateChannel, channelCreateBusy, onCreateChannel, notificationBusy, onToggleNotifications,
-  onGroupManagement, onCreateGroupActivity, canEditGroupPhotos, canLeaveGroup, request,
+  canCreateChannel, channelCreateBusy, onCreateChannel, notificationBusy, onToggleNotifications,
+  onGroupManagement, canEditGroupPhotos, canLeaveGroup, request,
   notify, onGroupRenamed, onChannelsChanged, onChannelDeleted, onLeftGroup,
 }: Props) {
   const isChannel = selectedChannelId !== 0
   return (
+    <>
+
 <ConversationManagementSection title={isChannel ? 'Quản lý kênh' : 'Quản lý nhóm'}>
             {!isChannel && <>
-              <button type="button" onClick={() => onGroupManagement('members')}><Users size={18} />Thành viên</button>
-              <button type="button" onClick={() => onGroupManagement('details')}><MoreHorizontal size={18} />Thông tin cộng đồng</button>
-              {canManageGroup && <>
-                <button type="button" onClick={() => onGroupManagement('permissions')}><ShieldCheck size={18} />Quyền quản trị</button>
-                <button type="button" onClick={() => onGroupManagement('requests')}><Users size={18} />Yêu cầu tham gia</button>
-                <button type="button" onClick={() => onGroupManagement('activity')}><MoreHorizontal size={18} />Nhật ký hoạt động</button>
-              </>}
-              <button type="button" onClick={() => onGroupManagement('rules')}><ShieldCheck size={18} />Nội quy nhóm</button>
-              <button type="button" onClick={() => onCreateGroupActivity('poll')}><MoreHorizontal size={18} />Bình chọn</button>
-              <button type="button" onClick={() => onCreateGroupActivity('note')}><MoreHorizontal size={18} />Ghi chú</button>
-              <button type="button" onClick={() => onCreateGroupActivity('reminder')}><MoreHorizontal size={18} />Nhắc hẹn</button>
+              <ConversationOptionRow icon={<Users size={18}/>} onClick={() => onGroupManagement('members')}>Thành viên và quản lý nhóm</ConversationOptionRow>
               {canCreateChannel && (creatingChannel
                 ? <GroupChannelCreateForm busy={channelCreateBusy} onCreate={onCreateChannel}
                     onCancel={() => setCreatingChannel(false)} />
-                : <button type="button" onClick={() => setCreatingChannel(true)}><Plus size={18} />Tạo kênh</button>)}
-              <button type="button" disabled={notificationBusy} onClick={onToggleNotifications}>
-                {conversation.muted ? <Bell size={18} /> : <BellOff size={18} />}
+                : <ConversationOptionRow icon={<Plus size={18}/>} onClick={() => setCreatingChannel(true)}>Tạo kênh</ConversationOptionRow>)}
+              <ConversationOptionRow disabled={notificationBusy} onClick={onToggleNotifications} icon={conversation.muted ? <Bell size={18}/> : <BellOff size={18}/>}>
                 {conversation.muted ? 'Bật thông báo nhóm' : 'Tắt thông báo nhóm'}
-              </button>
+              </ConversationOptionRow>
             </>}
             <GroupChannelControls groupId={conversation.id}
               groupName={conversation.name} channel={channel} userId={userId}
@@ -70,5 +58,6 @@ export default function ConversationGroupManagementMenu({
               onChannelsChanged={onChannelsChanged} onChannelDeleted={onChannelDeleted}
               onLeftGroup={onLeftGroup} />
         </ConversationManagementSection>
+    </>
   )
 }

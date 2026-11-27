@@ -19,6 +19,7 @@ import type { useMessageLongPress } from "../hooks/useMessageLongPress";
 import type { Dispatch, SetStateAction } from "react";
 import type { Message, GroupMember } from "../types";
 import MessageMentionText from "./MessageMentionText";
+import { wallpaperBackground } from './ChatWallpaperPicker';
 import MessageReactionQuickPicker from "./MessageReactionQuickPicker";
 
 const timelineDateFormatter = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -95,7 +96,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
 
   return (
     <div className="chat-timeline-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-    <div className="messages min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain scroll-auto!" ref={messagesScrollRef} onScroll={event => syncScroll(event.currentTarget)}>
+    <div className="messages min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain scroll-auto!" style={{ backgroundImage: wallpaperBackground(activeConversation.wallpaper) }} ref={messagesScrollRef} onScroll={event => syncScroll(event.currentTarget)}>
                     {hasMoreMessages && (
                       <button type="button" className="soco-load-more soco-older-messages"
                         onClick={() => void loadOlderMessages()} disabled={messagesLoadingMore}

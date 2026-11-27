@@ -45,13 +45,13 @@ function mount() {
   const defaults = {
     conversation: group(41),
     busy: false, notificationBusy: false, photoBusy: false, channelCreateBusy: false,
-    onToggleNotifications: vi.fn(), onClose: vi.fn(), onProfile: vi.fn(), onSearch: vi.fn(), onShared: vi.fn(),
+    onToggleNotifications: vi.fn(), onClose: vi.fn(), onProfile: vi.fn(), onShared: vi.fn(),
     request: vi.fn(async () => Response.json({})),
     selectedChannelId: 0, channel: general(41), userId: 5,
     canLeaveGroup: true, notify: vi.fn(), onGroupRenamed: vi.fn(),
     onChannelsChanged: vi.fn(async () => {}), onChannelDeleted: vi.fn(async () => {}),
-    onLeftGroup: vi.fn(), onGroupManagement: vi.fn(), canManageGroup: true,
-    onCreateGroupActivity: vi.fn(), canCreateChannel: true, onCreateChannel: vi.fn(async () => false),
+    onLeftGroup: vi.fn(), onGroupManagement: vi.fn(),
+    canCreateChannel: true, onCreateChannel: vi.fn(async () => false),
     canEditGroupPhotos: true, onSavePhoto: vi.fn(async () => true),
     onBlock: vi.fn(), onUnblock: vi.fn(), onClearHistory: vi.fn(),
   }
@@ -111,8 +111,9 @@ describe('ConversationDetailsPanel scoped UI state', () => {
     const page = mount()
     act(() => page.button('Thành viên').click())
     expect(page.defaults.onGroupManagement).toHaveBeenCalledWith('members')
-    act(() => page.button('Bình chọn').click())
-    expect(page.defaults.onCreateGroupActivity).toHaveBeenCalledWith('poll')
+    expect(page.host.textContent).not.toContain('Bình chọn')
+    expect(page.host.textContent).not.toContain('Quyền quản trị')
+    expect(page.button('Bảng tin nhóm')).not.toBeNull()
     page.render({ selectedChannelId: 25, channel: topic(41) })
     expect(page.host.textContent).not.toContain('Tạo kênh')
     expect(page.host.textContent).not.toContain('Bình chọn')
@@ -146,7 +147,7 @@ describe('ConversationDetailsPanel scoped UI state', () => {
     expect(section?.className).toBe(groupSection?.className)
     expect(section?.contains(page.button('Hồ sơ'))).toBe(true)
     expect(section?.contains(page.button('Tắt thông báo hội thoại'))).toBe(true)
-    expect(section?.contains(page.button('Chặn tin nhắn và cuộc gọi'))).toBe(true)
+    expect(page.host.querySelector('section[aria-label="Riêng tư và lịch sử"]')?.contains(page.button('Chặn tin nhắn và cuộc gọi'))).toBe(true)
     expect(page.host.querySelector('.group-photo-avatar-wrap .social-chat-details-avatar')).not.toBeNull()
     expect(page.host.querySelector('.group-photo-trigger')).toBeNull()
     expect(page.host.textContent).not.toContain('Quản lý nhóm')
@@ -160,14 +161,16 @@ describe('ConversationDetailsPanel scoped UI state', () => {
     expect(page.host.textContent).not.toContain('Chặn tin nhắn và cuộc gọi')
   })
 
-  it('keeps the original direct conversation layout on desktop', () => {
+  it('shares the group identity layout for desktop direct settings', () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({
       matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn(),
     })))
     const page = mount()
     page.render({ conversation: { ...group(80), type: 'direct' as const, otherUserId: 90 } })
-    expect(page.host.querySelector('[aria-label="Quản lý hội thoại"]')).toBeNull()
-    expect(page.host.querySelector('.group-photo-avatar-wrap')).toBeNull()
+    expect(page.host.querySelector('[aria-label="Quản lý hội thoại"]')?.contains(page.button('Hồ sơ'))).toBe(true)
+    expect(page.host.querySelector('[aria-label="Riêng tư và lịch sử"]')?.contains(page.button('Xóa lịch sử trò chuyện'))).toBe(true)
+    expect(page.host.querySelector('.group-photo-avatar-wrap .social-chat-details-avatar')).not.toBeNull()
+    expect(page.host.querySelector('.group-photo-trigger')).toBeNull()
     expect(page.button('Hồ sơ').querySelector('span')?.textContent).toBe('Hồ sơ')
   })
 })

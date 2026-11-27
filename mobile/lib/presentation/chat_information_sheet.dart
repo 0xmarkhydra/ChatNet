@@ -6,11 +6,13 @@ import '../widgets.dart';
 import 'conversation_avatar.dart';
 
 enum ChatInfoAction {
-  search,
   shared,
-  translation,
   notifications,
   manageGroup,
+  nickname,
+  commonGroups,
+  groupBoard,
+  wallpaper,
   createChannel,
   clearHistory,
   renameChannel,
@@ -75,28 +77,11 @@ Future<ChatInfoAction?> showChatInformationSheet(
         heightFactor: .76,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 12, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: socoNavy,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    key: const ValueKey('chat-info-close'),
-                    tooltip: 'Đóng thông tin hội thoại',
-                    onPressed: () => Navigator.pop(sheetContext),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
+            ChatSheetHeader(
+              title: title,
+              closeKey: const ValueKey('chat-info-close'),
+              closeLabel: 'Đóng thông tin hội thoại',
+              onClose: () => Navigator.pop(sheetContext),
             ),
             Expanded(
               child: ListView(
@@ -156,16 +141,6 @@ Future<ChatInfoAction?> showChatInformationSheet(
                     ChatInfoAction.shared,
                     Icons.perm_media_outlined,
                     'File phương tiện',
-                  ),
-                  option(
-                    ChatInfoAction.search,
-                    Icons.search_rounded,
-                    'Tìm tin nhắn',
-                  ),
-                  option(
-                    ChatInfoAction.translation,
-                    Icons.translate_rounded,
-                    'Cài đặt dịch AI',
                   ),
                   const Divider(),
                   if (channel) ...[
@@ -231,7 +206,26 @@ Future<ChatInfoAction?> showChatInformationSheet(
                           ? 'Bật thông báo nhóm'
                           : 'Tắt thông báo nhóm',
                     ),
+                    option(
+                      ChatInfoAction.groupBoard,
+                      Icons.assignment_outlined,
+                      'Bảng tin nhóm',
+                    ),
                   ] else ...[
+                    if (conversation['otherUserId'] != null &&
+                        conversation['blockedByMe'] != true &&
+                        conversation['blockedByOther'] != true) ...[
+                      option(
+                        ChatInfoAction.nickname,
+                        Icons.edit_outlined,
+                        'Đặt tên gợi nhớ',
+                      ),
+                      option(
+                        ChatInfoAction.commonGroups,
+                        Icons.groups_outlined,
+                        'Nhóm chung',
+                      ),
+                    ],
                     option(
                       ChatInfoAction.notifications,
                       conversation['muted'] == true
@@ -248,6 +242,12 @@ Future<ChatInfoAction?> showChatInformationSheet(
                       danger: true,
                     ),
                   ],
+                  const Divider(),
+                  option(
+                    ChatInfoAction.wallpaper,
+                    Icons.palette_outlined,
+                    'Đổi hình nền hội thoại',
+                  ),
                 ],
               ),
             ),
@@ -257,3 +257,100 @@ Future<ChatInfoAction?> showChatInformationSheet(
     },
   );
 }
+
+/// Shared heading and close control for chat information and option sheets.
+class ChatSheetHeader extends StatelessWidget {
+  const ChatSheetHeader({
+    super.key,
+    required this.title,
+    required this.onClose,
+    this.action,
+    this.closeKey,
+    this.closeLabel = 'Đóng',
+  });
+  final String title;
+  final VoidCallback onClose;
+  final Widget? action;
+  final Key? closeKey;
+  final String closeLabel;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 0, 12, 12),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: socoNavy,
+            ),
+          ),
+        ),
+        ?action,
+        IconButton(
+          key: closeKey,
+          tooltip: closeLabel,
+          onPressed: onClose,
+          icon: const Icon(Icons.close_rounded),
+        ),
+      ],
+    ),
+  );
+}
+
+class ChatSheetChoice<T> {
+  const ChatSheetChoice({
+    required this.value,
+    required this.label,
+    required this.leading,
+  });
+  final T value;
+  final String label;
+  final Widget leading;
+}
+
+/// Same list layout for classification, notification duration and wallpaper.
+Future<T?> showChatChoiceSheet<T>(
+  BuildContext context, {
+  required String title,
+  required List<ChatSheetChoice<T>> options,
+  T? selected,
+}) => showModalBottomSheet<T>(
+  context: context,
+  showDragHandle: true,
+  isScrollControlled: true,
+  useSafeArea: true,
+  builder: (sheetContext) => ConstrainedBox(
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(sheetContext).height * .72,
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ChatSheetHeader(
+          title: title,
+          onClose: () => Navigator.pop(sheetContext),
+        ),
+        Flexible(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.only(bottom: 12),
+            children: [
+              for (final option in options)
+                ListTile(
+                  leading: option.leading,
+                  title: Text(option.label),
+                  trailing: selected == option.value
+                      ? const Icon(Icons.check_rounded, color: socoBlue)
+                      : null,
+                  onTap: () => Navigator.pop(sheetContext, option.value),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  ),
+);

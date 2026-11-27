@@ -15,6 +15,8 @@ import type { GroupActivity, GroupActivityEvent, GroupActivityKind } from "./Gro
 import type { LanguageOption } from "../../i18n";
 
 export type ChatSectionProps = {
+  notificationBusyId: number | null;
+  toggleConversationNotifications: (conversation: Conversation, muteMinutes?: number) => Promise<void>;
   activeChatTranslationSettings: ChatTranslationSettings | undefined;
   activeConversation: Conversation | null;
   activeConversationId: number | null;
@@ -52,6 +54,7 @@ export type ChatSectionProps = {
   conversationLoadingMore: boolean;
   conversationListError: string;
   refreshConversations: () => Promise<void>;
+  onContactSaved?: (id: number, metadata: import('../../contacts/utils/contactMetadata').PersonalContactMetadata) => void;
   copyInviteLink: () => Promise<void>;
   createDirect: (event: FormEvent) => Promise<void>;
   createGroupChannel: (name: string, description: string) => Promise<boolean>;

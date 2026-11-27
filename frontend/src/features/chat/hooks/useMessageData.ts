@@ -310,7 +310,7 @@ export function useMessageData({
         } else {
           setConversations((current) =>
             current.map((item) =>
-              item.id === conversationId ? { ...item, unreadCount: 0 } : item,
+              item.id === conversationId ? { ...item, unreadCount: 0, manualUnread: false } : item,
             ),
           )
         }
@@ -347,7 +347,7 @@ export function useMessageData({
             void refreshConversations()
           } else {
             setConversations((current) =>
-              current.map((item) => item.id === id ? { ...item, unreadCount: 0 } : item),
+              current.map((item) => item.id === id ? { ...item, unreadCount: 0, manualUnread: false } : item),
             )
           }
         })

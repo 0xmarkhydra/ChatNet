@@ -1,27 +1,17 @@
-import { useState, useSyncExternalStore } from 'react'
-import { Ban, Bell, BellOff, ChevronRight, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react'
+import { useState } from 'react'
+import { Ban, Bell, BellOff, ShieldCheck, Trash2, Users, X } from 'lucide-react'
 import type { Conversation } from '../types'
 import type { GroupChannel } from '../utils/groupChannels'
-import type { GroupActivityKind } from '../types/groupActivities'
+import ChatWallpaperPicker from './ChatWallpaperPicker'
+import ConversationExtraTools from './ConversationExtraTools'
+import type { GroupActivity } from '../types/groupActivities'
 import type { GroupManagementSection } from './GroupSettingsPanel'
 import type { GroupPhotoTarget } from '../utils/groupPhotoTarget'
 import GroupAvatarEditor from './GroupAvatarEditor'
 import ConversationSharedPreview from './ConversationSharedPreview'
 import ConversationDetailsIdentity from './ConversationDetailsIdentity'
 import ConversationGroupManagementMenu from './ConversationGroupManagementMenu'
-import ConversationManagementSection from './ConversationManagementSection'
-
-const PHONE_QUERY = '(max-width: 760px)'
-
-function subscribePhoneLayout(onChange: () => void) {
-  const media = window.matchMedia?.(PHONE_QUERY)
-  media?.addEventListener('change', onChange)
-  return () => media?.removeEventListener('change', onChange)
-}
-
-function phoneLayoutSnapshot() {
-  return window.matchMedia?.(PHONE_QUERY).matches ?? false
-}
+import ConversationManagementSection, { ConversationOptionRow } from './ConversationManagementSection'
 
 type Props = {
   conversation: Conversation
@@ -30,7 +20,6 @@ type Props = {
   onToggleNotifications: () => void
   onClose: () => void
   onProfile: () => void
-  onSearch: () => void
   onShared: (tab?: 'media' | 'files' | 'links') => void
   request: (path: string, init?: RequestInit) => Promise<Response>
   selectedChannelId: number
@@ -43,8 +32,6 @@ type Props = {
   onChannelDeleted: () => Promise<void>
   onLeftGroup: () => void
   onGroupManagement: (section: GroupManagementSection) => void
-  canManageGroup: boolean
-  onCreateGroupActivity: (kind: GroupActivityKind) => void
   canCreateChannel: boolean
   channelCreateBusy: boolean
   onCreateChannel: (name: string, description: string) => Promise<boolean>
@@ -54,6 +41,10 @@ type Props = {
   onBlock: () => void
   onUnblock: () => void
   onClearHistory: () => void
+  activities?: GroupActivity[]
+  onActivity?: (id: number) => void
+  onRefresh?: () => Promise<void>
+  onContactSaved?: (id: number, metadata: import('../../contacts/utils/contactMetadata').PersonalContactMetadata) => void
 }
 
 export default function ConversationDetailsPanel(props: Props) {
@@ -64,40 +55,23 @@ export default function ConversationDetailsPanel(props: Props) {
 
 function ConversationDetailsPanelScope({
 
-  conversation, busy, notificationBusy, onToggleNotifications, onClose, onProfile, onSearch, onShared, request,
+  conversation, busy, notificationBusy, onToggleNotifications, onClose, onProfile, onShared, request,
   selectedChannelId, channel, userId, canLeaveGroup, notify, onGroupRenamed,
   onChannelsChanged, onChannelDeleted, onLeftGroup, onGroupManagement,
-  canManageGroup, onCreateGroupActivity, canCreateChannel, channelCreateBusy, onCreateChannel,
-  canEditGroupPhotos, photoBusy, onSavePhoto, onBlock, onUnblock, onClearHistory,
+  canCreateChannel, channelCreateBusy, onCreateChannel,
+  canEditGroupPhotos, photoBusy, onSavePhoto, onBlock, onUnblock, onClearHistory, activities, onActivity, onRefresh, onContactSaved,
 }: Props) {
   const isGroup = conversation.type === 'group'
   const isChannel = isGroup && selectedChannelId !== 0
-  const phoneLayout = useSyncExternalStore(subscribePhoneLayout, phoneLayoutSnapshot, () => false)
-  const compactDirect = !isGroup && phoneLayout
   const [creatingChannel, setCreatingChannel] = useState(false)
   const [photoTarget, setPhotoTarget] = useState<GroupPhotoTarget | null>(null)
 
-  const directProfile = (
-    <button type="button" onClick={onProfile}>
-      <Users size={compactDirect ? 18 : 19} aria-hidden="true" />
-      {compactDirect ? 'Hồ sơ' : <><span>Hồ sơ</span><ChevronRight size={16} aria-hidden="true" /></>}
-    </button>
-  )
+  const directProfile = <ConversationOptionRow icon={<Users size={18}/>} onClick={onProfile}>Hồ sơ</ConversationOptionRow>
   const notificationLabel = conversation.muted ? 'Bật thông báo hội thoại' : 'Tắt thông báo hội thoại'
-  const directNotifications = (
-    <button type="button" disabled={notificationBusy}
-      aria-pressed={Boolean(conversation.muted)} onClick={onToggleNotifications}>
-      {conversation.muted ? <Bell size={compactDirect ? 18 : 19} aria-hidden="true" /> : <BellOff size={compactDirect ? 18 : 19} aria-hidden="true" />}
-      {compactDirect ? notificationLabel : <><span>{notificationLabel}</span><ChevronRight size={16} aria-hidden="true" /></>}
-    </button>
-  )
+  const directNotifications = <ConversationOptionRow disabled={notificationBusy} aria-pressed={Boolean(conversation.muted)} icon={conversation.muted ? <Bell size={18}/> : <BellOff size={18}/>} onClick={onToggleNotifications}>{notificationLabel}</ConversationOptionRow>
   const blockLabel = conversation.blockedByMe ? 'Bỏ chặn người dùng' : 'Chặn tin nhắn và cuộc gọi'
   const directBlock = conversation.otherUserId && !conversation.blockedByOther ? (
-    <button type="button" className="conversation-options-danger" disabled={busy}
-      onClick={conversation.blockedByMe ? onUnblock : onBlock}>
-      <Ban size={compactDirect ? 18 : 19} aria-hidden="true" />
-      {compactDirect ? blockLabel : <><span>{blockLabel}</span><ChevronRight size={16} aria-hidden="true" /></>}
-    </button>
+    <ConversationOptionRow icon={<Ban size={18}/>} className="conversation-options-danger" disabled={busy} onClick={conversation.blockedByMe ? onUnblock : onBlock}>{blockLabel}</ConversationOptionRow>
   ) : null
 
   return (
@@ -111,39 +85,36 @@ function ConversationDetailsPanelScope({
       </div>
 
       <ConversationDetailsIdentity conversation={conversation} channel={channel} selectedChannelId={selectedChannelId}
-        canEditGroupPhotos={canEditGroupPhotos} photoBusy={photoBusy} onEditPhoto={setPhotoTarget} compactDirect={compactDirect} />
+        canEditGroupPhotos={canEditGroupPhotos} photoBusy={photoBusy} onEditPhoto={setPhotoTarget} />
 
       <ConversationSharedPreview conversationId={conversation.id}
         channelId={isGroup ? selectedChannelId : 0}
         request={request} onOpen={onShared} />
 
       <nav className="conversation-info-panel-links social-chat-details-links" aria-label="Tùy chọn hội thoại">
-        {!isGroup && !compactDirect && directProfile}
-        <button type="button" onClick={onSearch}>
-          <Search size={19} aria-hidden="true" />
-          <span>Tìm tin nhắn</span><ChevronRight size={16} aria-hidden="true" />
-        </button>
-        {!isGroup && !compactDirect && directNotifications}
-        {compactDirect && <ConversationManagementSection title="Quản lý hội thoại">
+        <ConversationManagementSection title="Tùy chỉnh hội thoại">
+          <ChatWallpaperPicker conversation={conversation} request={request} onRefresh={onRefresh} notify={notify} />
+        </ConversationManagementSection>
+        {!isGroup && <ConversationManagementSection title="Quản lý hội thoại">
           {directProfile}
+          <ConversationExtraTools conversation={conversation} request={request} notify={notify} onRefresh={onRefresh} onContactSaved={onContactSaved} />
           {directNotifications}
-          {directBlock}
         </ConversationManagementSection>}
 
+        {isGroup && !isChannel && <ConversationManagementSection title="Hoạt động nhóm"><ConversationExtraTools conversation={conversation} request={request} notify={notify} activities={activities} onActivity={onActivity} /></ConversationManagementSection>}
         {isGroup && <ConversationGroupManagementMenu conversation={conversation} channel={channel}
           selectedChannelId={selectedChannelId} userId={userId} creatingChannel={creatingChannel} setCreatingChannel={setCreatingChannel}
-          canManageGroup={canManageGroup} canCreateChannel={canCreateChannel} channelCreateBusy={channelCreateBusy}
+          canCreateChannel={canCreateChannel} channelCreateBusy={channelCreateBusy}
           onCreateChannel={onCreateChannel} notificationBusy={notificationBusy} onToggleNotifications={onToggleNotifications}
-          onGroupManagement={onGroupManagement} onCreateGroupActivity={onCreateGroupActivity}
+          onGroupManagement={onGroupManagement}
           canEditGroupPhotos={canEditGroupPhotos} canLeaveGroup={canLeaveGroup} request={request} notify={notify}
           onGroupRenamed={onGroupRenamed} onChannelsChanged={onChannelsChanged}
           onChannelDeleted={onChannelDeleted} onLeftGroup={onLeftGroup} />}
 
-        {!isGroup && !compactDirect && directBlock}
-        {!isChannel && <button type="button" className="conversation-options-danger" disabled={busy} onClick={onClearHistory}>
-          <Trash2 size={19} aria-hidden="true" /><span>Xóa lịch sử trò chuyện</span>
-          <ChevronRight size={16} aria-hidden="true" />
-        </button>}
+        {!isChannel && <ConversationManagementSection title="Riêng tư và lịch sử">
+          {!isGroup && directBlock}
+          <ConversationOptionRow icon={<Trash2 size={18}/>} className="conversation-options-danger" disabled={busy} onClick={onClearHistory}>Xóa lịch sử trò chuyện</ConversationOptionRow>
+        </ConversationManagementSection>}
       </nav>
       {photoTarget && <GroupAvatarEditor target={photoTarget}
         busy={photoBusy} onSave={onSavePhoto} onClose={() => setPhotoTarget(null)} />}

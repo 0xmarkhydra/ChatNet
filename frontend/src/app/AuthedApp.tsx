@@ -99,7 +99,7 @@ import FeedReactionControl from "../features/feed/components/FeedReactionControl
 import StoryViewer from "../features/feed/components/StoryViewer";
 import MessageActions from "../features/chat/components/MessageActions";
 import LinkPreview from "../features/chat/components/LinkPreview";
-import { GroupActivityComposerMenu, GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/components/GroupActivities";
+import { GroupActivityDialog, GroupActivityMarker, useGroupActivities, type GroupActivityKind } from "../features/chat/components/GroupActivities";
 import { messageReactionLabel } from "../features/chat/utils/messageReactions";
 import {
   copyChatImage,
@@ -268,6 +268,7 @@ import CallsSection from "../features/calls/components/CallsSection";
 import ChatTranslationSection from "../features/chat/components/ChatTranslationSection";
 import FeedPostDetail from "../features/feed/components/FeedPostDetail";
 import FeedSection from "../features/feed/components/FeedSection";
+import { useConversationNotificationToggle } from "../features/chat/hooks/useConversationNotificationToggle";
 import ConversationActionDialog from "../features/chat/components/ConversationActionDialog";
 import MessageActionDialog from "../features/chat/components/MessageActionDialog";
 import StoryOverlay from "../features/feed/components/StoryOverlay";
@@ -829,6 +830,8 @@ export default function AuthedApp({
     session, sessionRef, activeConversationId, activeConversationIdRef,
     apiFetch, setConversations, refreshConversations, setNotice,
   })
+
+  const { notificationBusyId, toggleConversationNotifications } = useConversationNotificationToggle({ apiFetch, setConversations, setNotice });
 
   useEffect(() => {
     if (!groupSettingsOpen) setGroupMemberViewOpen(false);
@@ -2347,6 +2350,9 @@ export default function AuthedApp({
         chat: <>
         {tab === 'chat' && desktopSection === null && translationSettingsConversationId === null && (
           <ChatSection
+          onContactSaved={(id, metadata) => setContactMetadata(current => ({ ...current, [id]: metadata }))}
+          notificationBusyId={notificationBusyId}
+          toggleConversationNotifications={toggleConversationNotifications}
           activeChatTranslationSettings={activeChatTranslationSettings}
           activeConversation={activeConversation}
           activeConversationId={activeConversationId}
@@ -2677,6 +2683,21 @@ export default function AuthedApp({
           pinBusy={pinBusy}
           setConversationActionId={setConversationActionId}
           toggleConversationPin={toggleConversationPin}
+          onSetUnread={async (conversation, unread) => {
+            try {
+              const response = await apiFetch('/api/conversations/' + conversation.id + '/read-state', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ unread }),
+              });
+              if (!response.ok) throw new Error('Không cập nhật được trạng thái đọc.');
+              setConversations(current => current.map(item => item.id === conversation.id ? { ...item, manualUnread: unread, unreadCount: unread ? item.unreadCount : 0 } : item));
+              void refreshConversations();
+            } catch (e) { setNotice(e instanceof Error ? e.message : 'Không cập nhật được trạng thái đọc.', 'error'); }
+          }}
+          notificationBusy={notificationBusyId !== null}
+          onToggleNotifications={toggleConversationNotifications}
+          categories={conversationCategories.categories}
+          categoryBusy={conversationCategories.busy}
+          onAssignCategory={conversationCategories.assign}
         />
         )}
 
