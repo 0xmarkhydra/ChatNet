@@ -15,6 +15,7 @@ import StoryActivity from './StoryActivity'
 import StoryHighlightEditor from './StoryHighlightEditor'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
+import { bindStoryVideoProgress } from '../lib/storyVideoProgress'
 
 type Props = {
   activeStory: Story
@@ -43,7 +44,6 @@ export default function StoryViewer(props: Props) {
   const authorLabel = userLabel(activeStory.authorDisplayName, activeStory.author)
   const [paused, setPaused] = useScopedState(activeStory.id, false)
   const [muted, setMuted] = useState(true)
-  const [videoProgress, setVideoProgress] = useScopedState(activeStory.id, 0)
   const [imageProgress, setImageProgress] = useScopedState(activeStory.id, 0)
   const [reply, setReply] = useScopedState(activeStory.id, '')
   const [replySending, setReplySending] = useScopedState(activeStory.id, false)
@@ -55,6 +55,7 @@ export default function StoryViewer(props: Props) {
   const replySequence = useRef(0)
   const activeStoryId = useLatest(activeStory.id)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const videoProgressRef = useRef<HTMLSpanElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const replyInputRef = useRef<HTMLInputElement>(null)
   const optionsButtonRef = useRef<HTMLButtonElement>(null)
@@ -111,6 +112,12 @@ export default function StoryViewer(props: Props) {
       imageElapsedRef.current = Math.min(duration, imageElapsedRef.current + performance.now() - started)
     }
   }, [activeStory.id, duration, isVideo, paused, menuOpen, replySending, activityOpen, nextId, setActiveStoryId, setImageProgress])
+
+  useEffect(() => {
+    const video = videoRef.current
+    const bar = videoProgressRef.current
+    if (isVideo && video && bar) return bindStoryVideoProgress(video, bar)
+  }, [activeStory.id, isVideo, attachment?.url])
 
   useEffect(() => {
     if (!isVideo || !videoRef.current) return
@@ -247,11 +254,6 @@ export default function StoryViewer(props: Props) {
               <video key={activeStory.id} ref={videoRef} src={attachment.url} className="size-full object-contain"
                 autoPlay muted={muted} playsInline
                 onEnded={() => setActiveStoryId(nextId)}
-                onTimeUpdate={(event) => {
-                  const media = event.currentTarget
-                  setVideoProgress(Number.isFinite(media.duration) && media.duration > 0
-                    ? Math.min(100, media.currentTime / media.duration * 100) : 0)
-                }}
                 aria-label={attachment.name}
               />
             ) : (
@@ -279,8 +281,12 @@ export default function StoryViewer(props: Props) {
               aria-label={'Tin ' + (authorIndex + 1) + ' trên ' + authorStories.length}>
               {authorStories.map((story, index) => (
                 <span key={story.id} className="h-0.75 flex-1 overflow-hidden rounded-full bg-white/40">
-                  <span className="block h-full bg-white"
-                    style={{ width: index < authorIndex ? '100%' : index === authorIndex ? (isVideo ? videoProgress : imageProgress) + '%' : '0%' }} />
+                  {isVideo && index === authorIndex ? (
+                    <span key="video" ref={videoProgressRef} className="block h-full w-full origin-left bg-white [transform:scaleX(0)]" />
+                  ) : (
+                    <span key="static" className="block h-full bg-white"
+                      style={{ width: index < authorIndex ? '100%' : index === authorIndex ? imageProgress + '%' : '0%' }} />
+                  )}
                 </span>
               ))}
             </div>
