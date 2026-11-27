@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 import PostComposerLauncher from './PostComposerLauncher'
+import { UiLocaleContext, createUiTranslator } from '@/shared/i18n/locale'
 
 vi.mock('./UserAvatar', () => ({
   default: ({ username }: { username: string }) => <span data-avatar={username} />,
@@ -23,7 +24,7 @@ describe('shared Tailwind post launcher', () => {
 
     try {
       await act(async () => root.render(<PostComposerLauncher
-        username="trung" displayName="Trung" prompt="Bạn đang nghĩ gì?"
+        username="trung" displayName="Trung"
         onCreatePost={onCreatePost}
         onCreateMediaPost={onCreateMediaPost}
         onCreateStory={onCreateStory}
@@ -36,8 +37,8 @@ describe('shared Tailwind post launcher', () => {
       const getButton = (label: string) => container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
       await act(async () => {
         container.querySelector<HTMLButtonElement>('button:not([aria-label])')?.click()
-        getButton('Story')?.click()
-        getButton('Check-in')?.click()
+        getButton(createUiTranslator('vi')('feed.createStory'))?.click()
+        getButton(createUiTranslator('vi')('common.ui.addCheckin'))?.click()
       })
       expect(onCreatePost).toHaveBeenCalledOnce()
       expect(onCreateStory).toHaveBeenCalledOnce()
@@ -66,7 +67,7 @@ describe('shared Tailwind post launcher', () => {
     const root = createRoot(container)
     try {
       await act(async () => root.render(<PostComposerLauncher
-        username="trung" displayName="Trung" prompt="Bạn đang nghĩ gì?" pending storyBusy
+        username="trung" displayName="Trung" pending storyBusy
         onCreatePost={() => {}} onCreateMediaPost={() => {}}
         onCreateStory={() => {}} onCheckIn={() => {}}
       />))
@@ -76,4 +77,28 @@ describe('shared Tailwind post launcher', () => {
       global.IS_REACT_ACT_ENVIRONMENT = prior
     }
   })
+})
+
+it('localizes the shared launcher prompt and shortcuts while retaining the draft state', () => {
+  const global = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  const prior = global.IS_REACT_ACT_ENVIRONMENT
+  global.IS_REACT_ACT_ENVIRONMENT = true
+  const container = document.createElement('div')
+  const root = createRoot(container)
+  const onCreatePost = vi.fn()
+  try {
+    for (const locale of ['vi', 'en', 'zh', 'ja', 'ko']) {
+      const t = createUiTranslator(locale)
+      for (const hasDraft of [false, true]) {
+        act(() => root.render(<UiLocaleContext.Provider value={{ locale }}>
+          <PostComposerLauncher username="trung" displayName="Trung" hasDraft={hasDraft}
+            onCreatePost={onCreatePost} onCreateMediaPost={() => {}} onCreateStory={() => {}} onCheckIn={() => {}} />
+        </UiLocaleContext.Provider>))
+        expect(container.querySelector('button:not([aria-label])')?.textContent).toBe(t(hasDraft ? 'profile.continuePost' : 'feed.whatThinking'))
+        expect(Array.from(container.querySelectorAll('button[aria-label]'), el => el.getAttribute('aria-label'))).toEqual([t('common.photoSlashVideo'), t('feed.createStory'), t('common.ui.addCheckin')])
+        expect(container.querySelector('[data-avatar]')?.getAttribute('data-avatar')).toBe('trung')
+      }
+    }
+    expect(onCreatePost).not.toHaveBeenCalled()
+  } finally { act(() => root.unmount()); global.IS_REACT_ACT_ENVIRONMENT = prior }
 })

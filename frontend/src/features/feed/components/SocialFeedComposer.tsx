@@ -22,7 +22,7 @@ export default function SocialFeedComposer({
       flushOnMobile
       username={username}
       displayName={displayName}
-      prompt={draft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
+      hasDraft={Boolean(draft.trim())}
       pending={pending}
       storyBusy={storyBusy}
       onCreatePost={onCreatePost}

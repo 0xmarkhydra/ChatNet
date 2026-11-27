@@ -1,4 +1,4 @@
-import { useUiTranslation } from '@/shared/i18n/locale'
+import { useUiTranslation, type UiCopyKey } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { LocateFixed, MapPin } from 'lucide-react'
 import * as maplibregl from 'maplibre-gl'
@@ -18,7 +18,7 @@ export default function PostMapPicker({ value, disabled, onConfirm }: {
   const [point, setPoint] = useState<MapCheckIn | null>(initial)
   const [name, setName] = useState(initial?.name ?? '')
   const [ready, setReady] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<UiCopyKey | ''>('')
   const [attempt, setAttempt] = useState(0)
   const [locating, setLocating] = useState(false)
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function PostMapPicker({ value, disabled, onConfirm }: {
       instance = new maplibregl.Map({ container: hostNode, style: 'https://tiles.openfreemap.org/styles/liberty',
         center: start ? [start.longitude, start.latitude] : [105.85, 21.03], zoom: 13 })
     } catch {
-      queueMicrotask(() => { if (active) setError('Không mở được bản đồ trên thiết bị này.') })
+      queueMicrotask(() => { if (active) setError('feed.mapOpenFailed') })
       return () => { active = false }
     }
     map.current = instance
@@ -39,7 +39,7 @@ export default function PostMapPicker({ value, disabled, onConfirm }: {
     const observer = new ResizeObserver(() => instance.resize())
     observer.observe(hostNode)
     instance.on('load', () => { if (active) { setReady(true); setError('') } })
-    instance.on('error', () => { if (active && !instance.isStyleLoaded()) setError('Không tải được bản đồ. Hãy thử lại.') })
+    instance.on('error', () => { if (active && !instance.isStyleLoaded()) setError('feed.mapLoadFailed') })
     instance.on('click', event => {
       if (!active) return
       const coordinates = event.lngLat.wrap()
@@ -56,24 +56,24 @@ export default function PostMapPicker({ value, disabled, onConfirm }: {
     return () => { marker.remove() }
   }, [point, ready, attempt])
   const locate = () => {
-    if (!navigator.geolocation) { setError('Thiết bị không hỗ trợ định vị. Bạn vẫn có thể chọn điểm trên bản đồ.'); return }
+    if (!navigator.geolocation) { setError('feed.mapNoGps'); return }
     setLocating(true)
     const instance = map.current
     navigator.geolocation.getCurrentPosition(position => {
       if (map.current !== instance) return
       setLocating(false)
       map.current?.easeTo({ center: [position.coords.longitude, position.coords.latitude], zoom: 15 })
-    }, () => { if (map.current === instance) { setLocating(false); setError('Không lấy được vị trí hiện tại. Bạn vẫn có thể chọn trên bản đồ.') } }, { timeout: 8000 })
+    }, () => { if (map.current === instance) { setLocating(false); setError('feed.mapLocateFailed') } }, { timeout: 8000 })
   }
   return <div className="grid min-w-0 gap-2">
-    <small>Di chuyển bản đồ và chạm vào một điểm để ghim. Bạn không cần bật GPS.</small>
+    <small>{trUi('feed.mapHint')}</small>
     <div className="relative overflow-hidden rounded-xl border border-border-subtle">
       <div ref={host} aria-label={trUi("common.ui.locationMap")} style={{ width: '100%', height: 'min(42vh, 300px)' }} />
       <button type="button" aria-label={trUi("discover.myLocation")} disabled={!ready || disabled || locating} onClick={locate} className="absolute left-2 top-2 rounded-lg bg-white p-2 shadow"><LocateFixed size={18} /></button>
     </div>
-    {error && <small role="status">{error} {!ready && <button type="button" onClick={() => { setReady(false); setError(''); setAttempt(v => v + 1) }}>{trUi("common.retry")}</button>}</small>}
+    {error && <small role="status">{trUi(error)} {!ready && <button type="button" onClick={() => { setReady(false); setError(''); setAttempt(v => v + 1) }}>{trUi("common.retry")}</button>}</small>}
     {point && <small className="text-muted-foreground"><MapPin size={14} aria-hidden="true" /> {point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}</small>}
     <input type="text" aria-label={trUi("common.ui.selectedLocation")} placeholder={trUi("common.ui.optionalPlaceName")} value={name} maxLength={120} disabled={disabled || !point} onChange={e => setName(e.target.value)} />
-    <button type="button" className="rounded-lg bg-primary px-3 py-2 font-medium text-white disabled:opacity-50" disabled={disabled || !point || !ready} onClick={() => point && onConfirm({ ...point, name })}>Xác nhận vị trí</button>
+    <button type="button" className="rounded-lg bg-primary px-3 py-2 font-medium text-white disabled:opacity-50" disabled={disabled || !point || !ready} onClick={() => point && onConfirm({ ...point, name })}>{trUi('feed.confirmLocation')}</button>
   </div>
 }

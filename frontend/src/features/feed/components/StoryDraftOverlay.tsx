@@ -39,7 +39,7 @@ export default function StoryDraftOverlay({
   const busy = storyBusy || (storyDraft.kind === 'media' && Boolean(mediaUploading))
 
   return (
-    <ProfileOverlay title={trUi("feed.createStory")} closeLabel="Đóng tạo tin" busy={storyBusy || mediaUploading === 'story'}
+    <ProfileOverlay title={trUi("feed.createStory")} closeLabel={trUi("feed.closeStory")} busy={storyBusy || mediaUploading === 'story'}
       onClose={() => setStoryDraft(null)}>
       <div className="box-border px-4 pt-4 pb-5 sm:px-6 sm:pt-5 sm:pb-6">
         {storyDraft.kind === 'choose' ? (
@@ -53,12 +53,12 @@ export default function StoryDraftOverlay({
             <button ref={mediaChoice} type="button" className={choiceCard} data-story-background="indigo"
               onClick={() => fileInput.current?.click()}>
               <span className={choiceIcon}><ImagePlus size={22} aria-hidden="true" /></span>
-              <span className={choiceLabel}>Tạo tin có ảnh hoặc video</span>
+              <span className={choiceLabel}>{trUi('feed.createMediaStory')}</span>
             </button>
             <button type="button" data-story-background="berry" className={choiceCard}
               onClick={() => { setFileError(''); setStoryDraft({ kind: 'text' }) }}>
               <span className={choiceIcon} aria-hidden="true">Aa</span>
-              <span className={choiceLabel}>Tạo tin dạng văn bản</span>
+              <span className={choiceLabel}>{trUi('feed.createTextStory')}</span>
             </button>
           </div>
         ) : storyDraft.kind === 'media' ? (

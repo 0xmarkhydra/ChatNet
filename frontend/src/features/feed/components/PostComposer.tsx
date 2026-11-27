@@ -146,7 +146,7 @@ export default function PostComposer({
             onChange={event => setCheckInLocation(event.target.value)}
             placeholder={trUi("common.ui.placeName")} disabled={isPosting} required /> :
             <Suspense fallback={<small>{trUi("discover.loadingMap")}</small>}><PostMapPicker value={checkInLocation} disabled={isPosting} onConfirm={pin => { setCheckInLocation(formatMapCheckIn(pin)); setActiveTool(null) }} /></Suspense>}
-          <small>{postVisibility === "public" ? "Bài công khai luôn có vị trí GPS. Địa điểm nhập thêm là check-in tùy chọn." : "Không bắt buộc. Chỉ người có quyền xem bài viết mới thấy vị trí này."}</small>
+          <small>{postVisibility === "public" ? trUi("feed.publicGpsHint") : trUi("feed.privateGpsHint")}</small>
           {location && <span className="flex min-w-0 max-w-full items-start gap-1 text-xs font-medium text-neutral-600"><MapPin size={14} className="mt-1 shrink-0 text-neutral-500" aria-hidden="true" /><span className="min-w-0 rounded-md bg-neutral-100 px-1.5 py-0.5 line-clamp-2 [overflow-wrap:anywhere]" title={checkInDisplayName(location)}>{checkInDisplayName(location)}</span></span>}
         </div>
       )}
@@ -177,12 +177,12 @@ export default function PostComposer({
         <div className="feed-pending-media">
           <MediaAttachmentsView items={postAttachments} pending={!editingPost}
             onRemove={isPosting || !!editingPost ? undefined : index => setPostAttachments(current => current.filter((_, i) => i !== index))} />
-          {editingPost && <small className="smart-composer-hint">Ảnh/video đã đăng được giữ nguyên khi sửa bài viết.</small>}
+          {editingPost && <small className="smart-composer-hint">{trUi('feed.editMediaHint')}</small>}
         </div>
       )}
       {mediaUploading === 'feed' && uploadProgress && (
         <div className="smart-upload-progress" role="status" aria-live="polite">
-          <span>Đang tải ảnh/video · {Math.round(100 * uploadProgress.loaded / Math.max(uploadProgress.total, 1))}%</span>
+          <span>{trUi('feed.uploadingMedia', { percent: Math.round(100 * uploadProgress.loaded / Math.max(uploadProgress.total, 1)) })}</span>
           <progress aria-label={trUi("common.ui.mediaProgress")} max={uploadProgress.total} value={uploadProgress.loaded} />
           {cancelUpload && <button type="button" onClick={cancelUpload}>{trUi("common.cancelUpload")}</button>}
         </div>
@@ -209,21 +209,21 @@ export default function PostComposer({
       <div className="feed-composer-settings">
         {!popup && postAudience}
         {showPostBackgrounds && <div className="feed-background-palette" aria-label={trUi("common.ui.choosePostBackground")}>
-          {['', 'violet', 'blue', 'sunset', 'mint', 'night'].map(bg => (
+          {(['', 'violet', 'blue', 'sunset', 'mint', 'night'] as const).map(bg => (
             <button key={bg || 'none'} type="button" className={'feed-palette-dot bg-' + (bg || 'none')}
-              aria-pressed={postBackground === bg} aria-label={bg || trUi("common.ui.noBackground")} onClick={() => setPostBackground(bg)}>
+              aria-pressed={postBackground === bg} aria-label={bg ? trUi(`feed.background.${bg}`) : trUi("common.ui.noBackground")} onClick={() => setPostBackground(bg)}>
               {postBackground === bg ? '✓' : ''}
             </button>
           ))}
         </div>}
       </div>
-      {contentLength > 4500 && <p className="smart-composer-count" aria-live="polite">{contentLength} / 5.000 ký tự</p>}
-      {overLimit && <p className="smart-composer-error" role="alert">Nội dung, địa điểm, cảm xúc và gắn thẻ vượt quá 5.000 ký tự.</p>}
-      {checkInOpen && !location && <p className="smart-composer-hint">Chọn vị trí hoặc bỏ gắn thẻ để tiếp tục.</p>}
+      {contentLength > 4500 && <p className="smart-composer-count" aria-live="polite">{trUi('feed.characterCount', { count: contentLength, limit: 5000 })}</p>}
+      {overLimit && <p className="smart-composer-error" role="alert">{trUi('feed.contentLimit')}</p>}
+      {checkInOpen && !location && <p className="smart-composer-hint">{trUi('feed.selectLocationHint')}</p>}
        {submitError && <p className="profile-post-error" role="alert">{submitError}</p>}
       {(popup || postText.trim() || postAttachments.length > 0 || checkInOpen || taggedFriends.length > 0 || feelingId) && (
         <button className="feed-submit" disabled={isPosting || !!mediaUploading || overLimit || (checkInOpen && !location) ||
-          (!postText.trim() && postAttachments.length === 0 && !location && taggedFriends.length === 0 && !feelingId)}>{isPosting ? trUi("common.processing") : editingPost ? trUi("common.saveChanges") : 'Đăng'}</button>
+          (!postText.trim() && postAttachments.length === 0 && !location && taggedFriends.length === 0 && !feelingId)}>{isPosting ? trUi("common.processing") : editingPost ? trUi("common.saveChanges") : trUi('feed.publishShort')}</button>
       )}
     </form>
   )

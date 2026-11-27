@@ -66,10 +66,10 @@ export default function PostTagPicker({
             </button>
           })}
           {matchingFriends.length === 0 && <p className="smart-tag-empty">
-            {taggableFriends.length ? trUi("chat.noMatchingFriends") : 'Danh sách bạn bè đang trống.'}
+            {taggableFriends.length ? trUi("chat.noMatchingFriends") : trUi('feed.tagEmpty')}
           </p>}
         </div>
-        <small className="smart-tag-hint">{trUi("common.ui.maximum") + ' '}{MAX_TAGGED_FRIENDS} người. Tên tài khoản được lưu vào nội dung bài viết.</small>
+        <small className="smart-tag-hint">{trUi('feed.tagLimit', { count: MAX_TAGGED_FRIENDS })}</small>
       </>}
     </section>
   )

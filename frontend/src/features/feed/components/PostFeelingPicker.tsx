@@ -22,7 +22,7 @@ export default function PostFeelingPicker({ feelingPickerOpen, feelingId, disabl
         <button type="button" disabled={disabled} aria-label={trUi("common.ui.closeFeeling")} onClick={onClose}><X size={17} aria-hidden="true" /></button>
       </header>
       {selected && <div className="smart-feeling-selected">
-        <span><span key={`${selected.id}:${selectionRun}`} className="smart-feeling-emoji" data-feeling={selected.id} aria-hidden="true">{selected.emoji}</span> Đang cảm thấy {selected.label}</span>
+        <span><span key={`${selected.id}:${selectionRun}`} className="smart-feeling-emoji" data-feeling={selected.id} aria-hidden="true">{selected.emoji}</span> {trUi('feed.feelingSelected', { feeling: trUi(`feed.feeling.${selected.id}`) })}</span>
         <button type="button" disabled={disabled} aria-label={trUi("common.ui.removeFeeling")} onClick={onClear}><X size={15} aria-hidden="true" /></button>
       </div>}
       {feelingPickerOpen && <div className="smart-feeling-options" role="group" aria-label={trUi("chat.chooseReaction")}>
@@ -30,7 +30,7 @@ export default function PostFeelingPicker({ feelingPickerOpen, feelingId, disabl
           <button key={feeling.id} type="button" disabled={disabled} aria-pressed={feelingId === feeling.id}
             onClick={() => { setSelectionRun(run => run + 1); onSelect(feeling.id) }}>
             <span className="smart-feeling-emoji" data-feeling={feeling.id} aria-hidden="true">{feeling.emoji}</span>
-            <span>{feeling.label}</span>
+            <span>{trUi(`feed.feeling.${feeling.id}`)}</span>
             {feelingId === feeling.id && <Check size={15} aria-hidden="true" />}
           </button>
         ))}

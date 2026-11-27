@@ -16,10 +16,10 @@ export default function ContactCallConversationSection({ items, label, onOpenCal
       <h3 className="fd-call-section-heading">{label}<small>{items.length}</small></h3>
       {items.map(conversation => <div key={conversation.id} className="fd-person-row fd-call-conversation-row">
         <button type="button" className="fd-person-identity" onClick={() => onOpenCallChat?.(conversation.id)}
-          aria-label={'Mở cuộc trò chuyện với ' + conversation.name}>
+          aria-label={trUi('contacts.openConversationNamed', { name: conversation.name })}>
           <ConversationAvatar conversation={conversation} className="avatar fd-avatar" />
           <span><strong>{conversation.name}</strong><small>{conversation.type === 'group'
-            ? conversation.memberCount + ' thành viên' : conversation.online ? trUi("profile.active") : 'Cuộc trò chuyện cá nhân'}</small></span>
+            ? trUi('common.countMembers', { count: conversation.memberCount }) : conversation.online ? trUi("profile.active") : trUi('contacts.directConversation')}</small></span>
         </button>
         <CallHeaderActions conversationId={conversation.id} disabled={Boolean(conversation.blockedByMe || conversation.blockedByOther)}/>
       </div>)}

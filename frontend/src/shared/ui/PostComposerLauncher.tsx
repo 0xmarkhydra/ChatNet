@@ -6,7 +6,7 @@ import PostStatusPrompt from './PostStatusPrompt'
 type Props = {
   username: string
   displayName: string
-  prompt: string
+  hasDraft?: boolean
   onCreatePost: () => void
   onCreateMediaPost: (files: File[]) => void
   onCreateStory: () => void
@@ -21,7 +21,7 @@ const shortcutClass = 'inline-grid size-10 shrink-0 place-items-center rounded-x
 
 /** One Tailwind-owned launcher for Feed and Profile. Parent page CSS must not style its internals. */
 export default function PostComposerLauncher({
-  username, displayName, prompt, onCreatePost, onCreateMediaPost, onCreateStory, onCheckIn,
+  username, displayName, hasDraft = false, onCreatePost, onCreateMediaPost, onCreateStory, onCheckIn,
   pending = false, storyBusy = false, flushOnMobile = false,
 }: Props) {
   const trUi = useUiTranslation()
@@ -37,7 +37,7 @@ export default function PostComposerLauncher({
           displayName={displayName}
           avatarClassName="relative size-10! shrink-0! overflow-hidden rounded-full! app-mobile:size-9!"
           promptClassName="box-border min-h-[41px] min-w-0 flex-1 rounded-full border border-[#eef0f4] bg-[#f3f5f8] px-[17px] py-2 text-left text-sm font-normal leading-normal text-[#687487] transition-colors hover:border-[#e2e7f0] hover:bg-[#edf1f7] focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-blue-400 disabled:cursor-not-allowed! disabled:opacity-45! app-mobile:min-h-10 app-mobile:px-[11px] app-mobile:text-xs"
-          prompt={prompt}
+          prompt={trUi(hasDraft ? "profile.continuePost" : "feed.whatThinking")}
           onCreatePost={onCreatePost}
           pending={pending}
         />
@@ -54,12 +54,12 @@ export default function PostComposerLauncher({
             onClick={() => quickMediaInput.current?.click()}>
             <ImagePlus size={21} aria-hidden="true" />
           </button>
-          <button type="button" aria-label="Story" title={trUi("feed.createStory")} disabled={pending || storyBusy}
+          <button type="button" aria-label={trUi("feed.createStory")} title={trUi("feed.createStory")} disabled={pending || storyBusy}
             className={`${shortcutClass} border-[#ebe1fc] bg-[#f3edfe] text-[#8250cb]`}
             onClick={onCreateStory}>
             <Clapperboard size={21} aria-hidden="true" />
           </button>
-          <button type="button" aria-label="Check-in" title={trUi("common.ui.addCheckin")} disabled={pending}
+          <button type="button" aria-label={trUi("common.ui.addCheckin")} title={trUi("common.ui.addCheckin")} disabled={pending}
             className={`${shortcutClass} border-[#f9e7d3] bg-[#fff3e6] text-[#d47a26]`}
             onClick={onCheckIn}>
             <MapPin size={21} aria-hidden="true" />

@@ -560,7 +560,7 @@ export default function ProfileSection({
                 {mobileTimeline ? (
                   <div className="-mx-4! w-[calc(100%+32px)]! max-w-none! min-w-0">
                   <PostComposerLauncher flushOnMobile username={name} displayName={displayName}
-                    prompt={postText.trim() ? trUi("profile.continuePost") : trUi("feed.whatThinking")}
+                    hasDraft={Boolean(postText.trim())}
                     onCreatePost={() => setProfileComposerOpen(true)} onCreateMediaPost={onCreateMediaPost}
                     onCreateStory={onCreateStory} onCheckIn={onCheckIn} pending={!!pendingPost || mediaUploading === "feed"} storyBusy={storyBusy} />
                   </div>

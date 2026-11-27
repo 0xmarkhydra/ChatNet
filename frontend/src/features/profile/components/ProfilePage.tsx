@@ -118,7 +118,7 @@ export default function ProfilePage({
                 <PostComposerLauncher
                   username={username}
                   displayName={displayName}
-                  prompt={postDraft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
+                  hasDraft={Boolean(postDraft.trim())}
                   onCreatePost={onCreatePost}
                   onCreateMediaPost={onCreateMediaPost}
                   onCreateStory={onCreateStory}

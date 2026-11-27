@@ -195,7 +195,7 @@ export default function ContactsView({
       </section>}
         <section className="fd-card fd-list-card">
           {searching ? <>
-            <div className="fd-list-header"><div><h2>{trUi("common.searchResults")}</h2><p>Tìm người dùng theo tên, username hoặc email</p></div>
+            <div className="fd-list-header"><div><h2>{trUi("common.searchResults")}</h2><p>{trUi('contacts.searchHint')}</p></div>
               <button type="button" className="fd-text-button" onClick={() => setFriendQuery('')}>{trUi("common.clearSearch")}</button></div>
 
             <ContactSearchResults results={contactSearchResults}
@@ -203,7 +203,7 @@ export default function ContactsView({
               relationshipFor={friendRelationship} onAction={act} onProfile={setFriendPreview}
               onRetry={() => setFriendSearchRetry(value => value + 1)} />
           </> : <>
-            <div className="fd-list-header"><h2>{embeddedInCalls ? trUi("contacts.friends") : 'Tất cả bạn bè'}</h2>
+            <div className="fd-list-header"><h2>{embeddedInCalls ? trUi("contacts.friends") : trUi('contacts.allFriends')}</h2>
               <div className="fd-list-actions">
                 <span>{trUi("common.countPeople", { count: friends.length })}</span>
                 <button type="button" aria-label={trUi("contacts.reloadFriends")} title={trUi("contacts.reloadFriends")}
@@ -212,9 +212,9 @@ export default function ContactsView({
             </div>
             <div ref={filterHostRef} className="fd-filters sliding-pill-host" role="group" aria-label={trUi("common.ui.filterContacts")}>
               <span ref={filterPillRef} className="sliding-pill contacts-filter-active-pill" aria-hidden="true" />
-              {([['alphabetical','A – Z'],['online','Đang online'],['favorites','Yêu thích']] as const).map(([filter,label]) =>
+              {([['alphabetical','A – Z'],['online','contacts.online'],['favorites','contacts.favorites']] as const).map(([filter,label]) =>
                 <button ref={directoryFilter === filter ? filterActiveRef : undefined} type="button" key={filter} className={directoryFilter === filter ? 'active' : ''}
-                  aria-pressed={directoryFilter === filter} onClick={() => setDirectoryFilter(filter)}>{label}</button>)}
+                  aria-pressed={directoryFilter === filter} onClick={() => setDirectoryFilter(filter)}>{filter === 'alphabetical' ? label : trUi(label as 'contacts.online' | 'contacts.favorites')}</button>)}
             </div>
             {friendsError && <div className="fd-sync-feedback" role="alert">
               <span>{friendsError}</span>
@@ -232,22 +232,22 @@ export default function ContactsView({
                   }}>{avatar(friend)}<span>
                     <strong>{contactMetadata[friend.id]?.nickname || personName(friend)}</strong>
                     <small>{friend.online ? trUi("profile.active") : trUi("common.offline")}
-                      {contactMetadata[friend.id]?.favorite ? ' · Yêu thích' : ''}
-                      {friend.blockedByOther ? ' · Bạn đã bị chặn' : friend.blockedByMe ? ' · Đã chặn' : ''}</small>
+                      {contactMetadata[friend.id]?.favorite ? ' · ' + trUi('contacts.favorites') : ''}
+                      {friend.blockedByOther ? ' · ' + trUi('chat.blockedBy') : friend.blockedByMe ? ' · ' + trUi('contacts.blocked') : ''}</small>
                   </span></button>
                 {embeddedInCalls && <>
-                  <button type="button" className="fd-icon-btn" aria-label={'Gọi thoại cho ' + personName(friend)}
+                  <button type="button" className="fd-icon-btn" aria-label={trUi('contacts.voiceCallNamed', { name: personName(friend) })}
                     disabled={isBlocked(friend)} onClick={() => startCall(friend)}><Phone size={20}/></button>
-                  <button type="button" className="fd-icon-btn" aria-label={'Gọi video cho ' + personName(friend)}
+                  <button type="button" className="fd-icon-btn" aria-label={trUi('contacts.videoCallNamed', { name: personName(friend) })}
                     disabled={isBlocked(friend)} onClick={() => void openDirectByUsername(friend.username, 'video')}><Video size={20}/></button>
                 </>}
               </div>
-              {!embeddedInCalls && !isMobileLayout && expandedFriendId === friend.id && <section className="fd-inline-profile" aria-label={'Thông tin của ' + personName(friend)}>
+              {!embeddedInCalls && !isMobileLayout && expandedFriendId === friend.id && <section className="fd-inline-profile" aria-label={trUi('contacts.infoNamed', { name: personName(friend) })}>
                 {profileDetails(friend)}
               </section>}
               </Fragment>)}
               {visibleFriends.length === 0 && !friendsError && (!embeddedInCalls || (callSections.groups.length === 0 && callSections.otherContacts.length === 0)) && <p className="fd-empty" role={friendsLoading ? 'status' : undefined}>
-                {friendsLoading ? 'Đang tải danh sách bạn bè...' : friends.length ? trUi("chat.noFriends") : embeddedInCalls ? 'Bạn chưa có bạn bè trong danh bạ.' : 'Bạn chưa có bạn bè. Nhấn Kết bạn mới để kết nối.'}
+                {friendsLoading ? trUi('contacts.loadingFriends') : friends.length ? trUi("chat.noFriends") : embeddedInCalls ? trUi('contacts.emptyDirectory') : trUi('contacts.emptyFriendsHint')}
               </p>}
               {embeddedInCalls && <ContactCallConversationSection items={callSections.groups} label={trUi("chat.group")} onOpenCallChat={onOpenCallChat} />}
               {embeddedInCalls && <ContactCallConversationSection items={callSections.otherContacts} label={trUi("contacts.otherContacts")} onOpenCallChat={onOpenCallChat} />}
@@ -257,7 +257,7 @@ export default function ContactsView({
         </div>
         {!embeddedInCalls && <section className="fd-card fd-profile-panel" aria-label={trUi("contacts.friendInfo")}>
           {selectedFriend && !searching ? profileDetails(selectedFriend) : <div className="fd-empty fd-profile-placeholder"><Users size={38}/>
-            <h2>{searching ? 'Kết nối bạn bè' : 'Chưa chọn bạn bè'}</h2><p>{searching ? 'Chọn một kết quả tìm kiếm để xem hồ sơ.' : 'Kết bạn mới để xem thông tin ở đây.'}</p></div>}
+            <h2>{searching ? trUi('contacts.connectFriends') : trUi('contacts.noSelection')}</h2><p>{searching ? trUi('contacts.selectResult') : trUi('contacts.selectHint')}</p></div>}
         </section>}
       </div>
     </> : <ContactInvitations friendRequests={friendRequests} friendBusyIds={friendBusyIds} actOnFriend={actOnFriend} declineFriendRequest={declineFriendRequest} connectionUrl={connectionUrl} onScanQr={onScanQr} onBack={() => { onScreenChange('directory'); setFriendQuery('') }} onSearch={openSearch} />}
