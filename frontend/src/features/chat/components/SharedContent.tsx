@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { userLabel } from '../../../shared/utils/userLabel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileText, Images, Link2, X } from 'lucide-react'
@@ -62,6 +63,8 @@ export default function SharedContent({
   request: RequestFn
   onClose: () => void
 }) {
+  const trUi = useUiTranslation()
+
   const requestRef = useLatest(request)
   const [tab, setTab] = useState<Tab>(initialTab)
   const view = [conversationId, channelId, tab].join(':')
@@ -130,18 +133,18 @@ export default function SharedContent({
   )
 
   return (
-    <div className="shared-content-layer" role="dialog" aria-modal="true" aria-label="Nội dung đã chia sẻ">
-      <button className="shared-content-scrim" type="button" aria-label="Đóng nội dung dùng chung" onClick={onClose} />
+    <div className="shared-content-layer" role="dialog" aria-modal="true" aria-label={trUi("chat.sharedContent")}>
+      <button className="shared-content-scrim" type="button" aria-label={trUi("common.ui.closeSharedContent")} onClick={onClose} />
       <section className="shared-content-sheet">
         <header className="shared-content-header">
           <div>
-            <strong>Nội dung đã chia sẻ</strong>
+            <strong>{trUi("chat.sharedContent")}</strong>
             <small>Ảnh, video, tệp và liên kết trong cuộc trò chuyện</small>
           </div>
-          <button type="button" onClick={onClose} aria-label="Đóng"><X size={20} /></button>
+          <button type="button" onClick={onClose} aria-label={trUi("common.close")}><X size={20} /></button>
         </header>
 
-        <nav className="shared-content-tabs" aria-label="Loại nội dung">
+        <nav className="shared-content-tabs" aria-label={trUi("common.ui.contentType")}>
           {tabs.map(({ id, label, icon: Icon }) => (
             <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
               <Icon size={17} /><span>{label}</span>
@@ -152,7 +155,7 @@ export default function SharedContent({
         <div className="shared-content-body">
 
           {loading && <div className="shared-content-state" role="status">Đang tải nội dung đã chia sẻ...</div>}
-          {error && <div className="shared-content-state error"><span>{error}</span><button type="button" onClick={() => void load(true)}>Thử lại</button></div>}
+          {error && <div className="shared-content-state error"><span>{error}</span><button type="button" onClick={() => void load(true)}>{trUi("common.retry")}</button></div>}
           {empty && <div className="shared-content-state">Chưa có nội dung thuộc mục này.</div>}
 
           {!loading && !error && tab === 'media' && (
@@ -168,7 +171,7 @@ export default function SharedContent({
                 >
                   {attachment.kind === 'video'
                     ? <video src={attachment.url} muted playsInline preload="metadata" />
-                    : <img src={attachment.url} alt={attachment.name || 'Ảnh đã chia sẻ'} loading="lazy" />}
+                    : <img src={attachment.url} alt={attachment.name || trUi("common.ui.sharedPhotos")} loading="lazy" />}
                   <span>{userLabel(message.senderDisplayName, message.sender)}</span>
                 </button>
               ))}
@@ -212,9 +215,7 @@ export default function SharedContent({
           )}
 
           {!loading && !error && nextBefore && (
-            <button className="shared-content-more" type="button" disabled={loadingMore} onClick={() => void load(false)}>
-              Xem thêm
-            </button>
+            <button className="shared-content-more" type="button" disabled={loadingMore} onClick={() => void load(false)}>{trUi("common.seeMore")}</button>
           )}
         </div>
       </section>

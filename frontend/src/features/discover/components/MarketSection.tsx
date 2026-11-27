@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { lazy } from "react";
 import { Suspense } from "react";
 import { ErrorBoundary } from "../../../shared/ui/ErrorBoundary";
@@ -19,9 +20,11 @@ export default function MarketSection({
   apiFetch,
   session,
 }: MarketSectionProps) {
+  const trUi = useUiTranslation()
+
   return (
-      <ErrorBoundary resetKey={session.sessionId} fallback={(retry) => <AsyncSectionFallback title="Chợ" onRetry={retry} onReload={() => window.location.reload()} />}>
-      <Suspense fallback={<AsyncSectionFallback title="Chợ" loading />}>
+      <ErrorBoundary resetKey={session.sessionId} fallback={(retry) => <AsyncSectionFallback title={trUi("discover.market")} onRetry={retry} onReload={() => window.location.reload()} />}>
+      <Suspense fallback={<AsyncSectionFallback title={trUi("discover.market")} loading />}>
             <Marketplace
               searchQuery={searchQuery}
               key={session.sessionId}

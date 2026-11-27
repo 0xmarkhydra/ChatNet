@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { BellOff } from 'lucide-react'
 import { CategoryBadge } from './ConversationCategories'
 import type { ConversationCategory } from '../hooks/useConversationCategories'
@@ -10,12 +11,14 @@ export default function ConversationRailStatus({
   category?: ConversationCategory
   muted?: boolean
 }) {
+  const trUi = useUiTranslation()
+
   if (!category && !muted) return null
 
   return <span className="conversation-rail-status">
     {category && <CategoryBadge category={category} iconOnly plain />}
     {muted && <span className="conversation-rail-notification-state is-muted"
-      title="Đã tắt thông báo" role="img" aria-label="Đã tắt thông báo">
+      title={trUi("chat.muted")} role="img" aria-label={trUi("chat.muted")}>
       <BellOff size={13} aria-hidden="true" />
     </span>}
   </span>

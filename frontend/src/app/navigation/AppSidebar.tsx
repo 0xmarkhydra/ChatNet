@@ -1,12 +1,13 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { Bell, Bookmark, BookUser, Compass, MessageCircle, Newspaper, Scan, Search, Settings, ShoppingBag } from 'lucide-react'
-import { formatUnreadMessageDescription } from '../../features/i18n/lib/i18n'
+import { formatUnreadMessageDescription, UI_MESSAGES, type UIMessageKey } from '../../features/i18n/lib/i18n'
 import type { Tab } from '../../shared/types/navigation'
 import UserAvatar from '../../shared/ui/UserAvatar'
 import { Button } from '../../shared/ui/button'
 import { cn } from '../../shared/lib/utils'
 
 type Props = {
+  t?: (key: UIMessageKey) => string
   tab: Tab
   section: 'groups' | 'calls' | null
   username: string
@@ -25,7 +26,7 @@ type Props = {
 }
 
 export default function AppSidebar({
-  tab, section, username, displayName, unreadTotal, notificationCount, feedSaved, settingsActive,
+  t = key => UI_MESSAGES[key], tab, section, username, displayName, unreadTotal, notificationCount, feedSaved, settingsActive,
   onNavigate, onSaved, onSettings, onScreenshot, screenshotBusy, searchActive = false, onSearch,
 }: Props) {
   const activeKey = `${tab}:${section ?? ''}:${feedSaved}:${settingsActive}:${searchActive}`
@@ -94,28 +95,28 @@ export default function AppSidebar({
   }, [activeKey])
 
   const mainItems = [
-    ...(onSearch ? [{ label: 'Tìm kiếm', Icon: Search, active: searchActive, action: onSearch }] : []),
-    { label: 'Bảng tin', Icon: Newspaper, active: tab === 'feed' && !feedSaved, action: () => onNavigate('feed') },
-    { label: 'Tin nhắn', Icon: MessageCircle, active: tab === 'chat' && section === null, action: () => onNavigate('chat'), count: unreadTotal },
-    { label: 'Khám phá', Icon: Compass, active: tab === 'discover' && !searchActive, action: () => onNavigate('discover') },
-    { label: 'Danh bạ', Icon: BookUser, active: tab === 'contacts', action: () => onNavigate('contacts') },
-    { label: 'Marketplace', Icon: ShoppingBag, active: tab === 'market', action: () => onNavigate('market') },
+    ...(onSearch ? [{ label: t('common.search'), key: 'common.search', Icon: Search, active: searchActive, action: onSearch }] : []),
+    { label: t('nav.feed'), key: 'nav.feed', Icon: Newspaper, active: tab === 'feed' && !feedSaved, action: () => onNavigate('feed') },
+    { label: t('nav.chat'), key: 'nav.chat', Icon: MessageCircle, active: tab === 'chat' && section === null, action: () => onNavigate('chat'), count: unreadTotal },
+    { label: t('nav.desktopDiscover'), key: 'nav.desktopDiscover', Icon: Compass, active: tab === 'discover' && !searchActive, action: () => onNavigate('discover') },
+    { label: t('nav.desktopContacts'), key: 'nav.desktopContacts', Icon: BookUser, active: tab === 'contacts', action: () => onNavigate('contacts') },
+    { label: t('nav.market'), key: 'nav.market', Icon: ShoppingBag, active: tab === 'market', action: () => onNavigate('market') },
   ]
 
   return (
-    <aside className="app-sidebar" aria-label="Điều hướng SocCo">
+    <aside className="app-sidebar" aria-label={t("nav.sidebar")}>
       <div className="app-sidebar-brand">
         <span className="app-sidebar-logo"><img src="/soco-mark.svg" alt="" width="40" height="40" /></span>
-        <span className="app-sidebar-brand-copy"><strong>SocCo</strong><small>ChatNet · Kết nối cộng đồng</small></span>
+        <span className="app-sidebar-brand-copy"><strong>SocCo</strong><small>{t("nav.community")}</small></span>
       </div>
-      <nav className="app-sidebar-nav" aria-label="Các khu vực" ref={navRef}>
+      <nav className="app-sidebar-nav" aria-label={t("nav.sections")} ref={navRef}>
         <span ref={pillRef} className="sidebar-liquid-pill" aria-hidden="true" />
-        {mainItems.map(({ label, Icon, active, action, count }) => (
+        {mainItems.map(({ label, key, Icon, active, action, count }) => (
           <Button
             variant="ghost"
-            key={label}
+            key={key}
             aria-label={label}
-            aria-keyshortcuts={label === 'Tìm kiếm' ? 'Control+K Meta+K' : undefined}
+            aria-keyshortcuts={key === 'common.search' ? 'Control+K Meta+K' : undefined}
             aria-describedby={count ? unreadDescriptionId : undefined}
             className={cn('app-sidebar-link justify-start', active && 'is-active')}
             aria-current={active ? 'page' : undefined}
@@ -127,38 +128,38 @@ export default function AppSidebar({
             {count ? <b className="app-sidebar-count" aria-hidden="true">{count > 99 ? '99+' : count}</b> : null}
           </Button>
         ))}
-        {unreadTotal > 0 && <span id={unreadDescriptionId} hidden>{formatUnreadMessageDescription(unreadTotal)}</span>}
+        {unreadTotal > 0 && <span id={unreadDescriptionId} hidden>{formatUnreadMessageDescription(unreadTotal, t("nav.chatUnread"))}</span>}
       </nav>
-      <div className="app-sidebar-secondary" role="group" aria-label="Tiện ích">
+      <div className="app-sidebar-secondary" role="group" aria-label={t("nav.tools")}>
       {onScreenshot && (
         <Button
           type="button"
           variant="ghost"
           className="app-sidebar-link justify-start"
-          aria-label="Chụp màn hình không kèm cửa sổ SocCO"
+          aria-label={t("nav.screenshotHint")}
           aria-keyshortcuts="Control+Alt+A"
-          title="Chụp màn hình không kèm cửa sổ SocCO (Ctrl+Alt+A)"
+          title={`${t("nav.screenshotHint")} (Ctrl+Alt+A)`}
           disabled={screenshotBusy}
           onClick={onScreenshot}
         >
           <Scan size={22} strokeWidth={1.8} aria-hidden="true" />
-          <span>Chụp màn hình</span>
+          <span>{t("nav.screenshot")}</span>
         </Button>
       )}
-        <Button variant="ghost" className={cn('app-sidebar-link justify-start', tab === 'notifications' && 'is-active')} aria-label="Thông báo" aria-current={tab === 'notifications' ? 'page' : undefined} onClick={() => onNavigate('notifications')}>
-          <Bell size={22} strokeWidth={1.8} aria-hidden="true" /><span>Thông báo</span>
+        <Button variant="ghost" className={cn('app-sidebar-link justify-start', tab === 'notifications' && 'is-active')} aria-label={t("nav.notifications")} aria-current={tab === 'notifications' ? 'page' : undefined} onClick={() => onNavigate('notifications')}>
+          <Bell size={22} strokeWidth={1.8} aria-hidden="true" /><span>{t("nav.notifications")}</span>
           {notificationCount > 0 && <b className="app-sidebar-count">{notificationCount > 99 ? '99+' : notificationCount}</b>}
         </Button>
-        <Button variant="ghost" className={cn('app-sidebar-link justify-start', tab === 'feed' && feedSaved && 'is-active')} aria-label="Đã lưu" aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
-          <Bookmark size={22} strokeWidth={1.8} aria-hidden="true" /><span>Đã lưu</span>
+        <Button variant="ghost" className={cn('app-sidebar-link justify-start', tab === 'feed' && feedSaved && 'is-active')} aria-label={t("nav.saved")} aria-current={tab === 'feed' && feedSaved ? 'page' : undefined} onClick={onSaved}>
+          <Bookmark size={22} strokeWidth={1.8} aria-hidden="true" /><span>{t("nav.saved")}</span>
         </Button>
-        <Button variant="ghost" className={cn('app-sidebar-link justify-start', settingsActive && 'is-active')} aria-label="Cài đặt" aria-current={settingsActive ? 'page' : undefined} onClick={onSettings}>
-          <Settings size={22} strokeWidth={1.8} aria-hidden="true" /><span>Cài đặt</span>
+        <Button variant="ghost" className={cn('app-sidebar-link justify-start', settingsActive && 'is-active')} aria-label={t("nav.settings")} aria-current={settingsActive ? 'page' : undefined} onClick={onSettings}>
+          <Settings size={22} strokeWidth={1.8} aria-hidden="true" /><span>{t("nav.settings")}</span>
         </Button>
       </div>
-      <Button variant="ghost" className={cn('app-sidebar-account justify-start', tab === 'profile' && !settingsActive && 'is-active')} onClick={() => onNavigate('profile')} aria-label="Cá nhân" aria-current={tab === 'profile' && !settingsActive ? 'page' : undefined}>
+      <Button variant="ghost" className={cn('app-sidebar-account justify-start', tab === 'profile' && !settingsActive && 'is-active')} onClick={() => onNavigate('profile')} aria-label={t("nav.profile")} aria-current={tab === 'profile' && !settingsActive ? 'page' : undefined}>
         <UserAvatar username={username} name={displayName} className="app-sidebar-avatar" online />
-        <span className="app-sidebar-account-copy"><strong>{displayName}</strong><small>Đang hoạt động</small></span>
+        <span className="app-sidebar-account-copy"><strong>{displayName}</strong><small>{t("nav.active")}</small></span>
       </Button>
     </aside>
   )

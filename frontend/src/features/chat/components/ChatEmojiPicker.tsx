@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState } from 'react'
 import { Search } from 'lucide-react'
 import { chatEmojiGroups, searchChatEmojis } from '../utils/chatEmojiCatalog'
@@ -10,6 +11,8 @@ type Props = {
 }
 
 export default function ChatEmojiPicker({ onSelect, selectedEmoji, label = 'Danh sách emoji' }: Props) {
+  const trUi = useUiTranslation()
+
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState(chatEmojiGroups[0].id)
   const emojis = searchChatEmojis(search, category)
@@ -20,13 +23,13 @@ export default function ChatEmojiPicker({ onSelect, selectedEmoji, label = 'Danh
         <Search size={16} aria-hidden="true" />
         <input
           type="search"
-          aria-label="Tìm emoji"
-          placeholder="Tìm emoji..."
+          aria-label={trUi("chat.emojiSearch")}
+          placeholder={trUi("chat.emojiPlaceholder")}
           value={search}
           onChange={event => setSearch(event.target.value)}
         />
       </div>
-      <div className="chat-emoji-picker-categories" role="group" aria-label="Loại emoji">
+      <div className="chat-emoji-picker-categories" role="group" aria-label={trUi("chat.emojiCategory")}>
         {chatEmojiGroups.map(group => (
           <button
             key={group.id}
@@ -40,9 +43,9 @@ export default function ChatEmojiPicker({ onSelect, selectedEmoji, label = 'Danh
         ))}
       </div>
       <div className="chat-emoji-picker-heading">
-        {search ? 'Kết quả tìm kiếm' : chatEmojiGroups.find(group => group.id === category)?.name}
+        {search ? trUi("common.searchResults") : chatEmojiGroups.find(group => group.id === category)?.name}
       </div>
-      <div className="chat-emoji-picker-grid" role="group" aria-label="Chọn emoji">
+      <div className="chat-emoji-picker-grid" role="group" aria-label={trUi("chat.selectEmoji")}>
         {emojis.length > 0 ? emojis.map(({ emoji, label: emojiLabel }) => (
           <button
             key={emoji}
@@ -53,7 +56,7 @@ export default function ChatEmojiPicker({ onSelect, selectedEmoji, label = 'Danh
             title={emojiLabel}
             onClick={() => onSelect(emoji)}
           >{emoji}</button>
-        )) : <p className="chat-emoji-picker-empty">Không tìm thấy emoji phù hợp.</p>}
+        )) : <p className="chat-emoji-picker-empty">{trUi("chat.noEmoji")}</p>}
       </div>
     </div>
   )

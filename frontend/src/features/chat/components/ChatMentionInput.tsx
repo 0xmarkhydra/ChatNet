@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useId, useLayoutEffect, useRef, useState, type RefObject, type ClipboardEvent } from 'react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import type { GroupMember } from '../types'
@@ -18,6 +19,8 @@ type Props = {
 type Candidate = { key: string; username: string; displayName: string; online?: boolean; all?: boolean }
 
 export default function ChatMentionInput({ members, inputRef, text, setText, placeholder, onFilesPaste }: Props) {
+  const trUi = useUiTranslation()
+
   const [cursor, setCursor] = useState(0)
   const [focused, setFocused] = useState(false)
   const [dismissed, setDismissed] = useState(false)
@@ -94,7 +97,7 @@ export default function ChatMentionInput({ members, inputRef, text, setText, pla
 
   return (
     <div className="chat-mention-input">
-      {open && <div className="chat-mention-list" id={mentionListId} role="listbox" aria-label="Nhắc đến thành viên">
+      {open && <div className="chat-mention-list" id={mentionListId} role="listbox" aria-label={trUi("chat.mentionMember")}>
         {candidates.map((candidate, index) => (
           <button
             key={candidate.key}
@@ -110,7 +113,7 @@ export default function ChatMentionInput({ members, inputRef, text, setText, pla
               ? <span className="chat-mention-avatar" aria-hidden="true">@</span>
               : <UserAvatar username={candidate.username} name={candidate.displayName || candidate.username} className="chat-mention-avatar" />}
             <span className="chat-mention-name"><strong>{candidate.displayName || candidate.username}</strong><small>@{candidate.username}</small></span>
-            {candidate.online && <span className="chat-mention-online" aria-label="Đang hoạt động" />}
+            {candidate.online && <span className="chat-mention-online" aria-label={trUi("profile.active")} />}
           </button>
         ))}
       </div>}
@@ -122,7 +125,7 @@ export default function ChatMentionInput({ members, inputRef, text, setText, pla
           ref={inputRef}
           className="chat-message-input"
           rows={1}
-          aria-label="Tin nhắn"
+          aria-label={trUi("chat.messages")}
           aria-autocomplete={members.length ? 'list' : 'none'}
           aria-expanded={open}
           aria-controls={open ? mentionListId : undefined}
@@ -158,7 +161,7 @@ export default function ChatMentionInput({ members, inputRef, text, setText, pla
             event.currentTarget.form?.requestSubmit()
           }}
           onPaste={onFilesPaste}
-          title="Dán ảnh/tệp bằng Cmd/Ctrl+V hoặc kéo thả vào cuộc trò chuyện"
+          title={trUi("chat.pasteFile")}
           maxLength={4000}
         />
       </div>

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState } from 'react'
 import { ArrowLeft, Check, ChevronDown, Info, Languages, ShieldCheck, X } from 'lucide-react'
 import type { Conversation } from '../types'
@@ -22,6 +23,8 @@ const DISPLAY_OPTIONS: Array<{ value: ChatTranslationDisplay, label: string }> =
 export default function ChatTranslationSettingsPage({
   conversation, initial, languages, onCancel, onSave,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [draft, setDraft] = useState<ChatTranslationSettings>(initial)
   const update = <K extends keyof ChatTranslationSettings>(key: K, value: ChatTranslationSettings[K]) =>
     setDraft(previous => ({ ...previous, [key]: value }))
@@ -53,34 +56,34 @@ export default function ChatTranslationSettingsPage({
   )
 
   return (
-    <div className="chat-translation-settings-page" aria-label="Ngôn ngữ và dịch AI">
+    <div className="chat-translation-settings-page" aria-label={trUi("chat.languageAI")}>
       <section className="chat-translation-settings-form" aria-labelledby="translation-page-heading">
         <div className="chat-translation-settings-heading">
           <Languages size={23} aria-hidden="true" />
           <div>
-            <h1 id="translation-page-heading">Dịch tin nhắn tự động</h1>
+            <h1 id="translation-page-heading">{trUi("chat.autoMessageTranslate")}</h1>
             <p>Giúp bạn trò chuyện với người dùng khác ngôn ngữ.</p>
           </div>
         </div>
         <label className="chat-translation-setting-toggle">
           <span>
-            <strong>Bật dịch cho cuộc trò chuyện này</strong>
+            <strong>{trUi("chat.enableTranslation")}</strong>
             <small>Dịch khi có tin nhắn khác ngôn ngữ.</small>
           </span>
           <input type="checkbox" checked={draft.enabled}
             onChange={event => update('enabled', event.target.checked)}
-            aria-label="Bật dịch cho cuộc trò chuyện này" />
+            aria-label={trUi("chat.enableTranslation")} />
           <span className="chat-translation-setting-switch" aria-hidden="true"><span /></span>
         </label>
         {languageField('targetLanguage', 'Ngôn ngữ của bạn')}
         {languageField('sourceLanguage', 'Ngôn ngữ người kia')}
         <label className="chat-translation-setting-field" htmlFor="translationDisplayMode">
-          <span>Chế độ hiển thị</span>
+          <span>{trUi("chat.displayMode")}</span>
           <span className="chat-translation-select">
             <Languages size={19} aria-hidden="true" />
             <select id="translationDisplayMode" value={draft.display}
               onChange={event => update('display', event.target.value as ChatTranslationDisplay)}
-              aria-label="Chế độ hiển thị">
+              aria-label={trUi("chat.displayMode")}>
               {DISPLAY_OPTIONS.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -94,15 +97,13 @@ export default function ChatTranslationSettingsPage({
         </p>
         <div className="chat-translation-settings-actions">
           <button type="button" className="chat-translation-cancel" onClick={onCancel}>
-            <X size={17} aria-hidden="true" /> Hủy
-          </button>
+            <X size={17} aria-hidden="true" />{trUi("common.cancel")}</button>
           <button type="button" className="chat-translation-save" onClick={() => onSave(draft)}>
-            <Check size={18} aria-hidden="true" /> Lưu thay đổi
-          </button>
+            <Check size={18} aria-hidden="true" />{trUi("common.saveChanges")}</button>
         </div>
       </section>
-      <aside className="chat-translation-settings-preview" aria-label="Xem trước bản dịch">
-        <h2>Xem trước</h2>
+      <aside className="chat-translation-settings-preview" aria-label={trUi("chat.translationPreview")}>
+        <h2>{trUi("common.preview")}</h2>
         <div className="chat-translation-preview-person">
           <UserAvatar name={conversation.name} username={conversation.otherUsername}
             group={conversation.type === 'group'} />
@@ -120,16 +121,15 @@ export default function ChatTranslationSettingsPage({
               draft.display === 'bilingual' ? 'Hiển thị cùng tin gốc' : 'Hiển thị khi cần thiết'}</small>
           </div>
         ) : (
-          <div className="chat-translation-preview-disabled">Dịch tự động đang tắt đối với cuộc trò chuyện này.</div>
+          <div className="chat-translation-preview-disabled">{trUi("chat.translationDisabled")}</div>
         )}
         <div className="chat-translation-preview-tip">
-          <h3><Info size={18} aria-hidden="true" /> Lưu ý về bản dịch</h3>
+          <h3><Info size={18} aria-hidden="true" />{trUi("chat.translationNote")}</h3>
           <p>Đây là ví dụ minh họa. Kết quả dịch thực tế có thể khác tùy ngôn ngữ và ngữ cảnh.</p>
-          <p>Có thể xem lại tin gốc khi cần.</p>
+          <p>{trUi("chat.viewOriginal")}</p>
         </div>
         <button className="chat-translation-preview-back" type="button" onClick={onCancel}>
-          <ArrowLeft size={16} aria-hidden="true" /> Quay lại hội thoại
-        </button>
+          <ArrowLeft size={16} aria-hidden="true" />{trUi("chat.backChat")}</button>
       </aside>
     </div>
   )

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import ChatEmojiPicker from './ChatEmojiPicker'
 import type { MessageActionsProps } from '../types/messageActions'
 
@@ -5,7 +6,9 @@ import type { MessageActionsProps } from '../types/messageActions'
 export default function MessageReactionChooser({
   activeMessageAction, toggleReaction, setMessageActionId,
 }: Pick<MessageActionsProps, 'activeMessageAction' | 'toggleReaction' | 'setMessageActionId'>) {
+  const trUi = useUiTranslation()
+
   const selectedEmoji = activeMessageAction.reactions?.find(reaction => reaction.mine)?.emoji
-  return <ChatEmojiPicker label="Chọn emoji để thả cảm xúc" selectedEmoji={selectedEmoji}
+  return <ChatEmojiPicker label={trUi("common.ui.chooseReaction")} selectedEmoji={selectedEmoji}
     onSelect={emoji => { setMessageActionId(null); void toggleReaction(activeMessageAction, emoji) }} />
 }

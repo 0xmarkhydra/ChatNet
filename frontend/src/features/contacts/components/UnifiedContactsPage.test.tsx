@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import UnifiedContactsPage from './UnifiedContactsPage'
+import { UiLocaleContext } from '@/shared/i18n/locale'
 
 vi.mock('../../calls/components/CallCenter', () => ({
   default: ({ contactMode }: { contactMode: string }) => <div data-testid="call-content">{contactMode}</div>,
@@ -46,14 +47,15 @@ function mount(path = '/contacts') {
       />
     </>
   }
-  act(() => root.render(<MemoryRouter initialEntries={[path]}><Page /></MemoryRouter>))
+  const setLocale = (locale: string) => act(() => root.render(<UiLocaleContext.Provider value={{ locale }}><MemoryRouter initialEntries={[path]}><Page /></MemoryRouter></UiLocaleContext.Provider>))
+  setLocale('vi')
   cleanup.push(() => { act(() => root.unmount()); host.remove() })
   const button = (name: string) => {
     const found = [...host.querySelectorAll('button')].find(item => item.textContent?.includes(name))
     if (!found) throw new Error('Missing button ' + name)
     return found
   }
-  return { host, button, onOpenChat, route: () => host.querySelector('[data-testid="location"]')?.textContent }
+  return { host, button, onOpenChat, setLocale, route: () => host.querySelector('[data-testid="location"]')?.textContent }
 }
 
 describe('Unified Contacts navigation', () => {
@@ -95,4 +97,21 @@ describe('Unified Contacts navigation', () => {
     expect(app.route()).toBe('/contacts/requests')
     expect(app.host.querySelector('[data-testid="friends-content"]')).not.toBeNull()
   })
+})
+
+it('updates directory navigation and headings across all five locales without losing the route', () => {
+  const app = mount()
+  for (const [locale, title, friends, groups, requests] of [
+    ['vi','Danh sách bạn bè','Bạn bè','Nhóm chat','Lời mời'],
+    ['en','Friends list','Friends','Group chats','Requests'],
+    ['zh','好友列表','好友','群聊','请求'],
+    ['ja','友達リスト','友達','グループチャット','リクエスト'],
+    ['ko','친구 목록','친구','그룹 채팅','요청'],
+  ]) {
+    app.setLocale(locale)
+    expect(app.host.querySelector('.unified-contacts-heading h1')?.textContent).toBe(title)
+    expect(Array.from(app.host.querySelectorAll('.unified-contacts-nav button > span')).slice(0,3).map(el => el.textContent)).toEqual([friends,groups,requests])
+    expect(app.host.querySelector('.unified-contacts-count')?.textContent).toBe('2')
+    expect(app.route()).toBe('/contacts')
+  }
 })

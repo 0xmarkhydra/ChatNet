@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { X } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -13,6 +14,8 @@ type Props = {
 }
 
 export default function GroupRenameDialog({ currentName, draft, onDraftChange, onConfirm, onClose, busy }: Props) {
+  const trUi = useUiTranslation()
+
   const dialogRef = useRef<HTMLDialogElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -49,22 +52,22 @@ export default function GroupRenameDialog({ currentName, draft, onDraftChange, o
       onKeyDown={(event) => { if (event.key === 'Escape') event.stopPropagation() }}
       onClick={(event) => { if (event.target === dialogRef.current && !submitting && !busy) onClose() }}>
       <header className="group-rename-dialog-header">
-        <h2 id="group-rename-title">Đổi tên nhóm</h2>
-        <button type="button" className="group-rename-close" aria-label="Đóng"
+        <h2 id="group-rename-title">{trUi("chat.renameGroup")}</h2>
+        <button type="button" className="group-rename-close" aria-label={trUi("common.close")}
           onClick={onClose} disabled={submitting || busy}><X size={19} /></button>
       </header>
       <form onSubmit={(event) => void submit(event)} className="group-rename-dialog-body">
         <UserAvatar name={currentName} group className="group-rename-avatar" />
         <p id="group-rename-description">Bạn có chắc chắn muốn đổi tên nhóm? Tên mới sẽ hiển thị với tất cả thành viên.</p>
-        <input ref={inputRef} aria-label="Tên nhóm mới" value={draft}
+        <input ref={inputRef} aria-label={trUi("common.ui.newGroupName")} value={draft}
           onChange={(event) => onDraftChange(event.target.value)} maxLength={120}
           disabled={submitting || busy} autoComplete="off" required />
         {tooLong && <small className="group-rename-error" role="alert">Tên nhóm không được vượt quá 120 byte.</small>}
         <div className="group-rename-actions">
           <button type="button" className="group-rename-cancel"
-            onClick={onClose} disabled={submitting || busy}>Hủy</button>
+            onClick={onClose} disabled={submitting || busy}>{trUi("common.cancel")}</button>
           <button type="submit" className="group-rename-confirm"
-            disabled={submitting || busy || invalid}>Xác nhận</button>
+            disabled={submitting || busy || invalid}>{trUi("common.confirm")}</button>
         </div>
       </form>
     </dialog>

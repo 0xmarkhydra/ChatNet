@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Clock3, Search, UsersRound, X } from 'lucide-react'
@@ -25,12 +26,12 @@ type Props = {
 }
 
 const navItems = [
-  { id: 'directory', title: 'Danh sách bạn bè', label: 'Bạn bè' },
-  { id: 'groups', title: 'Danh sách nhóm', label: 'Nhóm chat' },
-  { id: 'invitations', title: 'Lời mời kết bạn', label: 'Lời mời' },
-  { id: 'calls', title: 'Lịch sử cuộc gọi', label: 'Cuộc gọi' },
-  { id: 'overview', title: 'Khám phá bạn bè', label: 'Khám phá' },
-  { id: 'translation', title: 'Dịch AI cuộc gọi', label: 'Dịch AI' },
+  { id: 'directory', title: 'contacts.friendList', label: 'contacts.friends' },
+  { id: 'groups', title: 'chat.groupList', label: 'contacts.groupChats' },
+  { id: 'invitations', title: 'contacts.friendRequests', label: 'contacts.requests' },
+  { id: 'calls', title: 'calls.history', label: 'common.ui.call' },
+  { id: 'overview', title: 'contacts.discoverFriends', label: 'discover.discover' },
+  { id: 'translation', title: 'contacts.callTranslation', label: 'chat.aiTranslation' },
 ] as const
 
 const paths: Record<Section, string> = {
@@ -55,6 +56,8 @@ export default function UnifiedContactsPage({
   contactsContent, conversations, friends, incomingRequests, request, userId, token,
   targetLanguage, friendQuery, setFriendQuery, onOpenChat, onNavigate,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const section = contactsSectionFromPath(pathname)
@@ -79,26 +82,26 @@ export default function UnifiedContactsPage({
   const active = navItems.find(item => item.id === section)!
   const isCallSection = section === 'calls' || section === 'translation'
 
-  return <section className="unified-contacts" aria-label="Danh bạ và cuộc gọi">
+  return <section className="unified-contacts" aria-label={trUi("common.ui.contactsCalls")}>
     <div className="unified-contacts-nav">
-      <h1 className="unified-contacts-visually-hidden">Danh bạ</h1>
-      <nav aria-label="Danh mục danh bạ">
+      <h1 className="unified-contacts-visually-hidden">{trUi("contacts.directory")}</h1>
+      <nav aria-label={trUi("common.ui.contactCategories")}>
         {navItems.map(({ id, title, label }) => <button
           type="button" key={id}
           className={'unified-contacts-nav-item' + (section === id ? ' active' : '')}
           aria-current={section === id ? 'page' : undefined}
-          title={title}
+          title={trUi(title)}
           onClick={() => navigateTo(id)}
         >
-          <span>{label}</span>
+          <span>{trUi(label)}</span>
           {id === 'invitations' && incomingRequests > 0 && <small className="unified-contacts-count">{incomingRequests > 99 ? '99+' : incomingRequests}</small>}
         </button>)}
       </nav>
     </div>
     <div className="unified-contacts-main">
       <header className="unified-contacts-heading">
-        <div><h1>{active.title}</h1><p>{isCallSection ? 'Xem và quản lý cuộc gọi ngay trong danh bạ' : section === 'groups' ? 'Nhóm và các liên hệ từ hội thoại' : 'Kết nối, trò chuyện và gọi cho mọi người'}</p></div>
-        {section === 'calls' && <span className="unified-contacts-heading-note"><Clock3 size={15} /> Gần đây</span>}
+        <div><h1>{trUi(active.title)}</h1><p>{isCallSection ? trUi('contacts.callHint') : section === 'groups' ? trUi('contacts.groupHint') : trUi('contacts.directoryHint')}</p></div>
+        {section === 'calls' && <span className="unified-contacts-heading-note"><Clock3 size={15} />{trUi("common.recent")}</span>}
       </header>
       <div className={'unified-contacts-content' + (isCallSection ? ' is-calls' : '')}>
         {isCallSection ? <CallCenter
@@ -120,16 +123,16 @@ export default function UnifiedContactsPage({
           <label className="unified-contacts-group-search">
             <Search size={18} aria-hidden="true" />
             <input value={groupQuery} onChange={event => setGroupQuery(event.target.value)}
-              placeholder="Tìm nhóm hoặc liên hệ..." aria-label="Tìm nhóm và liên hệ" />
-            {groupQuery && <button type="button" aria-label="Xóa tìm kiếm nhóm"
+              placeholder={trUi("common.ui.searchGroupContacts")} aria-label={trUi("common.ui.findGroupContacts")} />
+            {groupQuery && <button type="button" aria-label={trUi("common.ui.clearGroupSearch")}
               onClick={() => setGroupQuery('')}><X size={16} /></button>}
           </label>
-          <ContactCallConversationSection label="Nhóm của bạn" items={groups} onOpenCallChat={onOpenChat} />
-          <ContactCallConversationSection label="Liên hệ khác" items={otherContacts} onOpenCallChat={onOpenChat} />
+          <ContactCallConversationSection label={trUi("chat.yourGroups")} items={groups} onOpenCallChat={onOpenChat} />
+          <ContactCallConversationSection label={trUi("contacts.otherContacts")} items={otherContacts} onOpenCallChat={onOpenChat} />
           {groups.length === 0 && otherContacts.length === 0 && <div className="unified-contacts-empty">
             <UsersRound size={32} aria-hidden="true" />
-            <strong>{groupQuery ? 'Không có kết quả phù hợp' : 'Chưa có nhóm hoặc liên hệ khác'}</strong>
-            <p>{groupQuery ? 'Hãy thử từ khóa khác.' : 'Nhóm và người bạn từng trò chuyện sẽ hiển thị tại đây.'}</p>
+            <strong>{groupQuery ? trUi("common.noMatching") : trUi('contacts.noGroupsContacts')}</strong>
+            <p>{groupQuery ? trUi('common.ui.tryAnotherKeyword') : trUi('contacts.groupsEmptyHint')}</p>
           </div>}
         </div> : contactsContent}
       </div>

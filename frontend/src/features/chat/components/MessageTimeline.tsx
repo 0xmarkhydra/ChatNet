@@ -1,3 +1,4 @@
+import { useUiLocale, useUiTranslation } from '@/shared/i18n/locale'
 import { ArrowDown, RefreshCw, Languages, MoreHorizontal, LoaderCircle, CornerUpLeft, Forward } from "lucide-react";
 import UserAvatar from "../../../shared/ui/UserAvatar";
 import { userLabel } from "../../../shared/utils/userLabel";
@@ -24,10 +25,11 @@ import MessageMentionText from "./MessageMentionText";
 import { wallpaperBackground } from './ChatWallpaperPicker';
 import MessageReactionQuickPicker from "./MessageReactionQuickPicker";
 
-const timelineDateFormatter = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 // Isolate scroll-button state so scrolling never rerenders the message bubbles.
 function JumpToLatest({ messagesScrollRef }: Pick<ChatSectionProps, 'messagesScrollRef'>) {
+  const trUi = useUiTranslation()
+
   const [showLatest, setShowLatest] = useState(false);
   useLayoutEffect(() => {
     const element = messagesScrollRef.current;
@@ -64,7 +66,7 @@ function JumpToLatest({ messagesScrollRef }: Pick<ChatSectionProps, 'messagesScr
     if (!element) return;
     element.scrollTo({ top: element.scrollHeight, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
   };
-  return <button type="button" className="chat-jump-latest absolute bottom-ui-3 left-1/2 z-[12] grid size-control-touch -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-solid border-border-subtle bg-card p-0 text-primary shadow-ui-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={jumpLatest} aria-label="Đến tin nhắn mới nhất" title="Đến tin nhắn mới nhất"><ArrowDown size={20} aria-hidden="true" /></button>;
+  return <button type="button" className="chat-jump-latest absolute bottom-ui-3 left-1/2 z-[12] grid size-control-touch -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-solid border-border-subtle bg-card p-0 text-primary shadow-ui-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={jumpLatest} aria-label={trUi("chat.latestMessage")} title={trUi("chat.latestMessage")}><ArrowDown size={20} aria-hidden="true" /></button>;
 }
 
 type Props = Omit<Pick<ChatSectionProps, "activeChatTranslationSettings" | "activeConversation" | "activeConversationId" | "apiFetch" | "bottomRef" | "chatOnline" | "chatOutbox" | "conversationBlocked" | "effectiveAutoTranslate" | "effectiveTargetLanguage" | "groupActivities" | "hasMoreMessages" | "languageOptions" | "loadMissingMessages" | "loadOlderMessages" | "manuallyTranslated" | "messageGapBefore" | "messageGapLoading" | "messageInputRef" | "setMessageScrollAtBottom" | "messagesLoadingMore" | "messageHistoryLoading" | "unreadMessageId" | "messageHistoryError" | "retryMessageHistory" | "messagesScrollRef" | "chatScrollRefs" | "outgoingMessage" | "onReactionUsers" | "onForwardMessage" | "reactionPreviews" | "retryQueuedChatMessages" | "selectedChannelId" | "session" | "setGroupActivityViewedId" | "setManuallyTranslated" | "setReplyingTo" | "setTranslationOriginals" | "sortedGroupActivityEvents" | "t" | "toggleReaction" | "translateMessage" | "translationFailures" | "translationOriginals" | "translationPending" | "translations" | "updateChatOutbox" | "visibleMessages">, "activeConversation"> & Pick<ReturnType<typeof useMessageLongPress>, "beginMessageLongPress" | "cancelMessageLongPress" | "moveMessageLongPress" | "openMessageActions" | "openMessageReactions" | "suppressMessageClick"> & {
@@ -75,6 +77,9 @@ type Props = Omit<Pick<ChatSectionProps, "activeChatTranslationSettings" | "acti
   setReadersTarget: Dispatch<SetStateAction<{ message: Message; readerIds: number[]; sessionId: string } | null>>;
 };
 export default function MessageTimeline({ activeChatTranslationSettings, activeConversation, activeConversationId, apiFetch, beginMessageLongPress, bottomRef, cancelMessageLongPress, chatOnline, chatOutbox, conversationBlocked, effectiveAutoTranslate, effectiveTargetLanguage, groupActivities, hasMoreMessages, languageOptions, loadMissingMessages, loadOlderMessages, manuallyTranslated, messageGapBefore, messageGapLoading, messageInputRef, setMessageScrollAtBottom, messagesLoadingMore, messageHistoryLoading, unreadMessageId, messageHistoryError, retryMessageHistory, messagesScrollRef, chatScrollRefs, outgoingMessage, moveMessageLongPress, openMessageActions, openMessageReactions, onReactionUsers, onForwardMessage, reactionPreviews, retryQueuedChatMessages, selectedChannelId, session, setGroupActivityViewedId, setManuallyTranslated, setReplyingTo, setTranslationOriginals, sortedGroupActivityEvents, suppressMessageClick, t, toggleReaction, translateMessage, translationFailures, translationOriginals, translationPending, translations, updateChatOutbox, visibleMessages, messageReaderMembers, setReadersTarget, groupMembers, onProfile }: Props) {
+  const trUi = useUiTranslation()
+  const uiLocale = useUiLocale()
+  const timelineDateFormatter = useMemo(() => new Intl.DateTimeFormat(uiLocale, { day: '2-digit', month: '2-digit', year: 'numeric' }), [uiLocale])
   useChatScrollCoordinator({ ...chatScrollRefs, activeConversationId, selectedChannelId, unreadMessageId, messageHistoryLoading, messages: visibleMessages, outgoingMessage, chatOutbox });
   const latestRowActions = useLatest({ apiFetch, beginMessageLongPress, cancelMessageLongPress, moveMessageLongPress, openMessageActions, openMessageReactions, onReactionUsers, onForwardMessage, toggleReaction, setManuallyTranslated, setReplyingTo, setTranslationOriginals, translateMessage, onProfile, setReadersTarget });
   const rowActions = useMemo<RowActions>(() => ({
@@ -135,15 +140,15 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                     {visibleMessages.length === 0 && messageHistoryError && (
                       <div role="alert" className="flex flex-col items-center gap-3 py-10 text-sm text-slate-500">
                         <span>Không tải được lịch sử tin nhắn.</span>
-                        <button type="button" className="soco-load-more" onClick={retryMessageHistory}>Thử lại</button>
+                        <button type="button" className="soco-load-more" onClick={retryMessageHistory}>{trUi("common.retry")}</button>
                       </div>
                     )}
                     {visibleMessages.map((message, index) => {
                       const messageDay = new Date(message.createdAt)
                       const previousDay = index > 0 ? new Date(visibleMessages[index - 1].createdAt) : null
                       const displayDay = !previousDay || messageDay.toDateString() !== previousDay.toDateString()
-                      const dayLabel = !displayDay ? '' : messageDay.toDateString() === todayLabel ? 'Hôm nay'
-                        : messageDay.toDateString() === yesterdayLabel ? 'Hôm qua'
+                      const dayLabel = !displayDay ? '' : messageDay.toDateString() === todayLabel ? trUi('chat.today')
+                        : messageDay.toDateString() === yesterdayLabel ? trUi('chat.yesterday')
                           : timelineDateFormatter.format(messageDay)
                       const mine = message.senderId === session.user.id
                       const groupReaderIds = activeConversation.type === 'group' && mine
@@ -172,8 +177,8 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                             </button>
                           )}
                           {unreadMessageId === message.id && (
-                            <div className="chat-unread-divider my-ui-4 flex min-w-0 shrink-0 items-center gap-ui-2 text-ui-label font-semibold text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border" data-unread-message-id={message.id} role="separator" aria-label="Tin nhắn chưa đọc">
-                              <span className="text-center">Tin nhắn chưa đọc</span>
+                            <div className="chat-unread-divider my-ui-4 flex min-w-0 shrink-0 items-center gap-ui-2 text-ui-label font-semibold text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border" data-unread-message-id={message.id} role="separator" aria-label={trUi("chat.unread")}>
+                              <span className="text-center">{trUi("chat.unread")}</span>
                             </div>
                           )}
                         <MessageTimelineRow message={message} mine={mine} isGroup={activeConversation.type === 'group'}
@@ -204,7 +209,7 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                       <article className="message mine outgoing-preview chat-outbox-message" key={item.clientId} aria-busy={item.status !== 'failed'}>
                         {item.replyToMessageId && (
                           <div className="message-reply-quote">
-                            <strong>{item.replyToSender || 'Trả lời'}</strong><span>{replyPreview(item.replyToText || '')}</span>
+                            <strong>{item.replyToSender || trUi("chat.reply")}</strong><span>{replyPreview(item.replyToText || '')}</span>
                           </div>
                         )}
                         {item.text && (isGiphyMedia(item.text.trim()) ? <img src={item.text.trim()} alt="Sticker GIPHY" referrerPolicy="no-referrer" loading="lazy" decoding="async" className="block h-auto max-h-48 w-40 max-w-full object-contain" /> : <div className="bubble"><span className="message-selectable-text">{item.text}</span></div>)}
@@ -212,17 +217,17 @@ export default function MessageTimeline({ activeChatTranslationSettings, activeC
                         <div className="chat-outbox-footer">
                           {(item.status === 'failed' || !chatOnline) && (
                             <span className={item.status === 'failed' ? 'message-stamp chat-outbox-error' : 'message-stamp'} role="status">
-                              {item.status === 'failed' ? item.error || 'Không gửi được' : 'Chờ có mạng'}
+                              {item.status === 'failed' ? item.error || 'Không gửi được' : trUi("chat.waitingNetwork")}
                             </span>
                           )}
                           {!conversationBlocked && (item.status === 'failed' || (item.status === 'unconfirmed' && chatOnline)) && (
                             <button type="button" className="chat-outbox-retry"
-                              aria-label={item.status === 'failed' ? 'Gửi lại tin nhắn bị lỗi' : 'Gửi lại tin nhắn đang chờ'}
+                              aria-label={item.status === 'failed' ? trUi("common.ui.retryFailedMessage") : trUi("common.ui.retryPendingMessage")}
                               onClick={() => {
                               updateChatOutbox((items) => items.map((old) =>
                                 old.clientId === item.clientId ? { ...old, status: 'queued', error: undefined } : old))
                               void retryQueuedChatMessages()
-                            }}><RefreshCw size={14} /> Gửi lại</button>
+                            }}><RefreshCw size={14} />{trUi("common.resend")}</button>
                           )}
                         </div>
                       </article>
@@ -263,6 +268,8 @@ type RowProps = {
 
 // Bubble-local state stays mounted when unrelated draft, rail, or receipt updates render the parent.
 const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isGroup, groupPosition, groupReaderIds, groupMembers, messageReaderMembers, deliveryStatus, sessionId, conversationBlocked, effectiveAutoTranslate, translationDisplay, translatedLanguage, translation, originalVisible, manualTranslation, translationBusy, translationFailed, reactionBusy, messageInputRef, suppressMessageClick: suppressMessageClickRef, actions }: RowProps) {
+  const trUi = useUiTranslation()
+  const uiLocale = useUiLocale()
   const { apiFetch, beginMessageLongPress, cancelMessageLongPress, moveMessageLongPress, openMessageActions, openMessageReactions, onReactionUsers, onForwardMessage, toggleReaction, setManuallyTranslated, setReplyingTo, setTranslationOriginals, translateMessage, onProfile, setReadersTarget } = actions;
   const groupStart = groupPosition === 'single' || groupPosition === 'start'
   const groupEnd = groupPosition === 'single' || groupPosition === 'end'
@@ -290,7 +297,7 @@ const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isG
           disabled={reactionBusy}
           className={reaction.mine ? 'reaction-chip active' : 'reaction-chip'}
           onClick={() => onReactionUsers(message, reaction.emoji)}
-          aria-label={`Xem ${reaction.count} người thả ${messageReactionLabel(reaction.emoji)}`}
+          aria-label={trUi("common.ui.viewReactionCount", { v1: reaction.count, v2: messageReactionLabel(reaction.emoji, trUi) })}
         >
           <span className={reaction.mine && reactionBusy ? 'reaction-motion-glyph' : undefined}
             aria-hidden="true">{reaction.emoji}</span>{' '}{reaction.count}
@@ -305,7 +312,7 @@ const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isG
     <article
       data-message-id={message.id}
       className={'message message-press-target min-w-0 animate-none!' + (mine ? ' mine' : '') + (isGroup ? ' channel-message' : '') + (groupPosition !== 'single' ? ` message-group-${groupPosition}` : '')}
-      title={!groupEnd ? formatTime(message.createdAt) + (message.editedAt && !message.deleted ? ' · đã sửa' : '') : undefined}
+      title={!groupEnd ? formatTime(message.createdAt, uiLocale) + (message.editedAt && !message.deleted ? ' · ' + trUi('chat.edited') : '') : undefined}
       onPointerDown={(event) => {
         suppressMessageClickRef.current = null
         if (!conversationBlocked) beginMessageLongPress(message, event.clientX, event.clientY, event.button, event.pointerType, event.target)
@@ -344,15 +351,15 @@ const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isG
       {message.replyToMessageId && (
         <div className="message-reply-quote">
           <strong>{userLabel(message.replyToDisplayName, message.replyToSender)}</strong>
-          <span>{replyPreview(message.replyToText || '') || 'Tin nhắn đã thu hồi'}</span>
+          <span>{replyPreview(message.replyToText || '') || trUi('chat.recalled')}</span>
         </div>
       )}
       {message.deleted ? (
-        <div className="bubble recalled-message">Tin nhắn đã được thu hồi</div>
+        <div className="bubble recalled-message">{trUi("chat.recalledFull")}</div>
       ) : (
         <div className="message-content">
           {message.forwarded && (
-            <span className="chat-forwarded-caption">Đã chuyển tiếp 1 tin nhắn</span>
+            <span className="chat-forwarded-caption">{trUi("chat.forwardedOne")}</span>
           )}
           {giphyUrl && <div className="chat-message-media"><img src={giphyUrl} alt="Sticker GIPHY" referrerPolicy="no-referrer" loading="lazy" decoding="async" className="block h-auto max-h-48 w-40 max-w-full object-contain" /></div>}
           {message.text && !giphyUrl && (
@@ -374,7 +381,7 @@ const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isG
               {reactionControls}
               {!isTranslating && !effectiveAutoTranslate && translationView.mode === 'dual' && (
                 <button type="button" className="chat-translation-action"
-                  aria-label="Ẩn dịch" title="Ẩn dịch"
+                  aria-label={trUi("chat.hideTranslation")} title={trUi("chat.hideTranslation")}
                   onClick={() => setManuallyTranslated((current) => ({ ...current, [message.id]: false }))}>
                   <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
                 </button>
@@ -382,15 +389,15 @@ const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isG
               {!isTranslating && !effectiveAutoTranslate &&
                 (!manualTranslation || !hasTranslation) && (
                 <button type="button" className="chat-translation-action"
-                  aria-label={translationFailed ? 'Thử dịch lại' : 'Dịch'}
-                  title={translationFailed ? 'Thử dịch lại' : 'Dịch'}
+                  aria-label={translationFailed ? trUi('chat.retryTranslation') : trUi('chat.translate')}
+                  title={translationFailed ? trUi('chat.retryTranslation') : trUi('chat.translate')}
                   onClick={() => void translateMessage(message)}>
                   <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
                 </button>
               )}
               {!isTranslating && effectiveAutoTranslate && translationFailed && !hasTranslation && (
                 <button type="button" className="chat-translation-action"
-                  aria-label="Thử dịch lại" title="Thử dịch lại"
+                  aria-label={trUi("chat.retryTranslation")} title={trUi("chat.retryTranslation")}
                   onClick={() => void translateMessage(message)}>
                   <Languages size={17} strokeWidth={1.9} aria-hidden="true" />
                 </button>
@@ -401,48 +408,48 @@ const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isG
             <button
               type="button"
               className={originalVisible ? 'translation-flip-pill original' : 'translation-flip-pill translated'}
-              aria-label={originalVisible ? 'Hiện nội dung đã dịch' : 'Hiện tin nhắn gốc'}
+              aria-label={originalVisible ? trUi('common.ui.showTranslated') : trUi('common.ui.showOriginal')}
               onClick={() => setTranslationOriginals((current) => ({
                 ...current, [message.id]: !current[message.id],
               }))}
             >
               <span className="translation-flip-icon" aria-hidden="true">↔</span>
-              <b>{originalVisible ? 'DỊCH' : 'GỐC'}</b>
-              <small>{originalVisible ? translatedLanguage : 'Nguyên văn'}</small>
+              <b>{originalVisible ? trUi('chat.translatedShort') : trUi('chat.originalShort')}</b>
+              <small>{originalVisible ? translatedLanguage : trUi('chat.originalText')}</small>
               <span className="translation-flip-swap" aria-hidden="true">↔</span>
             </button>
           )}
           {isTranslating && (
             <span className="chat-translation-loading" role="status" aria-live="polite">
               <LoaderCircle size={15} aria-hidden="true" />
-              Đang dịch tin nhắn…
+              {trUi('chat.translationWorking')}
             </span>
           )}
           {Boolean(message.attachments?.length) && (
             <div className={photoOnly ? 'chat-message-media chat-message-photo' : 'chat-message-media'}>
               <MediaAttachmentsView items={message.attachments} deferVideo />
-              {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt)}</span>}
+              {photoOnly && <span className="chat-image-time">{formatTime(message.createdAt, uiLocale)}</span>}
             </div>
           )}
           {(!message.text || giphyUrl) && reactionControls}
           {!conversationBlocked && (
-            <div className="chat-message-hover-toolbar" role="group" aria-label="Thao tác tin nhắn">
-              <button type="button" title="Trả lời" aria-label="Trả lời tin nhắn"
+            <div className="chat-message-hover-toolbar" role="group" aria-label={trUi("common.ui.messageActions")}>
+              <button type="button" title={trUi("chat.reply")} aria-label={trUi("common.ui.replyMessage")}
                 onClick={() => { setReplyingTo(message); messageInputRef.current?.focus() }}>
                 <CornerUpLeft size={18} strokeWidth={2} aria-hidden="true" />
               </button>
-              <button type="button" title="Chuyển tiếp" aria-label="Chuyển tiếp tin nhắn"
+              <button type="button" title={trUi("chat.forward")} aria-label={trUi("chat.forwardMessage")}
                 onClick={() => onForwardMessage(message)}>
                 <Forward size={18} aria-hidden="true" />
               </button>
               {Boolean(message.text.trim()) && !giphyUrl && (
-                <button type="button" title="Dịch" aria-label="Dịch tin nhắn"
+                <button type="button" title={trUi("chat.translate")} aria-label={trUi("common.ui.translateMessage")}
                   disabled={isTranslating}
                   onClick={() => void translateMessage(message)}>
                   <Languages size={18} aria-hidden="true" />
                 </button>
               )}
-              <button type="button" title="Thêm tùy chọn" aria-label="Thêm tùy chọn tin nhắn"
+              <button type="button" title={trUi("common.ui.moreOptions")} aria-label={trUi("common.ui.moreMessageOptions")}
                 onClick={(event) => openMessageActions(message, event.currentTarget)}>
                 <MoreHorizontal size={18} aria-hidden="true" />
               </button>
@@ -451,10 +458,10 @@ const MessageTimelineRow = memo(function MessageTimelineRow({ message, mine, isG
         </div>
       )}
       <div className={photoOnly ? 'message-stamp chat-photo-stamp' : 'message-stamp'}>
-        {formatTime(message.createdAt)}
-        {message.editedAt && !message.deleted ? ' · đã sửa' : ''}
+        {formatTime(message.createdAt, uiLocale)}
+        {message.editedAt && !message.deleted ? ' · ' + trUi('chat.edited') : ''}
         {!isGroup && mine && !message.deleted && deliveryStatus
-          ? <span className="chat-message-delivery-status"> · {deliveryStatus === 'read' ? 'Đã xem' : 'Đã gửi'}</span>
+          ? <span className="chat-message-delivery-status"> · {deliveryStatus === 'read' ? trUi('chat.seen') : trUi('common.sent')}</span>
           : ''}
         {isGroup && mine && groupReaderIds.length > 0
           ? <MessageReadersInline

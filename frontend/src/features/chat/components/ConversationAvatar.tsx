@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import type { Conversation } from '../types'
 import '../styles/conversation-avatar.css'
@@ -8,6 +9,8 @@ type Props = {
 }
 
 export default function ConversationAvatar({ conversation, className }: Props) {
+  const trUi = useUiTranslation()
+
   const isGroup = conversation.type === 'group'
   const members = isGroup && !conversation.avatarUrl
     ? (conversation.avatarMembers || []).filter(Boolean).slice(0, 3)
@@ -18,7 +21,7 @@ export default function ConversationAvatar({ conversation, className }: Props) {
       <div
         className={`${className} conversation-avatar-cluster members-${members.length}`}
         role="img"
-        aria-label={`Ảnh đại diện nhóm ${conversation.name}`}
+        aria-label={trUi("common.ui.groupAvatarName", { v1: String(conversation.name) })}
         title={conversation.name}
       >
         {members.map((username) => (

@@ -1,9 +1,12 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useId } from 'react'
 import { MessageCircle, Search, Send, Users } from 'lucide-react'
 import { Button } from '../../../shared/ui/button'
 import { useSharedPostLinkPicker, type SharedPostLinkPickerProps } from '../hooks/useSharedPostLinkPicker'
 
 export default function SharedPostLinkPicker(props: SharedPostLinkPickerProps) {
+  const trUi = useUiTranslation()
+
   const { url, conversations, hasMore, loadingMore, onLoadMore, request, onClose, onOpenChat, onSent } = props
   const title = useId()
   const { dialog, query, selected, error, openInstead, busy, search, options, changeQuery, selectConversation, submit } =
@@ -17,10 +20,10 @@ export default function SharedPostLinkPicker(props: SharedPostLinkPickerProps) {
       <label className="flex items-center gap-2 rounded-lg border border-border px-3">
         <Search size={18} aria-hidden="true" />
         <input type="search" autoFocus className="min-w-0 flex-1 bg-transparent py-2 outline-none"
-          aria-label="Tìm người hoặc nhóm" placeholder="Tìm người hoặc nhóm" value={query} disabled={busy}
+          aria-label={trUi("chat.searchPeopleGroups")} placeholder={trUi("chat.searchPeopleGroups")} value={query} disabled={busy}
           onChange={event => changeQuery(event.target.value)} />
       </label>
-      <div className="grid max-h-64 gap-1 overflow-auto" aria-label="Cuộc trò chuyện">
+      <div className="grid max-h-64 gap-1 overflow-auto" aria-label={trUi("chat.conversation")}>
         {options.map(item => {
           const Icon = item.type === 'group' ? Users : MessageCircle
           return <Button key={item.id} type="button" variant={selected?.id === item.id ? 'secondary' : 'ghost'}
@@ -31,18 +34,18 @@ export default function SharedPostLinkPicker(props: SharedPostLinkPickerProps) {
         })}
         {search.loading && <p role="status" className="text-sm text-muted-foreground">Đang tìm cuộc trò chuyện…</p>}
         {search.error && <Button type="button" variant="outline" disabled={busy} onClick={search.retry}>Thử tìm lại</Button>}
-        {!search.loading && !search.error && !options.length && <p className="text-sm text-muted-foreground">Không có cuộc trò chuyện phù hợp.</p>}
+        {!search.loading && !search.error && !options.length && <p className="text-sm text-muted-foreground">{trUi("chat.noConversation")}</p>}
         {(search.active ? search.hasMore : hasMore) && <Button type="button" variant="ghost"
           disabled={busy || (search.active ? search.loadingMore : loadingMore)}
-          onClick={search.active ? () => void search.loadMore() : onLoadMore}>Xem thêm</Button>}
+          onClick={search.active ? () => void search.loadMore() : onLoadMore}>{trUi("common.seeMore")}</Button>}
       </div>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>Hủy</Button>
+        <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>{trUi("common.cancel")}</Button>
         {openInstead && selected
           ? <Button type="button" onClick={() => onOpenChat(selected.id)}>Mở hội thoại</Button>
           : <Button type="button" disabled={busy || !options.some(item => item.id === selected?.id)} onClick={() => void submit()}>
-              <Send size={16} aria-hidden="true" />{busy ? 'Đang gửi…' : 'Gửi'}
+              <Send size={16} aria-hidden="true" />{busy ? trUi("common.sending") : trUi("common.send")}
             </Button>}
       </div>
     </div>

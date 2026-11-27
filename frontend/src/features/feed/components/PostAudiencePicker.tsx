@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import { useScopedState } from '../../../shared/hooks/useScopedState'
 import { Check, ChevronDown, Globe2, LockKeyhole, UsersRound } from 'lucide-react'
@@ -11,12 +12,14 @@ type Props = {
 }
 
 const audienceChoices = [
-  { value: 'public', label: 'Công khai', description: 'Mọi người đều có thể xem bài viết.', Icon: Globe2 },
-  { value: 'friends', label: 'Bạn bè', description: 'Chỉ bạn bè của bạn có thể xem.', Icon: UsersRound },
-  { value: 'private', label: 'Chỉ mình tôi', description: 'Chỉ bạn có thể xem bài viết.', Icon: LockKeyhole },
+  { value: 'public', label: 'common.public', description: 'feed.audiencePublicHint', Icon: Globe2 },
+  { value: 'friends', label: 'contacts.friends', description: 'feed.audienceFriendsHint', Icon: UsersRound },
+  { value: 'private', label: 'feed.audiencePrivate', description: 'feed.audiencePrivateHint', Icon: LockKeyhole },
 ] as const
 
 export default function PostAudiencePicker({ value, disabled = false, onChange }: Props) {
+  const trUi = useUiTranslation()
+
   const [open, setOpen] = useScopedState(disabled ? 'disabled' : 'enabled', false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -101,7 +104,7 @@ export default function PostAudiencePicker({ value, disabled = false, onChange }
   return (
     <div className="smart-composer-audience" ref={containerRef}>
       <button ref={triggerRef} type="button" className="smart-audience-trigger"
-        aria-label="Ai có thể xem bài viết" aria-haspopup="menu"
+        aria-label={trUi("feed.audience")} aria-haspopup="menu"
         aria-expanded={open} aria-controls={open ? menuId : undefined}
         disabled={disabled}
         onClick={() => setOpen(previous => !previous)}
@@ -117,19 +120,19 @@ export default function PostAudiencePicker({ value, disabled = false, onChange }
           }
         }}>
         <current.Icon size={14} strokeWidth={2.2} aria-hidden="true" />
-        <span>{current.label}</span>
+        <span>{trUi(current.label)}</span>
         <ChevronDown size={13} className={open ? 'smart-audience-chevron is-open' : 'smart-audience-chevron'} aria-hidden="true" />
       </button>
       {open && <div className="smart-audience-menu" id={menuId}
-        role="menu" aria-label="Ai có thể xem bài viết" popover="manual"
+        role="menu" aria-label={trUi("feed.audience")} popover="manual"
         ref={menuRef} onKeyDown={onMenuKeyDown}>
         <div className="smart-audience-menu-heading">
-          <strong>Ai có thể xem bài viết?</strong>
-          <small>Chọn đối tượng bạn muốn chia sẻ.</small>
+          <strong>{trUi('feed.audienceHeading')}</strong>
+          <small>{trUi('feed.audienceHint')}</small>
         </div>
         {audienceChoices.map(({ value: choiceValue, label, description, Icon }) => (
           <button key={choiceValue} type="button" role="menuitemradio"
-            aria-label={label} aria-checked={value === choiceValue}
+            aria-label={trUi(label)} aria-checked={value === choiceValue}
             className="smart-audience-choice"
             onClick={() => {
               onChange(choiceValue)
@@ -137,7 +140,7 @@ export default function PostAudiencePicker({ value, disabled = false, onChange }
               triggerRef.current?.focus()
             }}>
             <span className="smart-audience-choice-icon"><Icon size={19} strokeWidth={1.9} aria-hidden="true" /></span>
-            <span className="smart-audience-choice-copy"><strong>{label}</strong><small>{description}</small></span>
+            <span className="smart-audience-choice-copy"><strong>{trUi(label)}</strong><small>{trUi(description)}</small></span>
             {value === choiceValue && <Check size={17} className="smart-audience-choice-check" aria-hidden="true" />}
           </button>
         ))}

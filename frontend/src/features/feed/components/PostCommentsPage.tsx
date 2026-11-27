@@ -1,3 +1,4 @@
+import { useUiTranslation, useUiLocale, formatUiRelativeTime } from '@/shared/i18n/locale'
 import PostLocationTag from './PostLocationTag'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, Heart, MessageCircle, X } from 'lucide-react'
@@ -48,21 +49,14 @@ type Props = {
   children: ReactNode
 }
 
-function relativeDate(value: string): string {
-  const age = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000))
-  if (!Number.isFinite(age)) return new Date(value).toLocaleString('vi-VN')
-  if (age < 1) return 'Vừa xong'
-  if (age < 60) return `${age} phút trước`
-  if (age < 1440) return `${Math.floor(age / 60)} giờ trước`
-  if (age < 10080) return `${Math.floor(age / 1440)} ngày trước`
-  return new Date(value).toLocaleDateString('vi-VN')
-}
-
 export default function PostCommentsPage({
   post, onClose, username, ownDisplayName, token, targetLanguage, likeBusy,
   request, onLike, onReactionUsers, onUpdated, onDeleted, onFeedback, onAuthorOpen, onEditPost, taggedNames,
   sortOrder, onSortChange, children, onRepostChanged, onRepostRemoved, onOpenOriginal, onShareToChat,
 }: Props) {
+  const trUi = useUiTranslation()
+  const locale = useUiLocale()
+
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null)
@@ -80,8 +74,8 @@ export default function PostCommentsPage({
   const authorName = userLabel(post.author === username ? (ownDisplayName || post.authorDisplayName) : post.authorDisplayName, post.author)
   const commentCount = post.comments?.length || 0
   const shares = post.repostCount
-  const sharesLabel = typeof shares === 'number' && Number.isFinite(shares) ? `${shares.toLocaleString('vi-VN')} lượt đăng lại` : 'Chia sẻ'
-  const visibility = post.visibility === 'private' ? 'Chỉ mình tôi' : post.visibility === 'friends' ? 'Bạn bè' : 'Công khai'
+  const sharesLabel = typeof shares === 'number' && Number.isFinite(shares) ? trUi('feed.repostsCount', { count: shares }) : trUi('common.share')
+  const visibility = trUi(post.visibility === 'private' ? 'profile.onlyMe' : post.visibility === 'friends' ? 'contacts.friends' : 'common.public')
   const extras = parsePostExtras(post.content)
 
   return (
@@ -95,18 +89,18 @@ export default function PostCommentsPage({
         if (event.target === event.currentTarget) onClose()
       }}>
       <header className="post-comments-modal-heading">
-        <h2 id={titleId}>{post.repostKind === 'quick' ? `${authorName} đã đăng lại` : `Bài viết của ${authorName}`}</h2>
-        <button type="button" aria-label="Đóng chi tiết bài viết" onClick={onClose}><X size={22} aria-hidden="true" /></button>
+        <h2 id={titleId}>{post.repostKind === 'quick' ? trUi('feed.authorReposted', { name: authorName }) : trUi('feed.authorPost', { name: authorName })}</h2>
+        <button type="button" aria-label={trUi("common.ui.closePostDetails")} onClick={onClose}><X size={22} aria-hidden="true" /></button>
       </header>
       <div className="post-comments-scroll">
         <ModalPortalContext.Provider value={portalContainer}>
 
-          <article className="post-comments-original" aria-label="Nội dung bài viết">
+          <article className="post-comments-original" aria-label={trUi("feed.postContent")}>
             <header className="post-comments-author items-start!">
               <UserAvatar username={post.author} name={authorName} className="post-comments-author-avatar" />
               <div className="post-comments-author-copy">
                 <button type="button" className="post-comments-author-name" onClick={() => onAuthorOpen(post.author)}>{authorName}</button>
-                <div className="post-comments-meta"><span>{relativeDate(post.createdAt)}</span><span>{visibility}</span></div>
+                <div className="post-comments-meta"><span>{formatUiRelativeTime(post.createdAt, locale, trUi('feed.justNow'))}</span><span>{visibility}</span></div>
                 <PostLocationTag post={post} />
               </div>
               <FeedPostActions onEdit={post.repostKind === 'quick' ? undefined : onEditPost} post={post} mine={post.author === username} request={request}
@@ -133,34 +127,34 @@ export default function PostCommentsPage({
             <div className="post-comments-stats">
               <button type="button" className="feed-post-likes feed-reaction-users-trigger"
                 disabled={post.likes === 0} onClick={() => onReactionUsers(post, portalContainer ?? undefined)}
-                aria-label={`Xem ${post.likes} người bày tỏ cảm xúc`}>
-                <Heart size={20} fill="currentColor" aria-hidden="true" /> {post.likes.toLocaleString('vi-VN')} lượt thích
+                aria-label={trUi("common.ui.viewReactionsCount", { v1: String(post.likes) })}>
+                <Heart size={20} fill="currentColor" aria-hidden="true" /> {trUi('feed.likesCount', { count: post.likes })}
               </button>
-              <div className="post-comments-totals"><span>{commentCount.toLocaleString('vi-VN')} bình luận</span><span>{sharesLabel}</span></div>
+              <div className="post-comments-totals"><span>{trUi('feed.commentsCount', { count: commentCount })}</span><span>{sharesLabel}</span></div>
             </div>
             <div className={postActions}>
               <FeedLikeButton post={post} busy={likeBusy} onLike={(emoji) => void onLike(post, emoji)} />
-              <button type="button" aria-label="Bình luận" title="Bình luận" className={commentAction}
+              <button type="button" aria-label={trUi("feed.comment")} title={trUi("feed.comment")} className={commentAction}
                 onClick={() => composerTarget?.querySelector<HTMLTextAreaElement>('textarea')?.focus()}>
-                <MessageCircle size={21} aria-hidden="true" /><span>Bình luận</span>
+                <MessageCircle size={21} aria-hidden="true" /><span>{trUi("feed.comment")}</span>
               </button>
               <FeedRepostAction post={post} request={request} onUpdated={onUpdated}
                 onRemoved={onRepostRemoved} onChanged={onRepostChanged} onShareToChat={onShareToChat} onFeedback={onFeedback} />
             </div>
           </div>
 
-          <section className="post-comments-thread" aria-label="Thảo luận về bài viết">
+          <section className="post-comments-thread" aria-label={trUi("common.ui.postDiscussion")}>
             <header className="post-comments-thread-heading">
-              <h2>Bình luận ({commentCount.toLocaleString('vi-VN')})</h2>
+              <h2>{trUi('feed.commentHeading', { count: commentCount })}</h2>
               <label className="post-comments-sort">
-                <select aria-label="Sắp xếp bình luận" value={sortOrder} onChange={event => onSortChange(event.target.value as SortOrder)}>
-                  <option value="newest">Mới nhất</option>
-                  <option value="oldest">Cũ nhất</option>
+                <select aria-label={trUi("common.ui.sortComments")} value={sortOrder} onChange={event => onSortChange(event.target.value as SortOrder)}>
+                  <option value="newest">{trUi("common.newest")}</option>
+                  <option value="oldest">{trUi('feed.oldest')}</option>
                 </select>
                 <ChevronDown size={14} aria-hidden="true" />
               </label>
             </header>
-            {commentCount === 0 && <p className="post-comments-empty">Chưa có bình luận. Hãy bắt đầu cuộc trò chuyện.</p>}
+            {commentCount === 0 && <p className="post-comments-empty">{trUi('feed.noComments')}</p>}
             {children && composerTarget && portalContainer && (
               <CommentComposerTarget.Provider value={composerTarget}>{children}</CommentComposerTarget.Provider>
             )}

@@ -1,3 +1,4 @@
+import { useUiTranslation, useUiLocale, formatUiRelativeTime, formatUiDate } from '@/shared/i18n/locale'
 import { userLabel } from '../../../shared/utils/userLabel'
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ModalPortalContext } from '../../../shared/ui/modalPortalContext'
@@ -22,21 +23,13 @@ type TranslationProps = { api: string; token: string; target: string }
 export type DiscussionDraft = { replyTo: FeedComment | null; drafts: Record<number, string>; sending?: boolean; error?: string }
 const translationCache = new Map<string, string>()
 
-function commentRelativeTime(value: string) {
-  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000))
-  if (!Number.isFinite(minutes)) return new Date(value).toLocaleDateString('vi-VN')
-  if (minutes < 1) return 'Vừa xong'
-  if (minutes < 60) return `${minutes} phút trước`
-  if (minutes < 1440) return `${Math.floor(minutes / 60)} giờ trước`
-  if (minutes < 10080) return `${Math.floor(minutes / 1440)} ngày trước`
-  return new Date(value).toLocaleDateString('vi-VN')
-}
-
 export function FeedText({ text, api, token, target, maxLines, onExpand }: TranslationProps & {
   text: string
   maxLines?: number
   onExpand?: () => void
 }) {
+  const trUi = useUiTranslation()
+
   const host = useRef<HTMLDivElement>(null)
   const key = JSON.stringify([api, token, target, text])
   const [fetched, setFetched] = useScopedState(key, '')
@@ -115,13 +108,11 @@ export function FeedText({ text, api, token, target, maxLines, onExpand }: Trans
           type="button"
           className="feed-text-more"
           onClick={() => onExpand ? onExpand() : setExpanded(true)}
-        >
-          Xem thêm
-        </button>
+        >{trUi("common.seeMore")}</button>
       )}
       {translated && translated !== text && (
         <button type="button" className="feed-text-toggle" onClick={() => setOriginal(!original)}>
-          {original ? 'Xem bản dịch' : 'Xem bản gốc'}
+          {original ? trUi("calls.showTranslation") : trUi("common.ui.originalContent")}
         </button>
       )}
       {failed && <small className="feed-translation-error">Chưa dịch được. Đang hiển thị bản gốc.</small>}
@@ -145,6 +136,9 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   sortOrder?: 'oldest' | 'newest'
   showComments?: boolean
 }) {
+  const trUi = useUiTranslation()
+  const locale = useUiLocale()
+
   const composerTarget = useContext(CommentComposerTarget)
   const modalContainer = useContext(ModalPortalContext)
   const { replyTo, drafts } = editor
@@ -262,45 +256,45 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
                 <button type="button" className="visitor-name-link" onClick={() => onAuthorOpen(comment.author)}>{authorName}</button>
               ) : authorName}
             </strong>
-            {parent && <small className="feed-reply-to">Trả lời {userLabel(parent.authorDisplayName, parent.author)}</small>}
+            {parent && <small className="feed-reply-to">{trUi("chat.reply") + ' '}{userLabel(parent.authorDisplayName, parent.author)}</small>}
             {editingComment === comment.id ? (
               <div className="feed-comment-edit">
-                <textarea maxLength={1000} rows={3} value={editingText} onChange={event => setEditingText(event.target.value)} aria-label="Chỉnh sửa bình luận" />
+                <textarea maxLength={1000} rows={3} value={editingText} onChange={event => setEditingText(event.target.value)} aria-label={trUi("feed.editComment")} />
                 <div>
-                  <button type="button" onClick={() => setEditingComment(null)}>Hủy</button>
+                  <button type="button" onClick={() => setEditingComment(null)}>{trUi("common.cancel")}</button>
                   <button type="button" disabled={commentActionBusy || !editingText.trim()} onClick={() => void runAction(async () => {
                     await onEdit(comment.id, editingText.trim()); setEditingComment(null)
-                  })}>Lưu</button>
+                  })}>{trUi("common.save")}</button>
                 </div>
               </div>
             ) : <FeedText {...translation} text={comment.content} maxLines={3} />}
           </div>
           <div className="feed-comment-actions">
-            {variant === 'default' && <time dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}
+            {variant === 'default' && <time dateTime={comment.createdAt}>{formatUiDate(comment.createdAt, locale, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}
             {variant === 'post-page' && onLike && comment.id > 0 && <>
               <button type="button" className={comment.liked ? 'feed-comment-liked' : ''}
                 aria-pressed={Boolean(comment.liked)} disabled={commentActionBusy}
                 onClick={() => void runAction(() => onLike(comment.id, !comment.liked))}>
                 <Heart size={14} fill={comment.liked ? 'currentColor' : 'none'} aria-hidden="true" />
-                {comment.liked ? 'Đã thích' : 'Thích'}
+                {comment.liked ? trUi("feed.liked") : trUi("feed.like")}
               </button>
               <span aria-hidden="true">·</span>
             </>}
-            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={`Trả lời ${authorName}`}>Trả lời</button>
+            <button type="button" disabled={sending} onClick={() => reply(comment)} aria-label={trUi('common.ui.replyTo', { name: authorName })}>{trUi("chat.reply")}</button>
             {variant === 'post-page' && <span aria-hidden="true">·</span>}
-            {variant === 'post-page' && <time dateTime={comment.createdAt}>{commentRelativeTime(comment.createdAt)}</time>}
+            {variant === 'post-page' && <time dateTime={comment.createdAt}>{formatUiRelativeTime(comment.createdAt, locale, trUi('feed.justNow'))}</time>}
             <div className="feed-comment-menu">
-              <button type="button" aria-label="Tùy chọn bình luận" aria-expanded={commentOptionsId === comment.id}
+              <button type="button" aria-label={trUi("common.ui.commentOptions")} aria-expanded={commentOptionsId === comment.id}
                 onClick={event => { optionsTrigger.current = event.currentTarget; setCommentOptionsId(current => current === comment.id ? null : comment.id) }}>
                 <Ellipsis size={16} />
               </button>
               {commentOptionsId === comment.id && createPortal(
-                <div ref={optionsPanel} style={optionsPosition} className="feed-comment-options" role="group" aria-label="Thao tác bình luận">
+                <div ref={optionsPanel} style={optionsPosition} className="feed-comment-options" role="group" aria-label={trUi("common.ui.commentActions")}>
                   {comment.author === currentUser ? (
                     <>
                       <button type="button" disabled={commentActionBusy} onClick={() => {
                         setEditingComment(comment.id); setEditingText(comment.content); setReportingComment(null); setCommentOptionsId(null)
-                      }}>Chỉnh sửa bình luận</button>
+                      }}>{trUi("feed.editComment")}</button>
                       <button type="button" className="danger" disabled={commentActionBusy} onClick={() => {
                         setCommentOptionsId(null)
                         if (window.confirm('Xóa bình luận và các phản hồi bên dưới?')) void runAction(() => onDelete(comment.id))
@@ -314,13 +308,13 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
             </div>
           </div>
           {reportingComment === comment.id && <div className="feed-comment-edit">
-            <select aria-label="Lý do báo cáo bình luận" value={reportReason} onChange={event => setReportReason(event.target.value)}>
+            <select aria-label={trUi("common.ui.reportCommentReason")} value={reportReason} onChange={event => setReportReason(event.target.value)}>
               {['Nội dung spam','Quấy rối hoặc xúc phạm','Lừa đảo hoặc giả mạo','Nội dung không phù hợp'].map(reason => <option key={reason}>{reason}</option>)}
             </select>
-            <div><button type="button" onClick={() => setReportingComment(null)}>Hủy</button>
+            <div><button type="button" onClick={() => setReportingComment(null)}>{trUi("common.cancel")}</button>
               <button type="button" disabled={commentActionBusy} onClick={() => void runAction(async () => {
                 await onReport(comment.id, reportReason); setReportingComment(null)
-              })}>Gửi báo cáo</button></div>
+              })}>{trUi("feed.sendReport")}</button></div>
           </div>}
         </div>
       </div>
@@ -331,15 +325,15 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
       <form className="feed-comment-form" onSubmit={(event) => { event.preventDefault(); void send() }}>
         {replyTo && (
           <div className="feed-reply-target">
-            <span>Đang trả lời {userLabel(replyTo.authorDisplayName, replyTo.author)}</span>
-            <button type="button" disabled={sending} onClick={() => updateEditor({ drafts, replyTo: null })}>Hủy</button>
+            <span>{trUi("chat.replying") + ' '}{userLabel(replyTo.authorDisplayName, replyTo.author)}</span>
+            <button type="button" disabled={sending} onClick={() => updateEditor({ drafts, replyTo: null })}>{trUi("common.cancel")}</button>
           </div>
         )}
         <div className="feed-comment-compose">
           {variant === 'post-page' && <UserAvatar username={currentUser} name={currentUser} className="feed-comment-composer-avatar" />}
           <textarea ref={input} rows={variant === 'post-page' ? 1 : 2} maxLength={1000} disabled={sending}
-            aria-label={replyTo ? `Phản hồi ${userLabel(replyTo.authorDisplayName, replyTo.author)}` : 'Viết bình luận'}
-            placeholder={replyTo ? `Trả lời ${userLabel(replyTo.authorDisplayName, replyTo.author)}...` : 'Viết bình luận...'}
+            aria-label={replyTo ? trUi('common.ui.respondTo', { name: userLabel(replyTo.authorDisplayName, replyTo.author) }) : trUi("common.ui.writeComment")}
+            placeholder={replyTo ? trUi('common.ui.replyToPlaceholder', { name: userLabel(replyTo.authorDisplayName, replyTo.author) }) : trUi("common.ui.writeCommentPlaceholder")}
             value={draft} onChange={(event) => updateEditor({ replyTo, drafts: { ...drafts, [draftKey]: event.target.value } })}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -347,8 +341,8 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
                 void send()
               }
             }} />
-          <button type="submit" disabled={sending || !draft.trim()} aria-label="Gửi bình luận">
-            {variant === 'post-page' ? <SendHorizontal size={21} aria-hidden="true" /> : 'Gửi'}
+          <button type="submit" disabled={sending || !draft.trim()} aria-label={trUi("common.ui.sendComment")}>
+            {variant === 'post-page' ? <SendHorizontal size={21} aria-hidden="true" /> : trUi("common.send")}
           </button>
         </div>
         {error && <p role="alert" className="feed-comment-error">{error}</p>}
@@ -356,7 +350,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
   )
 
   return (
-    <section className="feed-discussion" aria-label="Bình luận">
+    <section className="feed-discussion" aria-label={trUi("feed.comment")}>
       {showComments && (
         <>
           <ul className="feed-comment-threads">
@@ -392,7 +386,7 @@ export function FeedDiscussion({ comments, pending, submit, editor, updateEditor
               <div className="feed-comment-body">
                 <div className="feed-comment-bubble">
                   <strong>{userLabel(pending.authorDisplayName, pending.author)}</strong>
-                  {pending.parentId && <small className="feed-reply-to">Trả lời {userLabel(byID.get(pending.parentId)?.authorDisplayName, byID.get(pending.parentId)?.author)}</small>}
+                  {pending.parentId && <small className="feed-reply-to">{trUi("chat.reply") + ' '}{userLabel(byID.get(pending.parentId)?.authorDisplayName, byID.get(pending.parentId)?.author)}</small>}
                   <p className="pending-content">{pending.content}</p>
                 </div>
               </div>

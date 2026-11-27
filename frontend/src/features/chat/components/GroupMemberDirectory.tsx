@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Copy, Crown, LogOut, MoreHorizontal, ShieldCheck, ShieldOff, UserMinus, UserPlus, UserCheck } from 'lucide-react'
 import type { GroupMember } from '../types'
@@ -22,6 +23,8 @@ export type GroupMemberDirectoryProps = {
 export default function GroupMemberDirectory({
   activeGroupMember, canManageActiveGroup, onOpenMemberProfile, memberFriendRelationship, onMemberFriendAction, friendBusyIds, setMemberViewOpen, groupBusy, groupMembers, userId, changeGroupMemberRole, removeGroupMember, notify
 }: GroupMemberDirectoryProps) {
+  const trUi = useUiTranslation()
+
   const [openMemberMenu, setOpenMemberMenu] = useState<number | null>(null)
   const [menuDirection, setMenuDirection] = useState<'down' | 'up'>('down')
   const menuRef = useRef<HTMLDivElement>(null)
@@ -75,7 +78,7 @@ export default function GroupMemberDirectory({
 
 
   return (
-      <div className="group-member-directory" aria-label="Danh sách thành viên nhóm">
+      <div className="group-member-directory" aria-label={trUi("common.ui.groupMemberList")}>
         {groupMembers.map((member) => {
           const isSelf = member.id === userId
           const canSetRole = activeGroupMember?.role === 'owner' && !isSelf && member.role !== 'owner'
@@ -88,18 +91,18 @@ export default function GroupMemberDirectory({
           return <div className={menuOpen ? 'group-member-directory-row menu-open' : 'group-member-directory-row'} key={member.id}>
             <button type="button" className="group-member-profile"
               onClick={() => onOpenMemberProfile(member.username)}
-              aria-label={`Xem trang cá nhân ${member.displayName || member.username}`}>
+              aria-label={trUi("common.ui.profileNamed", { v1: String(member.displayName || member.username) })}>
               <UserAvatar username={member.username} name={member.displayName || member.username}
                 className="group-member-avatar" online={member.online} />
               <span className="group-member-copy">
                 <strong>{member.displayName || member.username}{isSelf ? ' · Bạn' : ''}</strong>
-                <span>{member.role === 'owner' ? 'Chủ nhóm' : member.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
+                <span>{member.role === 'owner' ? trUi("chat.owner") : member.role === 'admin' ? trUi("chat.admin") : trUi("chat.members")}
                   {member.online ? ' · online' : ''}</span>
               </span>
             </button>
             <div className="group-member-menu-anchor" ref={menuOpen ? menuRef : null}>
               <button type="button" className="group-member-more"
-                aria-label={`Tùy chọn của ${member.displayName || member.username}`}
+                aria-label={trUi("common.ui.optionsNamed", { v1: String(member.displayName || member.username) })}
                 aria-expanded={menuOpen} aria-haspopup="menu"
                 onClick={() => {
                   if (!menuOpen) setMenuDirection('down')
@@ -107,7 +110,7 @@ export default function GroupMemberDirectory({
                 }}>
                 <MoreHorizontal size={20} aria-hidden="true" />
               </button>
-              {menuOpen && <div className={menuDirection === 'up' ? 'group-member-menu open-up' : 'group-member-menu'} role="menu" aria-label={`Tùy chọn của ${member.displayName || member.username}`}>
+              {menuOpen && <div className={menuDirection === 'up' ? 'group-member-menu open-up' : 'group-member-menu'} role="menu" aria-label={trUi("common.ui.optionsNamed", { v1: String(member.displayName || member.username) })}>
                 <button type="button" role="menuitem" onClick={() => void copyMemberUsername(member.username)}>
                   <Copy size={16} aria-hidden="true" /> Sao chép @username
                 </button>
@@ -125,7 +128,7 @@ export default function GroupMemberDirectory({
                       ? 'Chấp nhận kết bạn'
                       : relationship === 'outgoing'
                         ? 'Đã gửi lời mời'
-                        : 'Kết bạn'}
+                        : trUi("contacts.addFriend")}
                   </button>
                 )}
                 {canSetRole && <>
@@ -136,17 +139,14 @@ export default function GroupMemberDirectory({
                   </button>
                   <button type="button" role="menuitem" disabled={groupBusy}
                     onClick={() => { setOpenMemberMenu(null); void changeGroupMemberRole(member, 'owner') }}>
-                    <Crown size={16} aria-hidden="true" /> Chuyển quyền chủ nhóm
-                  </button>
+                    <Crown size={16} aria-hidden="true" />{trUi("chat.transferOwner")}</button>
                 </>}
                 {canRemove && <button type="button" role="menuitem" className="danger" disabled={groupBusy}
                   onClick={() => { setOpenMemberMenu(null); void removeGroupMember(member) }}>
-                  <UserMinus size={16} aria-hidden="true" /> Xóa khỏi nhóm
-                </button>}
+                  <UserMinus size={16} aria-hidden="true" />{trUi("chat.removeMember")}</button>}
                 {canLeave && <button type="button" role="menuitem" className="danger" disabled={groupBusy}
                   onClick={() => { setOpenMemberMenu(null); void removeGroupMember(member) }}>
-                  <LogOut size={16} aria-hidden="true" /> Rời nhóm
-                </button>}
+                  <LogOut size={16} aria-hidden="true" />{trUi("chat.leaveGroup")}</button>}
               </div>}
             </div>
           </div>

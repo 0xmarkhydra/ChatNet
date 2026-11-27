@@ -1,5 +1,4 @@
-
-
+import { useUiTranslation } from '@/shared/i18n/locale'
 type Props = {
   blockedBusy: boolean
   blockedOpen: boolean
@@ -19,23 +18,24 @@ export default function BlockedUsersPanel({
   blockedUsers,
   unblockContact,
 }: Props) {
+  const trUi = useUiTranslation()
   return (
     <>
               <div className="settings-row">
-                <div><strong>Người dùng đã chặn</strong><small>Quản lý những tài khoản không thể nhắn tin hoặc kết bạn với bạn.</small></div>
+                <div><strong>{trUi('contacts.blockedUsers')}</strong><small>{trUi('contacts.blockedHint')}</small></div>
                 <button type="button" className="settings-action" disabled={blockedBusy}
                   onClick={() => blockedOpen ? setBlockedOpen(false) : void loadBlockedUsers()}>
-                  {blockedOpen ? 'Thu gọn' : 'Xem danh sách'}
+                  {trUi(blockedOpen ? 'contacts.collapse' : 'contacts.viewList')}
                 </button>
               </div>
               {blockedError && <div className="settings-row" role="alert">
-                <small>{blockedError}</small>
+                <small>{blockedError === 'Không tải được danh sách chặn.' ? trUi('contacts.blockedLoadFailed') : blockedError === 'Không thể bỏ chặn. Hãy thử lại.' ? trUi('contacts.unblockFailed') : blockedError}</small>
                 <button type="button" className="settings-action" disabled={blockedBusy}
-                  onClick={() => void loadBlockedUsers()}>Thử lại</button>
+                  onClick={() => void loadBlockedUsers()}>{trUi('common.retry')}</button>
               </div>}
               {blockedOpen && (
                 <div className="account-sessions-panel">
-                  {blockedUsers.length === 0 && <p>Chưa chặn tài khoản nào.</p>}
+                  {blockedUsers.length === 0 && <p>{trUi('contacts.noBlocked')}</p>}
                   {blockedUsers.map((item) => (
                     <div className="account-session-item" key={item.id}>
                       <div className="account-session-details">
@@ -43,7 +43,7 @@ export default function BlockedUsersPanel({
                         <small>@{item.username}</small>
                       </div>
                       <button type="button" className="settings-action" disabled={blockedBusy}
-                        onClick={() => void unblockContact(item.id)}>Bỏ chặn</button>
+                        onClick={() => void unblockContact(item.id)}>{trUi('contacts.unblock')}</button>
                     </div>
                   ))}
                 </div>

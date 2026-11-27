@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import type { Tab } from "../../shared/types/navigation";
 import type { GroupWorkspaceMode } from "../../features/chat/components/CommunityGroupsPage";
 import type { DesktopSection } from "./headerContext";
@@ -17,51 +18,52 @@ export type HeaderTitleProps = {
   profileEditing: boolean;
 };
 
-function groupTitle(p: HeaderTitleProps) {
-  if (p.groupWorkspaceMode === "create") return p.groupCreateStep === 1 ? "Tạo cộng đồng mới" : "Tạo nhóm mới";
-  if (p.groupWorkspaceMode === "manage") return "Quản trị nhóm";
-  if (p.groupWorkspaceMode === "channel") return p.activeConversationName || "Kênh trò chuyện nhóm";
-  return "Nhóm & cộng đồng";
+function groupTitle(p: HeaderTitleProps, trUi: ReturnType<typeof useUiTranslation>) {
+  if (p.groupWorkspaceMode === "create") return p.groupCreateStep === 1 ? trUi('chat.communityCreate') : trUi('app.newGroup');
+  if (p.groupWorkspaceMode === "manage") return trUi('app.groupAdmin');
+  if (p.groupWorkspaceMode === "channel") return p.activeConversationName || trUi('common.ui.groupChannels');
+  return trUi('app.groupsCommunities');
 }
 
-function groupSubtitle(p: HeaderTitleProps) {
+function groupSubtitle(p: HeaderTitleProps, trUi: ReturnType<typeof useUiTranslation>) {
   if (p.groupWorkspaceMode === "create") {
-    return p.groupCreateStep === 1 ? "Thiết lập không gian riêng cho nhóm" : "Bước " + p.groupCreateStep + "/3 · Chọn thành viên và xác nhận";
+    return p.groupCreateStep === 1 ? trUi('app.groupSetup') : trUi('app.groupStep', { step: p.groupCreateStep });
   }
-  if (p.groupWorkspaceMode === "manage") return "Phân quyền, thành viên và cài đặt cộng đồng";
-  if (p.groupWorkspaceMode === "channel") return "Kênh và trò chuyện nhóm";
-  return "Quản lý các nhóm của bạn";
+  if (p.groupWorkspaceMode === "manage") return trUi('app.groupAdminSubtitle');
+  if (p.groupWorkspaceMode === "channel") return trUi('app.channelSubtitle');
+  return trUi('app.groupsSubtitle');
 }
 
 export default function HeaderTitle(p: HeaderTitleProps) {
+  const trUi = useUiTranslation()
   const title: Record<Tab, string> = {
-    chat: "Tin nhắn",
-    contacts: "Danh bạ",
-    notifications: "Thông báo",
-    discover: "Khám phá",
-    market: "Marketplace",
-    feed: "Bảng tin",
-    profile: p.profileSettings && p.profileDesktop ? "Cài đặt" : p.profileEditing ? "Chỉnh sửa hồ sơ" : "Hồ sơ cá nhân",
+    chat: trUi('chat.messages'),
+    contacts: trUi('contacts.directory'),
+    notifications: trUi('common.notifications'),
+    discover: trUi('discover.discover'),
+    market: trUi('discover.market'),
+    feed: trUi('feed.feed'),
+    profile: p.profileSettings && p.profileDesktop ? trUi('common.settings') : p.profileEditing ? trUi('profile.editProfile') : trUi('app.personalProfile'),
   };
   const subtitle: Record<Tab, string> = {
     chat: p.translationSettingsOpen
-      ? "Chọn ngôn ngữ và quyền dịch của cuộc trò chuyện"
-      : p.desktopSection === "groups" ? groupSubtitle(p) : "Trò chuyện gần đây và kết nối realtime",
-    contacts: "Bạn bè, nhóm, lời mời và lịch sử cuộc gọi",
-    notifications: "Cập nhật những hoạt động quan trọng",
-    discover: "Tìm người, nhóm và những nội dung thú vị",
-    market: "Mua sắm, đăng bán và quản lý đơn hàng",
-    feed: "Khoảnh khắc và cộng đồng dành cho bạn",
+      ? trUi('app.translationSubtitle')
+      : p.desktopSection === "groups" ? groupSubtitle(p, trUi) : trUi('app.chatSubtitle'),
+    contacts: trUi('app.contactsSubtitle'),
+    notifications: trUi('app.notificationsSubtitle'),
+    discover: trUi('app.discoverSubtitle'),
+    market: trUi('app.marketSubtitle'),
+    feed: trUi('app.feedSubtitle'),
     profile: p.profileSettings
-      ? "Cài đặt tài khoản và quyền riêng tư"
-      : p.profileEditing ? "Thông tin cá nhân và quyền hiển thị" : "Trang cá nhân, bài viết và thông tin của bạn",
+      ? trUi('app.settingsSubtitle')
+      : p.profileEditing ? trUi('app.profileEditSubtitle') : trUi('app.profileSubtitle'),
   };
-  const heading = p.searchResults ? "Kết quả tìm kiếm" : p.tab === "chat" && p.translationSettingsOpen
-    ? "Ngôn ngữ & dịch AI"
+  const heading = p.searchResults ? trUi('common.searchResults') : p.tab === "chat" && p.translationSettingsOpen
+    ? trUi('chat.languageAI')
     : p.tab === "chat" && p.desktopSection === "groups"
-      ? groupTitle(p)
+      ? groupTitle(p, trUi)
       : p.tab === "chat" && p.desktopSection === "calls"
-        ? "Cuộc gọi"
+        ? trUi('common.ui.call')
         : title[p.tab];
   const showSubtitle = p.searchResults || p.translationSettingsOpen ||
     (p.tab === "chat" && p.desktopSection === "groups" && p.groupWorkspaceMode !== "list") ||
@@ -69,7 +71,7 @@ export default function HeaderTitle(p: HeaderTitleProps) {
   return (
     <div className="app-page-heading">
       <strong>{heading}</strong>
-      {showSubtitle && <small>{p.searchResults ? "Tìm người, bài viết, cộng đồng và sản phẩm" : subtitle[p.tab]}</small>}
+      {showSubtitle && <small>{p.searchResults ? trUi('app.searchSubtitle') : subtitle[p.tab]}</small>}
     </div>
   );
 }

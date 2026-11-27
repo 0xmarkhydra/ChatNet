@@ -3,6 +3,7 @@ import type { ApiRequest } from '../../../shared/types/api'
 import type { Session } from '../../../shared/types/session'
 import { loadAppLocalePreference, saveAppLocalePreference } from '../lib/i18n'
 import { isSupportedLanguageCode } from '../utils/languages'
+import { isAppLocale, normalizeAppLocale } from '../../../shared/i18n/supportedLocales'
 
 type Options = {
   session: Session | null
@@ -47,12 +48,10 @@ export function useLanguagePreferencesLifecycle({
       }
       if (typeof cached?.autoTranslate === "boolean")
         setAutoTranslate(cached.autoTranslate);
-      if (
-        cached?.appLocale === "auto" ||
-        (cached?.appLocale && isSupportedLanguageCode(cached.appLocale))
-      ) {
-        setAppLocale(cached.appLocale);
-        saveAppLocalePreference(cached.appLocale);
+      if (cached?.appLocale) {
+        const locale = normalizeAppLocale(cached.appLocale);
+        setAppLocale(locale);
+        saveAppLocalePreference(locale);
       }
     } catch {
       // Ignore malformed local fallback; server preferences remain authoritative.
@@ -73,17 +72,14 @@ export function useLanguagePreferencesLifecycle({
           ? preferences.targetLanguage
           : "en";
         const nextAuto = preferences.autoTranslate !== false;
-        const serverLocale =
-          preferences.appLocale === "auto" ||
-          isSupportedLanguageCode(preferences.appLocale)
-            ? preferences.appLocale
-            : "auto";
+        const serverLocale = !preferences.appLocale || preferences.appLocale === 'auto'
+          ? loadAppLocalePreference()
+          : normalizeAppLocale(preferences.appLocale);
 
         // First-use language selection takes priority over the default server value.
         const setupLocaleKey = `chatnet-setup-locale:${session.user.id}`;
         const pendingLocale = localStorage.getItem(setupLocaleKey);
-        const validPendingLocale = pendingLocale === "auto" ||
-          (pendingLocale !== null && isSupportedLanguageCode(pendingLocale));
+        const validPendingLocale = pendingLocale !== null && isAppLocale(pendingLocale);
         const nextLocale = validPendingLocale && pendingLocale ? pendingLocale : serverLocale;
 
         if (validPendingLocale && pendingLocale) {

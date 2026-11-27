@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Link } from "react-router-dom";
 import { StoryHighlights } from '../../feed'
 import { SettingsWorkspace } from "../../settings";
@@ -229,6 +230,8 @@ export default function ProfileSection({
   visibleProfilePosts,
   visibleTranslationSettingsOptions,
 }: ProfileSectionProps) {
+  const trUi = useUiTranslation()
+
   const [avatarPicker, setAvatarPicker] = useState<{ opener: HTMLButtonElement | null } | null>(null);
   const openAvatarPicker = (opener: HTMLButtonElement | null) => setAvatarPicker({ opener });
   const displayName = userLabel(profileMedia?.displayName || session.user.displayName, name);
@@ -252,6 +255,7 @@ export default function ProfileSection({
           >
             {isProfileDesktop && desktopProfileSettings && (
               <SettingsWorkspace
+                t={t}
                 privacy={privacy}
                 privacyLoading={privacyLoading}
                 privacyBusy={privacyBusy}
@@ -269,7 +273,7 @@ export default function ProfileSection({
                       setDesktopProfileSettings(false);
                       setProfileEditorOpen(true);
                     }}>
-                      <PencilLine size={16} aria-hidden="true" /> Chỉnh sửa hồ sơ
+                      <PencilLine size={16} aria-hidden="true" /> {t("settings.editProfile")}
                     </button>
                     {!isStandalone && (
                       <button type="button" className="settings-workspace-action" onClick={() => void installApp()}>
@@ -298,15 +302,15 @@ export default function ProfileSection({
                   <div className="settings-card">
                     <div className="settings-row">
                       <div>
-                        <strong>{isDesktopBuild ? "Thông báo Desktop" : t("profile.notifications")}</strong>
+                        <strong>{isDesktopBuild ? t("settings.desktopNotifications") : t("profile.notifications")}</strong>
                         <small>{isDesktopBuild
-                          ? "Nhận thông báo khi SocCo còn đang chạy."
+                          ? t("settings.desktopNotificationsHint")
                           : t("profile.notificationsHint")}</small>
                       </div>
                       <button type="button" role="switch"
                         className={"switch-button" + ((isDesktopBuild ? nativeNotifications.enabled : pushEnabled) ? " on" : "")}
                         aria-checked={isDesktopBuild ? nativeNotifications.enabled : pushEnabled}
-                        aria-label={isDesktopBuild ? "Thông báo Desktop" : t("profile.notifications")}
+                        aria-label={isDesktopBuild ? t("settings.desktopNotifications") : t("profile.notifications")}
                         disabled={!isDesktopBuild && pushBusy}
                         onClick={() => isDesktopBuild ? nativeNotifications.toggle() : void togglePush()}
                       ><span /></button>
@@ -374,16 +378,16 @@ export default function ProfileSection({
                 }
                 appearance={
                   <p className="settings-workspace-empty-note">
-                    Giao diện SocCo hiện sử dụng bộ màu sáng thống nhất trên web và desktop.
+                    {t("settings.appearanceNote")}
                   </p>
                 }
                 storage={
                   <div className="settings-workspace-account">
                     <p className="settings-workspace-empty-note">
-                      Bạn có thể quản lý ảnh, video và tệp đã chia sẻ trong từng cuộc trò chuyện.
+                      {t("settings.storageNote")}
                     </p>
                     <button type="button" className="settings-workspace-action" onClick={() => switchTab("chat")}>
-                      Mở tin nhắn
+                      {t("settings.openChat")}
                     </button>
                   </div>
                 }
@@ -421,7 +425,7 @@ export default function ProfileSection({
               className="hidden-media-input"
               type="file"
               accept="image/*"
-              aria-label="Chọn ảnh bìa"
+              aria-label={trUi("profile.selectCover")}
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
                 event.currentTarget.value = "";
@@ -434,17 +438,15 @@ export default function ProfileSection({
                 <button
                   type="button"
                   onClick={closeProfileTimeline}
-                  aria-label="Quay lại hồ sơ"
+                  aria-label={trUi("profile.backProfile")}
                 >
                   <ArrowLeft size={20} />
                 </button>
-                <h2 ref={profileHeadingRef} tabIndex={-1}>
-                  Trang cá nhân
-                </h2>
+                <h2 ref={profileHeadingRef} tabIndex={-1}>{trUi("profile.profile")}</h2>
                 {mobileTimeline ? <button
                   type="button"
                   onClick={closeProfileTimeline}
-                  aria-label="Cài đặt"
+                  aria-label={trUi("common.settings")}
                 >
                   <Settings size={18} aria-hidden="true" />
                 </button> : <button
@@ -452,24 +454,24 @@ export default function ProfileSection({
                   onClick={() => setProfileEditorOpen(true)}
                 >
                   <Settings size={18} />
-                  <span>Chỉnh sửa</span>
+                  <span>{trUi("common.editLabel")}</span>
                 </button>}
               </header>
             )}
             {activeSettings ? (
-              <MobileProfileScreen title={activeSettings === "menu" ? "Cài đặt trang cá nhân" : editingProfile ? "Chỉnh sửa trang cá nhân" : activeSettings === "privacy" ? "Quyền hiển thị" : "Người dùng đã chặn"} onBack={backSettings} backDisabled={editingProfile && mobileEditor.saving}>
+              <MobileProfileScreen title={activeSettings === "menu" ? trUi("profile.profileSettings") : editingProfile ? trUi("profile.editPersonal") : activeSettings === "privacy" ? trUi("profile.visibility") : trUi("contacts.blockedUsers")} onBack={backSettings} backDisabled={editingProfile && mobileEditor.saving}>
                 {activeSettings === "menu" && <MobileProfileMenu username={name} displayName={displayName} friendCount={friendCount} onEdit={() => openEdit(true)} onQr={onProfileQr} onPrivacy={() => setSettingsView("privacy")} onBlocked={() => { setSettingsView("blocked"); void loadBlockedUsers(); }} onSaved={() => { setSettingsView(null); onSavedPosts(); }} />}
                 {editingProfile && <MobileProfileEditor {...mobileEditor} onChangeAvatar={openAvatarPicker} onChangeCover={() => coverFileInputRef.current?.click()} />}
                 {activeSettings === "privacy" && <MobileProfilePrivacy privacy={privacy} loading={privacyLoading} busy={privacyBusy} error={privacyError} onRetry={() => setPrivacyRetry(value => value + 1)} onSave={savePrivacy} />}
-                {activeSettings === "blocked" && <section className="rounded-ui-lg bg-card p-ui-3"><BlockedUsersPanel blockedBusy={blockedBusy} blockedOpen={blockedOpen} setBlockedOpen={setBlockedOpen} loadBlockedUsers={loadBlockedUsers} blockedError={blockedError} blockedUsers={blockedUsers} unblockContact={unblockContact} />{blockedBusy && <p role="status">Đang tải…</p>}</section>}
+                {activeSettings === "blocked" && <section className="rounded-ui-lg bg-card p-ui-3"><BlockedUsersPanel blockedBusy={blockedBusy} blockedOpen={blockedOpen} setBlockedOpen={setBlockedOpen} loadBlockedUsers={loadBlockedUsers} blockedError={blockedError} blockedUsers={blockedUsers} unblockContact={unblockContact} />{blockedBusy && <p role="status">{trUi("common.loading")}</p>}</section>}
               </MobileProfileScreen>
             ) : <>
             {mobileTimeline && (
-                <CoverHeader label="Điều hướng trang cá nhân"
-                  leading={<CoverHeaderAction label="Menu tài khoản" onClick={closeProfileTimeline}><Menu size={24} aria-hidden="true" /></CoverHeaderAction>}
+                <CoverHeader label={trUi("common.ui.profileNavigation")}
+                  leading={<CoverHeaderAction label={trUi("common.ui.accountMenu")} onClick={closeProfileTimeline}><Menu size={24} aria-hidden="true" /></CoverHeaderAction>}
                 >
                   <CoverHeaderAction label="Chỉnh sửa trang cá nhân" onClick={() => openEdit(false)}><PencilLine size={24} aria-hidden="true" /></CoverHeaderAction>
-                  <CoverHeaderAction label="Tìm kiếm" asChild><Link to="/search"><Search size={24} aria-hidden="true" /></Link></CoverHeaderAction>
+                  <CoverHeaderAction label={trUi("common.search")} asChild><Link to="/search"><Search size={24} aria-hidden="true" /></Link></CoverHeaderAction>
                   <CoverHeaderAction label="Cài đặt trang cá nhân" onClick={() => setSettingsView("menu")}><Ellipsis size={25} className="rounded-full border-2 border-current p-0.5" aria-hidden="true" /></CoverHeaderAction>
                 </CoverHeader>
             )}
@@ -497,11 +499,9 @@ export default function ProfileSection({
               actions={mobileTimeline ? (
                 <>
                   <Button size="lg" className="min-h-control-touch min-w-0 gap-ui-1 whitespace-normal rounded-ui-md! px-ui-2 text-[14px]! font-bold! text-white! bg-primary!" onClick={onCreateStory}>
-                    <Plus size={17} aria-hidden="true" />Tạo tin
-                  </Button>
+                    <Plus size={17} aria-hidden="true" />{trUi("feed.createStoryAlt")}</Button>
                   <Button size="lg" variant="secondary" className="min-h-control-touch min-w-0 gap-ui-1 whitespace-normal rounded-ui-md! px-ui-2 text-[14px]! font-bold! text-foreground! bg-secondary!" onClick={() => openEdit(false)}>
-                    <PencilLine size={17} aria-hidden="true" />Chỉnh sửa hồ sơ
-                  </Button>
+                    <PencilLine size={17} aria-hidden="true" />{trUi("profile.editProfile")}</Button>
                 </>
               ) : !profileTimelineOpen && (
                 <>
@@ -509,47 +509,46 @@ export default function ProfileSection({
                     {session.user.email}
                   </small>
                   <Button ref={profileIdentityRef} variant="ghost" size="lg" className="gap-1 px-2 text-primary"
-                    aria-label="Mở trang cá nhân" onClick={() => {
+                    aria-label={trUi("profile.openProfile")} onClick={() => {
                       setTimelineView("all");
                       setProfileTimelineOpen(true);
                       setGlobalSearch("");
-                    }}>
-                    Xem trang cá nhân <ChevronRight size={16} aria-hidden="true" />
+                    }}>{trUi("profile.viewProfile") + ' '}<ChevronRight size={16} aria-hidden="true" />
                   </Button>
                 </>
               )} />
 
             {mobileTimeline && (
-              <div className="sticky top-[var(--cover-header-offset)] z-20 flex w-full shrink-0 flex-wrap gap-ui-2 bg-card px-ui-4 py-ui-2 box-border" style={{ "--cover-header-offset": COVER_HEADER_OFFSET } as CSSProperties} role="group" aria-label="Nội dung trang cá nhân">
+              <div className="sticky top-[var(--cover-header-offset)] z-20 flex w-full shrink-0 flex-wrap gap-ui-2 bg-card px-ui-4 py-ui-2 box-border" style={{ "--cover-header-offset": COVER_HEADER_OFFSET } as CSSProperties} role="group" aria-label={trUi("profile.profileContent")}>
                 <Button size="lg" variant={timelineView === "all" ? "secondary" : "ghost"}
                   className="min-h-control-touch rounded-full! text-[14px]! font-semibold! text-foreground! aria-pressed:bg-[#e2ecff]! aria-pressed:font-bold! aria-pressed:text-primary!"
-                  aria-pressed={timelineView === "all"} onClick={() => setTimelineView("all")}>Bài viết</Button>
+                  aria-pressed={timelineView === "all"} onClick={() => setTimelineView("all")}>{trUi("discover.posts")}</Button>
                 {(["image", "video"] as const).map(kind => (
                   <Button key={kind} size="lg" variant={timelineView === kind ? "secondary" : "ghost"}
                     className="min-h-control-touch rounded-full! text-[14px]! font-semibold! text-foreground! aria-pressed:bg-primary/10! aria-pressed:text-primary!"
-                    aria-pressed={timelineView === kind} onClick={() => setTimelineView(kind)}>{kind === "image" ? "Ảnh" : "Video"}</Button>
+                    aria-pressed={timelineView === kind} onClick={() => setTimelineView(kind)}>{trUi(kind === "image" ? "common.photos" : "common.ui.video")}</Button>
                 ))}
-                <Button variant="ghost" size="icon" className="ml-auto size-control-touch rounded-full! text-muted-foreground!" aria-label="Cài đặt" onClick={closeProfileTimeline}><Settings size={20} aria-hidden="true" /></Button>
+                <Button variant="ghost" size="icon" className="ml-auto size-control-touch rounded-full! text-muted-foreground!" aria-label={trUi("common.settings")} onClick={closeProfileTimeline}><Settings size={20} aria-hidden="true" /></Button>
               </div>
             )}
 
             {mediaSelected ? (
-              <section className="personal-timeline-content profile-mobile-media w-full! px-ui-4!" aria-label={timelineView === "image" ? "Ảnh" : "Video"}>
+              <section className="personal-timeline-content profile-mobile-media w-full! px-ui-4!" aria-label={trUi(timelineView === "image" ? "common.photos" : "common.ui.video")}>
                 {profilePostsError && <p role="alert">{profilePostsError}{" "}
-                  <Button variant="outline" onClick={() => void loadProfilePosts(false, true)}>Thử lại</Button></p>}
+                  <Button variant="outline" onClick={() => void loadProfilePosts(false, true)}>{trUi("common.retry")}</Button></p>}
                 <ProfileMediaGallery
                   items={profilePosts.flatMap(post => (post.attachments ?? []).flatMap((attachment, index) =>
                     attachment.kind === timelineView && attachment.url ? [{ postId: post.id, attachment, index }] : [],
                   ))}
-                  emptyText={timelineView === "image" ? "Chưa có ảnh trong các bài viết đã tải." : "Chưa có video trong các bài viết đã tải."}
+                  emptyText={trUi(timelineView === "image" ? "profile.noLoadedPhotos" : "profile.noLoadedVideos")}
                   postsBusy={profilePostsBusy} onOpenPost={onOpenPost} onCreatePost={() => setProfileComposerOpen(true)} />
                 {profileHasMore && <Button variant="outline" disabled={profilePostsBusy}
-                  onClick={() => void loadProfilePosts(true)}>Xem thêm từ bài viết cũ</Button>}
+                  onClick={() => void loadProfilePosts(true)}>{trUi("profile.olderPosts")}</Button>}
               </section>
             ) : profileTimelineOpen ? (
               <section
                 className={mobileTimeline ? "personal-timeline-content w-full! max-w-none! px-ui-4! pt-ui-3!" : "personal-timeline-content"}
-                aria-label="Dòng thời gian cá nhân"
+                aria-label={trUi("common.ui.personalTimeline")}
               >
                 <div className={mobileTimeline ? "grid min-w-0 gap-ui-6 pb-ui-4" : "profile-page-aside"}>
                   <ProfileDetailsCard username={name} bio={mobileTimeline ? undefined : profileMedia?.bio} city={profileMedia?.city}
@@ -561,7 +560,7 @@ export default function ProfileSection({
                 {mobileTimeline ? (
                   <div className="-mx-4! w-[calc(100%+32px)]! max-w-none! min-w-0">
                   <PostComposerLauncher flushOnMobile username={name} displayName={displayName}
-                    prompt={postText.trim() ? "Tiếp tục bài viết của bạn..." : "Bạn đang nghĩ gì?"}
+                    hasDraft={Boolean(postText.trim())}
                     onCreatePost={() => setProfileComposerOpen(true)} onCreateMediaPost={onCreateMediaPost}
                     onCreateStory={onCreateStory} onCheckIn={onCheckIn} pending={!!pendingPost || mediaUploading === "feed"} storyBusy={storyBusy} />
                   </div>
@@ -580,13 +579,13 @@ export default function ProfileSection({
                     onClick={() => setProfileComposerOpen(true)}
                   >
                     {postText.trim()
-                      ? "Tiếp tục bản nháp của bạn..."
-                      : "Bạn đang nghĩ gì?"}
+                      ? trUi("profile.continueDraft")
+                      : trUi("feed.whatThinking")}
                   </button>
                   <button
                     type="button"
                     className="profile-post-photo"
-                    aria-label="Tạo bài viết có ảnh hoặc video"
+                    aria-label={trUi("common.ui.createMediaPost")}
                     onClick={() => setProfileComposerOpen(true)}
                   >
                     <Images size={23} />
@@ -595,10 +594,10 @@ export default function ProfileSection({
                 )}
                 {!mobileTimeline && (
                 <div className="personal-timeline-label">
-                  <h2>Dòng thời gian</h2>
+                  <h2>{trUi("profile.timeline")}</h2>
                   <button
                     type="button"
-                    aria-label="Tải lại dòng thời gian"
+                    aria-label={trUi("common.ui.reloadTimeline")}
                     disabled={profilePostsBusy || !!pendingPost}
                     onClick={() => void loadProfilePosts(false, true)}
                   >
@@ -615,9 +614,7 @@ export default function ProfileSection({
                       onClick={() =>
                         void loadProfilePosts(profilePosts.length > 0, true)
                       }
-                    >
-                      Thử lại
-                    </button>
+                    >{trUi("common.retry")}</button>
                   </div>
                 )}
 
@@ -647,14 +644,12 @@ export default function ProfileSection({
                   profilePosts.length === 0 &&
                   !pendingPost && (
                     <SocoEmptyState
-                      title="Chưa có bài viết nào"
-                      description="Chia sẻ khoảnh khắc đầu tiên lên trang cá nhân của bạn."
+                      title={trUi("common.ui.noProfilePosts")}
+                      description={trUi("common.ui.firstProfileMoment")}
                       action={
                         <SocoTextAction
                           onClick={() => setProfileComposerOpen(true)}
-                        >
-                          Đăng bài đầu tiên
-                        </SocoTextAction>
+                        >{trUi("feed.firstPost")}</SocoTextAction>
                       }
                     />
                   )}
@@ -664,9 +659,7 @@ export default function ProfileSection({
                     className="soco-load-more soco-feed-load-more"
                     disabled={profilePostsBusy || !!pendingPost}
                     onClick={() => void loadProfilePosts(true)}
-                  >
-                    Xem bài viết cũ hơn
-                  </button>
+                  >{trUi("profile.olderPosts")}</button>
                 )}
               </section>
             ) : (
@@ -674,10 +667,9 @@ export default function ProfileSection({
                 {isProfileDesktop && desktopProfileSettings ? (
                   <section className="profile-editor-settings-entry">
                     <div>
-                      <strong>Thông tin hồ sơ</strong>
+                      <strong>{trUi("profile.profileInfo")}</strong>
                       <p>
-                        Thay đổi tên, tên người dùng, tiểu sử, thành phố và ảnh
-                        hồ sơ trong trang chỉnh sửa.
+                        {trUi("profile.profileInfoHint")}
                       </p>
                     </div>
                     <button
@@ -686,16 +678,14 @@ export default function ProfileSection({
                         setDesktopProfileSettings(false);
                         setProfileEditorOpen(true);
                       }}
-                    >
-                      Chỉnh sửa hồ sơ
-                    </button>
+                    >{trUi("profile.editProfile")}</button>
                   </section>
                 ) : (
                   profileIdentityForm
                 )}
 
                 <div className="soco-profile-section-label">
-                  TÙY CHỌN & CÀI ĐẶT
+                  {trUi("profile.optionsSettings")}
                 </div>
                 <section className="settings-card">
                   {profilePrivacyControls}
@@ -750,12 +740,12 @@ export default function ProfileSection({
                     <div>
                       <strong>
                         {isDesktopBuild
-                          ? "Thông báo Desktop"
+                          ? t("settings.desktopNotifications")
                           : t("profile.notifications")}
                       </strong>
                       <small>
                         {isDesktopBuild
-                          ? "Ẩn nội dung và tên người gửi. Nhận khi SocCO còn chạy; thoát hẳn sẽ dừng thông báo."
+                          ? trUi("profile.desktopNotificationPrivacy")
                           : t("profile.notificationsHint")}
                       </small>
                     </div>
@@ -774,8 +764,8 @@ export default function ProfileSection({
                             ? nativeNotifications.enabled
                             : pushEnabled
                         )
-                          ? "Tắt thông báo"
-                          : "Bật thông báo"
+                          ? trUi("chat.mute")
+                          : trUi("common.enableNotice")
                       }
                       role="switch"
                       aria-checked={
@@ -963,7 +953,7 @@ export default function ProfileSection({
                     {translationSettingsSearch && (
                       <button
                         type="button"
-                        aria-label="Xóa tìm kiếm"
+                        aria-label={t("common.clearSearch")}
                         onClick={() => setTranslationSettingsSearch("")}
                       >
                         ×
@@ -1049,34 +1039,13 @@ export default function ProfileSection({
                     {localeSearch && (
                       <button
                         type="button"
-                        aria-label="Xóa tìm kiếm"
+                        aria-label={t("common.clearSearch")}
                         onClick={() => setLocaleSearch("")}
                       >
                         ×
                       </button>
                     )}
                   </label>
-
-                  {!localeSearch && (
-                    <button
-                      type="button"
-                      className={`locale-option locale-auto-option ${appLocale === "auto" ? "active" : ""}`}
-                      onClick={() => void changeAppLocale("auto")}
-                    >
-                      <span className="locale-option-flag" aria-hidden="true">
-                        ⚙️
-                      </span>
-                      <span className="locale-option-copy">
-                        <strong>{t("locale.device")}</strong>
-                        <small>{t("locale.deviceHint")}</small>
-                        <em>
-                          {selectedAppLanguage?.flag}{" "}
-                          {selectedAppLanguage?.localizedLanguage}
-                        </em>
-                      </span>
-                      {appLocale === "auto" && <i aria-hidden="true">✓</i>}
-                    </button>
-                  )}
 
                   <div className="locale-picker-list">
                     {visibleLocaleOptions.map((language) => (

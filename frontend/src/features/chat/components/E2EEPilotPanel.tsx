@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { CheckCircle2, Fingerprint, KeyRound, LoaderCircle, LockKeyhole, RefreshCw, Send, ShieldAlert } from 'lucide-react'
 import {
@@ -19,6 +20,8 @@ type Props = {
 export default function E2EEPilotPanel({
   conversationId, userId, otherUserId, request, onModeChange,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const service = useMemo(() =>
     new MLSPilotService(request, userId, otherUserId, conversationId),
   [conversationId, otherUserId, request, userId])
@@ -140,7 +143,7 @@ export default function E2EEPilotPanel({
   if (!status.pilotEnabled && status.mode === 'legacy') return null
   if (!status.pilotEnabled) {
     return (
-      <section className="mls-pilot-panel" aria-label="Trạng thái E2EE">
+      <section className="mls-pilot-panel" aria-label={trUi("common.ui.e2eeStatus")}>
         <div className="mls-pilot-heading">
           <LockKeyhole size={17} aria-hidden="true" />
           <span>Hội thoại E2EE: máy chủ chưa bật tính năng thử nghiệm để tiếp tục đồng bộ.</span>
@@ -150,13 +153,13 @@ export default function E2EEPilotPanel({
   }
 
   return (
-    <section className="mls-pilot-panel" aria-label="Nhắn tin E2EE thử nghiệm">
+    <section className="mls-pilot-panel" aria-label={trUi("common.ui.e2eeExperimental")}>
       <header className="mls-pilot-heading">
         <LockKeyhole size={18} aria-hidden="true" />
         <strong>{status.autoEnabled ? 'E2EE tự động · 1–1 thử nghiệm' : 'E2EE · Thử nghiệm 1–1'}</strong>
         <span className="mls-pilot-status">{status.mode === 'e2ee' ? 'Đã có MLS epoch ' + status.epoch : 'Chưa chuyển đổi'}</span>
         <button type="button" onClick={() => void perform(refresh)}
-          disabled={busy} aria-label="Đồng bộ E2EE" title="Đồng bộ E2EE">
+          disabled={busy} aria-label={trUi("common.ui.e2eeSync")} title={trUi("common.ui.e2eeSync")}>
           {busy ? <LoaderCircle size={16} className="mls-pilot-spin" /> : <RefreshCw size={16}/>}
         </button>
       </header>
@@ -235,13 +238,13 @@ export default function E2EEPilotPanel({
       )}
       {status.mode === 'e2ee' && ready && (
         <>
-          <div className="mls-pilot-thread" role="log" aria-label="Tin nhắn đã mã hóa đầu cuối">
+          <div className="mls-pilot-thread" role="log" aria-label={trUi("common.ui.e2eeMessage")}>
             {messages.length === 0 && <p className="mls-pilot-empty">Chưa có tin nhắn mã hóa. Hãy thử gửi lời chào 🔐</p>}
             {messages.map(message => (
               <div className={'mls-pilot-message' + (message.senderId === userId ? ' mine' : '')}
                 key={message.id}>
                 <span className="mls-pilot-message-meta">
-                  {message.senderId === userId ? 'Bạn' : 'Người nhận'} ·
+                  {message.senderId === userId ? trUi("common.you") : 'Người nhận'} ·
                   {new Date(message.createdAt).toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'})}
                 </span>
                 <p>{message.text}</p>
@@ -252,9 +255,9 @@ export default function E2EEPilotPanel({
             <label className="mls-pilot-sr" htmlFor={`mls-pilot-message-${conversationId}`}>Tin nhắn E2EE</label>
             <input id={`mls-pilot-message-${conversationId}`}
               value={draft} onChange={event => setDraft(event.target.value)}
-              placeholder="Nhắn tin đã mã hóa MLS…" maxLength={4000} disabled={busy} />
+              placeholder={trUi("common.ui.encryptedMessage")} maxLength={4000} disabled={busy} />
             <button type="submit" className="mls-pilot-primary" disabled={busy || !draft.trim()}
-              aria-label="Gửi tin nhắn E2EE"><Send size={17}/></button>
+              aria-label={trUi("common.ui.e2eeSend")}><Send size={17}/></button>
           </form>
         </>
       )}

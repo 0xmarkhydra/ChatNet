@@ -1,3 +1,4 @@
+import { useUiTranslation, useUiLocale } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { ChevronUp, MessageCircle, X } from 'lucide-react'
 import type { ApiRequest } from '@/shared/types/api'
@@ -19,6 +20,14 @@ type Props = {
 
 /** Owner view of a story: an activity bar, and a bottom sheet listing who viewed it and how they reacted. */
 export default function StoryActivity({ request, storyId, open, onOpenChange, onOpenMessages }: Props) {
+  const trUi = useUiTranslation()
+  const locale = useUiLocale()
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   const [viewers, setViewers] = useState<StoryViewerEntry[] | null>(null)
   const [total, setTotal] = useState(0)
   const [next, setNext] = useState<number | undefined>()
@@ -57,7 +66,7 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
   return (
     <>
       <div className="absolute inset-x-0 bottom-0 z-3 px-ui-3 pb-[max(var(--soco-space-4,16px),env(safe-area-inset-bottom))]">
-        <button ref={triggerRef} type="button" aria-haspopup="dialog" aria-expanded={open} aria-label={`Hoạt động: ${summary}`}
+        <button ref={triggerRef} type="button" aria-haspopup="dialog" aria-expanded={open} aria-label={trUi("common.ui.activityNamed", { v1: String(summary) })}
           onClick={() => {
             setAfter(undefined)
             retry()
@@ -88,14 +97,14 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
                 {kinds && <span aria-hidden="true" className="flex-none">{kinds}</span>}
                 <span className="truncate">{summary}</span>
               </h2>
-              <button type="button" autoFocus aria-label="Đóng hoạt động" onClick={() => onOpenChange(false)}
+              <button type="button" autoFocus aria-label={trUi("common.ui.closeActivity")} onClick={() => onOpenChange(false)}
                 className="grid size-control-touch flex-none cursor-pointer place-items-center rounded-full border-0 bg-muted p-0 text-foreground">
                 <X size={20} aria-hidden="true" />
               </button>
             </header>
             <div className="min-h-24 overflow-y-auto px-ui-4">
               {viewers && viewers.length > 0 && (
-                <ul aria-label="Người đã xem" className="m-0 list-none p-0">
+                <ul aria-label={trUi("chat.seenBy")} className="m-0 list-none p-0">
                   {viewers.map(viewer => {
                     const label = userLabel(viewer.displayName, viewer.username)
                     return (
@@ -103,9 +112,9 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
                         <UserAvatar username={viewer.username} name={label} className="box-border size-10 flex-none text-ui-label font-black" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-ui-body font-semibold">{label}</span>
-                          {viewer.viewedAt && <time dateTime={viewer.viewedAt} className="block text-ui-caption text-muted-foreground">{relativeStoryTime(viewer.viewedAt, 'Vừa xong')}</time>}
+                          {viewer.viewedAt && <time dateTime={viewer.viewedAt} className="block text-ui-caption text-muted-foreground">{relativeStoryTime(viewer.viewedAt, trUi('feed.justNow'), now, locale)}</time>}
                         </span>
-                        {viewer.emoji && <span role="img" aria-label={reactionLabel(viewer.emoji)} data-slot="reaction" className="flex-none text-xl leading-none">{viewer.emoji}</span>}
+                        {viewer.emoji && <span role="img" aria-label={reactionLabel(viewer.emoji, trUi)} data-slot="reaction" className="flex-none text-xl leading-none">{viewer.emoji}</span>}
                       </li>
                     )
                   })}
@@ -114,10 +123,10 @@ export default function StoryActivity({ request, storyId, open, onOpenChange, on
               {failed && (
                 <div role="alert" className="grid gap-ui-2 py-ui-3">
                   <p className="m-0 text-ui-body text-muted-foreground">Không thể tải lượt xem.</p>
-                  <button type="button" className={wideButton} onClick={retry}>Tải lại</button>
+                  <button type="button" className={wideButton} onClick={retry}>{trUi("common.reload")}</button>
                 </div>
               )}
-              {next && next !== after && <button type="button" className={wideButton} onClick={() => setAfter(next)}>Xem thêm</button>}
+              {next && next !== after && <button type="button" className={wideButton} onClick={() => setAfter(next)}>{trUi("common.seeMore")}</button>}
             </div>
             <div className="grid gap-ui-2 border-t border-border-subtle px-ui-4 pt-ui-3 pb-[max(var(--soco-space-4,16px),env(safe-area-inset-bottom))]">
               <p className="m-0 text-ui-label text-muted-foreground">Câu trả lời cho tin của bạn nằm trong Tin nhắn.</p>

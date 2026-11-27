@@ -1,5 +1,5 @@
 import { useRef, type SetStateAction } from "react";
-import { isSupportedLanguageCode } from "../../i18n";
+import { isAppLocale } from "../../i18n";
 import { saveAppLocalePreference } from "../../i18n";
 import { savePreferences as savePreferencesRequest, translateText } from "../api/translation";
 import { type ChatTranslationSettings, persistConversationTranslationSettings, type ConversationTranslationSettingsMap } from "../lib/conversationTranslationSettings";
@@ -134,7 +134,7 @@ export function useTranslationActions({
   async function changeAppLocale(nextLocale: string) {
     const normalized =
       nextLocale === "auto" ? "auto" : nextLocale.toLowerCase().split("-")[0];
-    if (normalized !== "auto" && !isSupportedLanguageCode(normalized)) return;
+    if (!isAppLocale(normalized)) return;
     setAppLocale(normalized);
     saveAppLocalePreference(normalized);
     setLocalePickerOpen(false);

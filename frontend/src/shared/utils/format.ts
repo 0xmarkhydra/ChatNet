@@ -1,8 +1,8 @@
 import type { MediaAttachment } from './media'
 
-export function formatTime(value?: string) {
+export function formatTime(value?: string, locale = 'vi-VN') {
   if (!value) return ''
-  return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  return new Date(value).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
 }
 
 export function formatBytes(value: number) {

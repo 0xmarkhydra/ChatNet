@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState } from 'react'
 import { Ban, Bell, BellOff, ShieldCheck, Trash2, Users, X } from 'lucide-react'
 import type { Conversation } from '../types'
@@ -61,6 +62,8 @@ function ConversationDetailsPanelScope({
   canCreateChannel, channelCreateBusy, onCreateChannel,
   canEditGroupPhotos, photoBusy, onSavePhoto, onBlock, onUnblock, onClearHistory, activities, onActivity, onRefresh, onContactSaved,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const isGroup = conversation.type === 'group'
   const isChannel = isGroup && selectedChannelId !== 0
   const [creatingChannel, setCreatingChannel] = useState(false)
@@ -75,11 +78,11 @@ function ConversationDetailsPanelScope({
   ) : null
 
   return (
-    <aside className="conversation-info-panel social-chat-details" id="conversation-details-panel" aria-label="Thông tin hội thoại">
+    <aside className="conversation-info-panel social-chat-details" id="conversation-details-panel" aria-label={trUi("chat.conversationInfo")}>
       <div className="conversation-details-heading">
-        <h2>{isChannel ? 'Thông tin kênh' : 'Thông tin hội thoại'}</h2>
+        <h2>{isChannel ? trUi("chat.channelInfo") : trUi("chat.conversationInfo")}</h2>
         <button type="button" className="sidebar-panel-close" onClick={onClose}
-          aria-label="Đóng thông tin hội thoại" title="Đóng">
+          aria-label={trUi("chat.closeConversationInfo")} title={trUi("common.close")}>
           <X size={19} aria-hidden="true" />
         </button>
       </div>
@@ -91,17 +94,17 @@ function ConversationDetailsPanelScope({
         channelId={isGroup ? selectedChannelId : 0}
         request={request} onOpen={onShared} />
 
-      <nav className="conversation-info-panel-links social-chat-details-links" aria-label="Tùy chọn hội thoại">
-        <ConversationManagementSection title="Tùy chỉnh hội thoại">
+      <nav className="conversation-info-panel-links social-chat-details-links" aria-label={trUi("chat.conversationOptions")}>
+        <ConversationManagementSection title={trUi("chat.chatSettings")}>
           <ChatWallpaperPicker conversation={conversation} request={request} onRefresh={onRefresh} notify={notify} />
         </ConversationManagementSection>
-        {!isGroup && <ConversationManagementSection title="Quản lý hội thoại">
+        {!isGroup && <ConversationManagementSection title={trUi("chat.manageConversation")}>
           {directProfile}
           <ConversationExtraTools conversation={conversation} request={request} notify={notify} onRefresh={onRefresh} onContactSaved={onContactSaved} />
           {directNotifications}
         </ConversationManagementSection>}
 
-        {isGroup && !isChannel && <ConversationManagementSection title="Hoạt động nhóm"><ConversationExtraTools conversation={conversation} request={request} notify={notify} activities={activities} onActivity={onActivity} /></ConversationManagementSection>}
+        {isGroup && !isChannel && <ConversationManagementSection title={trUi("chat.groupActivities")}><ConversationExtraTools conversation={conversation} request={request} notify={notify} activities={activities} onActivity={onActivity} /></ConversationManagementSection>}
         {isGroup && <ConversationGroupManagementMenu conversation={conversation} channel={channel}
           selectedChannelId={selectedChannelId} userId={userId} creatingChannel={creatingChannel} setCreatingChannel={setCreatingChannel}
           canCreateChannel={canCreateChannel} channelCreateBusy={channelCreateBusy}
@@ -111,9 +114,9 @@ function ConversationDetailsPanelScope({
           onGroupRenamed={onGroupRenamed} onChannelsChanged={onChannelsChanged}
           onChannelDeleted={onChannelDeleted} onLeftGroup={onLeftGroup} />}
 
-        {!isChannel && <ConversationManagementSection title="Riêng tư và lịch sử">
+        {!isChannel && <ConversationManagementSection title={trUi("chat.privacyHistory")}>
           {!isGroup && directBlock}
-          <ConversationOptionRow icon={<Trash2 size={18}/>} className="conversation-options-danger" disabled={busy} onClick={onClearHistory}>Xóa lịch sử trò chuyện</ConversationOptionRow>
+          <ConversationOptionRow icon={<Trash2 size={18}/>} className="conversation-options-danger" disabled={busy} onClick={onClearHistory}>{trUi("chat.clearHistory")}</ConversationOptionRow>
         </ConversationManagementSection>}
       </nav>
       {photoTarget && <GroupAvatarEditor target={photoTarget}

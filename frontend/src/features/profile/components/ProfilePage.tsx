@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useMemo, useState, type ReactNode } from 'react'
 import { ArrowRight, MapPin, Camera, ChevronDown, Image as ImageIcon, Mail, PencilLine, Plus, RefreshCw, Users, UserRound, Ellipsis } from 'lucide-react'
 import type { Post } from '../../feed'
@@ -60,41 +61,43 @@ export default function ProfilePage({
   composerPending = false, storyBusy = false, postDraft = '',
   onReloadPosts, onLoadMorePosts, onViewFriend, onOpenContacts, onOpenPost,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [section, setSection] = useState<Section>('posts')
   const acceptedFriends = useMemo(() => friends.filter(friend => friend.status === 'accepted'), [friends])
   const media = useMemo<ProfileMediaItem[]>(() => posts.flatMap(post => (post.attachments || [])
     .filter(item => (item.kind === 'image' || item.kind === 'video') && item.url)
     .map((attachment, index) => ({ postId: post.id, attachment, index }))), [posts])
   const tabs: { id: Section; label: string }[] = [
-    { id: 'posts', label: 'Bài viết' },
-    { id: 'about', label: 'Giới thiệu' },
-    { id: 'friends', label: 'Bạn bè' },
-    { id: 'image', label: 'Ảnh' },
-    { id: 'video', label: 'Video' },
+    { id: 'posts', label: trUi('discover.posts') },
+    { id: 'about', label: trUi('common.about') },
+    { id: 'friends', label: trUi('contacts.friends') },
+    { id: 'image', label: trUi('common.photos') },
+    { id: 'video', label: trUi('common.ui.video') },
   ]
 
 
   return (
-    <div className="profile-page app-desktop:px-0!" aria-label="Trang cá nhân">
+    <div className="profile-page app-desktop:px-0!" aria-label={trUi("profile.profile")}>
       <ProfileHero desktopMasthead bio={bio} displayName={displayName} username={username} city={city} workplace={workplace} school={school} friendCount={acceptedFriends.length}
         coverUrl={coverSet ? coverUrl : undefined}
         coverAction={<button type="button" className="profile-page-cover-action" onClick={onChangeCover}
-          disabled={editBusy} title="Thay đổi ảnh bìa"><Camera size={17} aria-hidden="true" /><span>{coverSet ? 'Đổi ảnh bìa' : 'Thêm ảnh bìa'}</span></button>}
+          disabled={editBusy} title={trUi("common.ui.changeCover")}><Camera size={17} aria-hidden="true" /><span>{coverSet ? trUi("profile.coverChange") : trUi('profile.addCover')}</span></button>}
         avatar={<>
           {profileNote}
           <ProfileAvatarMenu username={username} displayName={displayName} avatarClassName="profile-page-avatar app-desktop:size-full!" cameraBadge
             avatarSet={avatarSet} avatarVersion={avatarVersion} editBusy={editBusy} onChangeAvatar={onChangeAvatar} />
         </>}
         actions={<>
-            <Button className="font-semibold!" onClick={onCreateStory}><Plus size={18} aria-hidden="true" />Thêm vào tin</Button>
-            <Button variant="secondary" className="font-semibold!" onClick={onEditProfile}><PencilLine size={17} aria-hidden="true" />Chỉnh sửa trang cá nhân</Button>
+            <Button className="font-semibold!" onClick={onCreateStory}><Plus size={18} aria-hidden="true" />{trUi('profile.addToStory')}</Button>
+            <Button variant="secondary" className="font-semibold!" onClick={onEditProfile}><PencilLine size={17} aria-hidden="true" />{trUi('profile.editPersonal')}</Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="profile-page-more" aria-label="Tùy chọn hồ sơ"><ChevronDown size={19} aria-hidden="true" /></button>
+                <button type="button" className="profile-page-more" aria-label={trUi("common.ui.profileOptions")}><ChevronDown size={19} aria-hidden="true" /></button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={onCreatePost}><Plus size={18} aria-hidden="true" />Đăng bài mới</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSection('image')}><ImageIcon size={18} aria-hidden="true" />Ảnh</DropdownMenuItem>
+                <DropdownMenuItem onSelect={onCreatePost}><Plus size={18} aria-hidden="true" />{trUi('profile.newPost')}</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSection('image')}><ImageIcon size={18} aria-hidden="true" />{trUi("common.photos")}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
         </>} />
@@ -102,11 +105,11 @@ export default function ProfilePage({
       <ProfileTabs className="app-desktop:relative app-desktop:max-w-[1024px]! app-desktop:w-[calc(100%_-_2*var(--soco-space-4))] app-desktop:min-h-14 app-desktop:gap-0 app-desktop:shadow-none app-desktop:px-0" tabs={tabs} active={section} onChange={setSection}
         action={<DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="secondary" size="icon" className="ml-auto shrink-0" aria-label="Tùy chọn nội dung hồ sơ"><Ellipsis size={20} aria-hidden="true" /></Button>
+            <Button variant="secondary" size="icon" className="ml-auto shrink-0" aria-label={trUi("profile.contentOptions")}><Ellipsis size={20} aria-hidden="true" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onCreatePost}><Plus size={18} aria-hidden="true" />Đăng bài mới</DropdownMenuItem>
-            <DropdownMenuItem disabled={postsBusy} onSelect={onReloadPosts}><RefreshCw size={17} aria-hidden="true" />Làm mới nội dung</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onCreatePost}><Plus size={18} aria-hidden="true" />{trUi('profile.newPost')}</DropdownMenuItem>
+            <DropdownMenuItem disabled={postsBusy} onSelect={onReloadPosts}><RefreshCw size={17} aria-hidden="true" />{trUi('common.ui.refreshContent')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>} />
       </div>
@@ -116,7 +119,7 @@ export default function ProfilePage({
           highlights={highlights}
           onEditProfile={onEditProfile} onShowMedia={() => setSection('image')} onShowFriends={() => setSection('friends')}
           onViewFriend={onViewFriend} onOpenPost={onOpenPost} />
-        <section className="profile-page-main" aria-label="Nội dung trang cá nhân">
+        <section className="profile-page-main" aria-label={trUi("profile.profileContent")}>
           <div id="profile-page-tab-content" role="tabpanel" aria-labelledby={`profile-page-tab-${section}`} className="profile-page-panel app-desktop:flex app-desktop:min-w-0 app-desktop:flex-col app-desktop:gap-4">
             {section === 'posts' && (
               <>
@@ -124,7 +127,7 @@ export default function ProfilePage({
                   layout="stacked"
                   username={username}
                   displayName={displayName}
-                  prompt={postDraft.trim() ? 'Tiếp tục bài viết của bạn...' : 'Bạn đang nghĩ gì?'}
+                  hasDraft={Boolean(postDraft.trim())}
                   onCreatePost={onCreatePost}
                   onCreateMediaPost={onCreateMediaPost}
                   onCreateStory={onCreateStory}
@@ -133,53 +136,52 @@ export default function ProfilePage({
                   storyBusy={storyBusy}
                 />
                 <div className="profile-page-about flex items-center justify-between gap-ui-2 rounded-ui-lg border border-solid border-border-subtle bg-card px-ui-3! py-ui-2!">
-                  <h2 className="text-foreground!">Bài viết</h2>
-                  <Button variant="secondary" size="sm" disabled={postsBusy} onClick={onReloadPosts}><RefreshCw size={16} aria-hidden="true" />Làm mới</Button>
+                  <h2 className="text-foreground!">{trUi('feed.post')}</h2>
+                  <Button variant="secondary" size="sm" disabled={postsBusy} onClick={onReloadPosts}><RefreshCw size={16} aria-hidden="true" />{trUi('common.refresh')}</Button>
                 </div>
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
-                  <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
+                  <button type="button" onClick={onReloadPosts}>{trUi("common.retry")}</button></div>}
                 <div className="profile-page-post-feed feed zalo-feed app-desktop:flex app-desktop:min-w-0 app-desktop:flex-col app-desktop:gap-4">{postCards}</div>
                 {!postsBusy && !postsError && posts.length === 0 && !pendingPost &&
-                  <div className="profile-page-blank"><ImageIcon size={30} aria-hidden="true" /><p>Bạn chưa có bài viết nào.</p>
-                    <button type="button" onClick={onCreatePost}>Đăng bài đầu tiên</button></div>}
-                {hasMorePosts && <button className="profile-page-more-posts app-desktop:mt-[15px] app-desktop:flex app-desktop:min-h-[42px] app-desktop:w-full app-desktop:cursor-pointer app-desktop:items-center app-desktop:justify-center app-desktop:gap-2 app-desktop:rounded-[11px] app-desktop:border app-desktop:border-[#dde7fa] app-desktop:bg-[#f5f7ff] app-desktop:text-xs app-desktop:font-bold app-desktop:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>
-                  Xem bài viết cũ hơn <ArrowRight size={16} aria-hidden="true" /></button>}
+                  <div className="profile-page-blank"><ImageIcon size={30} aria-hidden="true" /><p>{trUi('profile.noOwnPosts')}</p>
+                    <button type="button" onClick={onCreatePost}>{trUi("feed.firstPost")}</button></div>}
+                {hasMorePosts && <button className="profile-page-more-posts app-desktop:mt-[15px] app-desktop:flex app-desktop:min-h-[42px] app-desktop:w-full app-desktop:cursor-pointer app-desktop:items-center app-desktop:justify-center app-desktop:gap-2 app-desktop:rounded-[11px] app-desktop:border app-desktop:border-[#dde7fa] app-desktop:bg-[#f5f7ff] app-desktop:text-xs app-desktop:font-bold app-desktop:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>{trUi("profile.olderPosts") + ' '}<ArrowRight size={16} aria-hidden="true" /></button>}
               </>
             )}
             {(section === 'image' || section === 'video') && (
               <div className="profile-page-subsection">
-                <h2>{section === "image" ? "Ảnh" : "Video"}</h2>
-                <ProfileMediaGallery items={media.filter(item => item.attachment.kind === section)} emptyText={section === "image" ? "Chưa có ảnh trong các bài viết đã tải." : "Chưa có video trong các bài viết đã tải."} postsBusy={postsBusy} onOpenPost={onOpenPost} onCreatePost={onCreatePost} />
-                {hasMorePosts && <button className="profile-page-more-posts app-desktop:mt-[15px] app-desktop:flex app-desktop:min-h-[42px] app-desktop:w-full app-desktop:cursor-pointer app-desktop:items-center app-desktop:justify-center app-desktop:gap-2 app-desktop:rounded-[11px] app-desktop:border app-desktop:border-[#dde7fa] app-desktop:bg-[#f5f7ff] app-desktop:text-xs app-desktop:font-bold app-desktop:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>Tải thêm bài viết cũ hơn</button>}
+                <h2>{trUi(section === "image" ? "common.photos" : "common.ui.video")}</h2>
+                <ProfileMediaGallery items={media.filter(item => item.attachment.kind === section)} emptyText={trUi(section === "image" ? "profile.noLoadedPhotos" : "profile.noLoadedVideos")} postsBusy={postsBusy} onOpenPost={onOpenPost} onCreatePost={onCreatePost} />
+                {hasMorePosts && <button className="profile-page-more-posts app-desktop:mt-[15px] app-desktop:flex app-desktop:min-h-[42px] app-desktop:w-full app-desktop:cursor-pointer app-desktop:items-center app-desktop:justify-center app-desktop:gap-2 app-desktop:rounded-[11px] app-desktop:border app-desktop:border-[#dde7fa] app-desktop:bg-[#f5f7ff] app-desktop:text-xs app-desktop:font-bold app-desktop:text-[#315fc6]" type="button" onClick={onLoadMorePosts} disabled={postsBusy}>{trUi("profile.loadOlderPosts")}</button>}
               </div>
             )}
             {section === 'about' && (
               <div className="profile-page-subsection">
-                <h2>Giới thiệu</h2>
-                <p>Thông tin tài khoản của bạn trên SocCo.</p>
-                <div className="profile-page-info-line"><UserRound size={19} aria-hidden="true" /><span>Tên hiển thị</span><strong>{displayName}</strong></div>
-                <div className="profile-page-info-line"><Users size={19} aria-hidden="true" /><span>Tên người dùng</span><strong>@{username}</strong></div>
-                {bio && <div className="profile-page-info-line"><UserRound size={19} aria-hidden="true" /><span>Tiểu sử</span><strong>{bio}</strong></div>}
-                {city && <div className="profile-page-info-line"><MapPin size={19} aria-hidden="true" /><span>Thành phố</span><strong>{city}</strong></div>}
-                {email && <div className="profile-page-info-line"><Mail size={19} aria-hidden="true" /><span>Email (chỉ bạn xem)</span><strong>{email}</strong></div>}
-                <button type="button" className="profile-page-info-edit" onClick={onEditProfile}><PencilLine size={17} /> Chỉnh sửa thông tin</button>
+                <h2>{trUi("common.about")}</h2>
+                <p>{trUi('profile.accountHint')}</p>
+                <div className="profile-page-info-line"><UserRound size={19} aria-hidden="true" /><span>{trUi("profile.displayName")}</span><strong>{displayName}</strong></div>
+                <div className="profile-page-info-line"><Users size={19} aria-hidden="true" /><span>{trUi("profile.username")}</span><strong>@{username}</strong></div>
+                {bio && <div className="profile-page-info-line"><UserRound size={19} aria-hidden="true" /><span>{trUi("profile.bio")}</span><strong>{bio}</strong></div>}
+                {city && <div className="profile-page-info-line"><MapPin size={19} aria-hidden="true" /><span>{trUi("profile.city")}</span><strong>{city}</strong></div>}
+                {email && <div className="profile-page-info-line"><Mail size={19} aria-hidden="true" /><span>{trUi('profile.privateEmail')}</span><strong>{email}</strong></div>}
+                <button type="button" className="profile-page-info-edit" onClick={onEditProfile}><PencilLine size={17} />{trUi("common.editInfo")}</button>
               </div>
             )}
             {section === 'friends' && (
               <div className="profile-page-subsection">
-                <h2>Bạn bè của bạn</h2>
-                <p>{acceptedFriends.length.toLocaleString('vi-VN')} liên hệ đã kết bạn.</p>
+                <h2>{trUi('profile.yourFriends')}</h2>
+                <p>{trUi('profile.friendCount', { count: acceptedFriends.length })}</p>
                 <div className="profile-page-friends app-desktop:grid app-desktop:grid-cols-2 app-desktop:gap-2.5">
                   {acceptedFriends.slice(0, 12).map(friend => (
                     <button type="button" key={friend.id} className="profile-page-friend app-desktop:flex app-desktop:min-w-0 app-desktop:cursor-pointer app-desktop:items-center app-desktop:gap-[11px] app-desktop:rounded-xl app-desktop:border app-desktop:border-[#e9edf5] app-desktop:bg-white app-desktop:p-3 app-desktop:text-left app-desktop:hover:bg-[#f6f8ff] app-desktop:[&>svg]:shrink-0 app-desktop:[&>svg]:text-[#9aabc6]"
-                      onClick={() => onViewFriend(friend.username)} title={`Xem hồ sơ ${friend.displayName || friend.username}`}>
+                      onClick={() => onViewFriend(friend.username)} title={trUi("common.ui.viewProfileNamed", { v1: String(friend.displayName || friend.username) })}>
                       <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="profile-page-friend-avatar" online={friend.online} />
                       <span><strong>{friend.displayName || friend.username}</strong><small>@{friend.username}</small></span><ArrowRight size={16} aria-hidden="true" />
                     </button>
                   ))}
                 </div>
-                {acceptedFriends.length === 0 && <p className="profile-page-hint app-desktop:text-[13px] app-desktop:text-[#8391a9]">Chưa có bạn bè trong danh bạ.</p>}
-                <button type="button" className="profile-page-info-edit" onClick={onOpenContacts}>Mở danh bạ <ArrowRight size={16} /></button>
+                {acceptedFriends.length === 0 && <p className="profile-page-hint app-desktop:text-[13px] app-desktop:text-[#8391a9]">{trUi('contacts.emptyDirectory')}</p>}
+                <button type="button" className="profile-page-info-edit" onClick={onOpenContacts}>{trUi("contacts.openContacts") + ' '}<ArrowRight size={16} /></button>
               </div>
             )}
           </div>

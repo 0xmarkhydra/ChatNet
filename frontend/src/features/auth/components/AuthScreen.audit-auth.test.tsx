@@ -7,7 +7,7 @@ import AuthScreen from './AuthScreen'
 
 vi.mock('../../../platform/desktop', () => ({ isDesktopBuild: false }))
 vi.mock('../../i18n', () => ({
-  loadAppLocalePreference: () => 'auto', saveAppLocalePreference: vi.fn(),
+  loadAppLocalePreference: () => 'vi', saveAppLocalePreference: vi.fn(),
 }))
 
 const validOtp = { verificationToken: 'initial-otp', emailMasked: 'q***@example.test', expiresInSeconds: 30 }
@@ -133,6 +133,22 @@ describe('auth screen edge cases', () => {
       expect(google.disabled).toBe(true)
       expect(google.title).toContain('chưa được hỗ trợ')
       expect(load).not.toHaveBeenCalled()
+      expect(ui.save).not.toHaveBeenCalled()
+    } finally { await ui.close() }
+  })
+
+  it('switches between the five languages and preserves the entered email without submitting', async () => {
+    const ui = await mount()
+    try {
+      await ui.fill('auth-email', 'qa@example.test')
+      const select = ui.host.querySelector<HTMLSelectElement>('#auth-mobile-language')!
+      expect(Array.from(select.options).map(option => option.value)).toEqual(['vi','en','zh','ja','ko'])
+      for (const [locale, heading] of [['zh','欢迎回来'],['ja','おかえりなさい'],['ko','다시 오신 것을 환영합니다'],['en','Welcome back']]) {
+        await act(async () => { select.value = locale; select.dispatchEvent(new Event('change', { bubbles: true })) })
+        expect(ui.host.querySelector('h2')?.textContent).toBe(heading)
+      }
+      expect(ui.button('Sign in with Google').disabled).toBe(true)
+      expect(ui.host.querySelector<HTMLInputElement>('#auth-email')?.value).toBe('qa@example.test')
       expect(ui.save).not.toHaveBeenCalled()
     } finally { await ui.close() }
   })

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { UI_MESSAGES, type UIMessageKey } from "../../i18n";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Bell, Database, Languages, LockKeyhole, MessageCircle,
@@ -12,6 +13,7 @@ export type Section =
   | "messages" | "appearance" | "storage" | "devices";
 
 type Props = {
+  t?: (key: UIMessageKey) => string;
   privacy: UserPrivacy | null;
   privacyLoading: boolean;
   privacyBusy: boolean;
@@ -29,20 +31,20 @@ type Props = {
 };
 
 export const SETTINGS_SECTIONS = [
-  { id: "account", label: "Thông tin tài khoản", subtitle: "Hồ sơ và thông tin cá nhân", icon: UserRound },
-  { id: "privacy", label: "Quyền riêng tư", subtitle: "Kiểm soát dữ liệu và những ai có thể tương tác với bạn.", icon: ShieldCheck },
-  { id: "security", label: "Bảo mật & đăng nhập", subtitle: "Quản lý các kết nối và tài khoản bị chặn", icon: LockKeyhole },
-  { id: "notifications", label: "Thông báo", subtitle: "Chọn cách bạn nhận thông tin", icon: Bell },
-  { id: "language", label: "Ngôn ngữ & dịch AI", subtitle: "Tùy chọn ngôn ngữ hiển thị và bản dịch", icon: Languages },
-  { id: "messages", label: "Tin nhắn & cuộc gọi", subtitle: "Âm thanh và trải nghiệm trò chuyện", icon: MessageCircle },
-  { id: "appearance", label: "Giao diện", subtitle: "Giao diện và cách hiển thị", icon: Palette },
-  { id: "storage", label: "Bộ nhớ & dữ liệu", subtitle: "Dữ liệu của ứng dụng", icon: Database },
-  { id: "devices", label: "Thiết bị đăng nhập", subtitle: "Kiểm tra và thu hồi các phiên đăng nhập", icon: Monitor },
+  { id: "account", label: "settings.account", subtitle: "settings.accountHint", icon: UserRound },
+  { id: "privacy", label: "settings.privacy", subtitle: "settings.privacyHint", icon: ShieldCheck },
+  { id: "security", label: "settings.security", subtitle: "settings.securityHint", icon: LockKeyhole },
+  { id: "notifications", label: "settings.notifications", subtitle: "settings.notificationsHint", icon: Bell },
+  { id: "language", label: "settings.language", subtitle: "settings.languageHint", icon: Languages },
+  { id: "messages", label: "settings.messages", subtitle: "settings.messagesHint", icon: MessageCircle },
+  { id: "appearance", label: "settings.appearance", subtitle: "settings.appearanceHint", icon: Palette },
+  { id: "storage", label: "settings.storage", subtitle: "settings.storageHint", icon: Database },
+  { id: "devices", label: "settings.devices", subtitle: "settings.devicesHint", icon: Monitor },
 ] as const;
 
 
 export default function SettingsWorkspace({
-  privacy, privacyLoading, privacyBusy, privacyError, onPrivacyRetry, onSavePrivacy,
+  t = key => UI_MESSAGES[key], privacy, privacyLoading, privacyBusy, privacyError, onPrivacyRetry, onSavePrivacy,
   account, security, notifications, language, messages, appearance, storage, devices,
 }: Props) {
   const location = useLocation();
@@ -60,10 +62,10 @@ export default function SettingsWorkspace({
   };
 
   return (
-    <div className="settings-workspace" aria-label="Cài đặt tài khoản">
+    <div className="settings-workspace" aria-label={t("settings.title")}>
       <aside className="settings-workspace-menu">
-        <h2>Cài đặt tài khoản</h2>
-        <nav aria-label="Danh mục cài đặt">
+        <h2>{t("settings.title")}</h2>
+        <nav aria-label={t("settings.categories")}>
           {SETTINGS_SECTIONS.map(({ id, label, icon: Icon }) => (
             <button
               type="button"
@@ -73,7 +75,7 @@ export default function SettingsWorkspace({
               onClick={() => navigate(id === "privacy" ? "/settings" : `/settings/${id}`)}
             >
               <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
-              <span>{label}</span>
+              <span>{t(label)}</span>
             </button>
           ))}
         </nav>
@@ -83,8 +85,8 @@ export default function SettingsWorkspace({
         <header className="settings-workspace-heading">
           <CurrentIcon size={21} strokeWidth={1.9} aria-hidden="true" />
           <div>
-            <h2 id="settings-workspace-title">{currentSection.label}</h2>
-            <p>{currentSection.subtitle}</p>
+            <h2 id="settings-workspace-title">{t(currentSection.label)}</h2>
+            <p>{t(currentSection.subtitle)}</p>
           </div>
         </header>
 

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { conversationPreview } from '../utils/conversationPreview'
 import { useEffect, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { ArrowLeft, ArrowRight, Bell, Check, Clock3, FileText, Image as ImageIcon, MessageCircle, MoreHorizontal, PencilLine, Plus, Search, Send, Settings, ShieldCheck, Users, UserPlus, Video, X } from 'lucide-react'
@@ -74,6 +75,8 @@ export default function CommunityGroupsPage({
   onChangeRole, onRemoveMember, onOpenMember, onMembersChanged, request, notify,
   messages, pendingMessages, chatOnline, onRetryPending, messageText, onMessageText, onSend, canSend, onCall, hasMore, loadingMore, onLoadMore,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [query, setQuery] = useState('')
   const [manageTab, setManageTab] = useState<ManageTab>('members')
   const [memberQuery, setMemberQuery] = useState('')
@@ -270,83 +273,83 @@ export default function CommunityGroupsPage({
     onSelectGroup(id,next)
   }
 
-  if (mode==='list') return <div className="cg-page" aria-label="Cộng đồng">
-    <div className="cg-card cg-list-head"><div><span className="cg-eyebrow"><Users size={16}/>CỘNG ĐỒNG SOCCO</span><h2>Cộng đồng</h2><p>Khám phá và kết nối với những cộng đồng bạn quan tâm.</p></div><button type="button" className="cg-primary" onClick={onCreate}><Plus size={18}/>Tạo cộng đồng mới</button></div>
+  if (mode==='list') return <div className="cg-page" aria-label={trUi("feed.community")}>
+    <div className="cg-card cg-list-head"><div><span className="cg-eyebrow"><Users size={16}/>CỘNG ĐỒNG SOCCO</span><h2>{trUi("feed.community")}</h2><p>Khám phá và kết nối với những cộng đồng bạn quan tâm.</p></div><button type="button" className="cg-primary" onClick={onCreate}><Plus size={18}/>{trUi("chat.communityCreate")}</button></div>
     <div className="cg-list-grid"><section className="cg-card cg-list-card">
-      <header className="cg-card-head"><h3>Cộng đồng của bạn</h3><small>{shownGroups.length} nhóm đã tham gia</small></header>
-      <label className="cg-search"><Search size={18}/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm tên nhóm..." aria-label="Tìm nhóm"/></label>
+      <header className="cg-card-head"><h3>{trUi("feed.yourCommunities")}</h3><small>{shownGroups.length} nhóm đã tham gia</small></header>
+      <label className="cg-search"><Search size={18}/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder={trUi("chat.groupSearch")} aria-label={trUi("common.ui.findGroup")}/></label>
       <div className="cg-group-list">{shownGroups.map(group=><div className="cg-group-row" key={group.id}>
         <span className="cg-group-icon"><Users size={23}/></span><div><strong>{group.name}</strong><small>{group.memberCount} thành viên · {group.unreadCount} tin chưa đọc</small><p>{conversationPreview(group.lastMessage)||'Bắt đầu trao đổi với nhóm của bạn.'}</p></div>
         <button type="button" className="cg-secondary" onClick={()=>select(group.id,'manage')}><Settings size={16}/>Quản trị</button>
         <button type="button" className="cg-primary" onClick={()=>select(group.id,'channel')}>Thảo luận<ArrowRight size={16}/></button>
       </div>)}{shownGroups.length===0&&<p className="cg-empty">{query?'Không tìm thấy nhóm phù hợp.':'Chưa có nhóm. Hãy tạo cộng đồng mới hoặc tải thêm.'}</p>}</div>
-      {hasMore&&<button type="button" className="cg-secondary" disabled={loadingMore} onClick={onLoadMore}>Tải thêm hội thoại</button>}
+      {hasMore&&<button type="button" className="cg-secondary" disabled={loadingMore} onClick={onLoadMore}>{trUi("chat.moreConversations")}</button>}
     </section><aside className="cg-card cg-list-aside"><ShieldCheck size={32}/><h3>Khám phá cộng đồng công khai</h3><p>Tìm và tham gia các cộng đồng phù hợp. Nhóm yêu cầu phê duyệt sẽ cần quản trị viên đồng ý.</p>
       <div className="cg-public-list">
         {publicGroups.filter(g=>!groups.some(group=>group.id===g.id)).map(g=><article key={g.id} className="cg-public-entry">
-          <strong>{g.name}</strong><small>{g.topic||'Cộng đồng'} · {g.memberCount} thành viên</small>
+          <strong>{g.name}</strong><small>{g.topic||trUi("feed.community")} · {g.memberCount} thành viên</small>
           <p>{g.description||'Cộng đồng công khai trên SocCo.'}</p>
           <button type="button" className="cg-secondary" disabled={joiningId!==null} onClick={()=>void joinPublic(g.id)}><UserPlus size={15}/>Tham gia</button>
         </article>)}
         {!publicLoading&&!publicGroups.length&&<p className="cg-muted">Chưa tìm thấy nhóm công khai.</p>}
 
       </div>
-      <button type="button" className="cg-secondary" onClick={onCreate}>Tạo nhóm mới<ArrowRight size={16}/></button>
+      <button type="button" className="cg-secondary" onClick={onCreate}>{trUi("chat.newGroup")}<ArrowRight size={16}/></button>
     </aside></div>
   </div>
 
-  if (!selectedGroup) return <div className="cg-page"><div className="cg-card cg-empty">Không tìm thấy nhóm. <button type="button" className="cg-secondary" onClick={()=>onMode('list')}>Về danh sách</button></div></div>
+  if (!selectedGroup) return <div className="cg-page"><div className="cg-card cg-empty">Không tìm thấy nhóm. <button type="button" className="cg-secondary" onClick={()=>onMode('list')}>{trUi("common.backToList")}</button></div></div>
 
-  if (mode==='manage') return <div className="cg-page cg-management" aria-label="Quản trị nhóm">
-    <header className="cg-card cg-group-banner"><span className="cg-group-icon"><Users size={26}/></span><div><h2>{selectedGroup.name}</h2><p>{metadata?.visibility==='public'?'Nhóm công khai':'Nhóm riêng tư'} · {selectedGroup.memberCount} thành viên</p></div><button type="button" className="cg-secondary" onClick={()=>onMode('list')}><ArrowLeft size={17}/>Danh sách</button>
-      {canInvite&&<button className="cg-primary" type="button" onClick={()=>{setManageTab('members');setInviteOpen(true)}}><Plus size={17}/>Mời thành viên</button>}</header>
+  if (mode==='manage') return <div className="cg-page cg-management" aria-label={trUi("chat.groupAdmin")}>
+    <header className="cg-card cg-group-banner"><span className="cg-group-icon"><Users size={26}/></span><div><h2>{selectedGroup.name}</h2><p>{metadata?.visibility==='public'?trUi("chat.groupPublic"):trUi("chat.groupPrivate")} · {selectedGroup.memberCount} thành viên</p></div><button type="button" className="cg-secondary" onClick={()=>onMode('list')}><ArrowLeft size={17}/>{trUi("common.list")}</button>
+      {canInvite&&<button className="cg-primary" type="button" onClick={()=>{setManageTab('members');setInviteOpen(true)}}><Plus size={17}/>{trUi("chat.inviteMembers")}</button>}</header>
     <div className="cg-admin-grid">
-      <nav className="cg-card cg-admin-nav" aria-label="Quản trị nhóm">
+      <nav className="cg-card cg-admin-nav" aria-label={trUi("chat.groupAdmin")}>
         {([['members','Thành viên',Users],['details','Thông tin cộng đồng',PencilLine],['permissions','Quyền quản trị',ShieldCheck],['requests','Yêu cầu tham gia',Clock3],['rules','Nội quy nhóm',FileText],['notifications','Thông báo',Bell],['files','Tệp đã chia sẻ',ImageIcon],['activity','Nhật ký hoạt động',Settings]] as const).map(([id,label,Icon])=>
           <button type="button" key={id} className={manageTab===id?'active':''} aria-current={manageTab===id?'page':undefined} onClick={()=>{setManageTab(id);setInviteOpen(false)}}><Icon size={19}/>{label}</button>)}
         <button type="button" onClick={()=>onMode('channel')}><MessageCircle size={19}/>Vào trò chuyện</button>
       </nav>
       <section className="cg-card cg-admin-content">
-        {manageTab==='members'&&<><h2>Thành viên</h2><p className="cg-muted">{members.length} người · {members.filter(m=>m.role!=='member').length} quản trị viên</p>
+        {manageTab==='members'&&<><h2>{trUi("chat.members")}</h2><p className="cg-muted">{members.length} người · {members.filter(m=>m.role!=='member').length} quản trị viên</p>
           {inviteOpen&&canInvite&&<div className="cg-invite-form"><h3>Mời bạn bè vào nhóm</h3>
-            <label className="cg-search"><Search size={17}/><input type="search" aria-label="Tìm bạn để mời" value={inviteSearch} onChange={e=>setInviteSearch(e.target.value)} placeholder="Tìm bạn chưa trong nhóm..."/></label>
+            <label className="cg-search"><Search size={17}/><input type="search" aria-label={trUi("common.ui.inviteFriends")} value={inviteSearch} onChange={e=>setInviteSearch(e.target.value)} placeholder={trUi("common.ui.inviteNonMembers")}/></label>
             <div className="cg-invite-options">{inviteCandidates.map(friend=><label key={friend.id}><input type="checkbox" checked={inviteSelection.includes(friend.id)} onChange={()=>setInviteSelection(v=>v.includes(friend.id)?v.filter(id=>id!==friend.id):[...v,friend.id])}/>{nameOf(friend)}</label>)}{!inviteCandidates.length&&<p className="cg-muted">Không còn bạn phù hợp để mời.</p>}</div>
-            <button type="button" className="cg-primary" disabled={groupBusy||!inviteSelection.length} onClick={onInvite}><UserPlus size={16}/>Mời ({inviteSelection.length})</button><button type="button" className="cg-secondary" onClick={()=>setInviteOpen(false)}>Đóng</button>
+            <button type="button" className="cg-primary" disabled={groupBusy||!inviteSelection.length} onClick={onInvite}><UserPlus size={16}/>Mời ({inviteSelection.length})</button><button type="button" className="cg-secondary" onClick={()=>setInviteOpen(false)}>{trUi("common.close")}</button>
           </div>}
-          <label className="cg-search"><Search size={18}/><input type="search" aria-label="Tìm thành viên trong nhóm" placeholder="Tìm thành viên" value={memberQuery} onChange={e=>setMemberQuery(e.target.value)}/></label>
+          <label className="cg-search"><Search size={18}/><input type="search" aria-label={trUi("chat.groupMembersSearch")} placeholder={trUi("chat.memberSearch")} value={memberQuery} onChange={e=>setMemberQuery(e.target.value)}/></label>
           <div className="cg-members-list">{shownMembers.map(member=><article className="cg-member-row" key={member.id}>
-            <button type="button" className="cg-member-info" onClick={()=>onOpenMember(member.username)}><UserAvatar username={member.username} name={nameOf(member)} className="avatar cg-avatar" online={member.online}/><span><strong>{member.id===userId?myName:nameOf(member)}</strong><small>{member.role==='owner'?'Chủ nhóm':member.role==='admin'?'Quản trị viên':'Thành viên'}</small></span></button>
-            {member.role==='owner'&&<span className="cg-owner-label">Chủ nhóm</span>}
+            <button type="button" className="cg-member-info" onClick={()=>onOpenMember(member.username)}><UserAvatar username={member.username} name={nameOf(member)} className="avatar cg-avatar" online={member.online}/><span><strong>{member.id===userId?myName:nameOf(member)}</strong><small>{member.role==='owner'?trUi("chat.owner"):member.role==='admin'?trUi("chat.admin"):trUi("chat.members")}</small></span></button>
+            {member.role==='owner'&&<span className="cg-owner-label">{trUi("chat.owner")}</span>}
             <div className="cg-menu-wrap"><button type="button" aria-label={'Tùy chọn '+nameOf(member)} aria-expanded={menuId===member.id} onClick={()=>setMenuId(v=>v===member.id?null:member.id)}><MoreHorizontal size={20}/></button>
               {menuId===member.id&&<div className="cg-pop-menu" role="menu">
-                <button role="menuitem" type="button" onClick={()=>{setMenuId(null);onOpenMember(member.username)}}>Xem hồ sơ</button>
+                <button role="menuitem" type="button" onClick={()=>{setMenuId(null);onOpenMember(member.username)}}>{trUi("chat.viewProfile")}</button>
                 {canManage&&member.role!=='owner'&&<>
                   <button role="menuitem" type="button" disabled={groupBusy} onClick={()=>{setMenuId(null);void onChangeRole(member,member.role==='admin'?'member':'admin')}}>{member.role==='admin'?'Gỡ quản trị':'Cấp quyền quản trị'}</button>
-                  {activeMember?.role==='owner'&&<button role="menuitem" disabled={groupBusy} type="button" onClick={()=>{setMenuId(null);void onChangeRole(member,'owner')}}>Chuyển quyền chủ nhóm</button>}
-                  <button role="menuitem" disabled={groupBusy} type="button" onClick={()=>{setMenuId(null);void onRemoveMember(member)}}>Xóa khỏi nhóm</button>
+                  {activeMember?.role==='owner'&&<button role="menuitem" disabled={groupBusy} type="button" onClick={()=>{setMenuId(null);void onChangeRole(member,'owner')}}>{trUi("chat.transferOwner")}</button>}
+                  <button role="menuitem" disabled={groupBusy} type="button" onClick={()=>{setMenuId(null);void onRemoveMember(member)}}>{trUi("chat.removeMember")}</button>
                 </>}
-                {member.id===userId&&<button role="menuitem" type="button" disabled={groupBusy} onClick={()=>{setMenuId(null);void onRemoveMember(member)}}>Rời nhóm</button>}
+                {member.id===userId&&<button role="menuitem" type="button" disabled={groupBusy} onClick={()=>{setMenuId(null);void onRemoveMember(member)}}>{trUi("chat.leaveGroup")}</button>}
               </div>}</div>
           </article>)}{!members.length&&<p className="cg-muted">Chưa có thành viên để hiển thị.</p>}</div>
         </>}
-        {manageTab==='details'&&<><h2>Thông tin cộng đồng</h2><p className="cg-muted">Mô tả và chủ đề được lưu vào PostgreSQL.</p>
+        {manageTab==='details'&&<><h2>{trUi("chat.communityInfo")}</h2><p className="cg-muted">Mô tả và chủ đề được lưu vào PostgreSQL.</p>
           <div className="cg-admin-edit">
-            <label>Mô tả<textarea aria-label="Mô tả cộng đồng" maxLength={500} rows={4} disabled={!canEdit||settingsBusy} value={metadataDraft.description} onChange={e=>setMetadataDraft(v=>({...v,description:e.target.value}))}/></label>
-            <label>Chủ đề<input aria-label="Chủ đề cộng đồng" maxLength={100} disabled={!canEdit||settingsBusy} value={metadataDraft.topic} onChange={e=>setMetadataDraft(v=>({...v,topic:e.target.value}))}/></label>
-            <label>Quyền truy cập<select aria-label="Quyền truy cập cộng đồng" disabled={!canEdit||settingsBusy} value={metadataDraft.visibility} onChange={e=>setMetadataDraft(v=>({...v,visibility:e.target.value as 'private'|'public'}))}><option value="private">Riêng tư</option><option value="public">Công khai</option></select></label>
-            {canEdit&&<button type="button" className="cg-primary" disabled={settingsBusy} onClick={()=>void saveMetadata()}><Check size={17}/>Lưu thông tin</button>}
+            <label>{trUi("common.description")}<textarea aria-label={trUi("chat.communityDescription")} maxLength={500} rows={4} disabled={!canEdit||settingsBusy} value={metadataDraft.description} onChange={e=>setMetadataDraft(v=>({...v,description:e.target.value}))}/></label>
+            <label>{trUi("common.topic")}<input aria-label={trUi("chat.communityTopic")} maxLength={100} disabled={!canEdit||settingsBusy} value={metadataDraft.topic} onChange={e=>setMetadataDraft(v=>({...v,topic:e.target.value}))}/></label>
+            <label>{trUi("common.access")}<select aria-label={trUi("chat.communityAccess")} disabled={!canEdit||settingsBusy} value={metadataDraft.visibility} onChange={e=>setMetadataDraft(v=>({...v,visibility:e.target.value as 'private'|'public'}))}><option value="private">{trUi("common.private")}</option><option value="public">{trUi("common.public")}</option></select></label>
+            {canEdit&&<button type="button" className="cg-primary" disabled={settingsBusy} onClick={()=>void saveMetadata()}><Check size={17}/>{trUi("chat.saveInfo")}</button>}
           </div>
         </>}
         {(['permissions','requests','activity'] as ManageTab[]).includes(manageTab)&&<>
-          <h2>{manageTab==='permissions'?'Quyền quản trị':manageTab==='requests'?'Yêu cầu tham gia':'Nhật ký hoạt động'}</h2>
+          <h2>{manageTab==='permissions'?trUi("chat.adminRights"):manageTab==='requests'?trUi("chat.joinRequests"):trUi("chat.activityLog")}</h2>
           {activeMember&&isAdmin?<GroupGovernancePanel key={selectedGroup.id} conversationId={selectedGroup.id} role={activeMember.role} section={manageTab as 'permissions' | 'requests' | 'activity'} request={request} notify={notify} onMembersChanged={onMembersChanged}/>:<p className="cg-muted">Chỉ chủ nhóm hoặc quản trị viên được truy cập mục này.</p>}
         </>}
-        {manageTab==='files'&&<><h2>Tệp đã chia sẻ</h2><p className="cg-muted">Tệp trong tin nhắn nhóm đã tải.</p>{attachments.length?<MediaAttachmentsView items={attachments}/>:<p className="cg-empty">Chưa có tệp đính kèm.</p>}</>}
-        {manageTab==='rules'&&<><h2>Nội quy nhóm</h2><p className="cg-muted">Các thành viên được xem nội quy; chủ nhóm và quản trị viên được quyền chỉnh sửa.</p>
-          <div className="cg-admin-edit"><label>Nội quy<textarea aria-label="Nội quy cộng đồng" rows={10} maxLength={5000} disabled={!canEdit||settingsBusy} value={metadataDraft.rules} onChange={e=>setMetadataDraft(v=>({...v,rules:e.target.value}))}/></label>
-            {canEdit&&<button className="cg-primary" type="button" disabled={settingsBusy} onClick={()=>void saveMetadata()}><Check size={17}/>Lưu nội quy</button>}</div>
+        {manageTab==='files'&&<><h2>{trUi("chat.sharedFiles")}</h2><p className="cg-muted">Tệp trong tin nhắn nhóm đã tải.</p>{attachments.length?<MediaAttachmentsView items={attachments}/>:<p className="cg-empty">Chưa có tệp đính kèm.</p>}</>}
+        {manageTab==='rules'&&<><h2>{trUi("chat.groupRules")}</h2><p className="cg-muted">Các thành viên được xem nội quy; chủ nhóm và quản trị viên được quyền chỉnh sửa.</p>
+          <div className="cg-admin-edit"><label>Nội quy<textarea aria-label={trUi("chat.communityRules")} rows={10} maxLength={5000} disabled={!canEdit||settingsBusy} value={metadataDraft.rules} onChange={e=>setMetadataDraft(v=>({...v,rules:e.target.value}))}/></label>
+            {canEdit&&<button className="cg-primary" type="button" disabled={settingsBusy} onClick={()=>void saveMetadata()}><Check size={17}/>{trUi("chat.saveRules")}</button>}</div>
         </>}
-        {manageTab==='notifications'&&<><h2>Thông báo nhóm</h2><p className="cg-muted">Tùy chọn riêng cho tài khoản của bạn, được đồng bộ qua backend.</p>
+        {manageTab==='notifications'&&<><h2>{trUi("chat.groupNotice")}</h2><p className="cg-muted">Tùy chọn riêng cho tài khoản của bạn, được đồng bộ qua backend.</p>
           <div className="cg-admin-edit cg-pref-edit">
             <label><input type="checkbox" checked={preferences.messageNotifications} onChange={e=>setPreferences(v=>({...v,messageNotifications:e.target.checked}))}/>Thông báo tin nhắn nhóm</label>
             <label><input type="checkbox" checked={preferences.mentionNotifications} onChange={e=>setPreferences(v=>({...v,mentionNotifications:e.target.checked}))}/>Thông báo khi được nhắc đến</label>
@@ -354,59 +357,59 @@ export default function CommunityGroupsPage({
           </div>
         </>}
       </section>
-      <aside className="cg-card cg-admin-right"><h3><ShieldCheck size={22}/>Quyền quản trị</h3><p className="cg-muted">Vai trò hiện tại: {activeMember?.role==='owner'?'Chủ nhóm':activeMember?.role==='admin'?'Quản trị viên':'Thành viên'}</p>
+      <aside className="cg-card cg-admin-right"><h3><ShieldCheck size={22}/>{trUi("chat.adminRights")}</h3><p className="cg-muted">{trUi("chat.currentRole") + ' '}{activeMember?.role==='owner'?trUi("chat.owner"):activeMember?.role==='admin'?trUi("chat.admin"):trUi("chat.members")}</p>
         {['Đổi tên nhóm','Duyệt thành viên mới','Mời thành viên','Ghim tin nhắn','Quản lý kênh riêng'].map((label,index)=>{
           const allowed=index===0?canEdit:index===1?canManage:index===2?canInvite:index===3?canManage:canEdit
           return <div className="cg-right-permission" key={label}><span className={allowed?'yes':''}>{allowed?<Check size={15}/>:<X size={15}/>}</span>{label}</div>
         })}
-        {canEdit&&<button className="cg-secondary" type="button" onClick={onRename}><PencilLine size={16}/>Đổi tên nhóm</button>}
+        {canEdit&&<button className="cg-secondary" type="button" onClick={onRename}><PencilLine size={16}/>{trUi("chat.renameGroup")}</button>}
       </aside>
     </div>
   </div>
 
-  return <div className="cg-page cg-channel" aria-label="Kênh trò chuyện nhóm">
+  return <div className="cg-page cg-channel" aria-label={trUi("common.ui.groupChannels")}>
     <div className="cg-channel-grid">
-      <aside className="cg-card cg-channel-nav"><div className="cg-channel-heading"><h2>{selectedGroup.name}</h2><p>{selectedGroup.memberCount} thành viên · {metadata?.visibility==='public'?'Nhóm công khai':'Nhóm riêng tư'}</p></div>
-        <small className="cg-section-label">KÊNH THẢO LUẬN</small><button type="button" className={'cg-channel-link'+(activeChannelId===0?' active':'')} onClick={()=>setActiveChannelId(0)}><MessageCircle size={19}/>Thảo luận chung</button>
+      <aside className="cg-card cg-channel-nav"><div className="cg-channel-heading"><h2>{selectedGroup.name}</h2><p>{selectedGroup.memberCount} thành viên · {metadata?.visibility==='public'?trUi("chat.groupPublic"):trUi("chat.groupPrivate")}</p></div>
+        <small className="cg-section-label">KÊNH THẢO LUẬN</small><button type="button" className={'cg-channel-link'+(activeChannelId===0?' active':'')} onClick={()=>setActiveChannelId(0)}><MessageCircle size={19}/>{trUi("chat.generalDiscussion")}</button>
         <small className="cg-section-label">KÊNH CON</small>
         {channels.filter(c=>c.id!==0).map(channel=><div key={channel.id} className="cg-channel-option">
           <button type="button" className={'cg-channel-link'+(activeChannelId===channel.id?' active':'')} onClick={()=>setActiveChannelId(channel.id)}><MessageCircle size={17}/>{channel.name}</button>
-          {canEdit&&<span><button type="button" title="Đổi tên kênh" aria-label={'Đổi tên kênh '+channel.name} disabled={channelBusy} onClick={()=>void renameChannel(channel)}><PencilLine size={14}/></button>
-          <button type="button" title="Xóa kênh trống" aria-label={'Xóa kênh '+channel.name} disabled={channelBusy} onClick={()=>void removeChannel(channel)}><X size={14}/></button></span>}
+          {canEdit&&<span><button type="button" title={trUi("chat.renameChannel")} aria-label={'Đổi tên kênh '+channel.name} disabled={channelBusy} onClick={()=>void renameChannel(channel)}><PencilLine size={14}/></button>
+          <button type="button" title={trUi("common.ui.deleteEmptyChannel")} aria-label={'Xóa kênh '+channel.name} disabled={channelBusy} onClick={()=>void removeChannel(channel)}><X size={14}/></button></span>}
         </div>)}
         {canEdit&&<form className="cg-channel-create" onSubmit={e=>{e.preventDefault();void createChannel()}}>
-          <input aria-label="Tên kênh mới" maxLength={80} value={newChannelName} onChange={e=>setNewChannelName(e.target.value)} placeholder="Tên kênh mới"/>
-          <input aria-label="Mô tả kênh mới" maxLength={500} value={newChannelDescription} onChange={e=>setNewChannelDescription(e.target.value)} placeholder="Mô tả (tùy chọn)"/>
-          <button type="submit" className="cg-secondary" disabled={!newChannelName.trim()||channelBusy}><Plus size={15}/>Tạo kênh</button>
+          <input aria-label={trUi("chat.channelNameNew")} maxLength={80} value={newChannelName} onChange={e=>setNewChannelName(e.target.value)} placeholder={trUi("chat.channelNameNew")}/>
+          <input aria-label={trUi("chat.channelDescriptionNew")} maxLength={500} value={newChannelDescription} onChange={e=>setNewChannelDescription(e.target.value)} placeholder={trUi("common.ui.optionalDescription")}/>
+          <button type="submit" className="cg-secondary" disabled={!newChannelName.trim()||channelBusy}><Plus size={15}/>{trUi("chat.createChannel")}</button>
         </form>}
         <small className="cg-section-label">THÀNH VIÊN TRỰC TUYẾN</small><div className="cg-online-list">{members.filter(m=>m.online).slice(0,8).map(member=><button type="button" key={member.id} onClick={()=>onOpenMember(member.username)}><UserAvatar username={member.username} name={nameOf(member)} className="avatar cg-small-avatar" online/>{nameOf(member)}</button>)}
           {!members.some(m=>m.online)&&<p className="cg-muted">Không có trạng thái online mới.</p>}</div>
-        <button type="button" className="cg-secondary cg-bottom-link" onClick={()=>onMode('list')}><ArrowLeft size={16}/>Danh sách nhóm</button>
+        <button type="button" className="cg-secondary cg-bottom-link" onClick={()=>onMode('list')}><ArrowLeft size={16}/>{trUi("chat.groupList")}</button>
       </aside>
       <section className="cg-center">
-        <header className="cg-card cg-channel-title"><div><h3><Users size={22}/> # {currentChannel?.name||'Thảo luận chung'}</h3><p>{currentChannel?.description||'Trao đổi của '+selectedGroup.name}</p></div><button type="button" aria-label="Gọi video nhóm" onClick={()=>onCall(selectedGroup.id)}><Video size={21}/></button></header>
-        <div className="cg-chat-messages" role="log" aria-label="Tin nhắn nhóm">{displayedMessages.map(message=><article className={'cg-message'+(message.senderId===userId?' mine':'')} key={message.id}>
+        <header className="cg-card cg-channel-title"><div><h3><Users size={22}/> # {currentChannel?.name||trUi("chat.generalDiscussion")}</h3><p>{currentChannel?.description||'Trao đổi của '+selectedGroup.name}</p></div><button type="button" aria-label={trUi("chat.groupVideoCall")} onClick={()=>onCall(selectedGroup.id)}><Video size={21}/></button></header>
+        <div className="cg-chat-messages" role="log" aria-label={trUi("chat.groupMessages")}>{displayedMessages.map(message=><article className={'cg-message'+(message.senderId===userId?' mine':'')} key={message.id}>
           {message.senderId!==userId&&<UserAvatar username={message.sender} name={message.senderDisplayName||message.sender} className="avatar cg-small-avatar"/>}
-          <div><strong>{message.senderDisplayName||message.sender}</strong><p>{message.deleted?'Tin nhắn đã thu hồi':message.text||'Tin nhắn có tệp đính kèm'}</p>
+          <div><strong>{message.senderDisplayName||message.sender}</strong><p>{message.deleted?trUi("chat.recalled"):message.text||'Tin nhắn có tệp đính kèm'}</p>
             {!message.deleted&&message.attachments?.length?<MediaAttachmentsView items={message.attachments}/>:null}
             <small>{new Date(message.createdAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}</small></div>
         </article>)}
         {activeChannelId===0&&pendingMessages.filter(item=>item.conversationId===selectedGroup.id).map(item=><article className="cg-message mine cg-message-pending" key={item.clientId}><div>
           <strong>Bạn · tin đang chờ</strong><p>{item.text||'Tệp đính kèm đang gửi'}</p>
-          {(item.status==='failed'||!chatOnline)&&<small>{item.status==='failed'?item.error||'Gửi thất bại':'Chờ có mạng'}</small>}
-          {item.status==='failed'&&<button type="button" onClick={onRetryPending}>Gửi lại</button>}
+          {(item.status==='failed'||!chatOnline)&&<small>{item.status==='failed'?item.error||trUi("chat.messageSendFailed"):trUi("chat.waitingNetwork")}</small>}
+          {item.status==='failed'&&<button type="button" onClick={onRetryPending}>{trUi("common.resend")}</button>}
         </div></article>)}
         {activeChannelId!==0&&channelUnconfirmed&&<article className="cg-message mine cg-message-pending"><div><strong>Bạn · Chờ xác nhận</strong><p>{channelUnconfirmed.text}</p><button type="button" disabled={channelSendBusy} onClick={()=>void sendChannelMessage({preventDefault(){}} as FormEvent)}>Gửi lại cùng mã tin</button></div></article>}
-        {!displayedMessages.length&&!channelUnconfirmed&&(activeChannelId!==0||!pendingMessages.some(item=>item.conversationId===selectedGroup.id))&&<p className="cg-empty">Chưa có tin nhắn. Hãy bắt đầu cuộc trò chuyện!</p>}</div>
-        <form className="cg-card cg-chat-form" onSubmit={activeChannelId===0?onSend:sendChannelMessage}><label htmlFor="cg-chat-text">Nhắn tin cho # {currentChannel?.name||'Thảo luận chung'}</label><textarea id="cg-chat-text" rows={2} value={activeChannelId===0?messageText:channelDraft} onChange={e=>activeChannelId===0?onMessageText(e.target.value):(setChannelDraft(e.target.value),setChannelUnconfirmed(null))} onKeyDown={e=>{if(!shouldSendChatOnEnter(e.nativeEvent))return;e.preventDefault();e.currentTarget.form?.requestSubmit()}} placeholder="Nhập tin nhắn..."/>
+        {!displayedMessages.length&&!channelUnconfirmed&&(activeChannelId!==0||!pendingMessages.some(item=>item.conversationId===selectedGroup.id))&&<p className="cg-empty">{trUi("chat.noMessages")}</p>}</div>
+        <form className="cg-card cg-chat-form" onSubmit={activeChannelId===0?onSend:sendChannelMessage}><label htmlFor="cg-chat-text">Nhắn tin cho # {currentChannel?.name||trUi("chat.generalDiscussion")}</label><textarea id="cg-chat-text" rows={2} value={activeChannelId===0?messageText:channelDraft} onChange={e=>activeChannelId===0?onMessageText(e.target.value):(setChannelDraft(e.target.value),setChannelUnconfirmed(null))} onKeyDown={e=>{if(!shouldSendChatOnEnter(e.nativeEvent))return;e.preventDefault();e.currentTarget.form?.requestSubmit()}} placeholder={trUi("chat.messagePlaceholder")}/>
           {channelError&&<p className="cg-error" role="alert">{channelError}</p>}
-          <div><button className="cg-secondary" type="button" onClick={onOpenFullChat}><Plus size={17}/>Tệp, trả lời, ghim (chat chung)</button><button type="submit" className="cg-primary" disabled={activeChannelId===0?!canSend:channelSendBusy||(!channelDraft.trim()&&!channelUnconfirmed)}><Send size={16}/>Gửi</button></div></form>
+          <div><button className="cg-secondary" type="button" onClick={onOpenFullChat}><Plus size={17}/>Tệp, trả lời, ghim (chat chung)</button><button type="submit" className="cg-primary" disabled={activeChannelId===0?!canSend:channelSendBusy||(!channelDraft.trim()&&!channelUnconfirmed)}><Send size={16}/>{trUi("common.send")}</button></div></form>
       </section>
-      <aside className="cg-card cg-channel-info"><h3>Thông tin kênh</h3><hr/><h4>Mô tả</h4><p>{currentChannel?.description||metadata?.description||'Thảo luận chung của nhóm '+selectedGroup.name}</p><h4>Chủ đề</h4><p>{metadata?.topic||'Chưa có chủ đề'}</p>
-        <h4>Thành viên</h4><div className="cg-channel-avatars">{members.slice(0,6).map(member=><UserAvatar key={member.id} username={member.username} name={nameOf(member)} className="avatar cg-small-avatar"/>)}</div>
-        <button type="button" className="cg-secondary" onClick={()=>onMode('manage')}><Users size={16}/>Xem tất cả thành viên</button>
-        <h4>Tài liệu chia sẻ</h4>{attachments.length?<MediaAttachmentsView items={attachments.slice(0,4)}/>:<p>Chưa có tệp được tải.</p>}
-        <button type="button" className="cg-secondary cg-bottom-link" onClick={()=>onMode('manage')}><Settings size={16}/>Quản lý nhóm</button>
+      <aside className="cg-card cg-channel-info"><h3>{trUi("chat.channelInfo")}</h3><hr/><h4>{trUi("common.description")}</h4><p>{currentChannel?.description||metadata?.description||'Thảo luận chung của nhóm '+selectedGroup.name}</p><h4>{trUi("common.topic")}</h4><p>{metadata?.topic||'Chưa có chủ đề'}</p>
+        <h4>{trUi("chat.members")}</h4><div className="cg-channel-avatars">{members.slice(0,6).map(member=><UserAvatar key={member.id} username={member.username} name={nameOf(member)} className="avatar cg-small-avatar"/>)}</div>
+        <button type="button" className="cg-secondary" onClick={()=>onMode('manage')}><Users size={16}/>{trUi("chat.memberList")}</button>
+        <h4>{trUi("chat.sharedDocuments")}</h4>{attachments.length?<MediaAttachmentsView items={attachments.slice(0,4)}/>:<p>Chưa có tệp được tải.</p>}
+        <button type="button" className="cg-secondary cg-bottom-link" onClick={()=>onMode('manage')}><Settings size={16}/>{trUi("chat.manageGroup")}</button>
       </aside>
     </div>
   </div>

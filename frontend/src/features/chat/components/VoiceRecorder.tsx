@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { Check, Mic, X } from 'lucide-react'
 import { preferredVoiceMime, voiceFileType } from '../utils/voiceMedia'
@@ -17,6 +18,8 @@ export default function VoiceRecorder({
   onRecorded: (file: File) => void
   onError: (message: string) => void
 }) {
+  const trUi = useUiTranslation()
+
   const [phase, setPhase] = useState<'idle' | 'requesting' | 'recording' | 'finalizing'>('idle')
   const [seconds, setSeconds] = useState(0)
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -143,14 +146,12 @@ export default function VoiceRecorder({
   }
   if (phase === 'recording') {
     return (
-      <div className="voice-recorder recording" role="group" aria-label="Đang ghi âm tin nhắn">
+      <div className="voice-recorder recording" role="group" aria-label={trUi("common.ui.recordingMessage")}>
         <span className="voice-recording-time" role="timer">● {formatDuration(seconds)} / 02:00</span>
-        <button type="button" onClick={() => stopRecording(false)} aria-label="Hủy ghi âm">
-          <X size={17} aria-hidden="true" /> Hủy
-        </button>
-        <button type="button" className="voice-save" onClick={() => stopRecording(true)} aria-label="Lưu ghi âm vào tin nhắn">
-          <Check size={17} aria-hidden="true" /> Xong
-        </button>
+        <button type="button" onClick={() => stopRecording(false)} aria-label={trUi("common.ui.cancelRecording")}>
+          <X size={17} aria-hidden="true" />{trUi("common.cancel")}</button>
+        <button type="button" className="voice-save" onClick={() => stopRecording(true)} aria-label={trUi("common.ui.saveRecording")}>
+          <Check size={17} aria-hidden="true" />{trUi("common.done")}</button>
       </div>
     )
   }
@@ -160,8 +161,8 @@ export default function VoiceRecorder({
       type="button"
       onClick={() => void startRecording()}
       disabled={disabled}
-      aria-label="Ghi âm tin nhắn thoại"
-      title="Ghi âm tối đa 2 phút"
+      aria-label={trUi("common.ui.recordVoiceMessage")}
+      title={trUi("common.ui.recordLimit")}
     ><Mic size={21} aria-hidden="true" /></button>
   )
 }

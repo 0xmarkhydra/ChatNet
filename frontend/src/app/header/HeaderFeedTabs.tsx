@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import useSlidingPill from "../../shared/ui/useSlidingPill";
 import type { FeedFilter } from "../../features/feed/utils/feedFilterRoute";
 
@@ -7,16 +8,18 @@ type Props = {
 };
 
 const tabs = [
-  { value: "all", label: "Dành cho bạn" },
-  { value: "following", label: "Đang theo dõi" },
-  { value: "latest", label: "Mới nhất" },
+  { value: "all", label: "common.ui.feedForYou" },
+  { value: "following", label: "common.ui.feedFollowing" },
+  { value: "latest", label: "common.newest" },
 ] as const;
 
 /** Desktop filter tabs share Feed's existing filter state, not an independent copy. */
 export default function HeaderFeedTabs({ filter, onChange }: Props) {
+  const trUi = useUiTranslation()
+
   const { hostRef, activeRef, pillRef } = useSlidingPill<HTMLDivElement>(filter);
   return (
-    <div ref={hostRef} className="appbar-feed-tabs sliding-pill-host" role="tablist" aria-label="Lọc bảng tin">
+    <div ref={hostRef} className="appbar-feed-tabs sliding-pill-host" role="tablist" aria-label={trUi("feed.feedFilter")}>
       <span ref={pillRef} className="sliding-pill appbar-feed-active-pill" aria-hidden="true" />
       {tabs.map((item) => (
         <button
@@ -28,13 +31,11 @@ export default function HeaderFeedTabs({ filter, onChange }: Props) {
           className={filter === item.value ? "is-active" : ""}
           onClick={() => onChange(item.value)}
         >
-          {item.label}
+          {trUi(item.label)}
         </button>
       ))}
       {filter === "saved" && (
-        <button ref={activeRef} type="button" role="tab" aria-selected={true} className="is-active">
-          Đã lưu
-        </button>
+        <button ref={activeRef} type="button" role="tab" aria-selected={true} className="is-active">{trUi("common.saved")}</button>
       )}
     </div>
   );

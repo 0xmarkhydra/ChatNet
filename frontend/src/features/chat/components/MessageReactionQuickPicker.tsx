@@ -1,7 +1,8 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SmilePlus, Plus } from 'lucide-react'
-import { messageReactions } from '../utils/messageReactions'
+import { messageReactions, messageReactionLabel } from '../utils/messageReactions'
 import type { Message } from '../types'
 
 // Only one quick reaction popover may be visible, even while crossing bubbles.
@@ -15,6 +16,8 @@ type Props = {
 }
 
 export default function MessageReactionQuickPicker({ message, busy, toggleReaction, openMessageReactions }: Props) {
+  const trUi = useUiTranslation()
+
   const trigger = useRef<HTMLButtonElement>(null)
   const picker = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -91,7 +94,7 @@ export default function MessageReactionQuickPicker({ message, busy, toggleReacti
   const selected = message.reactions?.find(reaction => reaction.mine)?.emoji
   return <>
     <button type="button" className="reaction-add"
-      aria-label="Chọn cảm xúc cho tin nhắn" aria-expanded={Boolean(position)}
+      aria-label={trUi("common.ui.messageReaction")} aria-expanded={Boolean(position)}
       onPointerEnter={event => { if (event.pointerType === 'mouse') show() }}
       onPointerLeave={event => { if (event.pointerType === 'mouse') scheduleClose() }}
       onClick={event => {
@@ -101,19 +104,19 @@ export default function MessageReactionQuickPicker({ message, busy, toggleReacti
       <SmilePlus size={16} aria-hidden="true" />
     </button>
     {position && createPortal(
-      <div className="chat-quick-reaction-picker" role="group" aria-label="Cảm xúc nhanh"
+      <div className="chat-quick-reaction-picker" role="group" aria-label={trUi("common.ui.quickReaction")}
         ref={picker} style={position}
         onPointerEnter={cancelClose}
         onPointerLeave={event => { if (event.pointerType === 'mouse') scheduleClose() }}
         onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) close() }}>
-        {messageReactions.map(({ emoji, label }) => (
-          <button type="button" key={emoji} title={label} aria-label={label}
+        {messageReactions.map(({ emoji }) => (
+          <button type="button" key={emoji} title={messageReactionLabel(emoji, trUi)} aria-label={messageReactionLabel(emoji, trUi)}
             aria-pressed={selected === emoji} disabled={busy}
             onClick={() => { close(); void toggleReaction(message, emoji) }}>
             {emoji}
           </button>
         ))}
-        <button type="button" title="Thêm emoji" aria-label="Thêm emoji khác"
+        <button type="button" title={trUi("common.ui.addEmoji")} aria-label={trUi("common.ui.moreEmoji")}
           onClick={() => { close(); openMessageReactions(message) }}>
           <Plus size={18} aria-hidden="true" />
         </button>

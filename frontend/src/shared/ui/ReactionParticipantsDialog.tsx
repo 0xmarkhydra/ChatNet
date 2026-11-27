@@ -1,3 +1,4 @@
+import { useUiTranslation, type UiCopyKey } from '@/shared/i18n/locale'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
@@ -38,12 +39,14 @@ export default function ReactionParticipantsDialog({
   request: (path: string, init?: RequestInit) => Promise<Response>
   onClose: () => void
 }) {
+  const trUi = useUiTranslation()
+
   const [selectedEmoji, setSelectedEmoji] = useState(initialEmoji)
   const reactionScope = `${kind}:${id}:${selectedEmoji}`
   const [users, setUsers] = useScopedState<ReactionUser[]>(reactionScope, [])
   const [hasMore, setHasMore] = useScopedState(reactionScope, false)
   const [loading, setLoading] = useScopedState(reactionScope, true)
-  const [error, setError] = useScopedState(reactionScope, '')
+  const [error, setError] = useScopedState<UiCopyKey | ''>(reactionScope, '')
   const pending = useRef<AbortController | null>(null)
   const requestRef = useRef(request)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -65,19 +68,19 @@ export default function ReactionParticipantsDialog({
       })
       if (!response.ok) {
         throw new Error(response.status === 405 || response.status === 501
-          ? 'Backend hiện tại chưa hỗ trợ xem danh sách người thả cảm xúc. Cần cập nhật backend cloud.'
+          ? 'common.ui.reactionUnsupported'
           : response.status === 403 || response.status === 404
-            ? 'Bạn không còn quyền xem danh sách cảm xúc này.'
-            : 'Không tải được danh sách cảm xúc.')
+            ? 'common.ui.reactionForbidden'
+            : 'common.ui.reactionFailed')
       }
       const page = await response.json() as ReactionPage
-      if (!Array.isArray(page.items)) throw new Error('Dữ liệu cảm xúc không hợp lệ.')
+      if (!Array.isArray(page.items)) throw new Error('common.ui.reactionInvalid')
       if (controller.signal.aborted) return
       setUsers(current => offset === 0 ? page.items : [...current, ...page.items])
       setHasMore(Boolean(page.hasMore))
     } catch (cause) {
       if (!controller.signal.aborted) {
-        setError(cause instanceof Error ? cause.message : 'Không tải được danh sách cảm xúc.')
+        setError(cause instanceof Error && (cause.message === 'common.ui.reactionUnsupported' || cause.message === 'common.ui.reactionForbidden' || cause.message === 'common.ui.reactionInvalid') ? cause.message : 'common.ui.reactionFailed')
       }
     } finally {
       if (pending.current === controller) {
@@ -135,24 +138,23 @@ export default function ReactionParticipantsDialog({
       >
         <header className="reaction-users-header">
           <div>
-            <h2 id="reaction-users-title">{kind === 'message' ? 'Cảm xúc tin nhắn' : 'Cảm xúc bài viết'}</h2>
-            <span>{users.length > 0 ? `${users.length}${hasMore ? '+' : ''} người đã bày tỏ cảm xúc` : 'Danh sách người đã bày tỏ cảm xúc'}</span>
+            <h2 id="reaction-users-title">{kind === 'message' ? trUi('common.ui.reactionMessage') : trUi("feed.postReaction")}</h2>
+            <span>{users.length > 0 ? trUi('common.ui.reactionCount', { count: hasMore ? String(users.length) + '+' : users.length }) : trUi('common.ui.reactionList')}</span>
           </div>
-          <button ref={closeRef} type="button" className="reaction-users-close" aria-label="Đóng danh sách cảm xúc" onClick={onClose}>
+          <button ref={closeRef} type="button" className="reaction-users-close" aria-label={trUi("common.ui.closeReactions")} onClick={onClose}>
             <X size={20} />
           </button>
         </header>
         {reactions.length > 0 && (
-          <div className="reaction-users-tabs" role="group" aria-label="Lọc theo cảm xúc">
+          <div className="reaction-users-tabs" role="group" aria-label={trUi("common.ui.filterReactions")}>
             <button type="button" className={!selectedEmoji ? 'is-active' : ''}
-              aria-pressed={!selectedEmoji} onClick={() => setSelectedEmoji('')}>
-              Tất cả <span>{total}</span>
+              aria-pressed={!selectedEmoji} onClick={() => setSelectedEmoji('')}>{trUi("common.all") + ' '}<span>{total}</span>
             </button>
             {reactions.filter(item => item.count > 0).map(item => (
               <button type="button" key={item.emoji}
                 className={selectedEmoji === item.emoji ? 'is-active' : ''}
                 aria-pressed={selectedEmoji === item.emoji}
-                aria-label={`${messageReactionLabel(item.emoji)}: ${item.count} người`}
+                aria-label={trUi("common.ui.reactionPeopleCount", { v1: String(messageReactionLabel(item.emoji, trUi)), v2: String(item.count) })}
                 onClick={() => setSelectedEmoji(item.emoji)}>
                 {item.emoji} <span>{item.count}</span>
               </button>
@@ -167,17 +169,17 @@ export default function ReactionParticipantsDialog({
                 <strong>{userLabel(user.displayName, user.username)}</strong>
                 <small>@{user.username}</small>
               </div>
-              <span className="reaction-users-emoji" title={messageReactionLabel(user.emoji)} aria-label={messageReactionLabel(user.emoji)}>
+              <span className="reaction-users-emoji" title={messageReactionLabel(user.emoji, trUi)} aria-label={messageReactionLabel(user.emoji, trUi)}>
                 {user.emoji}
               </span>
             </div>
           ))}
-          {!loading && users.length === 0 && !error && <p className="reaction-users-message">Chưa có ai bày tỏ cảm xúc.</p>}
-          {error && <p className="reaction-users-message reaction-users-error" role="alert">{error}</p>}
-          {loading && <p className="reaction-users-message">Đang tải danh sách...</p>}
+          {!loading && users.length === 0 && !error && <p className="reaction-users-message">{trUi("common.ui.reactionEmpty")}</p>}
+          {error && <p className="reaction-users-message reaction-users-error" role="alert">{trUi(error)}</p>}
+          {loading && <p className="reaction-users-message">{trUi("common.ui.reactionLoading")}</p>}
           {!loading && (hasMore || Boolean(error)) && (
             <button type="button" className="reaction-users-more" onClick={() => void loadPage(users.length)}>
-              {error ? 'Thử lại' : 'Xem thêm'}
+              {error ? trUi("common.retry") : trUi("common.seeMore")}
             </button>
           )}
         </div>

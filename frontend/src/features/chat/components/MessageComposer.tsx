@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useQuickReplyVisibility } from "../hooks/useQuickReplyVisibility";
 import QuickReplyPanel from "./QuickReplyPanel";
 import { Images, ThumbsUp, X } from "lucide-react";
@@ -22,6 +23,8 @@ const CHAT_ATTACHMENT_ACCEPT = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xl
 type Props = Omit<Pick<ChatSectionProps, "activeConversation" | "activeConversationId" | "addChatFiles" | "canSend" | "canSendLike" | "mediaUploading" | "messageAttachments" | "messageInputRef" | "messageSending" | "messageText" | "replyingTo" | "selectedChannelId" | "sendMessage" | "sendLike" | "session" | "setGroupActivityCreateKind" | "setMessageAttachments" | "setMessageText" | "setNotice" | "setReplyingTo">, "activeConversation"> & { activeConversation: NonNullable<ChatSectionProps["activeConversation"]>; groupMembers: GroupMember[]; chatFileInputRef: RefObject<HTMLInputElement | null>; apiFetch: ApiRequest; canSchedule: boolean };
 
 export default function MessageComposer({ activeConversation, activeConversationId, addChatFiles, apiFetch, canSchedule, canSend, canSendLike, chatFileInputRef, mediaUploading, messageAttachments, messageInputRef, messageSending, messageText, replyingTo, selectedChannelId, sendMessage, sendLike, session, setGroupActivityCreateKind, setMessageAttachments, setMessageText, setNotice, setReplyingTo, groupMembers }: Props) {
+  const trUi = useUiTranslation()
+
   const quickReplies = useQuickReplyVisibility(`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`, messageText);
   function openAttachmentPicker(mediaOnly: boolean) {
     const input = chatFileInputRef.current;
@@ -83,10 +86,10 @@ export default function MessageComposer({ activeConversation, activeConversation
                       <div className="composer-reply-preview">
                         {replySticker && <img src={replySticker} alt="" referrerPolicy="no-referrer" className="size-10 shrink-0 object-contain" />}
                         <div className="min-w-0 flex-1">
-                          <strong>Đang trả lời {userLabel(replyingTo.senderDisplayName, replyingTo.sender)}</strong>
-                          <span>{replyingTo.deleted ? 'Tin nhắn đã thu hồi' : (replyPreview(replyingTo.text) || attachmentLabel(replyingTo.attachments))}</span>
+                          <strong>{trUi("chat.replying") + ' '}{userLabel(replyingTo.senderDisplayName, replyingTo.sender)}</strong>
+                          <span>{replyingTo.deleted ? trUi("chat.recalled") : (replyPreview(replyingTo.text) || attachmentLabel(replyingTo.attachments))}</span>
                         </div>
-                        <button type="button" className="ghost-action flex! size-8! shrink-0 items-center justify-center self-center m-0! p-0! border-0! bg-transparent! shadow-none!" onClick={() => setReplyingTo(null)} aria-label="Hủy trả lời" title="Hủy trả lời"><X size={18} aria-hidden="true" /></button>
+                        <button type="button" className="ghost-action flex! size-8! shrink-0 items-center justify-center self-center m-0! p-0! border-0! bg-transparent! shadow-none!" onClick={() => setReplyingTo(null)} aria-label={trUi("chat.cancelReply")} title={trUi("chat.cancelReply")}><X size={18} aria-hidden="true" /></button>
                       </div>
                     )}
                     {messageAttachments.length > 0 && (
@@ -110,7 +113,7 @@ export default function MessageComposer({ activeConversation, activeConversation
                     <button className="ghost-action chat-composer-image" type="button"
                       onClick={() => openAttachmentPicker(true)}
                       disabled={Boolean(mediaUploading) || messageSending}
-                      aria-label="Đính kèm ảnh hoặc video" title="Chọn ảnh hoặc video">
+                      aria-label={trUi("common.ui.attachMedia")} title={trUi("common.ui.chooseMedia")}>
                       <Images size={19} aria-hidden="true" />
                     </button>
                     <VoiceRecorder
@@ -127,7 +130,7 @@ export default function MessageComposer({ activeConversation, activeConversation
                       inputRef={messageInputRef}
                       text={messageText}
                       setText={setMessageText}
-                      placeholder="Nhập tin nhắn…"
+                      placeholder={trUi("common.ui.messageEllipsis")}
                       onFilesPaste={(event) => {
                         const files = chatFilesFromClipboard(event.clipboardData)
                         if (files.length === 0) return
@@ -139,8 +142,8 @@ export default function MessageComposer({ activeConversation, activeConversation
                       className="send-button chat-composer-primary"
                       type={hasMessageContent ? "submit" : "button"}
                       disabled={hasMessageContent ? !canSend : !canSendLike}
-                      aria-label={hasMessageContent ? "Gửi tin nhắn" : "Gửi Like"}
-                      title={hasMessageContent ? "Gửi tin nhắn" : "Gửi Like"}
+                      aria-label={trUi(hasMessageContent ? "common.ui.sendMessage" : "chat.sendLike")}
+                      title={trUi(hasMessageContent ? "common.ui.sendMessage" : "chat.sendLike")}
                       onClick={hasMessageContent ? undefined : () => void sendLike()}
                     >
                       {hasMessageContent ? <UiIcon name="send" size={21} /> : <ThumbsUp size={21} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />}

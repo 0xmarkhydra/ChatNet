@@ -1,6 +1,7 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useState } from 'react'
 import type { ApiRequest } from '@/shared/types/api'
-import { reactionOptions } from '@/shared/utils/reactions'
+import { reactionOptions, reactionLabel } from '@/shared/utils/reactions'
 import { cn } from '@/shared/lib/utils'
 import { changeStoryReaction, readStoryReaction } from '../api/stories'
 
@@ -8,6 +9,8 @@ const loadError = 'Không thể tải cảm xúc.'
 
 /** Viewer's single reaction on someone else's story: tap to set or switch, tap again to remove. */
 export default function StoryReactionBar({ request, storyId }: { request: ApiRequest; storyId: number }) {
+  const trUi = useUiTranslation()
+
   // null = not known yet, '' = no reaction.
   const [mine, setMine] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
@@ -50,12 +53,12 @@ export default function StoryReactionBar({ request, storyId }: { request: ApiReq
           {mine === null && <button type="button" className="min-h-control-touch cursor-pointer rounded-ui-sm border-0 bg-white/10 px-ui-3 text-ui-label font-semibold text-white" onClick={() => {
             setError('')
             setRevision(value => value + 1)
-          }}>Tải lại</button>}
+          }}>{trUi("common.reload")}</button>}
         </div>
       )}
-      <div role="group" aria-label="Bày tỏ cảm xúc" className="flex justify-between">
+      <div role="group" aria-label={trUi("common.ui.expressReaction")} className="flex justify-between">
         {reactionOptions.map(option => (
-          <button key={option.emoji} type="button" aria-label={option.label} title={option.label} aria-pressed={mine === option.emoji}
+          <button key={option.emoji} type="button" aria-label={reactionLabel(option.emoji, trUi)} title={reactionLabel(option.emoji, trUi)} aria-pressed={mine === option.emoji}
             disabled={mine === null || busy} onClick={() => void choose(option.emoji)}
             className={cn('grid size-control-touch cursor-pointer place-items-center rounded-full border-0 p-0 text-2xl leading-none transition-transform disabled:cursor-not-allowed disabled:opacity-50',
               mine === option.emoji ? 'scale-110 bg-white/90' : 'bg-black/30 hover:bg-white/20')}>

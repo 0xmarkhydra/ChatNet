@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { conversationPreview } from '../utils/conversationPreview'
 import { useMemo, useState } from 'react'
 import { BellOff, Search, X } from 'lucide-react'
@@ -70,6 +71,8 @@ const formatChannelTime = (timestamp?: string) => {
 export default function GroupChannelSidebar({
   groupAvatarUrl, channels, selectedId, unreadAvailable, open, onSelect,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [search, setSearch] = useState('')
   const filtered = useMemo(() => channels.filter(channel =>
     (channel.name + ' ' + channel.description + ' ' + channel.lastMessage).toLocaleLowerCase('vi-VN')
@@ -77,13 +80,13 @@ export default function GroupChannelSidebar({
 
   return (
     <aside className={open ? 'group-channel-sidebar open' : 'group-channel-sidebar'}
-      aria-label="Danh sách kênh hội thoại">
+      aria-label={trUi("chat.channels")}>
       <div className="group-channel-sidebar-topbar">
         <label className="group-channel-sidebar-search">
           <Search size={17} aria-hidden="true" />
-          <input type="search" aria-label="Tìm kênh hội thoại" placeholder="Tìm kênh hội thoại..."
+          <input type="search" aria-label={trUi("common.ui.findChannel")} placeholder={trUi("common.ui.findChannelPlaceholder")}
             value={search} onChange={event => setSearch(event.target.value)} />
-          {search && <button type="button" aria-label="Xóa tìm kiếm kênh" onClick={() => setSearch('')}>
+          {search && <button type="button" aria-label={trUi("common.ui.clearChannelSearch")} onClick={() => setSearch('')}>
             <X size={15} aria-hidden="true" />
           </button>}
         </label>
@@ -91,14 +94,14 @@ export default function GroupChannelSidebar({
       {!unreadAvailable && <p className="group-channel-unread-unavailable" role="status">
         Số tin chưa đọc theo kênh chưa khả dụng. Cần cập nhật backend.
       </p>}
-      <nav className="group-channel-sidebar-list" aria-label="Chuyển kênh hội thoại">
+      <nav className="group-channel-sidebar-list" aria-label={trUi("common.ui.switchChannel")}>
         {filtered.length === 0 && <p className="group-channel-sidebar-empty">Không tìm thấy kênh phù hợp.</p>}
         {filtered.map(channel => (
           <div className="group-channel-sidebar-item" key={channel.id}>
             <button type="button"
               className={channel.id === selectedId ? 'group-channel-sidebar-row selected' : 'group-channel-sidebar-row'}
               aria-current={channel.id === selectedId ? 'page' : undefined}
-              aria-label={`Mở kênh ${channel.name}${channel.unreadCount ? `, ${channel.unreadCount} tin chưa đọc` : ''}`}
+              aria-label={trUi("common.ui.openChannelNamed", { v1: String(channel.name), v2: String(channel.unreadCount ? `, ${channel.unreadCount} tin chưa đọc` : '') })}
               title={channel.name}
               onClick={() => onSelect(channel.id)}
               onContextMenu={event => event.preventDefault()}>
@@ -112,16 +115,16 @@ export default function GroupChannelSidebar({
                 <span className="group-channel-sidebar-name-row">
                   <span className="group-channel-sidebar-name-status">
                     <strong>{channel.name}</strong>
-                    {channel.muted && <BellOff size={13} className="group-channel-sidebar-muted" aria-label="Đã tắt thông báo kênh" />}
+                    {channel.muted && <BellOff size={13} className="group-channel-sidebar-muted" aria-label={trUi("common.ui.channelMuted")} />}
                   </span>
                   <time>{formatChannelTime(channel.lastMessageAt)}</time>
                 </span>
-                <span className="group-channel-sidebar-topic-row" title={channel.description || 'Chưa đặt chủ đề'}>
-                  {channel.description || 'Chưa đặt chủ đề'}
+                <span className="group-channel-sidebar-topic-row" title={channel.description || trUi("chat.noTopic")}>
+                  {channel.description || trUi("chat.noTopic")}
                 </span>
                 <span className="group-channel-sidebar-meta-row">
-                  <small title={conversationPreview(channel.lastMessage) || 'Chưa có tin nhắn'}>{conversationPreview(channel.lastMessage) || 'Chưa có tin nhắn'}</small>
-                  {channel.unreadCount > 0 && <b className="group-channel-unread" aria-label={`${channel.unreadCount} tin chưa đọc`}>
+                  <small title={conversationPreview(channel.lastMessage) || trUi("chat.emptyMessages")}>{conversationPreview(channel.lastMessage) || trUi("chat.emptyMessages")}</small>
+                  {channel.unreadCount > 0 && <b className="group-channel-unread" aria-label={trUi("common.ui.unreadCount", { v1: String(channel.unreadCount) })}>
                     {channel.unreadCount > 99 ? '99+' : channel.unreadCount}
                   </b>}
                 </span>

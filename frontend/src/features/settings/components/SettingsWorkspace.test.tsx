@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
+import type { UIMessageKey } from "../../i18n";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import SettingsWorkspace from "./SettingsWorkspace";
+import PrivacySettingsPanel from "./PrivacySettingsPanel";
+import { UiLocaleContext } from "../../../shared/i18n/locale";
 
 vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 const cleanups: Array<() => void> = [];
@@ -15,11 +18,15 @@ function mount(path = "/settings") {
   function Probe() {
     const location = useLocation();
     const navigate = useNavigate();
+    const [english, setEnglish] = useState(false);
+    const labels: Partial<Record<UIMessageKey, string>> = { "settings.language": "Language & AI translation", "settings.languageHint": "Interface and translation preferences", "settings.title": "Account settings" };
     return (
       <>
         <output data-testid="pathname">{location.pathname}</output>
         <button onClick={() => navigate(-1)}>Back</button>
+        <button onClick={() => setEnglish(true)}>Switch language</button>
         <SettingsWorkspace
+          t={english ? key => labels[key] ?? key : undefined}
           privacy={null}
           privacyLoading={false}
           privacyBusy={false}
@@ -72,9 +79,44 @@ describe("SettingsWorkspace router navigation", () => {
     expect(page.pathname()).toBe("/settings");
   });
 
+  it("updates the active section when interface language changes", () => {
+    const page = mount("/settings/language");
+    expect(page.selected()).toContain("Ngôn ngữ & dịch AI");
+    page.click("Switch language");
+    expect(page.selected()).toContain("Language & AI translation");
+    expect(page.host.textContent).toContain("Interface and translation preferences");
+    expect(page.pathname()).toBe("/settings/language");
+  });
+
   it("renders a directly shared Settings section", () => {
     const page = mount("/settings/security");
     expect(page.selected()).toContain("Bảo mật & đăng nhập");
     expect(page.host.textContent).toContain("Security content");
   });
+});
+it("localizes privacy fields in all five locales without resetting draft", () => {
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  const privacy = { searchableByUsername: true, searchableByName: true, searchableByEmail: true, allowFriendRequests: true, showOnlineStatus: true };
+  const render = (locale: string) => act(() => root.render(<UiLocaleContext.Provider value={{ locale }}>
+    <PrivacySettingsPanel privacy={privacy} privacyLoading={false} privacyBusy={false} privacyError=""
+      onPrivacyRetry={() => {}} onSavePrivacy={async () => {}} />
+  </UiLocaleContext.Provider>));
+  try {
+    render("vi");
+    act(() => (host.querySelector('[role="switch"]') as HTMLButtonElement).click());
+    for (const [locale, profile, request, unsaved] of [
+      ["vi", "Hiển thị hồ sơ", "Cho phép lời mời kết bạn", "Bạn có thay đổi chưa lưu"],
+      ["en", "Profile visibility", "Allow friend requests", "You have unsaved changes"],
+      ["zh", "个人主页可见性", "允许好友请求", "你有未保存的更改"],
+      ["ja", "プロフィールの公開範囲", "友達リクエストを許可", "未保存の変更があります"],
+      ["ko", "프로필 공개 범위", "친구 요청 허용", "저장하지 않은 변경 사항이 있습니다"],
+    ]) {
+      render(locale);
+      expect(host.querySelector("#settings-workspace-profile-heading")?.textContent).toBe(profile);
+      expect(host.querySelector('[role="switch"]')?.getAttribute("aria-label")).toBe(request);
+      expect(host.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("false");
+      expect(host.textContent).toContain(unsaved);
+    }
+  } finally { act(() => root.unmount()); }
 });

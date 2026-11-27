@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import type { ReactNode } from "react";
 
 type AppHeaderProps = {
@@ -10,8 +11,10 @@ type AppHeaderProps = {
 
 /** One shared three-zone shell; page-specific title, search/filter, and actions are supplied by the caller. */
 export default function AppHeader({ className, start, center, end, mobileSearchActions = false }: AppHeaderProps) {
+  const trUi = useUiTranslation()
+
   return (
-    <header className={className} aria-label="Thanh công cụ chính">
+    <header className={className} aria-label={trUi("app.mainToolbar")}>
       <div className="appbar-start">{start}</div>
       <div className="appbar-brand" aria-label="SocCO">
         <img src="/soco-mark.svg" width="32" height="32" alt="" />

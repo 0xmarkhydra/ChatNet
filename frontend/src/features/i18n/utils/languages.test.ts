@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildLanguageOptions, filterLanguageOptions } from './languages'
+import { buildAppLanguageOptions, buildLanguageOptions, filterLanguageOptions } from './languages'
 
 afterEach(() => vi.unstubAllGlobals())
 
 describe('language names in the picker', () => {
+  it('restricts only the app language picker to the five installed locales', () => {
+    const app = buildAppLanguageOptions('en')
+    expect(app.map(option => option.value).sort()).toEqual(['en', 'ja', 'ko', 'vi', 'zh'])
+    expect(app.find(option => option.value === 'zh')?.nativeLanguage).toBe('简体中文')
+    expect(buildLanguageOptions('en').some(option => option.value === 'fr')).toBe(true)
+  })
   it('resolves and searches names missing from localized ICU data', () => {
     const options = buildLanguageOptions('vi')
     for (const [code, name] of [['aa', 'Afar'], ['ab', 'Abkhazian'], ['ae', 'Avestan']]) {

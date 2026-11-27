@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { type Room } from 'livekit-client'
 import { Languages, Mic, MicOff, MonitorUp, MonitorX, PhoneOff, Users, Video, VideoOff, Volume2, VolumeX, MoreHorizontal, Settings2 } from 'lucide-react'
@@ -33,50 +34,51 @@ type CallRoomControlsProps = {
 }
 
 export default function CallRoomControls({ room, ending, micOn, cameraOn, screenOn, soundOn, translationOn, isGroup, participantsSheetOpen, translationSheetOpen, moreRef, moreOpen, consentBusy, allowMyVoice, canEnd, toggleMic, toggleCamera, toggleScreen, toggleSound, toggleTranslation, closeCall, updateVoiceConsent, setMoreOpen, setTranslationSheetOpen, setParticipantsSheetOpen }: CallRoomControlsProps) {
+  const trUi = useUiTranslation()
+
   return (
         <footer className="secure-call-controls">
           <div className="call-primary-controls">
             <button type="button" className={!micOn ? 'is-off' : ''} disabled={!room || ending}
-              aria-label={micOn ? 'Tắt micro' : 'Bật micro'} aria-pressed={!micOn}
+              aria-label={micOn ? trUi("calls.micOff") : trUi("calls.micOn")} aria-pressed={!micOn}
               onClick={() => void toggleMic()}>
-              {micOn ? <Mic /> : <MicOff />}<span>{micOn ? 'Mic' : 'Tắt mic'}</span>
+              {micOn ? <Mic /> : <MicOff />}<span>{micOn ? 'Mic' : trUi("calls.micMute")}</span>
             </button>
             <button type="button" className={!cameraOn ? 'is-off' : ''} disabled={!room || ending}
-              aria-label={cameraOn ? 'Tắt camera' : 'Bật camera'} aria-pressed={!cameraOn}
+              aria-label={cameraOn ? trUi("calls.cameraOff") : trUi("calls.cameraOn")} aria-pressed={!cameraOn}
               onClick={() => void toggleCamera()}>
               {cameraOn ? <Video /> : <VideoOff />}<span>Camera</span>
             </button>
             <button type="button" className={translationOn ? 'is-on call-ai-action' : 'call-ai-action'}
-              disabled={!room || ending} aria-pressed={translationOn} title="Bật hoặc tắt dịch trực tiếp"
+              disabled={!room || ending} aria-pressed={translationOn} title={trUi("common.ui.toggleLiveTranslation")}
               onClick={toggleTranslation}>
-              <Languages /><span>{translationOn ? 'Đang dịch' : 'Dịch AI'}</span>
+              <Languages /><span>{translationOn ? trUi("calls.translating") : trUi("chat.aiTranslation")}</span>
             </button>
             {isGroup && <button type="button" className={participantsSheetOpen && !translationSheetOpen ? 'is-on' : ''}
-              aria-label="Xem người tham gia" aria-pressed={participantsSheetOpen && !translationSheetOpen}
+              aria-label={trUi("calls.participantsView")} aria-pressed={participantsSheetOpen && !translationSheetOpen}
               onClick={() => {
                 if (translationOn && translationSheetOpen) { setTranslationSheetOpen(false); setParticipantsSheetOpen(true) }
                 else setParticipantsSheetOpen((current) => !current)
               }}>
-              <Users /><span>Thành viên</span>
+              <Users /><span>{trUi("chat.members")}</span>
             </button>}
             <div className="call-more-wrapper" ref={moreRef}>
-              <button type="button" aria-label="Thêm tùy chọn cuộc gọi" aria-expanded={moreOpen}
+              <button type="button" aria-label={trUi("common.ui.moreCallOptions")} aria-expanded={moreOpen}
                 disabled={!room || ending} onClick={() => setMoreOpen((value) => !value)}>
-                <MoreHorizontal /><span>Thêm</span>
+                <MoreHorizontal /><span>{trUi("common.more")}</span>
               </button>
               {moreOpen && (
                 <div className="call-more-popover">
                   {isDesktopBuild && room && <CallDeviceSettings room={room} micOn={micOn} cameraOn={cameraOn} />}
                   <button type="button" onClick={() => { setMoreOpen(false); void toggleScreen() }}>
-                    {screenOn ? <MonitorX size={17} /> : <MonitorUp size={17} />} {screenOn ? 'Dừng chia sẻ màn hình' : 'Chia sẻ màn hình'}
+                    {screenOn ? <MonitorX size={17} /> : <MonitorUp size={17} />} {screenOn ? trUi("calls.stopScreenShare") : trUi("calls.shareScreen")}
                   </button>
                   <button type="button" onClick={() => { setMoreOpen(false); void toggleSound() }}>
-                    {soundOn ? <Volume2 size={17} /> : <VolumeX size={17} />} {soundOn ? 'Tắt loa' : 'Bật loa'}
+                    {soundOn ? <Volume2 size={17} /> : <VolumeX size={17} />} {soundOn ? trUi("calls.speakerOff") : trUi("calls.speakerOn")}
                   </button>
                   {translationOn && (
                     <button type="button" onClick={() => { setMoreOpen(false); setTranslationSheetOpen(true) }}>
-                      <Languages size={17} /> Mở phụ đề dịch
-                    </button>
+                      <Languages size={17} />{trUi("calls.openSubtitles")}</button>
                   )}
                   <button type="button" disabled={consentBusy} onClick={() => {
                     setMoreOpen(false)
@@ -88,7 +90,7 @@ export default function CallRoomControls({ room, ending, micOn, cameraOn, screen
               )}
             </div>
             <button type="button" className="hangup-button" disabled={ending} onClick={() => void closeCall(canEnd)}>
-              <PhoneOff /><span>{canEnd ? 'Kết thúc' : 'Rời'}</span>
+              <PhoneOff /><span>{canEnd ? trUi("calls.end") : trUi("calls.leave")}</span>
             </button>
           </div>
         </footer>

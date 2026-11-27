@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -41,6 +42,8 @@ const CAPTION_KEY = 'chatnet.call.subtitle-mode.v1'
 
 
 export default function CallCenter({ request, userId, token, conversations, targetLanguage, directoryContent, directoryQuery, onDirectoryQueryChange, onDirectoryOpen, onNavigate, onOpenChat, embedded = false, contactMode, onContactModeChange }: Props) {
+  const trUi = useUiTranslation()
+
   const requestRef = useLatest(request)
   const location = useLocation()
   const navigate = useNavigate()
@@ -208,35 +211,35 @@ export default function CallCenter({ request, userId, token, conversations, targ
 
   return (
     <div className={'call-center' + (embedded ? ' is-embedded' : '') + (contactMode ? ' is-contact-panel' : '')}>
-      <aside className="call-center-sidebar" aria-label="Điều hướng SocCo">
+      <aside className="call-center-sidebar" aria-label={trUi("common.ui.navigationNamed", { v1: "SocCo" })}>
         <div className="call-center-brand">
           <span className="call-center-logo">S</span><span><strong>SocCo</strong><small>ChatNet · Kết nối cộng đồng</small></span>
         </div>
-        <nav className="call-center-navigation" aria-label="Điều hướng">
-          <button type="button" onClick={() => onNavigate('feed')}><span className="call-nav-symbol"><CalendarDays size={19} /></span>Bảng tin</button>
-          <button type="button" onClick={() => onNavigate('chat')}><span className="call-nav-symbol"><MessageCircle size={19} /></span>Tin nhắn</button>
-          <button type="button" onClick={() => onNavigate('contacts')}><span className="call-nav-symbol"><Users size={19} /></span>Bạn bè</button>
-          <button type="button" className={view === 'directory' ? 'active' : ''} onClick={() => showView('directory')}><span className="call-nav-symbol"><BookUser size={19} /></span>Danh bạ</button>
-          <button type="button" className={view === 'history' ? 'active' : ''} onClick={() => showView('history')}><span className="call-nav-symbol"><Clock3 size={19} /></span>Lịch sử cuộc gọi</button>
-          <button type="button" className={view === 'settings' ? 'active' : ''} onClick={() => showView('settings')}><span className="call-nav-symbol"><Languages size={19} /></span>Dịch AI</button>
+        <nav className="call-center-navigation" aria-label={trUi("common.ui.navigation")}>
+          <button type="button" onClick={() => onNavigate('feed')}><span className="call-nav-symbol"><CalendarDays size={19} /></span>{trUi("feed.feed")}</button>
+          <button type="button" onClick={() => onNavigate('chat')}><span className="call-nav-symbol"><MessageCircle size={19} /></span>{trUi("chat.messages")}</button>
+          <button type="button" onClick={() => onNavigate('contacts')}><span className="call-nav-symbol"><Users size={19} /></span>{trUi("contacts.friends")}</button>
+          <button type="button" className={view === 'directory' ? 'active' : ''} onClick={() => showView('directory')}><span className="call-nav-symbol"><BookUser size={19} /></span>{trUi("contacts.directory")}</button>
+          <button type="button" className={view === 'history' ? 'active' : ''} onClick={() => showView('history')}><span className="call-nav-symbol"><Clock3 size={19} /></span>{trUi("calls.history")}</button>
+          <button type="button" className={view === 'settings' ? 'active' : ''} onClick={() => showView('settings')}><span className="call-nav-symbol"><Languages size={19} /></span>{trUi("chat.aiTranslation")}</button>
         </nav>
-        <div className="call-center-sidebar-foot"><ShieldCheck size={18} /> Cuộc gọi được mã hóa E2EE</div>
+        <div className="call-center-sidebar-foot"><ShieldCheck size={18} />{trUi("calls.encryptedE2EE")}</div>
       </aside>
 
       <div className="call-center-workspace">
         <header className="call-center-header">
           <div className="call-center-heading">
-            <h1>{view === 'history' ? 'Lịch sử cuộc gọi' : view === 'directory' ? 'Danh bạ' : 'Cài đặt dịch AI'}</h1>
+            <h1>{view === 'history' ? trUi("calls.history") : view === 'directory' ? trUi("contacts.directory") : trUi("chat.aiSettings")}</h1>
             <p>{view === 'history' ? 'Cuộc gọi nhỡ, đã nhận và đã thực hiện' : view === 'directory' ? 'Bạn bè, nhóm và các cuộc trò chuyện' : 'Điều chỉnh phụ đề trong cuộc gọi'}</p>
           </div>
           <div className="call-center-header-actions">
-            <div ref={viewPillSetHost} className="call-center-tabs sliding-pill-host" role="group" aria-label="Chọn màn cuộc gọi">
+            <div ref={viewPillSetHost} className="call-center-tabs sliding-pill-host" role="group" aria-label={trUi("common.ui.callScreen")}>
               {view !== 'settings' && <span ref={viewPillSetPill} className="sliding-pill call-tabs-active-pill" aria-hidden="true" />}
-              <button ref={view === 'history' ? viewPillSetActive : undefined} type="button" className={view === 'history' ? 'active' : ''} aria-pressed={view === 'history'} onClick={() => showView('history')}><Clock3 size={15} /> Lịch sử</button>
-              <button ref={view === 'directory' ? viewPillSetActive : undefined} type="button" className={view === 'directory' ? 'active' : ''} aria-pressed={view === 'directory'} onClick={() => showView('directory')}><BookUser size={15} /> Danh bạ</button>
+              <button ref={view === 'history' ? viewPillSetActive : undefined} type="button" className={view === 'history' ? 'active' : ''} aria-pressed={view === 'history'} onClick={() => showView('history')}><Clock3 size={15} />{trUi("calls.historyShort")}</button>
+              <button ref={view === 'directory' ? viewPillSetActive : undefined} type="button" className={view === 'directory' ? 'active' : ''} aria-pressed={view === 'directory'} onClick={() => showView('directory')}><BookUser size={15} />{trUi("contacts.directory")}</button>
             </div>
-            {view !== 'settings' && <label className={'call-center-search' + (view === 'directory' ? ' call-center-directory-search' : '')}><Search size={18} /><input value={view === 'directory' ? directoryQuery : query} onChange={(event) => view === 'directory' ? onDirectoryQueryChange(event.target.value) : setQuery(event.target.value)} placeholder={view === 'directory' ? 'Tìm kiếm trong danh bạ...' : 'Tìm kiếm trên SocCo...'} aria-label={view === 'directory' ? 'Tìm trong danh bạ' : 'Tìm cuộc trò chuyện'} />{(view === 'directory' ? directoryQuery : query) && <button type="button" onClick={() => view === 'directory' ? onDirectoryQueryChange('') : setQuery('')} aria-label="Xóa tìm kiếm"><X size={14} /></button>}</label>}
-            <button type="button" className="call-center-settings-trigger" onClick={() => showView(view === 'settings' ? previousViewRef.current : 'settings')} title={view === 'settings' ? 'Quay lại lịch sử' : 'Cài đặt dịch AI'} aria-label={view === 'settings' ? 'Quay lại lịch sử' : 'Cài đặt dịch AI'}>{view === 'settings' ? <ArrowLeft size={20} /> : <Settings2 size={20} />}</button>
+            {view !== 'settings' && <label className={'call-center-search' + (view === 'directory' ? ' call-center-directory-search' : '')}><Search size={18} /><input value={view === 'directory' ? directoryQuery : query} onChange={(event) => view === 'directory' ? onDirectoryQueryChange(event.target.value) : setQuery(event.target.value)} placeholder={view === 'directory' ? trUi("common.ui.searchDirectory") : trUi("common.ui.searchSocco")} aria-label={view === 'directory' ? trUi("contacts.searchContacts") : trUi("common.ui.findConversation")} />{(view === 'directory' ? directoryQuery : query) && <button type="button" onClick={() => view === 'directory' ? onDirectoryQueryChange('') : setQuery('')} aria-label={trUi("common.clearSearch")}><X size={14} /></button>}</label>}
+            <button type="button" className="call-center-settings-trigger" onClick={() => showView(view === 'settings' ? previousViewRef.current : 'settings')} title={view === 'settings' ? trUi("calls.backHistory") : trUi("chat.aiSettings")} aria-label={view === 'settings' ? trUi("calls.backHistory") : trUi("chat.aiSettings")}>{view === 'settings' ? <ArrowLeft size={20} /> : <Settings2 size={20} />}</button>
           </div>
         </header>
 
@@ -246,22 +249,22 @@ export default function CallCenter({ request, userId, token, conversations, targ
           <div className="call-center-content call-center-history">
             <div className="call-history-layout">
               <div className="call-history-main-column">
-                <section className="call-center-stats" aria-label="Thống kê lịch sử đã tải">
+                <section className="call-center-stats" aria-label={trUi("common.ui.callHistoryStats")}>
                   <div><strong>{monthCount}</strong><span>Cuộc gọi tháng này</span></div>
-                  <div><strong className="danger">{missedCount}</strong><span>Cuộc gọi nhỡ</span></div>
+                  <div><strong className="danger">{missedCount}</strong><span>{trUi("calls.missed")}</span></div>
                   <div><strong className="teal">{latestCallDuration(entries)}</strong><span>Thời lượng cuộc gọi gần nhất</span></div>
                 </section>
-                <div ref={filterPillSetHost} className="call-center-filters sliding-pill-host" role="group" aria-label="Lọc lịch sử">
+                <div ref={filterPillSetHost} className="call-center-filters sliding-pill-host" role="group" aria-label={trUi("calls.historyFilter")}>
                   <span ref={filterPillSetPill} className="sliding-pill call-filters-active-pill" aria-hidden="true" />
                   {([['all', 'Tất cả'], ['missed', 'Gọi nhỡ'], ['outgoing', 'Đã gọi'], ['group', 'Gọi nhóm']] as const).map(([id, label]) =>
                     <button ref={filter === id ? filterPillSetActive : undefined} key={id} type="button" className={filter === id ? 'active' : ''} aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>)}
-                  <button type="button" className="call-center-refresh" onClick={() => setRefreshId((n) => n + 1)} disabled={loading} aria-label="Tải lại lịch sử" title="Tải lại lịch sử"><RefreshCw size={17} /></button>
+                  <button type="button" className="call-center-refresh" onClick={() => setRefreshId((n) => n + 1)} disabled={loading} aria-label={trUi("chat.historyReload")} title={trUi("chat.historyReload")}><RefreshCw size={17} /></button>
                 </div>
-                  <section className="call-history-list call-center-card" aria-label="Danh sách lịch sử">
-                  <h2>Cuộc gọi gần đây</h2>
+                  <section className="call-history-list call-center-card" aria-label={trUi("calls.historyList")}>
+                  <h2>{trUi("calls.recent")}</h2>
 
-                  {!loading && error && <div className="call-center-state" role="alert"><strong>Không thể tải lịch sử</strong><p>{error}</p><button type="button" onClick={() => setRefreshId((n) => n + 1)}>Thử lại</button></div>}
-                  {!loading && !error && filtered.length === 0 && <div className="call-center-state"><PhoneMissed size={31} /><strong>{query || filter !== 'all' ? 'Không có kết quả phù hợp' : 'Chưa có cuộc gọi nào'}</strong><p>Lịch sử thật từ máy chủ sẽ xuất hiện tại đây khi bạn thực hiện cuộc gọi.</p><button type="button" onClick={() => showView('directory')}>Mở danh bạ</button></div>}
+                  {!loading && error && <div className="call-center-state" role="alert"><strong>{trUi("calls.historyError")}</strong><p>{error}</p><button type="button" onClick={() => setRefreshId((n) => n + 1)}>{trUi("common.retry")}</button></div>}
+                  {!loading && !error && filtered.length === 0 && <div className="call-center-state"><PhoneMissed size={31} /><strong>{query || filter !== 'all' ? trUi("common.noMatching") : trUi("calls.noCalls")}</strong><p>Lịch sử thật từ máy chủ sẽ xuất hiện tại đây khi bạn thực hiện cuộc gọi.</p><button type="button" onClick={() => showView('directory')}>{trUi("contacts.openContacts")}</button></div>}
                   {!loading && !error && filtered.map((entry) => {
                     const conversation = conversationMap.get(entry.conversationId)
                     const isMissed = missed(entry)
@@ -275,7 +278,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
                         }
                       }} aria-pressed={selected?.id === entry.id && (!isMobileLayout || mobileDetailsOpen)}>
                         <UserAvatar name={conversation?.name || 'Cuộc trò chuyện'} username={conversation?.otherUsername} group={entry.isGroup} className="call-history-avatar" />
-                        <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {callOutcome(entry, userId)}{' · ' + duration}</small></span>
+                        <span className="call-history-main"><strong>{conversation?.name || 'Cuộc trò chuyện #' + entry.conversationId}</strong><small className={isMissed ? 'missed' : ''}>{entry.isGroup ? 'Nhóm · ' : ''}{entry.mediaType === 'video' ? 'Video' : trUi("calls.voiceCall")} · {callOutcome(entry, userId)}{' · ' + duration}</small></span>
                         <span className="call-history-time">{formatCallDate(entry.createdAt)}</span>
                         {isMissed ? <PhoneMissed size={19} className="call-history-icon" /> : entry.createdBy === userId ? <PhoneOutgoing size={19} className="call-history-icon" /> : <PhoneIncoming size={19} className="call-history-icon" />}
                       </button>
@@ -284,7 +287,7 @@ export default function CallCenter({ request, userId, token, conversations, targ
                   <small className="call-center-limit">Hiển thị tối đa 100 cuộc gọi gần nhất mà bạn có quyền truy cập.</small>
                 </section>
               </div>
-              {isMobileLayout && mobileDetailsOpen && <button type="button" tabIndex={-1} className="call-detail-scrim" onClick={closeMobileDetails} aria-label="Đóng chi tiết cuộc gọi" />}
+              {isMobileLayout && mobileDetailsOpen && <button type="button" tabIndex={-1} className="call-detail-scrim" onClick={closeMobileDetails} aria-label={trUi("calls.closeDetail")} />}
               <aside
                 ref={detailPanelRef}
                 className={'call-history-details call-center-card' + (isMobileLayout && mobileDetailsOpen ? ' is-open' : '')}
@@ -293,22 +296,22 @@ export default function CallCenter({ request, userId, token, conversations, targ
                 aria-labelledby="call-detail-title"
               >
                 <div className="call-detail-heading">
-                  <h2 id="call-detail-title">Chi tiết cuộc gọi</h2>
-                  <button type="button" ref={detailCloseRef} className="call-detail-close" onClick={closeMobileDetails} aria-label="Đóng chi tiết cuộc gọi"><X size={20} /></button>
+                  <h2 id="call-detail-title">{trUi("calls.detail")}</h2>
+                  <button type="button" ref={detailCloseRef} className="call-detail-close" onClick={closeMobileDetails} aria-label={trUi("calls.closeDetail")}><X size={20} /></button>
                 </div>
                 {selected && !error ? (() => {
                   const conversation = conversationMap.get(selected.conversationId)
                   return <div className="call-detail-body">
                     <UserAvatar name={conversation?.name || 'Cuộc trò chuyện'} username={conversation?.otherUsername} group={selected.isGroup} className="call-detail-avatar" />
                     <h3>{conversation?.name || 'Cuộc trò chuyện #' + selected.conversationId}</h3>
-                    <p className={missed(selected) ? 'missed' : 'success'}>{selected.mediaType === 'video' ? 'Video' : 'Gọi thoại'} · {callOutcome(selected, userId)}</p>
+                    <p className={missed(selected) ? 'missed' : 'success'}>{selected.mediaType === 'video' ? 'Video' : trUi("calls.voiceCall")} · {callOutcome(selected, userId)}</p>
                     <dl>
-                      <div><dt>Thời gian bắt đầu</dt><dd>{formatCallDate(selected.createdAt)}</dd></div>
-                      <div><dt>Thời lượng</dt><dd>{formatDuration(selected)}</dd></div>
-                      <div><dt>Người tham gia</dt><dd>{selected.participantCount} người đã kết nối</dd></div>
-                      <div><dt>Loại cuộc gọi</dt><dd>{selected.isGroup ? 'Cuộc gọi nhóm' : 'Cá nhân'}</dd></div>
+                      <div><dt>{trUi("calls.startTime")}</dt><dd>{formatCallDate(selected.createdAt)}</dd></div>
+                      <div><dt>{trUi("calls.duration")}</dt><dd>{formatDuration(selected)}</dd></div>
+                      <div><dt>{trUi("calls.participants")}</dt><dd>{selected.participantCount} người đã kết nối</dd></div>
+                      <div><dt>{trUi("calls.type")}</dt><dd>{selected.isGroup ? 'Cuộc gọi nhóm' : trUi("profile.personal")}</dd></div>
                     </dl>
-                    {conversation ? <div className="call-detail-actions"><CallHeaderActions conversationId={selected.conversationId} /><button type="button" aria-label="Mở tin nhắn" title="Mở tin nhắn" onClick={() => { setMobileDetailsOpen(false); onOpenChat(selected.conversationId) }}><MessageCircle className="call-detail-open-chat-icon" size={19} /><span className="call-detail-open-chat-label">Mở tin nhắn</span></button></div> : <p className="call-detail-unavailable">Tải cuộc trò chuyện tương ứng trong Tin nhắn để gọi lại.</p>}
+                    {conversation ? <div className="call-detail-actions"><CallHeaderActions conversationId={selected.conversationId} /><button type="button" aria-label={trUi("settings.openMessages")} title={trUi("settings.openMessages")} onClick={() => { setMobileDetailsOpen(false); onOpenChat(selected.conversationId) }}><MessageCircle className="call-detail-open-chat-icon" size={19} /><span className="call-detail-open-chat-label">{trUi("settings.openMessages")}</span></button></div> : <p className="call-detail-unavailable">Tải cuộc trò chuyện tương ứng trong Tin nhắn để gọi lại.</p>}
                   </div>
                 })() : <div className="call-center-state"><Clock3 size={30} /><p>Chọn một cuộc gọi để xem chi tiết.</p></div>}
               </aside>
@@ -319,18 +322,18 @@ export default function CallCenter({ request, userId, token, conversations, targ
         {view === 'settings' && <div className="call-center-content">
           <div className="call-settings-layout">
             <section className="call-settings-form call-center-card">
-              <div className="call-center-section-intro"><div><h2><Languages size={22} /> Dịch thời gian thực</h2><p>Nghe và đọc phụ đề bằng ngôn ngữ phù hợp.</p></div></div>
+              <div className="call-center-section-intro"><div><h2><Languages size={22} />{trUi("calls.realtimeTranslation")}</h2><p>Nghe và đọc phụ đề bằng ngôn ngữ phù hợp.</p></div></div>
               <label className="call-setting-switch"><span><strong>Tự động bật dịch AI khi tham gia cuộc gọi</strong><small>Chỉ gửi giọng nói tới AI khi từng người tham gia cho phép.</small></span><input type="checkbox" checked={autoTranslation} onChange={(event) => setAutoTranslation(event.target.checked)} /></label>
-              <label className="call-setting-field"><strong>Ngôn ngữ nói</strong><select value="auto" disabled><option value="auto">Tự động nhận diện giọng nói</option></select></label>
-              <label className="call-setting-field"><strong>Ngôn ngữ nhận bản dịch</strong><select value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map((code) => <option key={code} value={code}>{languageLabels[code] || code}</option>)}</select><small>Danh sách ngôn ngữ do dịch vụ dịch cung cấp.</small></label>
-              <label className="call-setting-field"><strong>Chế độ phụ đề</strong><select value={captionMode} onChange={(event) => setCaptionMode(event.target.value)}><option value="both">Gốc + bản dịch</option><option value="translated">Chỉ bản dịch</option></select></label>
-              <label className="call-setting-field"><strong>Giọng đọc bản dịch</strong><select disabled value="off"><option value="off">Chưa hỗ trợ đọc thành tiếng</option></select></label>
-              <div className="call-setting-actions"><button type="button" className="call-setting-cancel" onClick={() => showView('history')}><X size={17} /> Hủy</button><button type="button" className="call-setting-save" onClick={saveSettings}><Check size={17} /> Áp dụng thay đổi</button></div>
+              <label className="call-setting-field"><strong>{trUi("calls.spokenLanguage")}</strong><select value="auto" disabled><option value="auto">{trUi("calls.spokenAuto")}</option></select></label>
+              <label className="call-setting-field"><strong>{trUi("calls.targetLanguage")}</strong><select value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map((code) => <option key={code} value={code}>{languageLabels[code] || code}</option>)}</select><small>Danh sách ngôn ngữ do dịch vụ dịch cung cấp.</small></label>
+              <label className="call-setting-field"><strong>{trUi("calls.subtitleMode")}</strong><select value={captionMode} onChange={(event) => setCaptionMode(event.target.value)}><option value="both">{trUi("calls.originalTranslated")}</option><option value="translated">{trUi("calls.translatedOnly")}</option></select></label>
+              <label className="call-setting-field"><strong>{trUi("calls.translationVoice")}</strong><select disabled value="off"><option value="off">{trUi("calls.noSpeech")}</option></select></label>
+              <div className="call-setting-actions"><button type="button" className="call-setting-cancel" onClick={() => showView('history')}><X size={17} />{trUi("common.cancel")}</button><button type="button" className="call-setting-save" onClick={saveSettings}><Check size={17} />{trUi("calls.apply")}</button></div>
               {savingMessage && <p className="call-setting-feedback" role="status">{savingMessage}</p>}
             </section>
             <aside className="call-settings-aside">
-              <section className="call-center-card"><h2>Xem trước phụ đề</h2><p>Minh họa cách hiển thị trong cuộc gọi khi bật dịch.</p><div className="call-caption-preview"><div className="call-preview-speaker"><span className="call-preview-avatar">A</span><span><strong>Người tham gia</strong><small>ĐANG NÓI</small></span></div>{captionMode === 'both' && <div className="call-preview-original">Hi! Can you hear me?</div>}<div className="call-preview-translated"><small>BẢN DỊCH · VIỆT</small>Chào! Bạn nghe thấy mình không?</div></div></section>
-              <section className="call-center-card call-settings-privacy"><h2><ShieldCheck size={20} /> Minh bạch về dữ liệu</h2><p>Để dịch giọng nói, mỗi người nói phải đồng ý cho phép xử lý âm thanh trong cuộc gọi. Có thể thu hồi quyền bất kỳ lúc nào.</p><small>Độ trễ dịch có thể thay đổi tùy mạng và thiết bị.</small></section>
+              <section className="call-center-card"><h2>{trUi("calls.subtitlePreview")}</h2><p>Minh họa cách hiển thị trong cuộc gọi khi bật dịch.</p><div className="call-caption-preview"><div className="call-preview-speaker"><span className="call-preview-avatar">A</span><span><strong>{trUi("calls.participants")}</strong><small>ĐANG NÓI</small></span></div>{captionMode === 'both' && <div className="call-preview-original">Hi! Can you hear me?</div>}<div className="call-preview-translated"><small>BẢN DỊCH · VIỆT</small>Chào! Bạn nghe thấy mình không?</div></div></section>
+              <section className="call-center-card call-settings-privacy"><h2><ShieldCheck size={20} />{trUi("calls.dataTransparency")}</h2><p>Để dịch giọng nói, mỗi người nói phải đồng ý cho phép xử lý âm thanh trong cuộc gọi. Có thể thu hồi quyền bất kỳ lúc nào.</p><small>Độ trễ dịch có thể thay đổi tùy mạng và thiết bị.</small></section>
             </aside>
           </div>
         </div>}

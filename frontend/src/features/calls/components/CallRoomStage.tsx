@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { type Dispatch, type SetStateAction } from 'react'
 import { type Participant } from 'livekit-client'
 import { ChevronDown, Languages, ShieldCheck, Sparkles, Users } from 'lucide-react'
@@ -15,6 +16,8 @@ type CallRoomTopbarProps = {
 }
 
 export function CallRoomTopbar({ title, phase, detail, statusLabel, participantCount, translationOn, setTranslationSheetOpen }: CallRoomTopbarProps) {
+  const trUi = useUiTranslation()
+
   return (
         <header className="secure-call-topbar">
           <div className="call-heading">
@@ -31,11 +34,11 @@ export function CallRoomTopbar({ title, phase, detail, statusLabel, participantC
           <div className="secure-call-topmeta">
             {translationOn && (
               <button type="button" className="call-live-status" onClick={() => setTranslationSheetOpen(true)}
-                aria-label="Mở phiên dịch đang hoạt động">
-                <Sparkles size={14} /> <span>Đang dịch</span>
+                aria-label={trUi("common.ui.openInterpreter")}>
+                <Sparkles size={14} /> <span>{trUi("calls.translating")}</span>
               </button>
             )}
-            <span className="call-encrypted-chip" title="Cuộc gọi được mã hóa đầu cuối">
+            <span className="call-encrypted-chip" title={trUi("calls.encrypted")}>
               <ShieldCheck size={15} /> E2EE
             </span>
           </div>
@@ -56,14 +59,16 @@ type CallRoomMediaStageProps = {
 }
 
 export function CallRoomMediaStage({ participants, localParticipant, phase, detail, translationOn, translationSheetOpen, latestCaption, callTargetLanguage, setTranslationSheetOpen }: CallRoomMediaStageProps) {
+  const trUi = useUiTranslation()
+
   return (
-          <section className="call-stage-media" aria-label="Người tham gia cuộc gọi">
+          <section className="call-stage-media" aria-label={trUi("calls.callParticipants")}>
             <div className={`secure-call-grid count-${Math.min(participants.length, 6)}`}>
               {participants.length === 0 ? (
                 <div className="call-connecting-state">
                   <div className="call-secure-spinner" />
                   <ShieldCheck size={28} />
-                  <strong>{phase === 'error' ? 'Không thể kết nối an toàn' : 'Đang kết nối cuộc gọi…'}</strong>
+                  <strong>{phase === 'error' ? trUi("calls.secureConnectionFailed") : trUi("calls.connecting")}</strong>
                   <span>{detail}</span>
                 </div>
               ) : participants.map((participant) => (

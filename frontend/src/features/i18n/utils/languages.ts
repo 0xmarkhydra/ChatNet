@@ -1,3 +1,5 @@
+import { APP_LOCALE_LABELS, isAppLocale } from '../../../shared/i18n/supportedLocales'
+
 export type LanguageOption = {
   value: string
   code: string
@@ -110,6 +112,15 @@ export function buildLanguageOptions(interfaceLocale = 'vi'): LanguageOption[] {
       searchText,
     }
   }).sort((a, b) => a.localizedLanguage.localeCompare(b.localizedLanguage, locale, { sensitivity: 'base' }))
+}
+
+export function buildAppLanguageOptions(interfaceLocale = 'vi') {
+  return buildLanguageOptions(interfaceLocale).flatMap(option => {
+    if (!isAppLocale(option.value)) return []
+    const nativeLanguage = APP_LOCALE_LABELS[option.value]
+    const localizedLanguage = option.value === 'zh' ? (safeDisplayName(interfaceLocale, 'language', 'zh-Hans') ?? option.localizedLanguage) : option.localizedLanguage
+    return [{ ...option, localizedLanguage, nativeLanguage, searchText: normalizeSearch([option.searchText, localizedLanguage, nativeLanguage].join(' ')) }]
+  })
 }
 
 export function filterLanguageOptions(options: LanguageOption[], query: string) {

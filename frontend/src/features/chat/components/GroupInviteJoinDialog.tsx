@@ -1,13 +1,16 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Link2, X, Users } from 'lucide-react'
 import '../styles/group-governance.css'
 import { useGroupInviteJoinDialog, type GroupInviteDialogProps } from '../hooks/useGroupInviteJoinDialog'
 
 export default function GroupInviteJoinDialog({ request, onJoined, notify }: GroupInviteDialogProps) {
+  const trUi = useUiTranslation()
+
   const { token, preview, busy, error, close, join } = useGroupInviteJoinDialog({ request, onJoined, notify })
   if (!token) return null
   return <div className="group-join-backdrop">
     <section className="group-join-dialog" role="dialog" aria-modal="true" aria-labelledby="group-join-title">
-      <button type="button" className="group-join-close" onClick={close} aria-label="Đóng"><X size={20} /></button>
+      <button type="button" className="group-join-close" onClick={close} aria-label={trUi("common.close")}><X size={20} /></button>
       <div className="group-join-icon"><Link2 size={24} /></div>
       <h2 id="group-join-title">Lời mời tham gia nhóm</h2>
       {error && <p className="group-governance-error" role="alert">{error}</p>}
@@ -22,9 +25,9 @@ export default function GroupInviteJoinDialog({ request, onJoined, notify }: Gro
           'Bạn có thể tham gia nhóm ngay bây giờ.'}</p>
       </>}
       <div className="group-join-actions">
-        <button type="button" onClick={close}>Đóng</button>
+        <button type="button" onClick={close}>{trUi("common.close")}</button>
         {preview && !preview.pending && <button type="button" disabled={busy} onClick={() => void join()}>
-          {preview.isMember ? 'Mở nhóm' : preview.requireApproval ? 'Gửi yêu cầu' : 'Tham gia nhóm'}
+          {preview.isMember ? trUi("chat.openGroup") : preview.requireApproval ? 'Gửi yêu cầu' : 'Tham gia nhóm'}
         </button>}
       </div>
     </section>

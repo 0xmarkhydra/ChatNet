@@ -1,8 +1,10 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 /** Shared placeholder for first-page Feed loading, never for pagination. */
 export default function FeedPostsFallback() {
+  const trUi = useUiTranslation()
   return (
-    <div className="feed-posts-loading grid gap-ui-3" role="status" aria-live="polite" aria-label="Đang tải bài viết">
-      <span className="sr-only">Đang tải bài viết...</span>
+    <div className="feed-posts-loading grid gap-ui-3" role="status" aria-live="polite" aria-label={trUi("common.ui.loadingPosts")}>
+      <span className="sr-only">{trUi("common.ui.loadingPostsDots")}</span>
       {[0, 1].map(item => (
         <div key={item} aria-hidden="true"
           className="rounded-ui-lg border border-border bg-card p-ui-4 motion-safe:animate-pulse">

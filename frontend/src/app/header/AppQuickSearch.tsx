@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import type { RefObject } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 import type { Tab } from '../../shared/types/navigation'
@@ -35,7 +36,8 @@ export default function AppQuickSearch({
   quickSearchOpen, setQuickSearchOpen, setFriendQuery, setGlobalSearch,
   setTab, navigate, results, loading, error, retry, onContact, onHit,
 }: Props) {
-  const searchText = searchLabels(tab)
+  const trUi = useUiTranslation()
+  const searchText = searchLabels(tab, trUi)
   return (
     <HeaderSearch
       anchorRef={anchorRef}

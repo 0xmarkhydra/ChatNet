@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Clock, Search, UsersRound } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -24,6 +25,8 @@ function Completion({ text, draft }: { text: string; draft: string }) {
 }
 
 export default function SearchSuggestions({ listId, draft, options, active, onPick }: SearchSuggestionsProps) {
+  const trUi = useUiTranslation()
+
   const sections = [
     { title: '', items: options.filter(option => option.kind === 'query') },
     { title: 'Mọi người', items: options.filter(option => option.kind === 'person') },
@@ -31,7 +34,7 @@ export default function SearchSuggestions({ listId, draft, options, active, onPi
   ].filter(section => section.items.length > 0)
 
   return (
-    <div id={listId} role="listbox" aria-label="Gợi ý tìm kiếm"
+    <div id={listId} role="listbox" aria-label={trUi("common.ui.searchSuggestions")}
       className="absolute top-full right-0 left-0 z-(--soco-z-dropdown) mt-ui-2 rounded-ui-lg border border-border bg-card p-ui-2 text-foreground shadow-ui-overlay">
       {sections.map(section => (
         <div key={section.title || 'queries'} role="presentation">

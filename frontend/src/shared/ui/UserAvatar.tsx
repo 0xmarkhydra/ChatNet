@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useScopedState } from '../hooks/useScopedState'
 import { API } from '../lib/config'
 import { cn } from '../lib/utils'
@@ -56,6 +57,7 @@ export default function UserAvatar({
   imageUrl?: string
   initialsOnly?: boolean
 }) {
+  const trUi = useUiTranslation()
   const version = avatarRefreshVersions.get(username)
   const imageUrl = initialsOnly ? '' : group ? (suppliedImageUrl || '') : profileAssetUrl(username, 'avatar', version)
   const [imageFailed, setImageFailed] = useScopedState(imageUrl, false)
@@ -70,7 +72,7 @@ export default function UserAvatar({
       data-story-status={ring}
       role="img"
       aria-label={name}
-      aria-description={ring === 'unseen' ? 'Có Story chưa xem' : ring === 'seen' ? 'Đã xem Story' : undefined}
+      aria-description={ring === 'unseen' ? trUi('common.ui.storyUnseen') : ring === 'seen' ? trUi('common.ui.storySeen') : undefined}
       title={name}
     >
       <span className="avatar-initials relative z-1 m-0 flex items-center justify-center leading-none" aria-hidden="true">{group ? '👥' : avatarInitials(name)}</span>

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { lazy, Suspense, useLayoutEffect, useState } from 'react'
 import { checkInDisplayName, formatMapCheckIn } from '../utils/publicPostLocation'
 const PostMapPicker = lazy(() => import('./PostMapPicker'))
@@ -59,6 +60,8 @@ export default function PostComposer({
   postAttachments, setPostAttachments, mediaUploading, uploadProgress, cancelUpload,
   showPostBackgrounds, setShowPostBackgrounds, postVisibility, setPostVisibility, setPostBackground,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [tagQuery, setTagQuery] = useState('')
   const [feelingPickerOpen, setFeelingPickerOpen] = useState(false)
@@ -117,8 +120,8 @@ export default function PostComposer({
         <textarea ref={postComposerRef}
           className={postBackground ? 'feed-composer-bg bg-' + postBackground : ''}
           disabled={isPosting}
-          aria-label="Nội dung bài viết"
-          placeholder="Bạn đang nghĩ gì?"
+          aria-label={trUi("feed.postContent")}
+          placeholder={trUi("feed.whatThinking")}
           value={postText}
           onChange={event => setPostText(event.target.value)}
           rows={1}
@@ -126,7 +129,7 @@ export default function PostComposer({
         />
       </div>
       <input ref={feedAlbumInputRef} className="hidden-media-input" type="file" accept="image/*,video/*" multiple
-        aria-label="Chọn ảnh hoặc video cho bài viết"
+        aria-label={trUi("common.ui.choosePostMedia")}
         onChange={event => {
           const files = Array.from(event.currentTarget.files || [])
           event.currentTarget.value = ''
@@ -135,19 +138,19 @@ export default function PostComposer({
       {activeTool === 'checkin' && checkInOpen && setCheckInLocation && (
         <div className="social-feed-checkin-field">
           <span className="smart-checkin-heading">
-            <strong><MapPin size={16} aria-hidden="true" /> Gắn thẻ vị trí</strong>
-            <button type="button" aria-label="Bỏ check-in" disabled={isPosting}
+            <strong><MapPin size={16} aria-hidden="true" />{trUi("common.ui.tagLocation")}</strong>
+            <button type="button" aria-label={trUi("common.ui.removeCheckin")} disabled={isPosting}
               onClick={() => { setCheckInOpen?.(false); setCheckInLocation(''); setActiveTool(null) }}><X size={17} aria-hidden="true" /></button>
           </span>
-          {postVisibility === 'public' ? <input type="text" aria-label="Địa điểm check-in" value={checkInDisplayName(checkInLocation)} maxLength={120}
+          {postVisibility === 'public' ? <input type="text" aria-label={trUi("common.ui.checkinPlace")} value={checkInDisplayName(checkInLocation)} maxLength={120}
             onChange={event => setCheckInLocation(event.target.value)}
-            placeholder="Nhập tên địa điểm" disabled={isPosting} required /> :
-            <Suspense fallback={<small>Đang tải bản đồ…</small>}><PostMapPicker value={checkInLocation} disabled={isPosting} onConfirm={pin => { setCheckInLocation(formatMapCheckIn(pin)); setActiveTool(null) }} /></Suspense>}
-          <small>{postVisibility === "public" ? "Bài công khai luôn có vị trí GPS. Địa điểm nhập thêm là check-in tùy chọn." : "Không bắt buộc. Chỉ người có quyền xem bài viết mới thấy vị trí này."}</small>
+            placeholder={trUi("common.ui.placeName")} disabled={isPosting} required /> :
+            <Suspense fallback={<small>{trUi("discover.loadingMap")}</small>}><PostMapPicker value={checkInLocation} disabled={isPosting} onConfirm={pin => { setCheckInLocation(formatMapCheckIn(pin)); setActiveTool(null) }} /></Suspense>}
+          <small>{postVisibility === "public" ? trUi("feed.publicGpsHint") : trUi("feed.privateGpsHint")}</small>
           {location && <span className="flex min-w-0 max-w-full items-start gap-1 text-xs font-medium text-neutral-600"><MapPin size={14} className="mt-1 shrink-0 text-neutral-500" aria-hidden="true" /><span className="min-w-0 rounded-md bg-neutral-100 px-1.5 py-0.5 line-clamp-2 [overflow-wrap:anywhere]" title={checkInDisplayName(location)}>{checkInDisplayName(location)}</span></span>}
         </div>
       )}
-      {activeTool !== 'checkin' && location && <div className="flex min-w-0 max-w-full items-center gap-2 text-sm"><MapPin size={15} className="shrink-0 text-neutral-500" aria-hidden="true" /><span className="min-w-0 max-w-full rounded-md bg-neutral-100 px-1.5 py-0.5 text-neutral-600 line-clamp-2 [overflow-wrap:anywhere]" title={checkInDisplayName(location)}>{checkInDisplayName(location)}</span><button type="button" className="shrink-0" disabled={isPosting} aria-label="Bỏ vị trí" onClick={() => { setCheckInLocation?.(''); setCheckInOpen?.(false) }}><X size={16} /></button></div>}
+      {activeTool !== 'checkin' && location && <div className="flex min-w-0 max-w-full items-center gap-2 text-sm"><MapPin size={15} className="shrink-0 text-neutral-500" aria-hidden="true" /><span className="min-w-0 max-w-full rounded-md bg-neutral-100 px-1.5 py-0.5 text-neutral-600 line-clamp-2 [overflow-wrap:anywhere]" title={checkInDisplayName(location)}>{checkInDisplayName(location)}</span><button type="button" className="shrink-0" disabled={isPosting} aria-label={trUi("common.ui.removeLocation")} onClick={() => { setCheckInLocation?.(''); setCheckInOpen?.(false) }}><X size={16} /></button></div>}
       {activeTool === 'tag' && (tagPickerOpen || taggedFriends.length > 0) && (
         <PostTagPicker
           tagPickerOpen={tagPickerOpen}
@@ -174,53 +177,53 @@ export default function PostComposer({
         <div className="feed-pending-media">
           <MediaAttachmentsView items={postAttachments} pending={!editingPost}
             onRemove={isPosting || !!editingPost ? undefined : index => setPostAttachments(current => current.filter((_, i) => i !== index))} />
-          {editingPost && <small className="smart-composer-hint">Ảnh/video đã đăng được giữ nguyên khi sửa bài viết.</small>}
+          {editingPost && <small className="smart-composer-hint">{trUi('feed.editMediaHint')}</small>}
         </div>
       )}
       {mediaUploading === 'feed' && uploadProgress && (
         <div className="smart-upload-progress" role="status" aria-live="polite">
-          <span>Đang tải ảnh/video · {Math.round(100 * uploadProgress.loaded / Math.max(uploadProgress.total, 1))}%</span>
-          <progress aria-label="Tiến độ tải ảnh/video" max={uploadProgress.total} value={uploadProgress.loaded} />
-          {cancelUpload && <button type="button" onClick={cancelUpload}>Hủy tải</button>}
+          <span>{trUi('feed.uploadingMedia', { percent: Math.round(100 * uploadProgress.loaded / Math.max(uploadProgress.total, 1)) })}</span>
+          <progress aria-label={trUi("common.ui.mediaProgress")} max={uploadProgress.total} value={uploadProgress.loaded} />
+          {cancelUpload && <button type="button" onClick={cancelUpload}>{trUi("common.cancelUpload")}</button>}
         </div>
       )}
-      <div className="composer-shortcuts smart-composer-actions" role="group" aria-label="Thêm vào bài viết">
-        <span className="smart-composer-actions-title">Thêm vào bài viết</span>
+      <div className="composer-shortcuts smart-composer-actions" role="group" aria-label={trUi("feed.addToPost")}>
+        <span className="smart-composer-actions-title">{trUi("feed.addToPost")}</span>
         <div className="smart-composer-action-icons">
-          <FeedComposerIconButton icon="photo" disabled={isPosting || !!editingPost} data-tooltip={editingPost ? 'Không thể thay đổi ảnh/video trong bài đã đăng' : 'Thêm ảnh hoặc video'} aria-label="Thêm ảnh hoặc video"
+          <FeedComposerIconButton icon="photo" disabled={isPosting || !!editingPost} data-tooltip={editingPost ? trUi("common.ui.editMediaDisabled") : trUi("feed.addMedia")} aria-label={trUi("feed.addMedia")}
             onClick={() => { selectTool('media'); feedAlbumInputRef.current?.click() }} />
-          <FeedComposerIconButton icon="background" disabled={isPosting} data-tooltip="Chọn nền chữ" aria-label="Nền chữ"
+          <FeedComposerIconButton icon="background" disabled={isPosting} data-tooltip={trUi("common.ui.chooseTextBackground")} aria-label={trUi("common.ui.textBackground")}
             aria-expanded={showPostBackgrounds} aria-pressed={showPostBackgrounds}
             onClick={() => { selectTool('background'); postComposerRef.current?.focus() }} />
-          <FeedComposerIconButton icon="tag" disabled={isPosting} data-tooltip="Gắn thẻ bạn bè" aria-label="Gắn thẻ bạn bè"
+          <FeedComposerIconButton icon="tag" disabled={isPosting} data-tooltip={trUi("feed.tagFriends")} aria-label={trUi("feed.tagFriends")}
             aria-expanded={tagPickerOpen} aria-pressed={taggedFriends.length > 0}
             onClick={() => selectTool('tag')} />
-          <FeedComposerIconButton icon="feeling" disabled={isPosting} data-tooltip="Bạn đang cảm thấy thế nào?" aria-label="Cảm xúc"
+          <FeedComposerIconButton icon="feeling" disabled={isPosting} data-tooltip={trUi("common.ui.feelingPrompt")} aria-label={trUi("common.ui.feeling")}
             aria-expanded={feelingPickerOpen} aria-pressed={Boolean(feelingId)}
             onClick={() => selectTool('feeling')} />
-          {setCheckInOpen && <FeedComposerIconButton icon="location" disabled={isPosting} data-tooltip="Gắn thẻ vị trí" aria-label="Check-in địa điểm"
+          {setCheckInOpen && <FeedComposerIconButton icon="location" disabled={isPosting} data-tooltip={trUi("common.ui.tagLocation")} aria-label={trUi("common.ui.checkIn")}
             aria-expanded={activeTool === 'checkin' && checkInOpen} aria-pressed={checkInOpen && !!checkInLocation.trim()}
             onClick={() => selectTool('checkin')} />}
         </div>
       </div>
       <div className="feed-composer-settings">
         {!popup && postAudience}
-        {showPostBackgrounds && <div className="feed-background-palette" aria-label="Chọn nền bài viết">
-          {['', 'violet', 'blue', 'sunset', 'mint', 'night'].map(bg => (
+        {showPostBackgrounds && <div className="feed-background-palette" aria-label={trUi("common.ui.choosePostBackground")}>
+          {(['', 'violet', 'blue', 'sunset', 'mint', 'night'] as const).map(bg => (
             <button key={bg || 'none'} type="button" className={'feed-palette-dot bg-' + (bg || 'none')}
-              aria-pressed={postBackground === bg} aria-label={bg || 'Không nền'} onClick={() => setPostBackground(bg)}>
+              aria-pressed={postBackground === bg} aria-label={bg ? trUi(`feed.background.${bg}`) : trUi("common.ui.noBackground")} onClick={() => setPostBackground(bg)}>
               {postBackground === bg ? '✓' : ''}
             </button>
           ))}
         </div>}
       </div>
-      {contentLength > 4500 && <p className="smart-composer-count" aria-live="polite">{contentLength} / 5.000 ký tự</p>}
-      {overLimit && <p className="smart-composer-error" role="alert">Nội dung, địa điểm, cảm xúc và gắn thẻ vượt quá 5.000 ký tự.</p>}
-      {checkInOpen && !location && <p className="smart-composer-hint">Chọn vị trí hoặc bỏ gắn thẻ để tiếp tục.</p>}
+      {contentLength > 4500 && <p className="smart-composer-count" aria-live="polite">{trUi('feed.characterCount', { count: contentLength, limit: 5000 })}</p>}
+      {overLimit && <p className="smart-composer-error" role="alert">{trUi('feed.contentLimit')}</p>}
+      {checkInOpen && !location && <p className="smart-composer-hint">{trUi('feed.selectLocationHint')}</p>}
        {submitError && <p className="profile-post-error" role="alert">{submitError}</p>}
       {(popup || postText.trim() || postAttachments.length > 0 || checkInOpen || taggedFriends.length > 0 || feelingId) && (
         <button className="feed-submit" disabled={isPosting || !!mediaUploading || overLimit || (checkInOpen && !location) ||
-          (!postText.trim() && postAttachments.length === 0 && !location && taggedFriends.length === 0 && !feelingId)}>{isPosting ? 'Đang xử lý…' : editingPost ? 'Lưu thay đổi' : 'Đăng'}</button>
+          (!postText.trim() && postAttachments.length === 0 && !location && taggedFriends.length === 0 && !feelingId)}>{isPosting ? trUi("common.processing") : editingPost ? trUi("common.saveChanges") : trUi('feed.publishShort')}</button>
       )}
     </form>
   )

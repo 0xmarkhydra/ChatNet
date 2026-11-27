@@ -51,3 +51,7 @@ in effect. Ponytail is third-party MIT-licensed; provenance is under
 ## Frontend architecture and React requirements (mandatory)
 
 The authoritative shared policy for Claude, ChatGPT and human contributors is **`docs/engineering/FRONTEND_STANDARDS.md`**. Read and follow it for every `frontend/` change, alongside `docs/engineering/FRONTEND_STRUCTURE.md` and the relevant React and Ponytail skills. The architecture, React 19, API ownership, session isolation, layout, testing and PR rules are enforced there. Do not imitate known legacy violations, expand lint/architecture baselines or bypass CI to make a change pass.
+
+## Mandatory internationalization
+
+Follow `AGENTS.md` and the internationalization section of `docs/engineering/FRONTEND_STANDARDS.md` for all new or changed UI. Support vi/en/zh/ja/ko, preserve user data, and run `npm --prefix frontend run check:i18n` before completion.

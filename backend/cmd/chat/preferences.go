@@ -21,7 +21,8 @@ func normalizeAppLocale(value string) (string, bool) {
 	if locale == "" || locale == "auto" {
 		return "auto", true
 	}
-	if languagecatalog.Valid(locale) {
+	switch locale {
+	case "vi", "en", "zh", "ja", "ko":
 		return locale, true
 	}
 	return "", false
@@ -52,6 +53,12 @@ func (s *server) getPreferences(w http.ResponseWriter, r *http.Request) {
 	`, claims.UserID).Scan(&prefs.TargetLanguage, &prefs.AutoTranslate, &prefs.AppLocale); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load preferences")
 		return
+	}
+	// Legacy stored locales must not expose unsupported choices to current clients.
+	if locale, ok := normalizeAppLocale(prefs.AppLocale); ok {
+		prefs.AppLocale = locale
+	} else {
+		prefs.AppLocale = "vi"
 	}
 	httpx.JSON(w, http.StatusOK, prefs)
 }

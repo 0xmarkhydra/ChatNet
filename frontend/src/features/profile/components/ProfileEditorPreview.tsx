@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import type { ReactNode } from 'react'
 import { Eye, MapPin } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -15,11 +16,13 @@ type Props = {
 }
 
 export default function ProfileEditorPreview({ profile, cover, username, displayName, displayNameDraft, usernameDraft, bioDraft, cityDraft }: Props) {
+  const trUi = useUiTranslation()
+
   const editName = displayNameDraft.trim() || profile?.displayName || displayName
   const editUsername = usernameDraft.trim().toLowerCase() || profile?.username || username
   return (
-        <section className="profile-editor-preview-card app-desktop:h-[428px] app-desktop:px-4 app-desktop:pt-[22px] app-desktop:pb-[17px] app-desktop:max-[1380px]:min-w-0" aria-label="Xem trước hồ sơ">
-          <h2 className="app-desktop:ml-[7px]">Xem trước hồ sơ</h2>
+        <section className="profile-editor-preview-card app-desktop:h-[428px] app-desktop:px-4 app-desktop:pt-[22px] app-desktop:pb-[17px] app-desktop:max-[1380px]:min-w-0" aria-label={trUi("profile.profilePreview")}>
+          <h2 className="app-desktop:ml-[7px]">{trUi("profile.profilePreview")}</h2>
           {cover}
           <div className="profile-editor-preview-identity app-desktop:flex app-desktop:items-center app-desktop:gap-[15px] app-desktop:pl-5">
             <UserAvatar username={username} name={editName} className="profile-editor-preview-avatar app-desktop:z-[2] app-desktop:mt-[-36px] app-desktop:block app-desktop:h-[82px] app-desktop:w-[82px] app-desktop:shrink-0 app-desktop:rounded-full app-desktop:border-[5px] app-desktop:border-white" />
