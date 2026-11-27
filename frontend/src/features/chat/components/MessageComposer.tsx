@@ -97,9 +97,9 @@ export default function MessageComposer({ activeConversation, activeConversation
                         />
                       </div>
                     )}
-                    <QuickReplyPanel key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`} request={apiFetch} query={quickReplies.query} managing={quickReplies.managing} onClose={quickReplies.close} onSelect={text => { if (/^\/[a-z0-9_-]*$/i.test(messageText)) setMessageText(text); else insertEmoji(text); }} />
+                    <QuickReplyPanel key={`quick-replies:${session.sessionId}:${activeConversation.id}:${selectedChannelId}`} request={apiFetch} query={quickReplies.query} managing={quickReplies.managing} onClose={quickReplies.close} onSelect={text => { if (/^\/[a-z0-9_-]*$/i.test(messageText)) setMessageText(text); else insertEmoji(text); }} />
                     {canSchedule ? <ScheduledMessageQueue
-                      key={session.sessionId}
+                      key={`schedule:${session.sessionId}`}
                       request={apiFetch}
                       conversationId={activeConversation.id}
                       channelId={selectedChannelId}
@@ -113,14 +113,14 @@ export default function MessageComposer({ activeConversation, activeConversation
                       <Images size={19} aria-hidden="true" />
                     </button>
                     <VoiceRecorder
-                      key={`${session.sessionId}:${activeConversationId}`}
+                      key={`voice:${session.sessionId}:${activeConversationId}`}
                       disabled={Boolean(mediaUploading) || messageSending}
                       onRecorded={(file) => { void addChatFiles([file]) }}
                       onError={(message) => setNotice(message, 'error')}
                     />
 
                     <ChatMentionInput
-                      key={`${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
+                      key={`mention:${session.sessionId}:${activeConversation.id}:${selectedChannelId}`}
                       conversationId={activeConversation.id}
                       members={activeConversation.type === 'group' ? groupMembers.filter(member => member.id !== session.user.id) : []}
                       inputRef={messageInputRef}
