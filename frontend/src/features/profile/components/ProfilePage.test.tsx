@@ -77,7 +77,7 @@ describe('own profile navigation and composer', () => {
       expect(onChangeAvatar).toHaveBeenCalledTimes(2)
       const tabbar = host.querySelector('.profile-page-tabbar')
       expect(tabbar?.querySelector('.profile-page-tab-indicator')).not.toBeNull()
-      expect(tabbar?.parentElement?.classList.contains('profile-page')).toBe(true)
+      expect(tabbar?.parentElement?.parentElement?.classList.contains('profile-page')).toBe(true)
       expect(host.querySelector('.profile-page-hero')?.contains(tabbar)).toBe(false)
       expect(tabbar?.classList.contains('is-measured')).toBe(true)
       expect(host.textContent).toContain('Bạn đang nghĩ gì?')
