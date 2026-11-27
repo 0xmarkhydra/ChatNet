@@ -49,6 +49,34 @@ class _WarmHistoryApi extends DemoApi {
 }
 
 void main() {
+  testWidgets('channel photo editor removes only the selected channel avatar', (
+    tester,
+  ) async {
+    final api = DemoApi();
+    api.rooms.first['avatarUrl'] = 'https://example.invalid/group.png';
+    api.channels[1]!.last['avatarUrl'] = 'https://example.invalid/channel.png';
+    api.preferences['autoTranslate'] = false;
+    await openChatParityDemo(tester, api);
+    await tester.tap(find.text('SocCO Design Team').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mobile-channel-5')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('chat-more-actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Đổi ảnh kênh'));
+    await tester.pumpAndSettle();
+    expect(find.text('Đổi ảnh kênh'), findsOneWidget);
+    await tester.tap(find.text('Gỡ ảnh'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lưu ảnh'));
+    await tester.pumpAndSettle();
+    expect(api.channels[1]!.last['avatarUrl'], '');
+    expect(api.rooms.first['avatarUrl'], 'https://example.invalid/group.png');
+    expect(find.text('Đổi ảnh kênh'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   testWidgets(
     'recent conversation remains visible during history revalidation',
     (tester) async {

@@ -110,6 +110,7 @@ export default function ChatSection({
   createDirect,
   createGroupChannel,
   refreshGroupChannels,
+  updateChannelAvatar,
   directUsername,
   effectiveAutoTranslate,
   effectiveTargetLanguage,
@@ -513,39 +514,37 @@ export default function ChatSection({
     if (target.kind === 'channel' && (!channelId || channelId < 1)) return false;
     if (!activeConversation || activeConversation.type !== 'group' || !canEditGroup || groupPhotoBusy) return false;
     const groupId = activeConversation.id;
+    const photoLabel = channelId ? 'ảnh kênh' : 'ảnh nhóm';
     setGroupPhotoBusy(true);
     try {
-      const capabilityResponse = channelId
-        ? await apiFetch(`/api/conversations/${groupId}/channels/${channelId}/avatar`, { cache: 'no-store' })
-        : await getGroupAvatarCapability(apiFetch, groupId);
+      const capabilityResponse = await getGroupAvatarCapability(apiFetch, groupId, channelId);
       const capability = await capabilityResponse.json().catch(() => null) as
         { canUpdateAvatar?: boolean; error?: string } | null;
       if (capabilityResponse.status === 404 || capabilityResponse.status === 405 ||
           (capabilityResponse.ok && capability?.canUpdateAvatar !== true)) {
-        throw new Error('Backend hiện tại chưa hỗ trợ lưu ảnh nhóm. Cần cập nhật backend Railway trước khi đổi ảnh.');
+        throw new Error(`Backend hiện tại chưa hỗ trợ lưu ${photoLabel}. Cần cập nhật backend Railway trước khi đổi ảnh.`);
       }
       if (!capabilityResponse.ok) throw new Error(capability?.error ||
-        'Không kiểm tra được quyền đổi ảnh nhóm (HTTP ' + capabilityResponse.status + ').');
+        'Không kiểm tra được quyền đổi ' + photoLabel + ' (HTTP ' + capabilityResponse.status + ').');
 
       const [attachment] = file ? await uploadMediaFiles([file], 'profile') : [null];
       if (file && !attachment) throw new Error('Không tải được ảnh.');
-      const response = channelId
-        ? await apiFetch(`/api/conversations/${groupId}/channels/${channelId}/avatar`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ attachment: attachment ? attachmentRequestBody(attachment) : null }),
-          })
-        : await saveGroupAvatar(apiFetch, groupId, attachment ? attachmentRequestBody(attachment) : null);
+      const response = await saveGroupAvatar(apiFetch, groupId, attachment ? attachmentRequestBody(attachment) : null, channelId);
       const data = await response.json().catch(() => null) as
-        { conversationId?: number; avatarUrl?: string; avatarSet?: boolean; error?: string } | null;
+        { conversationId?: number; channelId?: number; avatarUrl?: string; avatarSet?: boolean; error?: string } | null;
       if (response.status === 404 || response.status === 405) {
-        throw new Error('Backend chưa hỗ trợ lưu ảnh nhóm hoặc nhóm không còn tồn tại. Hãy kiểm tra bản triển khai Railway.');
+        throw new Error(`Không tìm thấy nơi lưu ${photoLabel}. Hãy kiểm tra bản triển khai Railway.`);
       }
       if (!response.ok) throw new Error(data?.error ||
-        'Không lưu được ảnh nhóm (HTTP ' + response.status + ').');
-      if (data?.conversationId !== groupId || typeof data.avatarSet !== 'boolean') {
-        throw new Error('Phản hồi lưu ảnh nhóm không hợp lệ. Vui lòng thử lại.');
+        'Không lưu được ' + photoLabel + ' (HTTP ' + response.status + ').');
+      if (data?.conversationId !== groupId || (channelId && data.channelId !== channelId) || typeof data.avatarSet !== 'boolean') {
+        throw new Error(`Phản hồi lưu ${photoLabel} không hợp lệ. Vui lòng thử lại.`);
       }
-      if (channelId) await refreshGroupChannels();
+      if (channelId) {
+        updateChannelAvatar(groupId, channelId, data.avatarUrl || undefined);
+        // Saving succeeded; a failed background refresh must not turn it into a failed upload.
+        void refreshGroupChannels().catch(() => {});
+      }
       else setConversations(current => current.map(item =>
         item.id === groupId ? { ...item, avatarUrl: data.avatarUrl || undefined } : item,
       ));

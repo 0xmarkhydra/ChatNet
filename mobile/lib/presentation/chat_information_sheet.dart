@@ -7,6 +7,7 @@ import 'conversation_avatar.dart';
 
 enum ChatInfoAction {
   shared,
+  editPhoto,
   notifications,
   manageGroup,
   nickname,
@@ -29,6 +30,7 @@ Future<ChatInfoAction?> showChatInformationSheet(
   required int channelId,
   Json? selectedChannel,
   required bool isDemo,
+  bool canEditPhoto = false,
   bool canManageChannel = false,
   bool canCreateChannel = false,
 }) {
@@ -89,20 +91,57 @@ Future<ChatInfoAction?> showChatInformationSheet(
                 children: [
                   Column(
                     children: [
-                      if (channel)
-                        UserAvatar(
-                          name: name,
-                          imageUrl: selectedChannel?['avatarUrl']?.toString(),
-                          size: 66,
-                          group: true,
-                          fetchProfileImage: false,
-                        )
-                      else
-                        ConversationAvatarView(
-                          room: conversation,
-                          size: 66,
-                          fetchProfileImage: !isDemo,
+                      SizedBox.square(
+                        dimension: 88,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            if (channel)
+                              UserAvatar(
+                                name: name,
+                                imageUrl: selectedChannel?['avatarUrl']
+                                    ?.toString(),
+                                size: 80,
+                                group: true,
+                                fetchProfileImage: false,
+                              )
+                            else
+                              ConversationAvatarView(
+                                room: conversation,
+                                size: 80,
+                                fetchProfileImage: !isDemo,
+                              ),
+                            if (group && canEditPhoto)
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Material(
+                                  color: Colors.white,
+                                  shape: const CircleBorder(),
+                                  elevation: 2,
+                                  child: IconButton(
+                                    tooltip: channel
+                                        ? 'Đổi ảnh kênh'
+                                        : 'Đổi ảnh nhóm',
+                                    onPressed: () =>
+                                        choose(ChatInfoAction.editPhoto),
+                                    icon: const Icon(
+                                      Icons.camera_alt_outlined,
+                                      size: 17,
+                                      color: socoBlue,
+                                    ),
+                                    constraints: const BoxConstraints.tightFor(
+                                      width: 32,
+                                      height: 32,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
+                      ),
                       const SizedBox(height: 10),
                       Text(
                         name,

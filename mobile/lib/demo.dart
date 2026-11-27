@@ -478,6 +478,32 @@ class DemoApi extends Api {
         }
         return {...settings};
       }
+      if ((parts[3] == 'avatar' && parts.length == 4) ||
+          (parts[3] == 'channels' &&
+              parts.length == 6 &&
+              parts[5] == 'avatar')) {
+        final channelId = parts.length == 6 ? int.tryParse(parts[4]) : 0;
+        final target = channelId == 0
+            ? room
+            : channels[id]
+                  ?.where((item) => item['id'] == channelId)
+                  .firstOrNull;
+        if (target == null) throw const ApiError('Không tìm thấy kênh.');
+        if (method == 'GET') return {'canUpdateAvatar': true};
+        if (method == 'PUT') {
+          final attachment = data['attachment'];
+          final url = attachment is Map
+              ? attachment['url']?.toString() ?? ''
+              : '';
+          target['avatarUrl'] = url;
+          return {
+            'conversationId': id,
+            if (channelId != 0) 'channelId': channelId,
+            'avatarUrl': url,
+            'avatarSet': url.isNotEmpty,
+          };
+        }
+      }
       if (parts[3] == 'channels') {
         return channels.putIfAbsent(
           id,
