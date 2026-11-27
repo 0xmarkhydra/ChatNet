@@ -6,6 +6,7 @@ import { PencilLine, Download, LogOut, ChevronDown, ChevronRight, Volume2, Arrow
 import { BlockedUsersPanel, type FriendConnection } from "../../contacts";
 import PostComposerLauncher from "@/shared/ui/PostComposerLauncher";
 import ProfileFriendsPreview from "./ProfileFriendsPreview";
+import { useProfileFriends } from "../hooks/useProfileFriends";
 import { isDesktopBuild } from "../../../platform/desktop";
 import { AccountSessionsPanel } from "../../auth";
 import UserAvatar, { avatarTone, profileAssetUrl } from "../../../shared/ui/UserAvatar";
@@ -237,6 +238,7 @@ export default function ProfileSection({
   const displayName = userLabel(profileMedia?.displayName || session.user.displayName, name);
   const [timelineView, setTimelineView] = useState<"all" | "image" | "video">("all");
   const mobileTimeline = profileTimelineOpen && !isProfileDesktop;
+  const profileFriends = useProfileFriends({ apiFetch, enabled: !isProfileDesktop, initialFriends: friends, sessionId: session.sessionId });
   const mediaSelected = mobileTimeline && timelineView !== "all";
   const activeSettings = mobileTimeline ? settingsView : null;
   const editingProfile = isMobileProfileEdit(activeSettings);
@@ -518,6 +520,11 @@ export default function ProfileSection({
                 </>
               )} />
 
+            {!profileTimelineOpen && !isProfileDesktop && <div className="grid min-w-0 gap-ui-6 px-ui-4 py-ui-3">
+              <ProfileFriendsPreview friends={profileFriends.friends} loading={profileFriends.loading} error={profileFriends.error}
+                onRetry={() => void profileFriends.reload()} onViewFriend={onViewFriend} onViewAll={() => switchTab("contacts")} />
+            </div>}
+
             {mobileTimeline && (
               <div className="sticky top-[var(--cover-header-offset)] z-20 flex w-full shrink-0 flex-wrap gap-ui-2 bg-card px-ui-4 py-ui-2 box-border" style={{ "--cover-header-offset": COVER_HEADER_OFFSET } as CSSProperties} role="group" aria-label={trUi("profile.profileContent")}>
                 <Button size="lg" variant={timelineView === "all" ? "secondary" : "ghost"}
@@ -554,7 +561,8 @@ export default function ProfileSection({
                   <ProfileDetailsCard username={name} bio={mobileTimeline ? undefined : profileMedia?.bio} city={profileMedia?.city}
                     workplace={profileMedia?.workplace} school={profileMedia?.school} iconEdit={mobileTimeline}
                     hasPrivateEmail={Boolean(session.user.email)} onEdit={() => mobileTimeline ? openEdit(false) : setProfileEditorOpen(true)} />
-                  {mobileTimeline && <ProfileFriendsPreview friends={friends} onViewFriend={onViewFriend} onViewAll={() => switchTab("contacts")} />}
+                  {mobileTimeline && <ProfileFriendsPreview friends={profileFriends.friends} loading={profileFriends.loading} error={profileFriends.error}
+                    onRetry={() => void profileFriends.reload()} onViewFriend={onViewFriend} onViewAll={() => switchTab("contacts")} />}
                   <StoryHighlights key={session.sessionId + ":" + name} request={apiFetch} username={name} className={mobileTimeline ? undefined : "profile-page-about"} owner mobileProfile={mobileTimeline} />
                 </div>
                 {mobileTimeline ? (

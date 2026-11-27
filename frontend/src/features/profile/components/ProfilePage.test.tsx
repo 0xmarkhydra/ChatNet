@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react'
+import { act, type ComponentProps } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 import ProfilePage from './ProfilePage'
@@ -8,6 +8,16 @@ vi.mock('../../../shared/ui/UserAvatar', () => ({
   default: ({ username, initialsOnly }: { username: string; initialsOnly?: boolean }) => <span data-avatar={username} data-initials-only={initialsOnly} />,
 }))
 vi.mock('./ProfileMediaGallery', () => ({ default: () => <div>Media gallery</div> }))
+
+const defaultProps: ComponentProps<typeof ProfilePage> = {
+  username: 'trung', displayName: 'Trung', coverSet: false, avatarSet: false, editBusy: false,
+  friends: [], posts: [], pendingPost: null, postsBusy: false, postsError: '',
+  hasMorePosts: false, postCards: null, profileNote: null,
+  onEditProfile: () => {}, onChangeAvatar: () => {}, onChangeCover: () => {},
+  onCreatePost: () => {}, onCreateMediaPost: () => {}, onCreateStory: () => {}, onCheckIn: () => {},
+  onReloadPosts: () => {}, onLoadMorePosts: () => {}, onViewFriend: () => {},
+  onOpenContacts: () => {}, onOpenPost: () => {},
+}
 
 describe('own profile navigation and composer', () => {
   it('switches tabs, maintains a sliding indicator and opens the shared post prompt', async () => {
@@ -99,4 +109,28 @@ describe('own profile navigation and composer', () => {
       environment.IS_REACT_ACT_ENVIRONMENT = previous
     }
   })
+})
+
+it('shows post loading skeleton before empty state', async () => {
+  const environment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  const previous = environment.IS_REACT_ACT_ENVIRONMENT
+  environment.IS_REACT_ACT_ENVIRONMENT = true
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  try {
+    await act(async () => root.render(<ProfilePage {...defaultProps} postsBusy />))
+    const loading = host.querySelector('.profile-page-main [role="status"][aria-busy="true"]')
+    expect(loading).not.toBeNull()
+    expect(loading?.querySelector('[aria-hidden="true"]')).not.toBeNull()
+    expect(host.querySelector('.profile-page-blank')).toBeNull()
+
+    await act(async () => root.render(<ProfilePage {...defaultProps} />))
+    expect(host.querySelector('.profile-page-main [role="status"][aria-busy="true"]')).toBeNull()
+    expect(host.querySelector('.profile-page-blank')).not.toBeNull()
+  } finally {
+    await act(async () => root.unmount())
+    host.remove()
+    environment.IS_REACT_ACT_ENVIRONMENT = previous
+  }
 })
