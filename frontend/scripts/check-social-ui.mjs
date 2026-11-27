@@ -2,7 +2,8 @@ import { chromium } from 'playwright'
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import { mkdirSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const port = await new Promise((done, reject) => {
@@ -11,7 +12,7 @@ const port = await new Promise((done, reject) => {
   s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => done(p)) })
 })
 const origin = `http://127.0.0.1:${port}`
-const frontendRoot = process.cwd().replace(/\\/g, '/').endsWith('/frontend') ? process.cwd() : resolve('frontend')
+const frontendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1',
   '--port', String(port), '--strictPort'], { cwd: frontendRoot, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, VITE_API_URL: 'http://localhost:8080' } })
 let serverLog = ''
