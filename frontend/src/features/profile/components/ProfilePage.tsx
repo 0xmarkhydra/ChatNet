@@ -173,7 +173,7 @@ export default function ProfilePage({
                   {acceptedFriends.slice(0, 12).map(friend => (
                     <button type="button" key={friend.id} className="profile-page-friend app-desktop:flex app-desktop:min-w-0 app-desktop:cursor-pointer app-desktop:items-center app-desktop:gap-[11px] app-desktop:rounded-xl app-desktop:border app-desktop:border-[#e9edf5] app-desktop:bg-white app-desktop:p-3 app-desktop:text-left app-desktop:hover:bg-[#f6f8ff] app-desktop:[&>svg]:shrink-0 app-desktop:[&>svg]:text-[#9aabc6]"
                       onClick={() => onViewFriend(friend.username)} title={`Xem hồ sơ ${friend.displayName || friend.username}`}>
-                      <UserAvatar username={friend.username} name={friend.displayName || friend.username} className="profile-page-friend-avatar" online={friend.online} />
+                      <UserAvatar storyStatus="none" username={friend.username} name={friend.displayName || friend.username} className="profile-page-friend-avatar" online={friend.online} />
                       <span><strong>{friend.displayName || friend.username}</strong><small>@{friend.username}</small></span><ArrowRight size={16} aria-hidden="true" />
                     </button>
                   ))}

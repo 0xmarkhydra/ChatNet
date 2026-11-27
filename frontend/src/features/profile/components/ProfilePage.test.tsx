@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import ProfilePage from './ProfilePage'
 
 vi.mock('../../../shared/ui/UserAvatar', () => ({
-  default: ({ username, initialsOnly }: { username: string; initialsOnly?: boolean }) => <span data-avatar={username} data-initials-only={initialsOnly} />,
+  default: ({ username, initialsOnly, storyStatus }: { username: string; initialsOnly?: boolean; storyStatus?: string }) => <span data-avatar={username} data-initials-only={initialsOnly} data-story-status={storyStatus} />,
 }))
 vi.mock('./ProfileMediaGallery', () => ({ default: () => <div>Media gallery</div> }))
 
@@ -23,7 +23,7 @@ describe('own profile navigation and composer', () => {
     try {
       await act(async () => root.render(<ProfilePage
         username="trung" displayName="Trung" coverSet={false} avatarSet={false} editBusy={false}
-        friends={[]} posts={[]} pendingPost={null} postsBusy={false} postsError=""
+        friends={[{ id: 2, username: 'friend', displayName: 'Bạn bè', online: true, status: 'accepted', updatedAt: '' }]} posts={[]} pendingPost={null} postsBusy={false} postsError=""
         hasMorePosts={false} postCards={null} profileNote={null}
         highlights={<section aria-label="Tin nổi bật" />}
         onEditProfile={() => {}} onChangeAvatar={onChangeAvatar} onChangeCover={() => {}}
@@ -31,6 +31,7 @@ describe('own profile navigation and composer', () => {
         onReloadPosts={() => {}} onLoadMorePosts={() => {}}
         onViewFriend={() => {}} onOpenContacts={() => {}} onOpenPost={() => {}}
       />))
+      expect(host.querySelector('.profile-page-friend-tiles [data-avatar="friend"]')?.getAttribute('data-story-status')).toBe('none')
       const identityRow = host.querySelector('.profile-page-hero-bottom')
       expect(identityRow?.querySelector('.profile-page-avatar-wrap')).not.toBeNull()
       expect(identityRow?.querySelector('.profile-page-identity-text')).not.toBeNull()
@@ -93,6 +94,8 @@ describe('own profile navigation and composer', () => {
       await act(async () => video?.click())
       expect(video?.getAttribute('aria-selected')).toBe('true')
       expect(media?.getAttribute('aria-selected')).toBe('false')
+      await act(async () => host.querySelector<HTMLButtonElement>('#profile-page-tab-friends')?.click())
+      expect(host.querySelector('.profile-page-friends [data-avatar="friend"]')?.getAttribute('data-story-status')).toBe('none')
     } finally {
       await act(async () => root.unmount())
       host.remove()

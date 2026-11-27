@@ -22,7 +22,7 @@ export default function ProfileFriendsPreview({ friends, onViewFriend, onViewAll
         return <li key={friend.id} className="min-w-0">
           <button type="button" aria-label={'Xem hồ sơ ' + label} onClick={() => onViewFriend(friend.username)}
             className="flex min-h-control-touch w-full min-w-0 cursor-pointer flex-col items-center gap-ui-2 rounded-ui-md border-0 bg-transparent p-0 text-center focus-visible:outline-2 focus-visible:outline-ring">
-            <UserAvatar username={friend.username} name={label} className="aspect-square w-full max-w-[76px] rounded-full text-ui-page font-bold" />
+            <UserAvatar storyStatus="none" username={friend.username} name={label} className="aspect-square w-full max-w-[76px] rounded-full text-ui-page font-bold" />
             <span className="line-clamp-2 w-full wrap-anywhere text-ui-body! font-semibold! leading-snug text-foreground!">{label}</span>
           </button>
         </li>

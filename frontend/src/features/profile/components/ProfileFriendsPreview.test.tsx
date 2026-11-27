@@ -5,6 +5,8 @@ import { expect, it, vi } from 'vitest'
 import type { FriendConnection } from '../../contacts'
 import ProfileFriendsPreview from './ProfileFriendsPreview'
 
+vi.mock('@/shared/ui/avatarStoryStatus', () => ({ useAvatarStoryStatus: () => 'unseen' }))
+
 const friend = (id: number, fields: Partial<FriendConnection> = {}): FriendConnection => ({
   id, username: 'user' + id, displayName: 'Bạn ' + id, online: false, status: 'accepted', updatedAt: '', ...fields,
 })
@@ -22,6 +24,8 @@ it('hides empty or unavailable connections and navigates from the four accepted 
     expect(host.textContent).toBe('')
     await act(async () => render([friend(1, { status: 'pending' }), friend(2, { blockedByOther: true }), ...[3, 4, 5, 6, 7].map(id => friend(id))]))
     expect(host.querySelectorAll('li')).toHaveLength(4)
+    expect(host.querySelectorAll('[data-story-status="none"]')).toHaveLength(4)
+    expect(host.querySelector('[data-slot="avatar-story-ring"]')).toBeNull()
     expect(host.textContent).not.toContain('Bạn 7')
     await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Xem hồ sơ Bạn 3"]')!.click())
     await act(async () => host.querySelector<HTMLButtonElement>('header button')!.click())

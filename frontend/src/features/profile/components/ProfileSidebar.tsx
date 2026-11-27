@@ -66,7 +66,7 @@ export default function ProfileSidebar({ username, email, bio, city, workplace, 
                   const label = friend.displayName || friend.username
                   return (
                     <button type="button" key={friend.id} onClick={() => onViewFriend(friend.username)} title={`Xem hồ sơ ${label}`}>
-                      <UserAvatar username={friend.username} name={label} className="profile-page-tile-avatar" />
+                      <UserAvatar storyStatus="none" username={friend.username} name={label} className="profile-page-tile-avatar" />
                       <span>{label}</span>
                     </button>
                   )
