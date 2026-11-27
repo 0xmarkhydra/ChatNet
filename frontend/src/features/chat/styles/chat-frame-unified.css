@@ -75,6 +75,17 @@
     > .conversation-panel:not(.group-chat-panel) .chat-head .room-info > div:last-child {
     min-width: 0;
     grid-template-columns: minmax(0, 1fr);
+    gap: 1px;
+    align-content: center;
+  }
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) .chat-head .room-copy > .room-subtitle {
+    margin: 0;
+    line-height: 1.25;
+  }
+  .modern-shell.app-layout .social-chat-layout
+    > .conversation-panel:not(.group-chat-panel) .chat-head .room-copy .conversation-category-assignment {
+    height: 22px;
   }
   .modern-shell.app-layout .social-chat-layout
     > .conversation-panel:not(.group-chat-panel) .chat-head .room-info :is(strong, .visitor-name-link) {
@@ -84,6 +95,7 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     text-align: start;
+    line-height: 1.2;
   }
   .modern-shell.app-layout .social-chat-layout
     > .conversation-panel:not(.group-chat-panel) > .chat-head > .translate-controls {
