@@ -31,10 +31,13 @@ export function notificationRouteTarget(location: {
   hash: string;
 }) {
   const params = new URLSearchParams(location.search);
-  if (!params.has("tab") && !params.has("conversation") && !params.has("message")) return null;
-
   const target = notificationDeepLink(params);
-  params.delete("tab");
+  // Feature pages own their query parameters. Only the legacy home route or
+  // recognized notification destinations may consume the shared "tab" key.
+  const consumeTab = params.has("tab") && (location.pathname === "/" || target.tab !== null);
+  if (!consumeTab && !params.has("conversation") && !params.has("message")) return null;
+
+  if (consumeTab || target.conversationId !== null) params.delete("tab");
   params.delete("conversation");
   params.delete("message");
 

@@ -158,8 +158,10 @@
   align-items: center;
   gap: 9px;
   flex: 0 0 auto;
-  min-height: 36px;
-  padding: 7px 9px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 9px;
+
   border: 0;
   border-radius: 9px;
   background: var(--soco-surface);
@@ -176,3 +178,13 @@
 .conversation-info-group-menu > button:disabled { opacity: .48; cursor: not-allowed; }
 .conversation-info-group-menu > .conversation-options-danger { color: #b54b5c; }
 .conversation-info-group-menu .group-channel-create-form { min-width: 0; max-width: 100%; }
+/* Shared detail layout: identical header, identity and action rows. */
+.modern-shell .conversation-info-panel.social-chat-details { box-sizing: border-box; overflow-x: hidden; }
+.modern-shell .conversation-info-panel .conversation-details-heading { flex: 0 0 auto; min-height: 36px; margin-bottom: 16px; }
+.modern-shell .conversation-info-panel .conversation-details-heading h2 { margin: 0; }
+.modern-shell .conversation-info-panel .conversation-info-panel-identity { flex: 0 0 auto; gap: 7px; padding-bottom: 20px; }
+.modern-shell .conversation-info-panel .group-photo-avatar-wrap { width: 92px; height: 92px; margin-bottom: 7px; }
+.modern-shell .conversation-info-panel .group-photo-avatar-wrap > .conversation-info-panel-avatar { width: 92px; height: 92px; flex: 0 0 92px; margin: 0; }
+.modern-shell .conversation-info-panel .conversation-info-group-menu > button { min-height: 44px; height: auto; padding: 9px; }
+.modern-shell .conversation-info-panel .conversation-info-group-menu > button > svg { flex: 0 0 18px; width: 18px; height: 18px; }
+.modern-shell .conversation-info-panel .conversation-info-group-menu > button > svg:last-child { flex: 0 0 16px; width: 16px; height: 16px; }

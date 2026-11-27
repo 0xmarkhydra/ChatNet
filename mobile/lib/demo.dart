@@ -328,6 +328,12 @@ class DemoApi extends Api {
     final parts = uri.path.split('/').where((s) => s.isNotEmpty).toList();
     final data = body ?? {};
     if (path == '/api/auth/me') return user;
+    if (path == '/api/conversation-categories' && method == 'GET') {
+      return [
+        {'id': 1, 'name': 'Công việc', 'color': 'indigo'},
+        {'id': 2, 'name': 'Gia đình', 'color': 'green'},
+      ];
+    }
     if (path == '/api/calls/translation/languages') {
       return {
         'languages': ['vi', 'en', 'ja', 'ko', 'zh'],
@@ -450,6 +456,10 @@ class DemoApi extends Api {
       if (parts.length == 3 && method == 'PATCH') {
         room.addAll(data);
         return room;
+      }
+      if (parts[3] == 'category' && method == 'PUT') {
+        room['categoryId'] = data['categoryId'];
+        return {'conversationId': id, 'categoryId': room['categoryId']};
       }
       if (parts[3] == 'notification-settings') {
         final settings = notificationSettings.putIfAbsent(
@@ -823,8 +833,13 @@ class DemoApi extends Api {
           return posts.where((p) => p['saved'] == true).toList();
         }
         if (uri.queryParameters['scope'] == 'mine') {
-          return posts.where((p) => p['author'] == user['username'] ||
-              p['author'] == user['displayName']).toList();
+          return posts
+              .where(
+                (p) =>
+                    p['author'] == user['username'] ||
+                    p['author'] == user['displayName'],
+              )
+              .toList();
         }
         return posts;
       }

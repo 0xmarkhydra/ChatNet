@@ -10,22 +10,22 @@ import StoryHighlightEditor from './StoryHighlightEditor'
 import StoryViewer from './StoryViewer'
 import '../styles/story-text.css'
 
-type Props = { request: ApiRequest; username: string; owner?: boolean; className?: string }
+type Props = { request: ApiRequest; username: string; owner?: boolean; className?: string; mobileProfile?: boolean }
 
-function HighlightPreview({ item }: { item: StoryHighlight }) {
+function HighlightPreview({ item, full }: { item: StoryHighlight; full: boolean }) {
   const media = item.attachment
-  const thumbnail = 'aspect-[9/16] w-full rounded-ui-md'
+  const thumbnail = full ? 'size-full rounded-ui-md' : 'aspect-[9/16] w-full rounded-ui-md'
   if (!media) return (
     <span data-story-background={item.background} className={`${thumbnail} grid box-border place-items-center overflow-hidden p-2 text-center text-ui-label font-medium leading-snug text-white`}>
       <span className="line-clamp-3 wrap-anywhere">{item.text}</span>
     </span>
   )
   if (media.kind === 'video') return <video src={media.url} muted playsInline preload="metadata" aria-hidden="true"
-    className={`${thumbnail} block bg-black object-contain`} />
-  return <img src={media.url} alt="" loading="lazy" className={`${thumbnail} block bg-black object-contain`} />
+    className={`${thumbnail} block bg-black ${full ? "object-cover" : "object-contain"}`} />
+  return <img src={media.url} alt="" loading="lazy" className={`${thumbnail} block bg-black ${full ? "object-cover" : "object-contain"}`} />
 }
 
-export default function StoryHighlights({ request, username, owner = false, className }: Props) {
+export default function StoryHighlights({ request, username, owner = false, className, mobileProfile = false }: Props) {
   const [items, setItems] = useState<StoryHighlight[] | null>(null)
   const [revision, setRevision] = useState(0)
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null)
@@ -67,22 +67,23 @@ export default function StoryHighlights({ request, username, owner = false, clas
     }
   }
 
+  const full = mobileProfile
   const activeStory = items?.find(item => item.id === activeStoryId)
   if (!owner && (!items || items.length === 0)) return null
   return (
-    <section className={cn('min-w-0 rounded-ui-lg border border-solid border-border bg-card p-ui-4 text-foreground', className)} aria-label="Tin nổi bật">
-      <h2 className="m-0 mb-3 text-ui-section font-semibold">Tin nổi bật</h2>
-      {refreshError ? <div><p role="status">Không tải được Tin nổi bật.</p><Button size="sm" type="button" variant="outline" onClick={refresh}>Tải lại</Button></div>
-        : !items ? <p role="status">Đang tải…</p>
-        : items.length === 0 && <p className="text-sm text-muted-foreground">Mở Story của bạn và chọn “Thêm vào Tin nổi bật” để giữ tin trên hồ sơ.</p>}
+    <section className={cn('min-w-0 bg-card text-foreground', full ? 'py-ui-1' : 'rounded-ui-lg border border-solid border-border p-ui-4', className)} aria-label="Tin nổi bật">
+      <h2 className={cn("m-0 mb-3", full ? "text-[length:var(--soco-type-section)]! font-semibold! tracking-[-0.3px] text-foreground!" : "text-ui-section font-semibold")}>Tin nổi bật</h2>
+      {refreshError ? <div><p role="status">Không tải được Tin nổi bật.</p><Button size={full ? "lg" : "sm"} type="button" variant="outline" onClick={refresh}>Tải lại</Button></div>
+        : !items ? <p role="status" className={full ? "min-h-46" : undefined}>Đang tải…</p>
+        : items.length === 0 && <p className={cn("text-sm", full ? "text-foreground/80" : "text-muted-foreground")}>Mở Story của bạn và chọn “Thêm vào Tin nổi bật” để giữ tin trên hồ sơ.</p>}
       {items && items.length > 0 && (
-        <ul role="list" className="m-0 mt-2 grid list-none auto-cols-[calc((100%_-_1rem)/3)] grid-flow-col gap-ui-2 overflow-x-auto overscroll-x-contain p-1">
+        <ul role="list" className={cn("m-0 mt-2 grid list-none grid-flow-col gap-ui-2 overflow-x-auto overscroll-x-contain p-1", full ? "auto-cols-[calc(var(--spacing)*28)]" : "auto-cols-[calc((100%_-_1rem)/3)]")}>
           {items.map(item => (
             <li key={item.id} className="relative min-w-0">
               <button type="button" aria-label={item.title} onClick={() => setActiveStoryId(item.id)}
-                className="grid w-full min-w-0 cursor-pointer appearance-none gap-1.5 rounded-ui-md border-0 bg-transparent p-0 text-center font-sans text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring">
-                <HighlightPreview item={item} />
-                <span className="line-clamp-2 wrap-anywhere px-0.5 pb-0.5 text-ui-label font-medium leading-snug">{item.title}</span>
+                className={cn("grid w-full min-w-0 cursor-pointer appearance-none border-0 bg-transparent p-0 font-sans focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring", full ? "relative h-46 w-28! overflow-hidden rounded-ui-md! text-left" : "gap-1.5 rounded-ui-md text-center text-foreground hover:bg-accent")}>
+                <HighlightPreview item={item} full={full} />
+                <span className={cn("wrap-anywhere text-ui-label leading-snug", full ? "absolute inset-x-0 bottom-0 bg-linear-to-t from-black/85 to-transparent px-ui-2 pt-ui-6 pb-ui-3 font-bold text-white" : "line-clamp-2 px-0.5 pb-0.5 font-medium")}><span className="line-clamp-2">{item.title}</span></span>
               </button>
               {owner && <Dialog open={managementId === item.id} onOpenChange={open => {
                 if (!open && busy) return

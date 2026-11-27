@@ -12,7 +12,16 @@
 @custom-variant app-wide (@media (min-width: 1121px));
 @custom-variant app-full (@media (min-width: 1331px));
 
+@custom-variant story-narrow (@media (max-width: 720px));
+
 @theme inline {
+  --color-story-canvas: #0b1220; /* design-debt-ignore: token definition */
+  --color-story-surface: #18233a; /* design-debt-ignore: token definition */
+  --color-story-frame: #18213e; /* design-debt-ignore: token definition */
+  --color-story-note: #75849e; /* design-debt-ignore: token definition */
+  --color-story-action: #f1f5ff; /* design-debt-ignore: token definition */
+  --color-story-action-foreground: #385c9a; /* design-debt-ignore: token definition */
+  --color-story-action-border: #e4ecfb; /* design-debt-ignore: token definition */
   --font-sans: var(--soco-font-sans);
   --font-mono: var(--soco-font-mono);
   --text-ui-caption: var(--soco-type-caption);
@@ -70,3 +79,15 @@
   --color-input: var(--soco-line);
   --color-ring: var(--soco-blue);
 }
+
+/* In a layer so utilities such as [--avatar-radius:0px] can change an avatar's shape. */
+@layer base {
+  .smart-avatar { --avatar-radius: 50%; }
+}
+
+/* Text story palettes, shared by creation tiles, preview, thumbnails and the viewer.
+ * Unlayered so that global button backgrounds cannot replace them. */
+[data-story-background="berry"] { background-image: linear-gradient(155deg, #672cb5, #ad255f); } /* design-debt-ignore: story content palette */
+[data-story-background="indigo"] { background-image: linear-gradient(145deg, #4229a7, #245a9d); } /* design-debt-ignore: story content palette */
+[data-story-background="teal"] { background-image: linear-gradient(155deg, #134e62, #11705d); } /* design-debt-ignore: story content palette */
+[data-story-background="sunset"] { background-image: linear-gradient(155deg, #8a350b, #9e2956); } /* design-debt-ignore: story content palette */

@@ -4,6 +4,7 @@ import type { Conversation, Message } from '../types'
 import { desktopBridge, isDesktopBuild } from '../../../platform/desktop'
 import { findConversation, getUnreadSummary } from '../api/conversations'
 import { useLatest } from '../../../shared/hooks/useLatest'
+import { useScopedState } from '../../../shared/hooks/useScopedState'
 
 const unreadEvent = 'soco:unread-refresh'
 const unavailableEvent = 'soco:notification-unavailable'
@@ -55,15 +56,12 @@ export function useDesktopNotifications(options: Options) {
   const userId = options.session?.user.id || 0
   const [setting, setSetting] = useState(() => ({ userId, enabled: readEnabled(userId) }))
   const enabled = setting.userId === userId ? setting.enabled : readEnabled(userId)
-  const [unread, setUnread] = useState<{ sessionId?: string; value: number | null }>({ value: null })
-  const unreadCount = unread.sessionId === sessionId ? unread.value : null
-  const setUnreadCount = (value: number | null) => setUnread({ sessionId, value })
-  const [syncWarning, setSyncWarning] = useState('')
-  const [nativeWarning, setNativeWarning] = useState('')
+  const [unreadCount, setUnreadCount] = useScopedState<number | null>(sessionId ?? null, null)
+  const [syncWarning, setSyncWarning] = useScopedState(sessionId ?? null, '')
+  const [nativeWarning, setNativeWarning] = useScopedState(sessionId ?? null, '')
 
   useEffect(() => {
-    if (!sessionId || !options.session) return
-    setUnreadCount(null); setSyncWarning(''); setNativeWarning('')
+    if (!sessionId) return
     let alive = true, busy = false, dirty = false, opening = false
     let timer = 0, accessRevision = 0
     const invalidateAccess = () => { accessRevision++ }
@@ -121,7 +119,7 @@ export function useDesktopNotifications(options: Options) {
       window.removeEventListener(unreadEvent, schedule); window.removeEventListener('focus', schedule)
       window.removeEventListener('online', schedule); window.removeEventListener(unavailableEvent, unavailable)
     }
-  }, [sessionId])
+  }, [sessionId, current, setUnreadCount, setSyncWarning, setNativeWarning])
 
   useEffect(() => {
     if (!isDesktopBuild || !sessionId) return
@@ -129,7 +127,7 @@ export function useDesktopNotifications(options: Options) {
       unreadCount, enabled, sound: options.sound }).catch(() => {
       if (current.current.sessionRef.current?.sessionId === sessionId) setNativeWarning('Không đồng bộ được thông báo với Desktop. Hãy khởi động lại ứng dụng.')
     })
-  }, [sessionId, options.activeConversationId, options.tab, options.sound, enabled, unreadCount, current])
+  }, [sessionId, options.activeConversationId, options.tab, options.sound, enabled, unreadCount, current, setNativeWarning])
 
   function toggle() {
     const session = current.current.sessionRef.current

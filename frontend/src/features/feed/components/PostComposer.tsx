@@ -217,7 +217,6 @@ export default function PostComposer({
       {contentLength > 4500 && <p className="smart-composer-count" aria-live="polite">{contentLength} / 5.000 ký tự</p>}
       {overLimit && <p className="smart-composer-error" role="alert">Nội dung, địa điểm, cảm xúc và gắn thẻ vượt quá 5.000 ký tự.</p>}
       {checkInOpen && !location && <p className="smart-composer-hint">Chọn vị trí hoặc bỏ gắn thẻ để tiếp tục.</p>}
-      {postVisibility === 'public' && (!editingPost || (editingPost.visibility && editingPost.visibility !== 'public')) && <p className="smart-composer-hint">📍 Khi đăng công khai, ChatNet sẽ lấy vị trí hiện tại tốt nhất từ GPS hoặc mạng. Nếu chưa đạt 10 m, tên khu vực có thể thiếu chính xác; sai số được lưu kèm vị trí. Tọa độ được gửi đến BigDataCloud để lấy tên khu vực; mọi người có thể xem vị trí này. Chọn Bạn bè hoặc Chỉ mình tôi nếu không muốn chia sẻ.</p>}
        {submitError && <p className="profile-post-error" role="alert">{submitError}</p>}
       {(popup || postText.trim() || postAttachments.length > 0 || checkInOpen || taggedFriends.length > 0 || feelingId) && (
         <button className="feed-submit" disabled={isPosting || !!mediaUploading || overLimit || (checkInOpen && !location) ||

@@ -84,6 +84,40 @@ function setup() {
 }
 
 describe('chat message pagination visit isolation', () => {
+  it('keeps the unread boundary for the visit even after reconnect returns zero', async () => {
+    const app = setup()
+    const session = account('A')
+    try {
+      await app.render(session)
+      await app.respond(0, [{ ...message(10), firstUnreadMessageId: 11 }, message(11), message(12)])
+      expect(app.current.unreadMessageId).toBe(11)
+      await act(async () => window.dispatchEvent(new CustomEvent('chatnet:sse-reconnected', { detail: { sessionId: 'A' } })))
+      await app.respond(1, [{ ...message(10), firstUnreadMessageId: 0 }, message(11), message(12)])
+      expect(app.current.unreadMessageId).toBe(11)
+      await app.render(session, 1)
+      expect(app.current.unreadMessageId).toBeNull()
+      await app.respond(2, [{ ...message(20, 42, 1), firstUnreadMessageId: 20 }])
+      expect(app.current.unreadMessageId).toBe(20)
+    } finally { await app.close() }
+  })
+
+  it('loads a bounded window around the first unread when it predates the latest page', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      const recent = page(200)
+      await app.respond(0, [{ ...recent[0], firstUnreadMessageId: 50 }, ...recent.slice(1)])
+      expect(app.request.mock.calls[1]?.[0]).toContain('before=50')
+      expect(app.request.mock.calls[2]?.[0]).toContain('after=49')
+      await app.respond(1, page(30, 20))
+      await app.respond(2, page(50))
+      expect(app.current.unreadMessageId).toBe(50)
+      expect(app.current.messages.map(item => item.id)).toContain(50)
+      expect(app.current.messages.at(-1)?.id).toBe(239)
+      expect(app.current.messageGapBefore).toBe(200)
+    } finally { await app.close() }
+  })
+
   it('exposes an initial loading state, then resolves after a slow history request', async () => {
     const app = setup()
     try {
@@ -359,4 +393,84 @@ describe('chat message pagination visit isolation', () => {
     } finally { await app.close() }
   })
 
+})
+
+describe('chat history derived loading and error state', () => {
+  it('clears the error while retrying and reports it again when the retry fails', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      await act(async () => app.jobs[0].reject(new Error('offline')))
+      await act(async () => app.current.retryMessageHistory())
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await act(async () => app.jobs[1].reject(new Error('still offline')))
+      expect(app.current.messageHistoryError).toBe(true)
+      expect(app.current.messageHistoryLoading).toBe(false)
+    } finally { await app.close() }
+  })
+
+  it('stays loading until the latest retry settles, ignoring a superseded failure', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      await app.respond(0, [message(10)])
+      await act(async () => app.current.retryMessageHistory())
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await act(async () => app.current.retryMessageHistory())
+      expect(app.jobs).toHaveLength(3)
+      await act(async () => app.jobs[1].reject(new Error('superseded')))
+      expect(app.current.messageHistoryLoading).toBe(true)
+      expect(app.current.messageHistoryError).toBe(false)
+      await app.respond(2, [message(11)])
+      expect(app.current.messageHistoryLoading).toBe(false)
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.notice).not.toHaveBeenCalled()
+    } finally { await app.close() }
+  })
+
+  it('does not carry a ready or error result over to a revisited channel', async () => {
+    const app = setup()
+    const session = account('A')
+    try {
+      await app.render(session, 0)
+      await act(async () => app.jobs[0].reject(new Error('offline')))
+      await app.render(session, 1)
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await app.respond(1, [])
+      expect(app.current.messageHistoryLoading).toBe(false)
+      await app.render(session, 0)
+      expect(app.current.messageHistoryError).toBe(false)
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await app.respond(2, [])
+      expect(app.current.messageHistoryLoading).toBe(false)
+      await app.render(session, 0)
+      expect(app.jobs).toHaveLength(3)
+      expect(app.current.messageHistoryLoading).toBe(false)
+    } finally { await app.close() }
+  })
+
+  it('stays loading while the unread window is fetched, then reports its failure and recovers on retry', async () => {
+    const app = setup()
+    try {
+      await app.render(account('A'))
+      const recent = page(200)
+      await app.respond(0, [{ ...recent[0], firstUnreadMessageId: 50 }, ...recent.slice(1)])
+      expect(app.jobs).toHaveLength(3)
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await app.respond(1, page(30, 20))
+      expect(app.current.messageHistoryLoading).toBe(true)
+      await act(async () => app.jobs[2].reject(new Error('offline')))
+      expect(app.current.messageHistoryLoading).toBe(false)
+      expect(app.current.messageHistoryError).toBe(true)
+
+      await act(async () => app.current.retryMessageHistory())
+      expect(app.current.messageHistoryLoading).toBe(true)
+      expect(app.current.messageHistoryError).toBe(false)
+      await app.respond(3, [message(10)])
+      expect(app.current.messageHistoryLoading).toBe(false)
+      expect(app.current.messageHistoryError).toBe(false)
+    } finally { await app.close() }
+  })
 })

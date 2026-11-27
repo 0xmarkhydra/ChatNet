@@ -30,27 +30,28 @@ import (
 )
 
 type message struct {
-	ID                  int64               `json:"id"`
-	ClientID            string              `json:"clientId,omitempty"`
-	ConversationID      int64               `json:"conversationId"`
-	ChannelID           int64               `json:"channelId,omitempty"`
-	SenderID            int64               `json:"senderId"`
-	Sender              string              `json:"sender"`
-	SenderDisplayName   string              `json:"senderDisplayName,omitempty"`
-	Text                string              `json:"text"`
-	Forwarded           bool                `json:"forwarded,omitempty"`
-	ReplyToMessageID    *int64              `json:"replyToMessageId,omitempty"`
-	ReplyToSender       string              `json:"replyToSender,omitempty"`
-	ReplyToDisplayName  string              `json:"replyToDisplayName,omitempty"`
-	ReplyToText         string              `json:"replyToText,omitempty"`
-	EditedAt            *time.Time          `json:"editedAt,omitempty"`
-	Deleted             bool                `json:"deleted,omitempty"`
-	Reactions           []messageReaction   `json:"reactions,omitempty"`
-	ReadByUserIDs       []int64             `json:"readByUserIds,omitempty"`
-	TranslatedText      string              `json:"translatedText,omitempty"`
-	TranslationLanguage string              `json:"translationLanguage,omitempty"`
-	Attachments         []mediax.Attachment `json:"attachments,omitempty"`
-	CreatedAt           time.Time           `json:"createdAt"`
+	ID                   int64               `json:"id"`
+	ClientID             string              `json:"clientId,omitempty"`
+	ConversationID       int64               `json:"conversationId"`
+	ChannelID            int64               `json:"channelId,omitempty"`
+	SenderID             int64               `json:"senderId"`
+	Sender               string              `json:"sender"`
+	SenderDisplayName    string              `json:"senderDisplayName,omitempty"`
+	Text                 string              `json:"text"`
+	Forwarded            bool                `json:"forwarded,omitempty"`
+	ReplyToMessageID     *int64              `json:"replyToMessageId,omitempty"`
+	ReplyToSender        string              `json:"replyToSender,omitempty"`
+	ReplyToDisplayName   string              `json:"replyToDisplayName,omitempty"`
+	ReplyToText          string              `json:"replyToText,omitempty"`
+	EditedAt             *time.Time          `json:"editedAt,omitempty"`
+	Deleted              bool                `json:"deleted,omitempty"`
+	Reactions            []messageReaction   `json:"reactions,omitempty"`
+	ReadByUserIDs        []int64             `json:"readByUserIds,omitempty"`
+	FirstUnreadMessageID *int64              `json:"firstUnreadMessageId,omitempty"`
+	TranslatedText       string              `json:"translatedText,omitempty"`
+	TranslationLanguage  string              `json:"translationLanguage,omitempty"`
+	Attachments          []mediax.Attachment `json:"attachments,omitempty"`
+	CreatedAt            time.Time           `json:"createdAt"`
 }
 
 type messageReaction struct {
@@ -71,6 +72,8 @@ type conversation struct {
 	OtherUsername  string     `json:"otherUsername,omitempty"`
 	MemberCount    int        `json:"memberCount"`
 	UnreadCount    int        `json:"unreadCount"`
+	ManualUnread   bool       `json:"manualUnread"`
+	Wallpaper      string     `json:"wallpaper,omitempty"`
 	LastMessage    string     `json:"lastMessage"`
 	LastMessageAt  *time.Time `json:"lastMessageAt,omitempty"`
 	AvatarURL      string     `json:"avatarUrl,omitempty"`
@@ -156,6 +159,10 @@ func main() {
 	mux.Handle("POST /api/users/nearby", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.findNearby)))
 	mux.Handle("DELETE /api/users/nearby", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.stopNearby)))
 	mux.Handle("GET /api/friends", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listFriends)))
+	mux.Handle("GET /api/contacts/{id}/common-groups", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listCommonGroups)))
+	mux.Handle("GET /api/chat/quick-replies", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listQuickReplies)))
+	mux.Handle("PUT /api/chat/quick-replies/{key}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.mutateQuickReply)))
+	mux.Handle("DELETE /api/chat/quick-replies/{key}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.mutateQuickReply)))
 	mux.Handle("GET /api/contacts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listContactMetadata)))
 	mux.Handle("PUT /api/contacts/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateContactMetadata)))
 	mux.Handle("GET /api/friends/requests", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listFriendRequests)))
@@ -225,6 +232,8 @@ func main() {
 	mux.Handle("GET /api/messages/{id}/reactions", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listMessageReactionUsers)))
 	mux.Handle("PUT /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
 	mux.Handle("DELETE /api/messages/{id}/pin", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setMessagePin)))
+	mux.Handle("PUT /api/conversations/{id}/wallpaper", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setChatWallpaper)))
+	mux.Handle("PUT /api/conversations/{id}/read-state", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.setConversationReadState)))
 	mux.Handle("POST /api/conversations/{id}/read", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.markRead)))
 	mux.Handle("PATCH /api/conversations/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.updateGroup)))
 	mux.Handle("GET /api/conversations/{id}/members", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.listGroupMembers)))
@@ -420,6 +429,11 @@ func (s *server) suggestUsers(w http.ResponseWriter, r *http.Request) {
 		  )
 		  AND NOT EXISTS (
 			SELECT 1 FROM direct_contacts dc WHERE dc.user_id=u.id
+		  )
+		  AND NOT EXISTS (
+		    SELECT 1 FROM friend_connections f
+		    WHERE f.user_low=LEAST($1,u.id) AND f.user_high=GREATEST($1,u.id)
+		      AND f.status='accepted'
 		  )
 		ORDER BY COALESCE(sg.mutual_groups,0) DESC, u.created_at DESC
 		LIMIT 10`, claims.UserID)
@@ -641,7 +655,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := s.db.Query(r.Context(), `
-		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,cm.pinned_at,
+		SELECT ca.category_id,c.id,c.type,COALESCE(c.name,''),c.created_at,cm.last_read_message_id,cm.pinned_at,cm.manual_unread,cm.chat_wallpaper,
 		       COALESCE((SELECT COUNT(*) FROM conversation_members x WHERE x.conversation_id=c.id),0),
 		       COALESCE((
 		           SELECT CASE
@@ -687,7 +701,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
                ORDER BY CASE WHEN avatar_member.user_id=$1 THEN 1 ELSE 0 END, avatar_member.user_id
                LIMIT 3
              ) ELSE ARRAY[]::text[] END,
-             COALESCE((SELECT NOT p.message_notifications
+             COALESCE((SELECT NOT p.message_notifications OR COALESCE(p.muted_until>NOW(),FALSE)
                FROM group_notification_preferences p
                WHERE p.conversation_id=c.id AND p.user_id=$1),FALSE)
 
@@ -696,9 +710,16 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN conversation_category_assignments ca ON ca.conversation_id=c.id AND ca.user_id=$1
         WHERE cm.user_id=$1
           AND ($5::bigint=0 OR c.id=$5)
+          AND (NOT cm.history_hidden OR EXISTS (
+            SELECT 1 FROM messages visible_message
+            WHERE visible_message.conversation_id=c.id AND visible_message.id>cm.cleared_through_message_id
+              AND (visible_message.channel_id IS NULL OR EXISTS (SELECT 1 FROM group_channels active_channel WHERE active_channel.id=visible_message.channel_id AND active_channel.deleted_at IS NULL))
+              AND (c.type='direct' OR NOT EXISTS (SELECT 1 FROM user_blocks b WHERE
+                (b.blocker_id=$1 AND b.blocked_id=visible_message.user_id) OR (b.blocked_id=$1 AND b.blocker_id=visible_message.user_id)))
+          ))
           AND ($4::bigint=-1 OR ($4=0 AND ca.category_id IS NULL) OR ca.category_id=$4)
 		  AND ($8::text='' OR c.type=$8)
-		  AND ($7::boolean=FALSE OR EXISTS (
+		  AND ($7::boolean=FALSE OR cm.manual_unread OR EXISTS (
 		    SELECT 1 FROM messages unread
 		    WHERE unread.conversation_id=c.id
               AND unread.id>CASE WHEN c.type='group' THEN COALESCE((
@@ -741,7 +762,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		var lastRead, memberCount, unreadCount int64
 		var groupAvatarRef string
 		var lastMessageAt time.Time
-		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef, &c.AvatarMembers, &c.Muted); err != nil {
+		if err := rows.Scan(&c.CategoryID, &c.ID, &c.Type, &c.Name, &c.CreatedAt, &lastRead, &c.PinnedAt, &c.ManualUnread, &c.Wallpaper, &memberCount, &c.LastMessage, &lastMessageAt, &unreadCount, &groupAvatarRef, &c.AvatarMembers, &c.Muted); err != nil {
 			log.Printf("list conversations scan failed: %v", err)
 			httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 			return
@@ -758,11 +779,14 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 			var username, displayName string
 			var showOnline bool
 			err := s.db.QueryRow(r.Context(), `
-				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status,
+				SELECT u.id,u.username,COALESCE(NULLIF(BTRIM(meta.nickname),''),NULLIF(BTRIM(u.display_name),''),u.username),u.show_online_status,
 				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=$2 AND b.blocked_id=u.id),
 				       EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker_id=u.id AND b.blocked_id=$2)
 				FROM conversation_members cm
 				JOIN users u ON u.id=cm.user_id
+				LEFT JOIN friend_contact_metadata meta ON meta.owner_id=$2 AND meta.contact_id=u.id
+				  AND EXISTS (SELECT 1 FROM friend_connections fc WHERE fc.user_low=LEAST($2::bigint,u.id)
+				    AND fc.user_high=GREATEST($2::bigint,u.id) AND fc.status='accepted')
 				WHERE cm.conversation_id=$1 AND cm.user_id<>$2 LIMIT 1`,
 				c.ID, claims.UserID).Scan(&otherID, &username, &displayName, &showOnline, &c.BlockedByMe, &c.BlockedByOther)
 			if err == nil {
@@ -779,6 +803,7 @@ func (s *server) listConversations(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load conversations")
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	httpx.JSON(w, http.StatusOK, items)
 }
 
@@ -845,6 +870,12 @@ func (s *server) createDirect(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, http.StatusInternalServerError, "cannot add member")
 			return
 		}
+	}
+
+	// Explicitly reopening a direct chat restores it only for the requester.
+	if _, err := tx.Exec(r.Context(), `UPDATE conversation_members SET history_hidden=FALSE WHERE conversation_id=$1 AND user_id=$2`, id, claims.UserID); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "cannot reopen conversation")
+		return
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
@@ -1038,6 +1069,17 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		before = n
 	}
 
+	after := int64(-1)
+	order := "DESC"
+	if raw := r.URL.Query().Get("after"); raw != "" {
+		n, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || n < 0 || before != 0 {
+			httpx.Error(w, http.StatusBadRequest, "invalid after cursor")
+			return
+		}
+		after, order = n, "ASC"
+	}
+
 	keyword := strings.TrimSpace(r.URL.Query().Get("search"))
 	sender := strings.TrimSpace(r.URL.Query().Get("sender"))
 	if len([]rune(keyword)) > 200 || len([]rune(sender)) > 100 {
@@ -1093,7 +1135,19 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		               (b.blocker_id=$5 AND b.blocked_id=cmr.user_id) OR (b.blocked_id=$5 AND b.blocker_id=cmr.user_id))
 		           ORDER BY cmr.user_id
 		       ),
-		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at
+		       COALESCE(mt.translated_text,''),COALESCE(mt.target_language,''),m.created_at,
+               (SELECT COALESCE(MIN(um.id),0) FROM messages um
+                JOIN conversations uc ON uc.id=um.conversation_id
+                JOIN conversation_members uv ON uv.conversation_id=uc.id AND uv.user_id=$5
+                WHERE um.conversation_id=$1 AND COALESCE(um.channel_id,0)=$10
+                  AND um.user_id<>$5 AND um.id>GREATEST(uv.cleared_through_message_id,
+                    CASE WHEN uc.type='group' THEN COALESCE((
+                      SELECT gcr.last_read_message_id FROM group_channel_reads gcr
+                      WHERE gcr.conversation_id=$1 AND gcr.user_id=$5 AND gcr.channel_id=$10
+                    ),uv.last_read_message_id) ELSE uv.last_read_message_id END)
+                  AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
+                    (b.blocker_id=$5 AND b.blocked_id=um.user_id) OR
+                    (b.blocked_id=$5 AND b.blocker_id=um.user_id)))
 		FROM messages m
 		JOIN users u ON u.id=m.user_id
 		JOIN conversation_members viewer ON viewer.conversation_id=m.conversation_id AND viewer.user_id=$5
@@ -1104,7 +1158,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN users ru ON ru.id=rm.user_id
 		LEFT JOIN message_translations mt
 		  ON mt.message_id=m.id AND mt.target_language=$2
-		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id AND COALESCE(m.channel_id,0)=$10 AND ($3::bigint=0 OR m.id<$3)
+		WHERE m.conversation_id=$1 AND m.id>viewer.cleared_through_message_id AND COALESCE(m.channel_id,0)=$10 AND ($3::bigint=0 OR m.id<$3) AND ($11::bigint<0 OR m.id>$11)
 		  AND (EXISTS(SELECT 1 FROM conversations dc WHERE dc.id=m.conversation_id AND dc.type='direct')
 		    OR NOT EXISTS(SELECT 1 FROM user_blocks b WHERE
 		      (b.blocker_id=$5 AND b.blocked_id=m.user_id) OR (b.blocked_id=$5 AND b.blocker_id=m.user_id)))
@@ -1112,7 +1166,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 		  AND ($7::text='' OR lower(u.username)=lower($7))
 		  AND ($8::timestamptz IS NULL OR m.created_at >= $8)
 		  AND ($9::timestamptz IS NULL OR m.created_at < $9)
-		ORDER BY m.id DESC LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to), channelID)
+		ORDER BY m.id `+order+` LIMIT $4`, conversationID, target, before, limit, claims.UserID, keyword, sender, nullableSearchTime(fromDate, from), nullableSearchTime(toDate, to), channelID, after)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "cannot load messages")
 		return
@@ -1126,7 +1180,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 			&m.ID, &m.ConversationID, &m.ChannelID, &m.SenderID, &m.Sender, &m.SenderDisplayName, &m.ClientID, &m.Text,
 			&m.ReplyToMessageID, &m.ReplyToSender, &m.ReplyToDisplayName, &m.ReplyToText,
 			&m.Forwarded, &m.EditedAt, &m.Deleted, &m.ReadByUserIDs,
-			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt,
+			&m.TranslatedText, &m.TranslationLanguage, &m.CreatedAt, &m.FirstUnreadMessageID,
 		) == nil {
 			if m.Deleted {
 				m.Text = ""
@@ -1135,7 +1189,7 @@ func (s *server) listMessages(w http.ResponseWriter, r *http.Request) {
 			items = append(items, m)
 		}
 	}
-	for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
+	for i, j := 0, len(items)-1; after < 0 && i < j; i, j = i+1, j-1 {
 		items[i], items[j] = items[j], items[i]
 	}
 	if err := s.attachMessageMedia(r.Context(), items, claims.UserID); err != nil {
@@ -1813,6 +1867,12 @@ func (s *server) markRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if tag, err := s.db.Exec(r.Context(), `UPDATE conversation_members SET manual_unread=FALSE WHERE conversation_id=$1 AND user_id=$2 AND manual_unread`, conversationID, claims.UserID); err != nil {
+		httpx.Error(w, 500, "cannot clear unread marker")
+		return
+	} else if tag.RowsAffected() > 0 {
+		s.publishConversationEvent(r.Context(), []int64{claims.UserID}, realtimeEvent{Type: "conversation.updated", ConversationID: conversationID})
+	}
 	lastReadID := previousReadID
 	if maxID > previousReadID {
 		if err := s.db.QueryRow(r.Context(), `

@@ -108,6 +108,7 @@ func main() {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "feed"})
 	})
+	mux.Handle("POST /api/posts/nearby", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.nearbyPosts)))
 	mux.Handle("GET /api/posts", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.list)))
 	mux.Handle("GET /api/posts/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.detailPost)))
 	mux.Handle("PATCH /api/posts/{id}", authx.CachedSessionMiddleware(s.jwtSecret, s.db, s.redis, http.HandlerFunc(s.editPost)))
@@ -174,7 +175,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 	// Treat LIKE metacharacters as literal input, not as user-supplied wildcards.
 	query = strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(query)
 	scope := r.URL.Query().Get("scope")
-	if scope != "" && scope != "saved" && scope != "mine" && scope != "following" {
+	if scope != "" && scope != "saved" && scope != "mine" && scope != "following" && scope != "public" {
 		httpx.Error(w, http.StatusBadRequest, "invalid scope")
 		return
 	}
@@ -196,7 +197,7 @@ func (s *server) list(w http.ResponseWriter, r *http.Request) {
 		       EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2)
 		FROM posts p JOIN users u ON u.id=p.user_id
 		WHERE ($1::bigint=0 OR p.id<$1) AND ($5='' OR u.username=$5) AND `+feedAccessSQL+`
-		  AND ($4='all' OR ($4='mine' AND p.user_id=$2)
+		  AND ($4='all' OR ($4='public' AND p.visibility='public') OR ($4='mine' AND p.user_id=$2)
 		       OR ($4='saved' AND EXISTS(SELECT 1 FROM saved_posts x WHERE x.post_id=p.id AND x.user_id=$2))
 		       OR ($4='following' AND (p.user_id=$2 OR EXISTS (
 		         SELECT 1 FROM friend_connections f WHERE f.status='accepted'

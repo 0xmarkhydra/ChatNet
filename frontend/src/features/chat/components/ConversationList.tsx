@@ -240,7 +240,7 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                         </div>
                         <div>
                           <span>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
-                          {conversation.unreadCount > 0 && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</b>}
+                          {(conversation.unreadCount > 0 || conversation.manualUnread) && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount || '•'}</b>}
                         </div>
                       </div>
                     </button>

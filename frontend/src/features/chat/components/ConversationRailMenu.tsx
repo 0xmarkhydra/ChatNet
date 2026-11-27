@@ -1,8 +1,10 @@
 import { useId, useRef, useState, type ReactNode } from 'react'
-import { ChevronsLeftRight, Menu, MessageSquarePlus, Search, Tags } from 'lucide-react'
+import { Check, ChevronsLeftRight, Menu, MessageSquarePlus, Search, Tags } from 'lucide-react'
 
 type Props = {
   categoryControls: ReactNode
+  filter: "all" | "unread" | "groups"
+  onFilterChange: (filter: "all" | "unread" | "groups") => void
   expanded: boolean
   onCreate: () => void
   onExpand: () => void
@@ -14,7 +16,7 @@ type Props = {
  * so neither the sliding avatar rail nor the mobile PWA viewport clips them.
  */
 export default function ConversationRailMenu({
-  categoryControls, expanded, onCreate, onExpand, onCollapse,
+  categoryControls, filter, onFilterChange, expanded, onCreate, onExpand, onCollapse,
 }: Props) {
   const id = useId()
   const popover = useRef<HTMLDivElement>(null)
@@ -96,6 +98,15 @@ export default function ConversationRailMenu({
           <Search size={18} aria-hidden="true" />
           Tìm hội thoại
         </button>
+        <div role="group" aria-label="Lọc hội thoại">
+          {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map(option => (
+            <button key={option.key} type="button" className="conversation-rail-menu-item" aria-pressed={filter === option.key}
+              onClick={() => run(() => { onFilterChange(option.key); if (!visuallyExpanded) onExpand(); })}>
+              <Check size={18} aria-hidden="true" style={{ visibility: filter === option.key ? 'visible' : 'hidden' }} />
+              {option.label}
+            </button>
+          ))}
+        </div>
         <div className="conversation-rail-menu-classification">
           <Tags size={17} aria-hidden="true" />
           {categoryControls}

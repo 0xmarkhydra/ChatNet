@@ -15,6 +15,8 @@ import type { GroupActivity, GroupActivityEvent, GroupActivityKind } from "./Gro
 import type { LanguageOption } from "../../i18n";
 
 export type ChatSectionProps = {
+  notificationBusyId: number | null;
+  toggleConversationNotifications: (conversation: Conversation, muteMinutes?: number) => Promise<void>;
   activeChatTranslationSettings: ChatTranslationSettings | undefined;
   activeConversation: Conversation | null;
   activeConversationId: number | null;
@@ -31,6 +33,7 @@ export type ChatSectionProps = {
   canInviteActiveGroup: boolean;
   canManageActiveGroup: boolean;
   canSend: boolean;
+  canSendLike: boolean;
   changeAutoTranslate: (next: boolean) => void;
   changeGroupMemberRole: (member: GroupMember, role: GroupMember["role"]) => Promise<void>;
   changeTargetLanguage: (next: string) => void;
@@ -46,12 +49,13 @@ export type ChatSectionProps = {
   nextChatSearchJumpRevision: () => number;
   clearActiveConversationHistory: () => Promise<void>;
   conversationBlocked: boolean;
-  conversationCategories: { categories: ConversationCategory[]; selected: number | null; select: (id: number | null) => void; items: Conversation[]; hasMore: boolean; loading: boolean; busy: boolean; error: string; listError: string; load: (more?: boolean, force?: boolean) => Promise<void>; save: (value: Omit<ConversationCategory, "id">, id?: number) => Promise<boolean>; remove: (id: number) => Promise<boolean>; assign: (id: number, categoryId: number | null) => Promise<boolean>; refreshCategories: (force?: boolean) => Promise<void>; refreshFiltered: () => void; applyAssignment: (id: number, categoryId: number | null) => void; };
+  conversationCategories: { categories: ConversationCategory[]; selected: number | null; select: (id: number | null) => void; items: Conversation[]; hasMore: boolean; loading: boolean; busy: boolean; error: string; listError: string; load: (more?: boolean, force?: boolean) => Promise<void>; save: (value: Omit<ConversationCategory, "id">, id?: number) => Promise<boolean>; remove: (id: number) => Promise<boolean>; assign: (id: number, categoryId: number | null) => Promise<boolean>; refreshCategories: (force?: boolean) => Promise<void>; refreshFiltered: () => void; applyAssignment: (id: number, categoryId: number | null) => void; removeClearedConversation: (id: number) => void; };
   conversationDetailsOpen: boolean;
   conversationListSearch: { active: boolean; items: Conversation[]; loading: boolean; loadingMore: boolean; hasMore: boolean; error: string; retry: () => void; loadMore: () => Promise<void>; };
   conversationLoadingMore: boolean;
   conversationListError: string;
   refreshConversations: () => Promise<void>;
+  onContactSaved?: (id: number, metadata: import('../../contacts/utils/contactMetadata').PersonalContactMetadata) => void;
   copyInviteLink: () => Promise<void>;
   createDirect: (event: FormEvent) => Promise<void>;
   createGroupChannel: (name: string, description: string) => Promise<boolean>;
@@ -101,6 +105,7 @@ export type ChatSectionProps = {
   messageSending: boolean;
   messagesLoadingMore: boolean;
   messageHistoryLoading: boolean;
+  unreadMessageId?: number | null;
   messageHistoryError: boolean;
   retryMessageHistory: () => void;
   messagesScrollRef: RefObject<HTMLDivElement | null>;
@@ -124,6 +129,7 @@ export type ChatSectionProps = {
   selectedChannelId: number;
   selectGroupChannel: (channelId: number) => void;
   sendMessage: (event: FormEvent | null, sticker?: string | File) => void;
+  sendLike: () => Promise<void>;
   session: Session;
   setActiveConversationId: Dispatch<SetStateAction<number | null>>;
   setChatCreateError: Dispatch<SetStateAction<string>>;

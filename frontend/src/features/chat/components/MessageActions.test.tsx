@@ -76,18 +76,18 @@ describe('MessageActions subcomponents', () => {
     expect(page.host.textContent).not.toContain('Thu hồi')
   })
 
-  it('resets expanded emoji picker when the active message changes', () => {
+  it('opens the emoji catalog directly without repeating quick reactions', () => {
     const page = mount('reactions')
-    act(() => page.button('Thêm emoji khác').click())
     expect(page.host.textContent).toContain('Chọn emoji đặc biệt')
+    expect(page.host.querySelector('.message-context-reactions')).toBeNull()
+    expect(page.host.querySelector('[aria-label="Thêm emoji khác"]')).toBeNull()
     page.render({ activeMessageAction: message(12) })
-    expect(page.host.textContent).not.toContain('Chọn emoji đặc biệt')
-    expect(page.button('Thêm emoji khác').getAttribute('aria-expanded')).toBe('false')
+    act(() => page.button('Chọn emoji đặc biệt').click())
+    expect(page.callbacks.toggleReaction).toHaveBeenCalledWith(expect.objectContaining({ id: 12 }), '🦊')
   })
 
   it('uses the current message for a custom emoji reaction, then closes', () => {
     const page = mount('reactions', message(20))
-    act(() => page.button('Thêm emoji khác').click())
     act(() => page.button('Chọn emoji đặc biệt').click())
     expect(page.callbacks.setMessageActionId).toHaveBeenCalledWith(null)
     expect(page.callbacks.toggleReaction).toHaveBeenCalledWith(page.callbacks.activeMessageAction, '🦊')

@@ -45,7 +45,7 @@ export default function StoryReactionBar({ request, storyId }: { request: ApiReq
   return (
     <div>
       {error && (
-        <div className="mb-ui-2 flex items-center gap-ui-2 rounded-ui-md bg-[#18233a] px-ui-3 py-ui-1 text-white">
+        <div className="mb-ui-2 flex items-center gap-ui-2 rounded-ui-md bg-story-surface px-ui-3 py-ui-1 text-white">
           <p role="status" className="m-0 flex-1 text-ui-label text-white/85">{error}</p>
           {mine === null && <button type="button" className="min-h-control-touch cursor-pointer rounded-ui-sm border-0 bg-white/10 px-ui-3 text-ui-label font-semibold text-white" onClick={() => {
             setError('')

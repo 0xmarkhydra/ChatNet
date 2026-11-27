@@ -55,7 +55,7 @@ export function selectChatListConversations(args: {
     ).filter((conversation) => normalizeChatName(conversation.name).includes(keyword));
   }
   return visibleConversations.filter((conversation) => {
-    if (filter === "unread" && conversation.unreadCount <= 0) return false;
+    if (filter === "unread" && conversation.unreadCount <= 0 && !conversation.manualUnread) return false;
     if (filter === "groups" && conversation.type !== "group") return false;
     return true;
   });

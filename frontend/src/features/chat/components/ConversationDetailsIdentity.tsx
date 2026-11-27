@@ -25,24 +25,18 @@ export default function ConversationDetailsIdentity({
 
   return (
 <div className="conversation-info-panel-identity social-chat-details-identity">
-        {isGroup ? (
           <div className="group-photo-avatar-wrap">
             {isChannel
               ? <UserAvatar name={displayName} className="conversation-info-panel-avatar social-chat-details-avatar" group imageUrl={displayAvatar} />
               : <ConversationAvatar conversation={conversation} className="conversation-info-panel-avatar social-chat-details-avatar" />}
 
-            {canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
+            {isGroup && canEditGroupPhotos && <button type="button" className="group-photo-trigger" disabled={photoBusy}
               aria-label={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'} title={isChannel ? 'Đổi ảnh kênh' : 'Đổi ảnh nhóm'}
               onClick={() => onEditPhoto({ name: displayName, avatarUrl: displayAvatar,
                 kind: isChannel ? 'channel' : 'group', channelId: isChannel ? selectedChannelId : undefined })}>
               <Camera size={17} aria-hidden="true" />
             </button>}
           </div>
-        ) : (
-          <UserAvatar username={conversation.otherUsername} name={conversation.name}
-            className="conversation-info-panel-avatar social-chat-details-avatar"
-            online={conversation.online} />
-        )}
         <strong title={displayName}>{displayName}</strong>
         <span>{blocked ? (conversation.blockedByOther ? 'Bạn đã bị chặn' : 'Bạn đã chặn người này')
           : isChannel ? `Kênh của nhóm ${conversation.name}` : isGroup ? `${conversation.memberCount} thành viên`

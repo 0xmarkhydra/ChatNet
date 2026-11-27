@@ -10,10 +10,13 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src')
 const readCss = path => readFileSync(resolve(root, path), 'utf8')
 const css = [
   readCss('styles/bottom-nav-glass.css'),
-  readCss('styles/mobile-shared-header.css'),
+  readCss('styles/adaptive-pwa.css'),
   readCss('features/discover/styles/explore-page.css'),
 ].join('\n')
-const browser = await chromium.launch({ headless: true })
+const browser = await chromium.launch({ headless: true }).catch(error => {
+  if (!String(error).includes("Executable doesn't exist")) throw error
+  return chromium.launch({ headless: true, channel: 'chrome' })
+})
 try {
   for (const width of [320, 375, 430]) {
     const page = await browser.newPage({ viewport: { width, height: 760 }, isMobile: true, hasTouch: true })
@@ -95,24 +98,25 @@ try {
     assert.equal(after.dockY, start.dockY, width + ': search not pulled with content')
     assert.equal(after.navY, start.navY, width + ': footer not pulled with content')
     assert.ok(after.tabsScrollLeft > 0, width + ': horizontal tabs remain independently scrollable')
-    const collapsed = await page.evaluate(() => {
+    const atEnd = await page.evaluate(() => {
       const shell = document.querySelector('.modern-shell')
       const content = document.querySelector('.explore-page')
       const tabs = document.querySelector('.explore-tabs')
       content.scrollTop = content.scrollHeight
-      shell.classList.add('mobile-chrome-hidden')
       const bounds = tabs.getBoundingClientRect()
       const hit = document.elementFromPoint(bounds.left + 22, bounds.top + 22)
       return {
+        hidden: shell.classList.contains('mobile-chrome-hidden'),
         scrollTop: content.scrollTop,
         tabsTop: bounds.top,
         frameTop: document.querySelector('.modern-frame').getBoundingClientRect().top,
         clickable: hit === tabs || tabs.contains(hit),
       }
     })
-    assert.ok(collapsed.scrollTop > 100, width + ': content scrolls to its end')
-    assert.ok(collapsed.tabsTop >= collapsed.frameTop - 1, width + ': tabs remain above scrolling content at the end')
-    assert.ok(collapsed.clickable, width + ': tabs remain clickable when header/footer are hidden')
+    assert.equal(atEnd.hidden, false, width + ': chrome stays visible at the end')
+    assert.ok(atEnd.scrollTop > 100, width + ': content scrolls to its end')
+    assert.ok(atEnd.tabsTop >= atEnd.frameTop - 1, width + ': tabs remain above scrolling content at the end')
+    assert.ok(atEnd.clickable, width + ': tabs remain clickable with header/footer visible')
     console.log('PASS ' + width + 'px Explore: vertical scroll, horizontal tabs, stable chrome, no footer gap')
     await page.close()
   }

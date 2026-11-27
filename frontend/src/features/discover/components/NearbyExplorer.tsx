@@ -21,6 +21,7 @@ type Props = {
   users: NearbyUser[]
   peopleBusy: boolean
   peopleScanning: boolean
+  peopleError?: string
   peopleActive: boolean
   peopleRadiusKm: number
   resultRadiusKm: number
@@ -43,7 +44,7 @@ function distance(value?: number) {
 }
 
 export default function NearbyExplorer({
-  query, onQueryChange, users, peopleBusy, peopleScanning, peopleActive, peopleRadiusKm, resultRadiusKm,
+  query, onQueryChange, users, peopleBusy, peopleScanning, peopleError, peopleActive, peopleRadiusKm, resultRadiusKm,
   onPeopleRadiusChange, onScanPeople, onStopPeople, friendActionBusy, onFriendAction, getFriendActionLabel,
 }: Props) {
   const [mode, setMode] = useState<'people' | 'places'>('people')
@@ -148,6 +149,8 @@ export default function NearbyExplorer({
     {mode === 'places' && <div className="nearby-categories" aria-label="Loại địa điểm">{categories.map((item) =>
       <button key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>}
     {mode === 'people' && <p className="nearby-privacy"><ShieldCheck size={16} />Vị trí chính xác của bạn không được chia sẻ.</p>}
+    {mode === 'people' && peopleScanning && <p role="status" aria-live="polite" aria-busy="true">Đang xác định vị trí và tìm người quanh đây…</p>}
+    {mode === 'people' && peopleError && <div className="nearby-error" role="alert">{peopleError}<button type="button" disabled={busy} onClick={() => void scan()}>Thử lại</button></div>}
     {locating && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang xác định vị trí…</p>}
     {loading && mode === 'places' && <p role="status" aria-live="polite" aria-busy="true">Đang tải địa điểm…</p>}
     {locationError && mode === 'places' && <p className="nearby-error" role="alert">{locationError}</p>}
@@ -159,11 +162,11 @@ export default function NearbyExplorer({
         <button title="Bản đồ" aria-label="Bản đồ" aria-pressed={view === 'map'} onClick={() => setView('map')}><MapIcon size={18} /></button>
       </div>}
     </div>
-    {mode === 'people' && users.length > 0 && resultRadiusKm !== peopleRadiusKm && <p className="nearby-privacy">Bán kính đã đổi. Kết quả vẫn thuộc lần tìm trước.</p>}
+    {mode === 'people' && users.length > 0 && resultRadiusKm !== peopleRadiusKm && <p className="nearby-privacy">Bán kính đã đổi. Kết quả vẫn thuộc lần tìm trước; nhấn Tìm lại để quét bán kính mới.</p>}
     {mode === 'people' ? <div className="nearby-people-list">
-      {!count && !busy && <div className="nearby-empty">
+      {!count && !busy && !peopleError && <div className="nearby-empty">
         <Users size={36} /><h2>{normalized ? 'Không khớp tìm kiếm' : peopleActive ? 'Chưa có ai ở gần' : 'Tìm người ở gần bạn'}</h2>
-        <p>{normalized ? 'Thử tên khác hoặc xóa tìm kiếm.' : peopleActive ? 'Thử tăng bán kính hoặc tìm lại sau.' : 'Chỉ người bật Quanh đây mới xuất hiện trong kết quả.'}</p>
+        <p>{normalized ? 'Thử tên khác hoặc xóa tìm kiếm.' : peopleActive ? 'Thử tăng bán kính hoặc tìm lại sau.' : 'Chỉ người từng bật Quanh đây và còn lưu vị trí mới xuất hiện. Bật tìm kiếm cũng cho phép người khác tìm thấy bạn.'}</p>
         <button className="nearby-primary" onClick={() => normalized ? onQueryChange('') : void scan()}>{normalized ? 'Xóa tìm kiếm' : peopleActive ? 'Tìm lại' : 'Bật và tìm người'}</button>
       </div>}
       {visibleUsers.map((user) => <article className="nearby-person" key={user.id}>

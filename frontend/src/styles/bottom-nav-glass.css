@@ -94,33 +94,6 @@
     background: none;
   }
 
-  /* One scroll controller for every tab (including Newsfeed). The header leaves
-     layout instantly (the scroll hook compensates scrollTop, so content never
-     slides under the finger) and only its transform/opacity are animated. */
-  .modern-shell.app-layout > .chatnet-appbar,
-  .modern-shell.app-layout > .bottom-navigation {
-    transition:
-      transform 600ms cubic-bezier(.4, 0, .2, 1),
-      opacity 600ms ease;
-    will-change: transform;
-  }
-  /* Hiding the footer waits briefly so a short flick does not trigger it; showing is immediate. */
-  .modern-shell.app-layout.mobile-chrome-hidden > .bottom-navigation {
-    transition-delay: 200ms;
-  }
-  .modern-shell.app-layout.mobile-chrome-hidden > .chatnet-appbar {
-    margin-top: calc(-1 * var(--mobile-header-height, 0px));
-    transform: translate3d(0, -100%, 0);
-    opacity: 0;
-    pointer-events: none;
-  }
-  .modern-shell.app-layout.mobile-chrome-hidden > .bottom-navigation {
-    margin-bottom: 0;
-    transform: translate3d(0, calc(100% + var(--bottom-nav-offset) + 8px), 0);
-    opacity: 0;
-    pointer-events: none;
-  }
-
   /* The nav floats over the page, so every routed page reserves its space. */
   .modern-shell.app-layout:not(.conversation-open) > .modern-frame {
     box-sizing: border-box;

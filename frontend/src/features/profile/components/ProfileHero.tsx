@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode, type RefObject } from 'react'
 import { BriefcaseBusiness, GraduationCap, MapPin } from 'lucide-react'
 
 type Props = {
@@ -16,9 +16,12 @@ type Props = {
   identityNotice?: ReactNode
   compact?: boolean
   centered?: boolean
+  bio?: string
+  headingRef?: RefObject<HTMLHeadingElement | null>
+  note?: ReactNode
 }
 
-export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice, compact = false, centered = false }: Props) {
+export default function ProfileHero({ displayName, username, city, workplace, school, friendCount, coverUrl, fallbackCoverTone, coverAction, avatar, actions, identityNotice, compact = false, centered = false, bio, headingRef, note }: Props) {
   const [failedCover, setFailedCover] = useState<string>()
   const showCover = coverUrl && coverUrl !== failedCover
   const coverClass = showCover ? 'has-user-cover' : fallbackCoverTone === undefined ? 'has-default-cover' : `has-account-cover avatar-tone-${fallbackCoverTone}`
@@ -27,14 +30,36 @@ export default function ProfileHero({ displayName, username, city, workplace, sc
     { id: 'workplace', text: workplace?.trim(), label: 'Nơi làm việc', Icon: BriefcaseBusiness },
     { id: 'school', text: school?.trim(), label: 'Trường học', Icon: GraduationCap },
   ].filter(detail => detail.text)
+  if (centered) {
+    return (
+      <section className="profile-mobile-full-hero relative mx-auto w-full min-w-0 shrink-0 bg-card">
+        <div className={`relative h-[250px] w-full overflow-hidden bg-[image:var(--soco-avatar-gradient)] ${coverClass}`}>
+          {showCover && <img className="block size-full object-cover" src={coverUrl} alt="Ảnh bìa" draggable={false} onError={() => setFailedCover(coverUrl)} />}
+          <div className="absolute inset-x-0 top-28 z-10">{note}</div>
+          {coverAction}
+        </div>
+        <div className="relative -mt-7 grid min-w-0 justify-items-center gap-ui-2 rounded-t-[28px] bg-card px-ui-4 pb-ui-3 text-center">
+          <div className="relative -mt-22 box-border size-[180px] rounded-full bg-card p-[5px]" data-profile-avatar-wrap>{avatar}</div>
+          <div className="min-w-0 max-w-full wrap-anywhere">
+            <h1 ref={headingRef} tabIndex={-1} className="m-0 text-[26px]! leading-tight! font-bold! tracking-[-0.5px] text-foreground! focus:outline-none">{displayName}</h1>
+            <p className="m-0 mt-ui-1 text-ui-body! text-muted-foreground!">@{username}</p>
+            {friendCount !== undefined && friendCount > 0 && <p className="m-0 mt-ui-1 text-ui-body! font-semibold! text-foreground!">{friendCount.toLocaleString('vi-VN')} người bạn</p>}
+            {bio?.trim() && <p className="m-0 mt-ui-3 text-[15px]! leading-normal! text-foreground!">{bio}</p>}
+            {identityNotice}
+          </div>
+          {actions && <div className="mt-ui-2 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-ui-2 max-[340px]:grid-cols-1">{actions}</div>}
+        </div>
+      </section>
+    )
+  }
   return (
-    <section className={'profile-page-hero' + (compact ? ' profile-page-hero-compact' : centered ? ' profile-page-hero-centered' : '')}>
+    <section className={'profile-page-hero' + (compact ? ' profile-page-hero-compact' : '')}>
       <div className={`profile-page-cover ${coverClass}`}>
         {showCover && <img src={coverUrl} alt="Ảnh bìa" draggable={false} onError={() => setFailedCover(coverUrl)} />}
         {coverAction}
       </div>
       <div className="profile-page-hero-bottom">
-        <div className="profile-page-avatar-wrap">{avatar}</div>
+        <div className="profile-page-avatar-wrap">{note}{avatar}</div>
         <div className="profile-page-identity-text">
           <h1>{displayName}</h1>
           <div className="profile-page-identity-summary">

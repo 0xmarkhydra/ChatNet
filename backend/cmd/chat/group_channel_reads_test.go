@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,6 +109,8 @@ func TestChannelUnreadIsolationIntegration(t *testing.T) {
 		switch {
 		case path == "/api/conversations/unread":
 			handler = s.unreadSummary
+		case method == http.MethodGet && strings.Contains(path, "/messages"):
+			handler = s.listMessages
 		case method == http.MethodPost:
 			handler = s.markGroupChannelRead
 		default:
@@ -181,6 +184,45 @@ func TestChannelUnreadIsolationIntegration(t *testing.T) {
 			t.Fatalf("channel %d unread %d, want 1", ch, first[ch])
 		}
 	}
+	// The unread boundary is viewer-specific and isolated per channel, even after
+	// another channel advances the group read cursor.
+	loadHistory := func(ch int64, query string) []message {
+		t.Helper()
+		res := do(1, http.MethodGet, fmt.Sprintf("/api/conversations/test/messages?channelId=%d%s", ch, query), "")
+		if res.Code != http.StatusOK {
+			t.Fatalf("history channel %d: %d %s", ch, res.Code, res.Body.String())
+		}
+		var result []message
+		if err := json.Unmarshal(res.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	checkBoundary := func(ch int64, wantUnread bool) int64 {
+		t.Helper()
+		rows := loadHistory(ch, "")
+		if len(rows) != 1 || rows[0].FirstUnreadMessageID == nil {
+			t.Fatalf("channel %d missing history/read snapshot: %+v", ch, rows)
+		}
+		want := int64(0)
+		if wantUnread {
+			want = rows[0].ID
+		}
+		if *rows[0].FirstUnreadMessageID != want {
+			t.Fatalf("channel %d first unread = %d, want %d", ch, *rows[0].FirstUnreadMessageID, want)
+		}
+		return rows[0].ID
+	}
+	checkBoundary(0, true)
+	anchor := checkBoundary(channelA, true)
+	checkBoundary(channelB, true)
+	forward := loadHistory(channelA, fmt.Sprintf("&after=%d&limit=1", anchor-1))
+	if len(forward) != 1 || forward[0].ID != anchor {
+		t.Fatalf("forward cursor must include the first unread message: %+v", forward)
+	}
+	if rows := loadHistory(channelA, fmt.Sprintf("&after=%d", anchor)); len(rows) != 0 {
+		t.Fatalf("forward cursor must be exclusive: %+v", rows)
+	}
 	read := do(1, http.MethodPost, "/api/conversations/test/channel-read", fmt.Sprintf(`{"channelId":%d}`, channelA))
 	if read.Code != http.StatusOK {
 		t.Fatalf("mark read: %d %s", read.Code, read.Body.String())
@@ -190,6 +232,9 @@ func TestChannelUnreadIsolationIntegration(t *testing.T) {
 		t.Fatalf("wrong isolation: %+v", after)
 	}
 	checkGroupBadge(after)
+	checkBoundary(0, true)
+	checkBoundary(channelA, false)
+	checkBoundary(channelB, true)
 	outsider := do(2, http.MethodPost, "/api/conversations/test/channel-read", fmt.Sprintf(`{"channelId":%d}`, channelB))
 	if outsider.Code != http.StatusForbidden {
 		t.Fatalf("outsider should be forbidden, got %d", outsider.Code)

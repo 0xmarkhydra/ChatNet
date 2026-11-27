@@ -31,6 +31,7 @@ async function setup(overrides: Partial<UseMessageSenderDeps> = {}) {
     canSend: true,
     canSendSticker: true,
     uploadMediaFiles: vi.fn(async () => []),
+    canSendLike: true,
     channelDraftKey: '',
     draft: { text: 'Secret', attachments: [] },
     messageText: 'Secret',
@@ -47,11 +48,12 @@ async function setup(overrides: Partial<UseMessageSenderDeps> = {}) {
     updateChatOutbox,
     ...overrides,
   } as unknown as UseMessageSenderDeps
+  let like!: () => Promise<void>
   let send!: ReturnType<typeof useMessageSender>['sendMessage']
   const root = createRoot(document.createElement('div'))
   function Harness() {
     const current = useMessageSender(deps)
-    useEffect(() => { send = current.sendMessage }, [current.sendMessage])
+    useEffect(() => { send = current.sendMessage; like = current.sendLike }, [current.sendMessage, current.sendLike])
     return null
   }
   await act(async () => root.render(createElement(Harness)))
@@ -61,6 +63,9 @@ async function setup(overrides: Partial<UseMessageSenderDeps> = {}) {
   const begin = () => send({ preventDefault: () => {} } as unknown as FormEvent)
   return {
     submit,
+    like: async () => act(async () => { await like() }),
+    setReplyingTo,
+    setChannelDrafts,
     begin,
     sendSticker: (sticker: string | File) => act(async () => { await send(null, sticker) }),
     sendingRef: deps.sendingRef,
@@ -235,5 +240,36 @@ describe('instant sticker delivery', () => {
     await encrypted.sendSticker(url)
     expect(encrypted.updateChatOutbox).not.toHaveBeenCalled()
     await encrypted.cleanup()
+  })
+})
+
+describe('quick Like', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    vi.stubGlobal('navigator', { onLine: true })
+    mocked.session = { sessionId: 'sess1', user: { id: 18 } }
+    mocked.sessionRef.current = mocked.session
+    mocked.apiFetch.mockResolvedValue({ok:true,json:async()=>({mode:'legacy',epoch:0})})
+  })
+  it('queues only a Like in the selected channel and preserves the draft', async () => {
+    const sender = await setup({canSend:false, selectedChannelId:7})
+    try {
+      await sender.like()
+      const queued = sender.updateChatOutbox.mock.results[0]?.value
+      expect(queued).toEqual([expect.objectContaining({conversationId:52,channelId:7,text:'👍',attachments:[],status:'queued'})])
+      expect(queued[0]).not.toHaveProperty('replyToMessageId')
+      expect(sender.setMessageDrafts).not.toHaveBeenCalled()
+      expect(sender.setChannelDrafts).not.toHaveBeenCalled()
+      expect(sender.setReplyingTo).not.toHaveBeenCalled()
+      expect(sender.retryQueuedChatMessages).toHaveBeenCalledTimes(1)
+    } finally { await sender.cleanup() }
+  })
+  it('does not bypass the encryption guard or disabled state', async () => {
+    mocked.apiFetch.mockResolvedValue({ok:true,json:async()=>({mode:'e2ee',epoch:1})})
+    const sender = await setup()
+    try { await sender.like(); expect(sender.updateChatOutbox).not.toHaveBeenCalled() } finally { await sender.cleanup() }
+    const blocked = await setup({canSendLike:false})
+    try { await blocked.like(); expect(blocked.updateChatOutbox).not.toHaveBeenCalled() } finally { await blocked.cleanup() }
   })
 })

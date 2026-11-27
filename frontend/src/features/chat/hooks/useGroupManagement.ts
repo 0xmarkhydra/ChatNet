@@ -51,11 +51,17 @@ export function useGroupManagement({
   const groupRequestRef = useRef(apiFetch)
   groupRequestRef.current = apiFetch
 
+  const groupScope = JSON.stringify([activeConversationId, activeConversationType, session?.token, session?.sessionId, tab, communityWorkspaceOpen])
+  const [previousGroupScope, setPreviousGroupScope] = useState(groupScope)
+  if (groupScope !== previousGroupScope) {
+    setPreviousGroupScope(groupScope)
+    setGroupMembers([])
+    setGroupPolicy(null)
+  }
+
   // Header permissions and avatar previews must work before the sidebar is opened.
   // Fetch only for the selected group, not for every conversation in the list.
   useEffect(() => {
-    setGroupMembers([])
-    setGroupPolicy(null)
     if ((tab !== 'chat' && !communityWorkspaceOpen) || activeConversationType !== 'group' || !activeConversationId || !session?.token) return
 
     const controller = new AbortController()

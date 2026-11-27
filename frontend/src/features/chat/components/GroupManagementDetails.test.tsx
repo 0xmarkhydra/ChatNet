@@ -20,7 +20,7 @@ function mount(request: (path: string, init?: RequestInit) => Promise<Response>,
     act(() => root.render(
       <GroupManagementDetails key={id + ':' + section}
         conversationId={id} section={section} canEdit={canEdit}
-        request={request} notify={notify} onOpenShared={vi.fn()} />,
+        request={request} notify={notify} />,
     ))
   }
   function button(label: string) {

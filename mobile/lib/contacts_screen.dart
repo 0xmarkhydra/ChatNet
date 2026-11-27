@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'state/app_providers.dart';
 import 'presentation/friend_list_presenter.dart';
 import 'presentation/contact_friend_profile_sheet.dart';
+import 'presentation/contact_metadata_editor.dart';
 import 'call_translation_settings_screen.dart';
 import 'feed_visitor_profile.dart';
 
@@ -238,33 +239,10 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     if (field == 'favorite') {
       next['favorite'] = !(next['favorite'] == true);
     } else {
-      var draft = next[field]?.toString() ?? '';
-      final value = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(field == 'nickname' ? 'Đặt biệt danh' : 'Ghi chú riêng'),
-          content: TextFormField(
-            key: ValueKey('contact-edit-$field'),
-            initialValue: draft,
-            onChanged: (value) => draft = value,
-            maxLength: field == 'nickname' ? 60 : 1500,
-            decoration: InputDecoration(
-              labelText: field == 'nickname' ? 'Biệt danh' : 'Ghi chú',
-            ),
-            minLines: 1,
-            maxLines: field == 'nickname' ? 1 : 5,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Hủy'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, draft.trim()),
-              child: const Text('Lưu'),
-            ),
-          ],
-        ),
+      final value = await showContactMetadataEditor(
+        context,
+        field: field,
+        initialValue: next[field]?.toString() ?? '',
       );
       if (value == null) return;
       next[field] = value;
@@ -524,7 +502,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                         button: true,
                         selected: contactTab == index,
                         child: Material(
-                          color: contactTab == index ? selectedBackground : Colors.transparent,
+                          color: contactTab == index
+                              ? selectedBackground
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(14),
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
@@ -533,13 +513,19 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                             child: Container(
                               constraints: const BoxConstraints(minHeight: 44),
                               alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
                               child: Text(
                                 tabs[index],
                                 style: TextStyle(
                                   fontSize: 14,
-                                  fontWeight: contactTab == index ? FontWeight.w700 : FontWeight.w500,
-                                  color: contactTab == index ? selectedColor : const Color(0xFF64799E),
+                                  fontWeight: contactTab == index
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: contactTab == index
+                                      ? selectedColor
+                                      : const Color(0xFF64799E),
                                 ),
                               ),
                             ),

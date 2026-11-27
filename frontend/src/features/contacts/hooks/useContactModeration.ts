@@ -9,6 +9,7 @@ import { parseContactReportReason, parseContactReportDetails } from "../utils/co
 type UseContactModerationDeps = Pick<UseContactActionsDeps,
   | "apiFetch"
   | "blockedBusy"
+  | "friendActionRef"
   | "friendBusyIds"
   | "refreshConversations"
   | "refreshFriendConnections"
@@ -31,6 +32,7 @@ type UseContactModerationDeps = Pick<UseContactActionsDeps,
 export function useContactModeration({
   apiFetch,
   blockedBusy,
+  friendActionRef,
   friendBusyIds,
   refreshConversations,
   refreshFriendConnections,
@@ -50,19 +52,22 @@ export function useContactModeration({
   setNotice,
 }: UseContactModerationDeps) {
   const blockedLoadFlight = useRef<{ sessionId: string; controller: AbortController; promise: Promise<void> } | null>(null);
+  const unblockFlight = useRef(false);
   useEffect(() => () => {
     blockedLoadFlight.current?.controller.abort();
+    unblockFlight.current = false;
   }, [session?.sessionId]);
 
   async function blockContact(friend: Pick<FriendSearchResult, 'id' | 'username' | 'displayName'>) {
     const sid = session?.sessionId;
-    if (!sid || friendBusyIds.has(friend.id)) return;
+    if (!sid || friendBusyIds.has(friend.id) || friendActionRef.current.has(friend.id)) return;
     if (
       !window.confirm(
         `Chặn @${friend.username}? Hai bạn sẽ không thể nhắn tin, gọi điện hoặc kết bạn với nhau.`,
       )
     )
       return;
+    friendActionRef.current.add(friend.id);
     setFriendBusyIds((old) => new Set(old).add(friend.id));
     setFriendMenuId(null);
     try {
@@ -104,6 +109,7 @@ export function useContactModeration({
         setNotice("Không thể chặn người dùng. Hãy thử lại.", "error");
     } finally {
       if (sessionRef.current?.sessionId === sid) {
+        friendActionRef.current.delete(friend.id);
         setFriendBusyIds((old) => {
           const next = new Set(old);
           next.delete(friend.id);
@@ -187,8 +193,9 @@ export function useContactModeration({
   }
   async function unblockContact(userId: number) {
     const sid = session?.sessionId;
-    if (!sid || blockedBusy || !window.confirm("Bỏ chặn người dùng này?"))
+    if (!sid || blockedBusy || unblockFlight.current || !window.confirm("Bỏ chặn người dùng này?"))
       return;
+    unblockFlight.current = true;
     setBlockedBusy(true);
     setBlockedError("");
     try {
@@ -212,7 +219,10 @@ export function useContactModeration({
       if (sessionRef.current?.sessionId === sid)
         setBlockedError("Không thể bỏ chặn. Hãy thử lại.");
     } finally {
-      if (sessionRef.current?.sessionId === sid) setBlockedBusy(false);
+      if (sessionRef.current?.sessionId === sid) {
+        unblockFlight.current = false;
+        setBlockedBusy(false);
+      }
     }
   }
 

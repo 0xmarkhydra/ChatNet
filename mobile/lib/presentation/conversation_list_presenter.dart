@@ -9,6 +9,7 @@ class ConversationPreview {
     required this.name,
     required this.isGroup,
     required this.unreadCount,
+    this.manualUnread = false,
     required this.pinned,
     required this.lastMessageAt,
   });
@@ -16,12 +17,14 @@ class ConversationPreview {
   final String name;
   final bool isGroup;
   final int unreadCount;
+  final bool manualUnread;
   final bool pinned;
   final String lastMessageAt;
 
   factory ConversationPreview.fromJson(JsonMap json) => ConversationPreview(
     name: json['name'] is String ? json['name'] as String : '',
     isGroup: json['type'] == 'group',
+    manualUnread: json['manualUnread'] == true,
     unreadCount: json['unreadCount'] is num
         ? (json['unreadCount'] as num).toInt()
         : 0,
@@ -50,7 +53,7 @@ bool _matches(ConversationPreview item, String needle, ChatListFilter filter) {
   }
   return switch (filter) {
     ChatListFilter.all => true,
-    ChatListFilter.unread => item.unreadCount > 0,
+    ChatListFilter.unread => item.unreadCount > 0 || item.manualUnread,
     ChatListFilter.groups => item.isGroup,
   };
 }

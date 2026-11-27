@@ -45,47 +45,11 @@
   font: inherit;
   font-weight: 600;
 }
-.smart-story-composer { display: grid; gap: 15px; width: 100%; min-width: 0; }
-.smart-story-frame {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  min-height: 220px;
-  max-height: min(62dvh, 520px);
-  border-radius: 13px;
-  overflow: hidden;
-  background: #18213e;
-}
-.smart-story-frame img, .smart-story-frame video {
-  display: block;
-  max-width: 100%;
-  max-height: min(62dvh, 520px);
-  object-fit: contain;
-}
-.smart-story-note { margin: 0; color: #75849e; font-size: 12px; line-height: 1.5; }
-.smart-story-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
-.smart-story-actions button {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  gap: 7px;
-  min-height: 41px;
-  padding: 9px 14px;
-  border-radius: 10px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 660;
-  cursor: pointer;
-}
-.smart-story-change { background: #f1f5ff; color: #385c9a; border: 1px solid #e4ecfb; }
-.smart-story-publish { background: var(--soco-blue); color: white; border: 1px solid var(--soco-blue); }
-.smart-story-actions button:disabled { opacity: .5; cursor: not-allowed; }
-.smart-story-actions button:focus-visible, .smart-checkin-heading button:focus-visible {
+.smart-checkin-heading button:focus-visible {
   outline: 3px solid #a8c2ff; outline-offset: 2px;
 }
 .zalo-post-composer .composer-shortcuts { flex-wrap: wrap; }
 @media (max-width: 760px) {
-  .smart-story-actions button { flex: 1 1 125px; }
   .zalo-post-composer .composer-shortcuts { gap: 6px 12px; }
   .zalo-post-composer .composer-shortcuts > button { min-height: 40px; }
   .social-feed-checkin-field { margin: 8px 0; }

@@ -13,6 +13,7 @@ export type UseMessageSenderDeps = {
   canSend: boolean;
   canSendSticker: boolean;
   uploadMediaFiles: (files: File[], scope: 'chat') => Promise<MediaAttachment[]>;
+  canSendLike?: boolean;
   channelDraftKey: string;
   draft: MessageDraft;
   messageAttachments: MediaAttachment[];
@@ -35,6 +36,7 @@ export function useMessageSender({
   canSend,
   canSendSticker,
   uploadMediaFiles,
+  canSendLike = false,
   channelDraftKey,
   draft,
   messageAttachments,
@@ -56,9 +58,13 @@ export function useMessageSender({
   const activeAttempt = useRef<object | null>(null);
   async function sendMessage(event: FormEvent | null, sticker?: string | File) {
     event?.preventDefault();
+    await queueMessage(false, sticker);
+  }
+  async function sendLike() { await queueMessage(true); }
+  async function queueMessage(quickLike: boolean, sticker?: string | File) {
     const immediate = sticker !== undefined;
     if (typeof sticker === 'string' && (!isGiphyMedia(sticker) || /\s/.test(sticker))) return;
-    if (!(immediate ? canSendSticker : canSend) || !activeConversationId || sendingRef.current || !session ||
+    if (!(quickLike ? canSendLike : immediate ? canSendSticker : canSend) || !activeConversationId || sendingRef.current || !session ||
         sessionRef.current !== session)
       return;
     sendingRef.current = true;
@@ -77,8 +83,8 @@ export function useMessageSender({
     const channelId = selectedChannelId;
     const draftKey = channelDraftKey;
     const submittedDraft = draft;
-    const reply = replyingTo;
-    let attachments = immediate ? [] : messageAttachments.map(attachmentRequestBody);
+    const reply = quickLike ? null : replyingTo;
+    let attachments = immediate || quickLike ? [] : messageAttachments.map(attachmentRequestBody);
     if (sticker && typeof sticker !== 'string') {
       let uploaded: MediaAttachment[];
       try {
@@ -99,7 +105,7 @@ export function useMessageSender({
       ...(channelId > 0 ? { channelId } : {}),
       clientId: crypto.randomUUID(),
       conversationId,
-      text: immediate ? (typeof sticker === 'string' ? sticker : '') : messageText.trim(),
+      text: quickLike ? '👍' : immediate ? (typeof sticker === 'string' ? sticker : '') : messageText.trim(),
       attachments,
       ...(reply
         ? {
@@ -114,12 +120,13 @@ export function useMessageSender({
     const next = updateChatOutbox((items) => enqueueChatMessage(items, item));
     if (!next.some((pending) => pending.clientId === item.clientId)) {
       setNotice(
-        immediate ? "Hàng đợi tin nhắn đã đầy. Hãy chọn lại sticker sau." : "Hàng đợi tin nhắn đã đầy. Nội dung vẫn ở ô nhập; hãy thử lại sau.",
+        quickLike ? "Hàng đợi tin nhắn đã đầy. Hãy thử lại sau." : immediate ? "Hàng đợi tin nhắn đã đầy. Hãy chọn lại sticker sau." : "Hàng đợi tin nhắn đã đầy. Nội dung vẫn ở ô nhập; hãy thử lại sau.",
         "warning",
       );
       return;
     }
     ownSendScrollConversationRef.current = conversationId;
+    if (!quickLike) {
     if (!immediate && channelId > 0) {
       setChannelDrafts(current => {
         if (current[draftKey] !== submittedDraft) return current;
@@ -136,6 +143,7 @@ export function useMessageSender({
       });
     }
     setReplyingTo((current) => (current === reply ? null : current));
+    }
     if (navigator.onLine) void retryQueuedChatMessages();
     else setChatOnline(false);
     } catch {
@@ -150,5 +158,5 @@ export function useMessageSender({
     }
   }
 
-  return { sendMessage };
+  return { sendMessage, sendLike };
 }

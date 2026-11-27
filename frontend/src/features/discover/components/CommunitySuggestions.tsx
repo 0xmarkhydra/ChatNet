@@ -35,9 +35,9 @@ export default function CommunitySuggestions({ communities, items, joinedItems, 
       <div className="explore-community-grid" aria-hidden="true">
         {[0, 1, 2].map(id => <div key={id} className="explore-community-card explore-skeleton" />)}
       </div>
-      <p className="sr-only" role="status">Đang tải cộng đồng…</p>
+      <p className="text-sm text-muted-foreground" role="status">Đang tải cộng đồng…</p>
     </>}
-    {communities.status === 'error' && <div className="explore-state" role="alert">
+    {communities.status === 'error' && <div className="explore-state border-destructive/30! bg-destructive/5!" role="alert">
       <p>{communities.error}</p><button type="button" onClick={communities.retry}>Thử lại</button>
     </div>}
     {communities.status === 'ready' && visibleItems.length === 0 && <div className="explore-state">

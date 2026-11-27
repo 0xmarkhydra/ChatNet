@@ -30,10 +30,11 @@ export function createFeedDiscussionPresenter({
   targetLanguage, translationPreferencesLoaded, currentUser,
   addComment, manageFeedComment, reportFeedComment, setCommentLike,
 }: Options) {
-  return (discussionPost: Post, onAuthorOpen: (username: string) => void) => (
+  return (discussionPost: Post, onAuthorOpen: (username: string) => void, showComments = true) => (
     <FeedDiscussion
       key={discussionPost.id}
       variant="post-page"
+      showComments={showComments}
       sortOrder={sortOrder}
       pending={pendingComments[discussionPost.id]}
       comments={discussionPost.comments || []}

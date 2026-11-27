@@ -48,6 +48,7 @@ export function useNearbyDiscovery({
       sessionRef.current?.sessionId === sessionId;
     setNearbyBusy(true);
     setNearbyScanning(true);
+    let phase: 'location' | 'request' = 'location';
     try {
       const position = await getCurrentPositionSmart();
       if (!isCurrentRequest()) return;
@@ -62,6 +63,7 @@ export function useNearbyDiscovery({
           "Tọa độ trình duyệt không hợp lệ. Kiểm tra Latitude (vĩ độ) và Longitude (kinh độ) trong cài đặt vị trí giả lập nếu đang dùng.",
         );
       }
+      phase = 'request';
       const response = await apiFetch("/api/users/nearby", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -74,8 +76,11 @@ export function useNearbyDiscovery({
       if (!isCurrentRequest()) return;
       if (!response.ok)
         throw new Error(
-          response.status === 429
-            ? "Chờ 10 giây trước khi tìm lại."
+          response.status === 429 ? "Chờ 10 giây trước khi tìm lại."
+            : response.status === 400 ? "Máy chủ không chấp nhận tọa độ hoặc bán kính tìm kiếm (400)."
+            : response.status === 401 || response.status === 403 ? "Không có quyền tìm người quanh đây. Kiểm tra phiên đăng nhập."
+            : response.status === 404 || response.status === 405 ? "Máy chủ chưa hỗ trợ API tìm người quanh đây."
+            : response.status >= 500 ? "Dịch vụ tìm người quanh đây đang gặp lỗi. Thử lại sau."
             : "Không tìm được bạn quanh đây. Thử lại sau.",
         );
       const result = (await response.json()) as {
@@ -85,9 +90,13 @@ export function useNearbyDiscovery({
         radiusKm?: number;
       };
       if (!isCurrentRequest()) return;
+      const expiresAt = Date.parse(result.expiresAt);
+      if (!Array.isArray(result.users) || !Number.isFinite(expiresAt)) {
+        throw new Error("Máy chủ trả dữ liệu Quanh đây không hợp lệ.");
+      }
       setNearbyUsers(result.users);
-      setNearbyResultRadiusKm(nearbyRadiusKm);
-      setNearbyUntil(Date.parse(result.expiresAt));
+      setNearbyResultRadiusKm(result.radiusKm ?? nearbyRadiusKm);
+      setNearbyUntil(expiresAt);
       setNotice(
         result.users.length
           ? `Quét thành công: tìm thấy ${result.users.length} người trong bán kính ${nearbyRadiusKm} km.`
@@ -96,8 +105,12 @@ export function useNearbyDiscovery({
       );
     } catch (error) {
       if (!isCurrentRequest()) return;
-      const message = await geolocationErrorMessage(error);
-      if (isCurrentRequest()) setNotice(message, "error");
+      const message = phase === 'location' ? await geolocationErrorMessage(error)
+        : error instanceof Error && error.message ? error.message : "Mất kết nối với dịch vụ Quanh đây.";
+      if (isCurrentRequest()) {
+        setNotice(message, "error");
+        return message;
+      }
     } finally {
       if (inFlight.current === flight) inFlight.current = null;
       if (isCurrentRequest()) {

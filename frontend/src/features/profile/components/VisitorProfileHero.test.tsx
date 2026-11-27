@@ -8,6 +8,7 @@ vi.mock('./ProfileNote', () => ({ default: () => null }))
 vi.mock('../../../shared/ui/UserAvatar', () => ({
   default: ({ username, online }: { username: string; online?: boolean }) => <span data-online={online}>{username}</span>,
   profileAssetUrl: () => '/cover.jpg',
+  avatarTone: () => 2,
 }))
 
 describe('VisitorProfileHero actions', () => {

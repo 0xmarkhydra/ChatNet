@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLatest } from '../../../shared/hooks/useLatest'
 import type { ApiRequest, AppDataContext } from '../../../shared/types/api'
 import { assignCategory, deleteCategory, listCategories, saveCategory } from '../api/categories'
 import { listConversationsByCategory } from '../api/conversations'
@@ -22,6 +23,11 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
  const flight = useRef(false)
  const mutation = useRef(false)
  const mutationSequence = useRef(0)
+ const [previousSessionId, setPreviousSessionId] = useState(session?.sessionId)
+ if (session?.sessionId !== previousSessionId) {
+  setPreviousSessionId(session?.sessionId)
+  setSelected(null); setCategories([]); setItems([]); setHasMore(false); setLoading(false); setBusy(false); setError(''); setListError('')
+ }
  const current = useRef({ apiFetch, mergeConversations, setCategory, clearCategory })
  current.current = { apiFetch, mergeConversations, setCategory, clearCategory }
 
@@ -130,20 +136,26 @@ export function useConversationCategories({ session, sessionRef, apiFetch, merge
    applyAssignment(id, categoryId)
   })
  }
+ function removeClearedConversation(id: number) {
+  setItems(current => current.filter(item => item.id !== id))
+  if (selectedRef.current !== null) void load(false, true)
+ }
  function refreshFiltered() { if (selectedRef.current !== null) void load() }
 
+ function discardPendingReads() { ++sequence.current; ++categorySequence.current }
+ const lifecycle = useLatest({ refreshCategories, discardPendingReads })
+
  useEffect(() => {
-  ++sequence.current
-  ++categorySequence.current
+  const { refreshCategories, discardPendingReads } = lifecycle.current
+  discardPendingReads()
   ++mutationSequence.current
   mutation.current = false
   selectedRef.current = null
   offset.current = 0
   flight.current = false
-  setSelected(null); setCategories([]); setItems([]); setHasMore(false); setLoading(false); setBusy(false); setError(''); setListError('')
   if (session?.sessionId) void refreshCategories()
-  return () => { ++sequence.current; ++categorySequence.current }
- }, [session?.sessionId])
+  return discardPendingReads
+ }, [session?.sessionId, lifecycle])
 
- return { categories, selected, select, items, hasMore, loading, busy, error, listError, load, save, remove, assign, refreshCategories, refreshFiltered, applyAssignment }
+ return { categories, selected, select, items, hasMore, loading, busy, error, listError, load, save, remove, assign, refreshCategories, refreshFiltered, removeClearedConversation, applyAssignment }
 }
