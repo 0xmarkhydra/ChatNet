@@ -20,6 +20,35 @@ const defaultProps: ComponentProps<typeof ProfilePage> = {
 }
 
 describe('own profile navigation and composer', () => {
+  it('shows mobile friends preview between profile details and highlights while keeping desktop card', async () => {
+    const environment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    const previous = environment.IS_REACT_ACT_ENVIRONMENT
+    environment.IS_REACT_ACT_ENVIRONMENT = true
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => root.render(<ProfilePage
+        {...defaultProps}
+        friends={[{ id: 1, username: 'friend', displayName: 'Friend', online: false, status: 'accepted', updatedAt: '' }]}
+        highlights={<section aria-label="Highlights" />}
+      />))
+
+      const aside = host.querySelector('.profile-page-aside')
+      const mobilePreview = Array.from(aside?.children ?? []).find(child => child.classList.contains('app-desktop:hidden'))
+      const desktopFriends = aside?.querySelector('.profile-page-friends-card')
+      expect(mobilePreview?.querySelector('section[aria-label]')).not.toBeNull()
+      expect(mobilePreview?.nextElementSibling?.getAttribute('aria-label')).toBe('Highlights')
+      expect(mobilePreview?.classList.contains('app-desktop:hidden')).toBe(true)
+      expect(desktopFriends?.classList.contains('hidden')).toBe(true)
+      expect(desktopFriends?.classList.contains('app-desktop:block')).toBe(true)
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+      environment.IS_REACT_ACT_ENVIRONMENT = previous
+    }
+  })
+
   it('switches tabs, maintains a sliding indicator and opens the shared post prompt', async () => {
     const environment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     const previous = environment.IS_REACT_ACT_ENVIRONMENT
@@ -47,7 +76,8 @@ describe('own profile navigation and composer', () => {
       expect(identityRow?.querySelector('.profile-page-hero-actions')).not.toBeNull()
       const info = host.querySelector('.profile-page-about')
       expect(info?.querySelector('h2')?.textContent).toBe('Thông tin cá nhân')
-      expect(info?.nextElementSibling?.getAttribute('aria-label')).toBe('Tin nổi bật')
+      expect(info?.nextElementSibling?.classList.contains('app-desktop:hidden')).toBe(true)
+      expect(info?.nextElementSibling?.nextElementSibling?.getAttribute('aria-label')).toBe('Tin nổi bật')
       expect(host.querySelector('.profile-page-main [aria-label="Tin nổi bật"]')).toBeNull()
       const story = [...host.querySelectorAll('button')].find(button => button.textContent === 'Thêm vào tin')
       await act(async () => story?.click())

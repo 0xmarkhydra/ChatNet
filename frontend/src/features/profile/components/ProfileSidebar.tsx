@@ -5,6 +5,7 @@ import type { FriendConnection } from '../../contacts'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import type { ProfileMediaItem } from './ProfileMediaGallery'
 import ProfileDetailsCard from './ProfileDetailsCard'
+import ProfileFriendsPreview from './ProfileFriendsPreview'
 
 type Props = {
   username: string
@@ -42,6 +43,9 @@ export default function ProfileSidebar({ username, email, bio, city, workplace, 
         <aside ref={aside} className="profile-page-aside" style={{ '--profile-aside-top': `${stickyTop}px` } as CSSProperties} aria-label={trUi("common.ui.profileInfoPhotosFriends")}>
           <ProfileDetailsCard username={username} bio={bio} city={city} workplace={workplace} school={school} grouped friendCount={friends.length}
             hasPrivateEmail={Boolean(email)} onEdit={onEditProfile} />
+          <div className="app-desktop:hidden">
+            <ProfileFriendsPreview friends={friends} onViewFriend={onViewFriend} onViewAll={onShowFriends} />
+          </div>
           {highlights}
           <section className="profile-page-recent">
             <div className="profile-page-recent-heading"><h2>{trUi("common.photos")}</h2>
@@ -58,7 +62,7 @@ export default function ProfileSidebar({ username, email, bio, city, workplace, 
               : <div className="profile-page-recent-empty"><ImageIcon size={24} aria-hidden="true" /><span>{trUi('profile.noLoadedPhotos')}</span></div>}
           </section>
           {friends.length > 0 && (
-            <section className="profile-page-recent profile-page-friends-card">
+            <section className="profile-page-recent profile-page-friends-card hidden app-desktop:block">
               <div className="profile-page-recent-heading"><h2>{trUi("contacts.friends")}</h2>
                 <button type="button" onClick={onShowFriends}>{trUi('profile.allFriends')}</button>
               </div>
