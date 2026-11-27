@@ -51,6 +51,7 @@ export default function SecureCallRoom({
   const [translationSheetOpen, setTranslationSheetOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [participantsSheetOpen, setParticipantsSheetOpen] = useState(true)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const moreRef = useRef<HTMLDivElement>(null)
   const [mediaPermissionError, setMediaPermissionError] = useState('')
   const [permissionRetrying, setPermissionRetrying] = useState(false)
@@ -70,6 +71,53 @@ export default function SecureCallRoom({
   const [ending, setEnding] = useState(false)
 
   useCallOverlayDismiss(moreOpen, translationSheetOpen, moreRef, setMoreOpen, setTranslationSheetOpen)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const getFocusableElements = () => Array.from(dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )).filter((element) => element.getClientRects().length > 0 && !element.closest('[hidden], [aria-hidden="true"]'))
+
+    dialog.focus({ preventScroll: true })
+
+    const containTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const focusable = getFocusableElements()
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialog.focus({ preventScroll: true })
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const currentIndex = focusable.indexOf(document.activeElement as HTMLElement)
+      if (event.shiftKey && (currentIndex <= 0)) {
+        event.preventDefault()
+        last.focus({ preventScroll: true })
+      } else if (!event.shiftKey && (currentIndex === -1 || currentIndex === focusable.length - 1)) {
+        event.preventDefault()
+        first.focus({ preventScroll: true })
+      }
+    }
+
+    const keepFocusInside = (event: FocusEvent) => {
+      if (event.target instanceof Node && dialog.contains(event.target)) return
+      const [first] = getFocusableElements()
+      ;(first ?? dialog).focus({ preventScroll: true })
+    }
+
+    dialog.addEventListener('keydown', containTab)
+    document.addEventListener('focusin', keepFocusInside)
+    return () => {
+      dialog.removeEventListener('keydown', containTab)
+      document.removeEventListener('focusin', keepFocusInside)
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
+    }
+  }, [])
 
   useCallRoomLifecycle({
     call, request, userId, autoPublish, onError, onClosed,
@@ -136,7 +184,7 @@ export default function SecureCallRoom({
   }
 
   return (
-    <div className="secure-call-layer" role="dialog" aria-modal="true" aria-label={`Cuộc gọi với ${title}`}>
+    <div ref={dialogRef} className="secure-call-layer" role="dialog" aria-modal="true" aria-label={`Cuộc gọi với ${title}`} tabIndex={-1}>
       <div className="secure-call-stage">
         <CallRoomTopbar title={title} phase={phase} detail={detail} statusLabel={statusLabel}
           participantCount={participants.length} translationOn={translationOn}

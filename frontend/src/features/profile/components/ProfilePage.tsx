@@ -124,6 +124,22 @@ export default function ProfilePage({
                   storyBusy={storyBusy}
                 />
                 <div className="profile-page-about profile-page-timeline-heading"><h2>Bài viết</h2></div>
+                {postsBusy && posts.length === 0 && !pendingPost && !postsError && (
+                  <div role="status" aria-live="polite" aria-busy="true" className="grid gap-3">
+                    <span className="sr-only">Đang tải bài viết…</span>
+                    <div aria-hidden="true" className="grid animate-pulse gap-3 rounded-ui-lg border border-border bg-card p-4 motion-reduce:animate-none">
+                      <div className="flex items-center gap-3">
+                        <div className="size-10 shrink-0 rounded-full bg-muted" />
+                        <div className="grid flex-1 gap-2">
+                          <div className="h-3 w-28 rounded bg-muted" />
+                          <div className="h-2 w-16 rounded bg-muted" />
+                        </div>
+                      </div>
+                      <div className="h-3 w-3/4 rounded bg-muted" />
+                      <div className="aspect-[4/3] w-full rounded-ui-md bg-muted" />
+                    </div>
+                  </div>
+                )}
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>Thử lại</button></div>}
                 <div className="profile-page-post-feed feed zalo-feed app-desktop:flex app-desktop:min-w-0 app-desktop:flex-col app-desktop:gap-4">{postCards}</div>
