@@ -3297,6 +3297,11 @@ select:focus-visible {
   bottom: -22px;
 }
 
+/* Existing reactions already sit below the bubble; keep the add icon aligned. */
+.message-content:has(.message-reactions > .reaction-chip) .reaction-add {
+  top: 0;
+}
+
 /* Incoming chips grow right from the bubble; outgoing chips grow left. */
 .message-content .message-reactions {
   position: absolute;
@@ -3355,6 +3360,9 @@ select:focus-visible {
   width: 29px;
   height: 28px;
   place-items: center;
+  position: relative;
+  left: 6px;
+  top: 6px;
   border: 1px solid var(--chatnet-line);
   border-radius: 999px;
   background: rgba(255, 255, 255, .82);
@@ -3370,6 +3378,7 @@ select:focus-visible {
 .message-content:has(> .bubble:hover) .reaction-add,
 .message-content:has(> .chat-message-media:hover) .reaction-add,
 .message-content .message-reactions:hover .reaction-add,
+.message-content .reaction-add[aria-expanded="true"],
 .message-content:focus-within .reaction-add {
   opacity: 1;
   pointer-events: auto;
@@ -3388,6 +3397,55 @@ select:focus-visible {
   border-color: var(--chatnet-accent);
   background: var(--chatnet-accent-soft);
   color: var(--chatnet-accent-ink);
+}
+
+.chat-quick-reaction-picker {
+  position: fixed;
+  z-index: 180;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  height: 46px;
+  padding: 4px 6px;
+  gap: 2px;
+  border: 1px solid var(--chatnet-line);
+  border-radius: 999px;
+  background: var(--chatnet-card, #fff);
+  box-shadow: 0 6px 16px rgba(26, 43, 72, .16);
+}
+
+.chat-quick-reaction-picker > button {
+  display: grid;
+  place-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--chatnet-muted);
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .12s ease;
+}
+
+.chat-quick-reaction-picker > button:hover {
+  transform: scale(1.18);
+}
+
+.chat-quick-reaction-picker > button[aria-pressed="true"] {
+  background: var(--chatnet-accent-soft);
+}
+
+.chat-quick-reaction-picker > button:last-child {
+  flex: 0 0 28px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-quick-reaction-picker > button { transition: none; }
 }
 
 .message-context-backdrop {

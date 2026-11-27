@@ -983,6 +983,7 @@ export default function ChatSection({
                     moveMessageLongPress={moveMessageLongPress}
                     openMessageActions={openMessageActions}
                     openMessageReactions={openMessageReactions}
+                    toggleReaction={toggleReaction}
                     onReactionUsers={onReactionUsers}
                     onForwardMessage={onForwardMessage}
                     reactionPreviews={reactionPreviews}
