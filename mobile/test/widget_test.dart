@@ -90,7 +90,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('feed-composer-open')));
     await tester.pumpAndSettle();
     expect(find.text('Gắn thẻ'), findsOneWidget);
-    expect(find.text('Check-in'), findsOneWidget);
+    expect(find.text('Vị trí'), findsOneWidget);
     await tester.tap(find.byTooltip('Đóng').last);
     await tester.pumpAndSettle();
 
@@ -154,6 +154,10 @@ void main() {
     await tester.tap(find.text('Hiện bản gốc'));
     await tester.pumpAndSettle();
     expect(find.text('Mình vừa cập nhật bảng màu mới.'), findsOneWidget);
+    expect(find.textContaining('Bản dịch minh họa.'), findsNothing);
+    await tester.tap(find.text('Hiện VI · AI'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Bản dịch minh họa.'), findsOneWidget);
     expect(find.text('Hai bạn đã là bạn bè'), findsOneWidget);
   });
 

@@ -202,6 +202,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   DateTime? lastGroupPrefetch;
   bool groupPrefetchBusy = false;
   List<Json> messages = [];
+  // View-only translation choices must survive replacement of message DTOs.
+  final _originalMessageIds = <int>{};
   // In-memory, session-bound history for very recent revisits only.
   final recentHistory = <String, ({DateTime at, List<Json> rows})>{};
   int historyCacheRevision = 0;
@@ -765,6 +767,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       selectedChannelId = channelId;
       if (conversation['type'] == 'group') pickerGroup = conversation;
       if (changedConversation) {
+        _originalMessageIds.clear();
         messages = warm ?? [];
         hasOlderMessages = false;
         olderLoading = false;
@@ -915,6 +918,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         unreadMessageId = anchor;
         initialTimelinePending = false;
         messageGapBefore = gap;
+        if (targetLanguage != target) _originalMessageIds.clear();
         targetLanguage = target;
         autoTranslate = shouldAutoTranslate;
         appLocale = locale;
@@ -1777,6 +1781,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     setState(() {
       active = null;
       messageLoadGeneration++;
+      _originalMessageIds.clear();
       unreadMessageId = null;
       messageGapBefore = null;
       messages = [];
@@ -2098,7 +2103,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       setState(() {
         message['translatedText'] = result['translatedText'];
         message['translationLanguage'] = language;
-        message['_showOriginal'] = false;
+        if (!silent) _originalMessageIds.remove((message['id'] as num).toInt());
       });
     } catch (value) {
       if (!silent) _show(value.toString());
@@ -2118,7 +2123,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       );
       if (!mounted) return;
       setState(() {
-        targetLanguage = updated['targetLanguage']?.toString() ?? nextTarget;
+        final language = updated['targetLanguage']?.toString() ?? nextTarget;
+        if (targetLanguage != language) _originalMessageIds.clear();
+        targetLanguage = language;
         autoTranslate = updated['autoTranslate'] != false;
         appLocale = updated['appLocale']?.toString() ?? appLocale;
         for (final message in messages) {
@@ -5138,7 +5145,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final mine = message['senderId'] == widget.api.user['id'];
     final deleted = message['deleted'] == true;
     final translated = message['translatedText']?.toString() ?? '';
-    final showOriginal = message['_showOriginal'] == true;
+    final messageId = (message['id'] as num).toInt();
+    final showOriginal = _originalMessageIds.contains(messageId);
     final reactions = objects(message['reactions']);
     final rawText = message['text']?.toString().trim() ?? '';
     final gif = !deleted && isGiphyMedia(rawText);
@@ -5285,9 +5293,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                           ? 'Hiện ${targetLanguage.toUpperCase()} · AI'
                           : 'Hiện bản gốc',
                     ),
-                    onPressed: () => setState(
-                      () => message['_showOriginal'] = !showOriginal,
-                    ),
+                    onPressed: () => setState(() {
+                      if (showOriginal) {
+                        _originalMessageIds.remove(messageId);
+                      } else {
+                        _originalMessageIds.add(messageId);
+                      }
+                    }),
                   ),
                 ),
               if (objects(message['attachments']).isNotEmpty)
