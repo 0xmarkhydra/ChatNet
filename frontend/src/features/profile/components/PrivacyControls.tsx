@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import type { Dispatch, SetStateAction } from 'react'
 import type { UserPrivacy } from '../types'
 
@@ -18,25 +19,27 @@ export default function PrivacyControls({
   privacyBusy,
   changePrivacy,
 }: Props) {
+  const trUi = useUiTranslation()
+
   return (
     <>
               <div className="settings-row">
                 <div>
-                  <strong>Quyền riêng tư tài khoản</strong>
-                  <small>Kiểm soát ai có thể tìm, gửi lời mời và thấy bạn trực tuyến. Thiết lập lưu trên máy chủ.</small>
+                  <strong>{trUi('settings.accountPrivacy')}</strong>
+                  <small>{trUi('settings.accountPrivacyHint')}</small>
                 </div>
               </div>
 
               {privacyError && <div className="settings-row" role="alert">
-                <span>{privacyError}</span>
-                <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>Thử lại</button>
+                <span>{privacyError === 'Lưu thất bại. Cài đặt trước đó vẫn được giữ.' ? trUi('settings.saveFailed') : privacyError}</span>
+                <button type="button" className="settings-action" onClick={() => setPrivacyRetry((n) => n + 1)}>{trUi("common.retry")}</button>
               </div>}
               {privacy && ([
-                ['searchableByUsername', 'Cho phép tìm bằng username', 'Người khác có thể tìm @username của bạn.'],
-                ['searchableByName', 'Cho phép tìm bằng tên', 'Tên hiển thị của bạn có thể xuất hiện trong kết quả.'],
-                ['searchableByEmail', 'Cho phép tìm bằng email', 'Chỉ tìm bằng email khớp chính xác; địa chỉ email không được hiển thị.'],
-                ['allowFriendRequests', 'Cho phép lời mời mới', 'Tắt để ngăn lời mời kết bạn mới từ người khác.'],
-                ['showOnlineStatus', 'Hiển thị trạng thái online', 'Ẩn sự hiện diện trong danh sách và kết quả tìm kiếm.'],
+                ['searchableByUsername', trUi('settings.usernameSearch'), trUi('settings.usernameHint')],
+                ['searchableByName', trUi('settings.allowNameSearch'), trUi('settings.nameHint')],
+                ['searchableByEmail', trUi('settings.emailSearch'), trUi('settings.emailHint')],
+                ['allowFriendRequests', trUi('settings.newRequests'), trUi('settings.newRequestsHint')],
+                ['showOnlineStatus', trUi('settings.onlineStatus'), trUi('settings.onlineHint')],
               ] as const).map(([key, label, hint]) => (
                 <div className="settings-row" key={key}>
                   <div><strong>{label}</strong><small>{hint}</small></div>

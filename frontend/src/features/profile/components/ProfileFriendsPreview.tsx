@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import type { FriendConnection } from '../../contacts'
 import UserAvatar from '@/shared/ui/UserAvatar'
 
@@ -8,13 +9,15 @@ type Props = {
 }
 
 export default function ProfileFriendsPreview({ friends, onViewFriend, onViewAll }: Props) {
+  const trUi = useUiTranslation()
+
   const accepted = friends.filter(friend => friend.status === 'accepted' && !friend.blockedByMe && !friend.blockedByOther)
   if (!accepted.length) return null
 
-  return <section className="grid min-w-0 gap-ui-2" aria-label="Bạn bè">
+  return <section className="grid min-w-0 gap-ui-2" aria-label={trUi("contacts.friends")}>
     <header className="flex items-center justify-between gap-ui-2">
-      <h2 className="m-0 text-ui-section! font-semibold! tracking-[-0.3px] text-foreground!">Bạn bè</h2>
-      <button type="button" className="min-h-control-touch cursor-pointer rounded-ui-sm border-0 bg-transparent px-ui-1 text-[15px]! font-medium! text-primary! focus-visible:outline-2 focus-visible:outline-ring" onClick={onViewAll}>Xem tất cả</button>
+      <h2 className="m-0 text-ui-section! font-semibold! tracking-[-0.3px] text-foreground!">{trUi("contacts.friends")}</h2>
+      <button type="button" className="min-h-control-touch cursor-pointer rounded-ui-sm border-0 bg-transparent px-ui-1 text-[15px]! font-medium! text-primary! focus-visible:outline-2 focus-visible:outline-ring" onClick={onViewAll}>{trUi("common.seeAll")}</button>
     </header>
     <ul className="m-0 grid list-none grid-cols-4 gap-ui-2 p-0" role="list">
       {accepted.slice(0, 4).map(friend => {

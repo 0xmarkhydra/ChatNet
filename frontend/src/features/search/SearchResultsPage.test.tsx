@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import SearchResultsPage from './SearchResultsPage'
+import { UiLocaleContext } from '@/shared/i18n/locale'
 import type { ApiRequest } from '../../shared/types/api'
 import type { Post } from '../feed'
 
@@ -56,7 +57,7 @@ function RouteLocation() {
   return <output data-testid="route">{location.search}</output>
 }
 
-async function mount(request: ApiRequest, route: string) {
+async function mount(request: ApiRequest, route: string, locale = 'vi') {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
@@ -64,7 +65,7 @@ async function mount(request: ApiRequest, route: string) {
     renderPosts: (posts: Post[], onOpen: (id: number) => void) => posts.map(post => <button key={post.id} type="button" data-testid="post-card" onClick={() => onOpen(post.id)}>{post.content}</button>) }
   roots.push(async () => { await act(async () => root.unmount()) })
   await act(async () => root.render(
-    <MemoryRouter initialEntries={[route]}><SearchResultsPage {...props} /><RouteLocation /></MemoryRouter>,
+    <UiLocaleContext.Provider value={{ locale }}><MemoryRouter initialEntries={[route]}><SearchResultsPage {...props} /><RouteLocation /></MemoryRouter></UiLocaleContext.Provider>,
   ))
   await act(async () => { await vi.advanceTimersByTimeAsync(600) })
   return {
@@ -114,7 +115,7 @@ it('renders every result type from the real APIs and narrows by type and filter'
   expect(view.host.textContent).not.toContain('Bob Trần')
   expect(view.host.textContent).toContain('Đang lọc')
 
-  await view.click(view.button('Xóa tất cả'))
+  await view.click(view.button('Xóa hết'))
   expect(view.route()).toBe('?q=thi%E1%BA%BFt&type=people')
 })
 
@@ -189,7 +190,7 @@ it('keeps paging posts when the loaded page is filtered out', async () => {
   const friendsOnly = [{ ...posts[0], visibility: 'friends' }, { ...posts[0], id: 12, visibility: 'friends' }, { ...posts[0], id: 13, visibility: 'friends' }, { ...posts[0], id: 14, visibility: 'friends' }, { ...posts[0], id: 15, visibility: 'friends' }]
   const view = await mount(routes({ '/api/posts': () => ok(friendsOnly) }), '/search?q=thi%E1%BA%BFt&type=posts')
   expect(view.host.textContent).not.toContain('Không tìm thấy kết quả')
-  expect(view.host.textContent).toContain('Chưa thấy bài viết khớp bộ lọc trong các kết quả đã tải.')
+  expect(view.host.textContent).toContain('Chưa thấy kết quả khớp bộ lọc trong các kết quả đã tải.')
   expect(view.button('Tải thêm bài viết')).toBeTruthy()
 })
 
@@ -266,4 +267,18 @@ it('offers suggested people and popular communities beside results and under an 
 it('leaves the suggestion rail out when its requests fail', async () => {
   const view = await mount(routes({ '/api/groups/public': () => failed() }), '/search?q=thi%E1%BA%BFt')
   expect(view.host.querySelector('aside[aria-label="Gợi ý cho bạn"]')).toBeNull()
+})
+
+it('renders localized search home and scopes in every supported language', async () => {
+  for (const [locale, heading, scope] of [
+    ['vi','Có gì mới từ tìm kiếm của bạn','Bài viết đã lưu'],
+    ['en',"What's new from your searches",'Saved posts'],
+    ['zh','你的搜索有何新动态','已保存帖子'],
+    ['ja','検索の新着情報','保存済みの投稿'],
+    ['ko','검색의 새 소식','저장한 게시물'],
+  ]) {
+    const view = await mount(routes(), '/search', locale)
+    expect(view.host.textContent).toContain(heading)
+    expect(view.button(scope)).toBeTruthy()
+  }
 })

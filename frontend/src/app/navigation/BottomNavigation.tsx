@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useId, useLayoutEffect, useRef } from 'react'
 import type { Tab } from '../../shared/types/navigation'
 import { formatUnreadMessageDescription, type UI_MESSAGES } from '../../features/i18n/lib/i18n'
@@ -21,6 +22,8 @@ export default function BottomNavigation({
   username,
   displayName,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const activeKey = tab
   const unreadDescriptionId = useId()
   const navRef = useRef<HTMLElement>(null)
@@ -99,7 +102,7 @@ export default function BottomNavigation({
   }, [activeKey])
 
   return (
-    <nav className="bottom-navigation" aria-label="Điều hướng chính" ref={navRef}>
+    <nav className="bottom-navigation" aria-label={trUi("app.mainNav")} ref={navRef}>
       <span ref={pillRef} className="nav-liquid-pill" aria-hidden="true" />
       <button
         type="button"

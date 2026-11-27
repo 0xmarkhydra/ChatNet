@@ -1,3 +1,5 @@
+import type { UiCopyKey } from '../i18n/locale'
+
 export const reactionOptions = [
   { emoji: '👍', label: 'Like' },
   { emoji: '❤️', label: 'Love' },
@@ -7,6 +9,8 @@ export const reactionOptions = [
   { emoji: '😡', label: 'Angry' },
 ] as const
 
-export function reactionLabel(emoji: string): string {
-  return reactionOptions.find((reaction) => reaction.emoji === emoji)?.label || emoji
+const reactionKeys: Record<string, UiCopyKey> = { '👍': 'common.ui.reactionLike', '❤️': 'common.ui.reactionLove', '😂': 'common.ui.reactionHaha', '😮': 'common.ui.reactionWow', '😢': 'common.ui.reactionSad', '😡': 'common.ui.reactionAngry' }
+export function reactionLabel(emoji: string, t?: (key: UiCopyKey) => string): string {
+  const key = reactionKeys[emoji]
+  return t && key ? t(key) : reactionOptions.find((reaction) => reaction.emoji === emoji)?.label || emoji
 }

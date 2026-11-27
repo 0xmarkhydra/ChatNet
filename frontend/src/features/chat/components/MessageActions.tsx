@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { userLabel } from '../../../shared/utils/userLabel'
 import { attachmentLabel, formatTime } from '../../../shared/utils/format'
 import type { MessageActionsProps } from '../types/messageActions'
@@ -5,6 +6,8 @@ import MessageReactionChooser from './MessageReactionChooser'
 import MessageActionList from './MessageActionList'
 
 export default function MessageActions(props: MessageActionsProps) {
+  const trUi = useUiTranslation()
+
  const { mode = 'actions', activeMessageAction, userId, setMessageActionId } = props
  const mine = activeMessageAction.senderId === userId
  const preview = activeMessageAction.text.trim() || attachmentLabel(activeMessageAction.attachments)
@@ -13,7 +16,7 @@ export default function MessageActions(props: MessageActionsProps) {
       className={mode === 'reactions' ? 'message-context-backdrop reaction-only' : 'message-context-backdrop'}
       role="dialog"
       aria-modal="true"
-      aria-label={mode === 'reactions' ? 'Chọn cảm xúc' : 'Tùy chọn tin nhắn'}
+      aria-label={mode === 'reactions' ? trUi("chat.chooseReaction") : trUi("common.ui.messageOptions")}
       onClick={(event) => {
         if (event.currentTarget === event.target) setMessageActionId(null)
       }}
@@ -23,8 +26,8 @@ export default function MessageActions(props: MessageActionsProps) {
     >
       <section className={mode === 'reactions' ? 'message-context-sheet reaction-only' : 'message-context-sheet'}>
         {mode === 'actions' && <div className={mine ? 'message-context-preview mine' : 'message-context-preview'}>
-          <small>{mine ? 'Bạn' : userLabel(activeMessageAction.senderDisplayName, activeMessageAction.sender)}</small>
-          <div className="message-context-preview-bubble">{preview || 'Tin nhắn'}</div>
+          <small>{mine ? trUi("common.you") : userLabel(activeMessageAction.senderDisplayName, activeMessageAction.sender)}</small>
+          <div className="message-context-preview-bubble">{preview || trUi("chat.messages")}</div>
           <time>{formatTime(activeMessageAction.createdAt)}</time>
         </div>}
 
@@ -37,9 +40,7 @@ export default function MessageActions(props: MessageActionsProps) {
           type="button"
           className="message-context-cancel"
           onClick={() => setMessageActionId(null)}
-        >
-          Đóng
-        </button>}
+        >{trUi("common.close")}</button>}
       </section>
     </div>
   )

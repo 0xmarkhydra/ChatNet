@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { collapseQuickReposts } from "../utils/feedRequestState";
 import FeedModeration from "./FeedModeration";
 import { userLabel } from "../../../shared/utils/userLabel";
@@ -145,6 +146,8 @@ export default function FeedSection({
   cancelStory,
   switchTab,
 }: FeedSectionProps) {
+  const trUi = useUiTranslation()
+
   const seenStories = useSeenStories(session.sessionId);
   const storyDisplayName = userLabel(profileMedia?.displayName || session.user.displayName, name);
   return (
@@ -271,9 +274,7 @@ export default function FeedSection({
                           else if (posts.length === 0) void refreshPosts();
                           else void loadMorePosts();
                         }}
-                      >
-                        Thử lại
-                      </button>
+                      >{trUi("common.retry")}</button>
                     </div>
                   )}
                   <div
@@ -291,21 +292,21 @@ export default function FeedSection({
                         <SocoEmptyState
                           title={
                             normalizedSearch
-                              ? "Không tìm thấy bài viết"
+                              ? trUi("common.ui.noPostsFound")
                               : feedFilter === "following"
-                                ? "Chưa có bài viết từ bạn bè"
+                                ? trUi("common.ui.noFriendPosts")
                                 : feedFilter === "saved"
-                                  ? "Chưa có bài viết đã lưu"
-                                  : "Chưa có bài viết"
+                                  ? trUi("common.ui.noSavedPosts")
+                                  : trUi("common.ui.noPosts")
                           }
                           description={
                             normalizedSearch
-                              ? "Thử một từ khóa khác nhé."
+                              ? trUi("common.ui.tryAnotherKeyword")
                               : feedFilter === "following"
-                                ? "Kết bạn để xem các bài viết được chia sẻ với bạn."
+                                ? trUi("common.ui.friendsSeePosts")
                                 : feedFilter === "saved"
-                                  ? "Mở menu của bài viết và chọn Lưu bài viết để xem lại ở đây."
-                                  : "Hãy chia sẻ khoảnh khắc đầu tiên của bạn."
+                                  ? trUi("common.ui.savePostHint")
+                                  : trUi("common.ui.firstMoment")
                           }
                           action={
                             !normalizedSearch && (
@@ -322,10 +323,10 @@ export default function FeedSection({
                                 }
                               >
                                 {feedFilter === "following"
-                                  ? "Tìm bạn bè"
+                                  ? trUi("contacts.findFriendsAlt")
                                   : feedFilter === "saved"
                                     ? "Quay lại Bảng tin"
-                                    : "Tạo bài viết"}
+                                    : trUi("feed.newPost")}
                               </SocoTextAction>
                             )
                           }

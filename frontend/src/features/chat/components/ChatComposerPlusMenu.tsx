@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, CalendarClock, ClipboardList, Clock3, FileText, Images, Plus, Smile } from 'lucide-react'
@@ -24,6 +25,8 @@ type Props = {
 }
 
 export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachMedia, onInsertEmoji, userId, onSelectSticker, onSelectGiphy, onSchedule, onQuickReplies, onGroupActivity }: Props) {
+  const trUi = useUiTranslation()
+
   const [mode, setMode] = useState<MenuMode>('closed')
   const [position, setPosition] = useState<ChatComposerMenuPosition | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -107,10 +110,10 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
         className="ghost-action attach-button chat-plus-trigger"
         type="button"
         disabled={disabled}
-        aria-label="Mở menu thêm nội dung"
+        aria-label={trUi("chat.openComposerMenu")}
         aria-haspopup="dialog"
         aria-expanded={mode !== 'closed'}
-        title="Tùy chọn soạn tin"
+        title={trUi("chat.composeOptions")}
         onClick={() => mode === 'closed' ? show('actions') : setMode('closed')}
       >
         <Plus className="chat-composer-plus" size={22} aria-hidden="true" />
@@ -120,17 +123,17 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
           ref={panelRef}
           className="chat-composer-plus-popover"
           role="dialog"
-          aria-label={mode === 'emoji' ? 'Chọn emoji' : mode === 'sticker' ? 'Chọn sticker' : mode === 'giphy' ? 'Chọn GIPHY' : 'Thêm nội dung vào tin nhắn'}
+          aria-label={mode === 'emoji' ? trUi("chat.selectEmoji") : mode === 'sticker' ? trUi("chat.selectSticker") : mode === 'giphy' ? trUi("chat.giphy") : trUi("chat.addMessageContent")}
           style={{ left: position.left, top: position.top, width: position.width, maxHeight: position.maxHeight }}
         >
           {mode === 'actions' ? (
             <>
-              <p className="chat-composer-plus-title">Tùy chọn soạn tin</p>
+              <p className="chat-composer-plus-title">{trUi("chat.composeOptions")}</p>
               <button type="button" className="chat-composer-plus-option" onClick={() => choose(onAttachFile)}>
-                <FileText size={19} aria-hidden="true" /><span>Tệp tin</span>
+                <FileText size={19} aria-hidden="true" /><span>{trUi("chat.file")}</span>
               </button>
               <button type="button" className="chat-composer-plus-option" onClick={() => choose(onAttachMedia)}>
-                <Images size={19} aria-hidden="true" /><span>Ảnh / Video</span>
+                <Images size={19} aria-hidden="true" /><span>{trUi("common.photoSlashVideo")}</span>
               </button>
               <button type="button" className="chat-composer-plus-option" onClick={() => show('emoji')}>
                 <Smile size={19} aria-hidden="true" /><span>Emoji</span>
@@ -138,32 +141,32 @@ export default function ChatComposerPlusMenu({ disabled, onAttachFile, onAttachM
               {onSelectSticker && <button type="button" className="chat-composer-plus-option" onClick={() => show('sticker')}>
                 <Smile size={19} aria-hidden="true" /><span>Sticker</span>
               </button>}
-              {onSelectGiphy && <button type="button" className="chat-composer-plus-option" onClick={() => show('giphy')}><Images size={19} aria-hidden="true" /><span>GIF / Sticker động</span></button>}
-              {onQuickReplies && <button type="button" className="chat-composer-plus-option" onClick={() => choose(onQuickReplies)}><ClipboardList size={19}/><span>Tin nhắn nhanh</span></button>}
+              {onSelectGiphy && <button type="button" className="chat-composer-plus-option" onClick={() => show('giphy')}><Images size={19} aria-hidden="true" /><span>{trUi("chat.gif")}</span></button>}
+              {onQuickReplies && <button type="button" className="chat-composer-plus-option" onClick={() => choose(onQuickReplies)}><ClipboardList size={19}/><span>{trUi("chat.quickMessage")}</span></button>}
               {onSchedule && (
                 <button type="button" className="chat-composer-plus-option" onClick={() => choose(onSchedule)}>
-                  <Clock3 size={19} aria-hidden="true" /><span>Hẹn giờ gửi</span>
+                  <Clock3 size={19} aria-hidden="true" /><span>{trUi("chat.scheduleSend")}</span>
                 </button>
               )}
               {onGroupActivity && <>
                 <button type="button" className="chat-composer-plus-option" onClick={() => choose(() => onGroupActivity('poll'))}>
-                  <ClipboardList size={19} aria-hidden="true" /><span>Bình chọn</span>
+                  <ClipboardList size={19} aria-hidden="true" /><span>{trUi("chat.poll")}</span>
                 </button>
                 <button type="button" className="chat-composer-plus-option" onClick={() => choose(() => onGroupActivity('note'))}>
-                  <FileText size={19} aria-hidden="true" /><span>Ghi chú nhóm</span>
+                  <FileText size={19} aria-hidden="true" /><span>{trUi("chat.groupNote")}</span>
                 </button>
                 <button type="button" className="chat-composer-plus-option" onClick={() => choose(() => onGroupActivity('reminder'))}>
-                  <CalendarClock size={19} aria-hidden="true" /><span>Nhắc hẹn nhóm</span>
+                  <CalendarClock size={19} aria-hidden="true" /><span>{trUi("chat.groupReminder")}</span>
                 </button>
               </>}
             </>
           ) : (
             <>
               <div className="chat-composer-plus-heading">
-                <button type="button" aria-label="Quay lại menu thêm" onClick={() => show('actions')}>
+                <button type="button" aria-label={trUi("chat.backMoreMenu")} onClick={() => show('actions')}>
                   <ArrowLeft size={19} aria-hidden="true" />
                 </button>
-                <strong>{mode === 'sticker' ? 'Chọn sticker' : mode === 'giphy' ? 'GIPHY' : 'Chọn emoji'}</strong>
+                <strong>{mode === 'sticker' ? trUi("chat.selectSticker") : mode === 'giphy' ? 'GIPHY' : trUi("chat.selectEmoji")}</strong>
               </div>
               {mode === 'giphy' && onSelectGiphy ? <GiphyPicker disabled={disabled} onSelect={url => choose(() => onSelectGiphy(url))} /> : mode === 'sticker' && onSelectSticker ? <ChatStickerPicker userId={userId} disabled={disabled} onSelect={file => choose(() => onSelectSticker(file))} /> : <ChatEmojiPicker onSelect={(emoji) => choose(() => onInsertEmoji(emoji))} />}
             </>

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Mic, Sparkles } from 'lucide-react'
 import { isDesktopBuild } from '../../../platform/desktop'
 
@@ -16,19 +17,19 @@ type CallRoomNoticesProps = {
 }
 
 export default function CallRoomNotices({ mediaPermissionError, mediaType, roomConnected, permissionRetrying, requestCallMediaPermission, consentError, consentRequested, allowMyVoice, consentBusy, updateVoiceConsent, dismissConsent }: CallRoomNoticesProps) {
+  const trUi = useUiTranslation()
+
   return (
     <>
         {mediaPermissionError && (
           <div className="call-permission-prompt" role="alert">
             <div className="call-notice-icon"><Mic size={18} /></div>
             <div className="call-notice-copy">
-              <strong>Cần quyền micro{mediaType === 'video' ? ' / camera' : ''}</strong>
+              <strong>{trUi("calls.microphonePermission")}{mediaType === 'video' ? ' / camera' : ''}</strong>
               <span>{mediaPermissionError} {isDesktopBuild ? 'Nếu đã chặn, hãy bật quyền SocCO trong cài đặt quyền riêng tư của hệ điều hành.' : 'Nếu đã chặn, hãy bật quyền trong cài đặt trình duyệt.'}</span>
             </div>
             <button type="button" disabled={!roomConnected || permissionRetrying}
-              onClick={() => void requestCallMediaPermission()}>
-              Cấp quyền
-            </button>
+              onClick={() => void requestCallMediaPermission()}>{trUi("calls.grantPermission")}</button>
           </div>
         )}
         {consentError && <div className="call-global-error" role="alert">{consentError}</div>}
@@ -40,8 +41,8 @@ export default function CallRoomNotices({ mediaPermissionError, mediaType, roomC
               <span>Chỉ áp dụng cuộc gọi này. Người nghe có thể gửi giọng nói của bạn tới máy chủ ChatNet và Google Gemini để dịch.</span>
             </div>
             <div className="call-consent-actions">
-              <button type="button" disabled={consentBusy} onClick={() => void updateVoiceConsent(true)}>Cho phép</button>
-              <button type="button" className="call-consent-decline" disabled={consentBusy} onClick={() => dismissConsent()}>Để sau</button>
+              <button type="button" disabled={consentBusy} onClick={() => void updateVoiceConsent(true)}>{trUi("common.allow")}</button>
+              <button type="button" className="call-consent-decline" disabled={consentBusy} onClick={() => dismissConsent()}>{trUi("common.later")}</button>
             </div>
           </div>
         )}

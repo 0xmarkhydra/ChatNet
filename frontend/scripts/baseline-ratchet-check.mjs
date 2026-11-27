@@ -35,6 +35,11 @@ export function increasedDesignDebt(previous, current) {
   return increases
 }
 
+export function increasedI18nDebt(previous, current) {
+  return Object.entries(current).filter(([key, count]) => count > (previous[key] ?? 0))
+    .map(([key, count]) => `${key}: ${previous[key] ?? 0} -> ${count}`)
+}
+
 function readBaselineAt(ref, filename) {
   const original = execFileSync('git', ['show', `${ref}:${filename}`], {
     cwd: repository, encoding: 'utf8',
@@ -72,7 +77,21 @@ function run() {
   assert.deepEqual(architectureAdded, [], `Architecture baseline must never add violations:\n${architectureAdded.join('\n')}`)
   assert.deepEqual(lintIncreases, [], `Lint baseline must not increase:\n${lintIncreases.join('\n')}`)
   assert.deepEqual(designIncreases, [], `Design-debt baseline must not increase:\n${designIncreases.join('\n')}`)
-  console.log('PASS: architecture, lint and design-debt baselines only ratchet down')
+  const i18nPath = 'frontend/scripts/i18n-hardcode-baseline.json'
+  const i18nFile = path.join(repository, i18nPath)
+  if (fs.existsSync(i18nFile)) {
+    let previous
+    try { previous = readBaselineAt(baseRef, i18nPath) }
+    catch (error) {
+      // Only the introducing PR has no previous i18n baseline.
+      if (!/exists on disk, but not in|does not exist in|path .* exists/.test(String(error.stderr || error.message))) throw error
+    }
+    if (previous) {
+      const increases = increasedI18nDebt(previous, JSON.parse(fs.readFileSync(i18nFile, 'utf8')))
+      assert.deepEqual(increases, [], `i18n baseline must not increase:\n${increases.join('\n')}`)
+    }
+  }
+  console.log('PASS: architecture, lint, design-debt and i18n baselines only ratchet down')
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) run()

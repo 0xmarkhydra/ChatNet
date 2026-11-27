@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { StoryHighlights } from '../../feed'
 import ProfileEditorPage from "./ProfileEditorPage";
 import { profileAssetUrl } from "../../../shared/ui/UserAvatar";
@@ -114,6 +115,8 @@ export default function ProfileOverviewSection({
   updateProfileImage,
   visibleProfilePosts,
 }: ProfileOverviewSectionProps) {
+  const trUi = useUiTranslation()
+
   const [avatarPicker, setAvatarPicker] = useState<{ opener: HTMLButtonElement | null } | null>(null);
   const [coverEditorOpen, setCoverEditorOpen] = useState(false);
   const openAvatarPicker = (opener: HTMLButtonElement | null) => setAvatarPicker({ opener });
@@ -124,7 +127,7 @@ export default function ProfileOverviewSection({
               className="hidden-media-input"
               type="file"
               accept="image/*"
-              aria-label="Chọn ảnh bìa"
+              aria-label={trUi("profile.selectCover")}
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
                 event.currentTarget.value = "";

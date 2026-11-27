@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Participant } from 'livekit-client'
 import { Languages, Mic, ShieldCheck, Sparkles, ChevronDown } from 'lucide-react'
@@ -38,6 +39,8 @@ type SecureCallRoomProps = {
 export default function SecureCallRoom({
   call, autoPublish, isGroup, title, apiBase, request, userId, sourceLanguage, targetLanguage, canEnd, onClosed, onError,
 }: SecureCallRoomProps) {
+  const trUi = useUiTranslation()
+
   const [phase, setPhase] = useState<'securing' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('securing')
   const [detail, setDetail] = useState('Đang thiết lập mã hóa đầu cuối…')
   const [runtime, setRuntime] = useState<RoomRuntime | null>(null)
@@ -184,7 +187,7 @@ export default function SecureCallRoom({
   }
 
   return (
-    <div ref={dialogRef} className="secure-call-layer" role="dialog" aria-modal="true" aria-label={`Cuộc gọi với ${title}`} tabIndex={-1}>
+    <div ref={dialogRef} className="secure-call-layer" role="dialog" aria-modal="true" aria-label={trUi("common.ui.callWith", { v1: String(title) })} tabIndex={-1}>
       <div className="secure-call-stage">
         <CallRoomTopbar title={title} phase={phase} detail={detail} statusLabel={statusLabel}
           participantCount={participants.length} translationOn={translationOn}
@@ -206,7 +209,7 @@ export default function SecureCallRoom({
           volume={translationOn && translatingIds.length ? 0.2 : 1} revision={revision} />}
 
         {translationOn && translationSheetOpen && (
-          <button type="button" className="call-sheet-backdrop" aria-label="Thu gọn phụ đề" onClick={() => setTranslationSheetOpen(false)} />
+          <button type="button" className="call-sheet-backdrop" aria-label={trUi("calls.collapseSubtitles")} onClick={() => setTranslationSheetOpen(false)} />
         )}
 
         <CallRoomNotices mediaPermissionError={mediaPermissionError} mediaType={call.mediaType}

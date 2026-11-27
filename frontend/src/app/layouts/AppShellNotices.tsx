@@ -1,3 +1,4 @@
+import { translateSystemNotice, useUiTranslation } from '@/shared/i18n/locale'
 import { Bell } from "lucide-react";
 import type { ToastNotice } from "../../shared/utils/toast";
 
@@ -23,19 +24,17 @@ export default function AppShellNotices({
   onEnablePush,
   onDismissNotice,
 }: AppShellNoticesProps) {
+  const trUi = useUiTranslation()
+
   return (
     <>
       {showPushPrompt && (
-        <section className="push-onboarding" aria-label="Thông báo tin nhắn" aria-live="polite">
+        <section className="push-onboarding" aria-label={trUi("common.ui.messageNotifications")} aria-live="polite">
           <Bell size={22} aria-hidden="true" />
-          <strong>Nhận thông báo tin nhắn mới?</strong>
+          <strong>{trUi("common.ui.messageNotificationPrompt")}</strong>
           <div className="push-onboarding-actions">
-            <button type="button" onClick={onDismissPushPrompt} disabled={pushBusy}>
-              Để sau
-            </button>
-            <button className="push-onboarding-enable" type="button" onClick={onEnablePush} disabled={pushBusy}>
-              Bật thông báo
-            </button>
+            <button type="button" onClick={onDismissPushPrompt} disabled={pushBusy}>{trUi("common.later")}</button>
+            <button className="push-onboarding-enable" type="button" onClick={onEnablePush} disabled={pushBusy}>{trUi("common.enableNotice")}</button>
           </div>
         </section>
       )}
@@ -50,11 +49,11 @@ export default function AppShellNotices({
           </span>
           <div className="toast-copy">
             <strong>
-              {notice.kind === "success" ? "Thành công" : notice.kind === "error" ? "Có lỗi" : notice.kind === "warning" ? "Lưu ý" : "Thông báo"}
+              {notice.kind === "success" ? trUi("common.success") : notice.kind === "error" ? trUi("common.error") : notice.kind === "warning" ? trUi("common.warning") : trUi("common.notifications")}
             </strong>
-            <span>{notice.message}</span>
+            <span>{translateSystemNotice(notice.message, trUi)}</span>
           </div>
-          <button type="button" aria-label="Đóng thông báo" onClick={onDismissNotice}>
+          <button type="button" aria-label={trUi("common.closeNotice")} onClick={onDismissNotice}>
             ×
           </button>
         </div>

@@ -121,7 +121,7 @@ describe('own profile navigation and composer', () => {
       await act(async () => root.render(<ProfilePage {...defaultProps} postsBusy />))
 
       const loading = host.querySelector('.profile-page-main [role="status"][aria-busy="true"]')
-      expect(loading?.textContent).toContain('Đang tải bài viết')
+      expect(loading?.textContent).toContain('Đang tải bài viết...')
       expect(loading?.querySelector('[aria-hidden="true"]')).not.toBeNull()
       expect(host.textContent).not.toContain('Bạn chưa có bài viết nào.')
 

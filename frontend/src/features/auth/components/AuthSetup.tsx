@@ -1,16 +1,16 @@
+import { createUiTranslator } from '@/shared/i18n/locale'
+import { APP_LOCALES, APP_LOCALE_LABELS, type AppLocale } from '@/shared/i18n/supportedLocales'
 import { useState } from 'react'
 import { Bell, Camera, Check, ChevronLeft, Languages, MapPin, Mic, ShieldCheck } from 'lucide-react'
-import { loadAppLocalePreference, saveAppLocalePreference } from '../../i18n'
+import { saveAppLocalePreference } from '../../i18n'
 
 type Permission = 'microphone' | 'camera' | 'notification' | 'location'
 type PermissionState = 'granted' | 'denied' | 'unsupported'
-const stages = ['Ngôn ngữ', 'Thông báo', 'Quyền thiết bị'] as const
+const stages = ['common.language', 'common.notifications', 'auth.devicePermission'] as const
 
-export default function AuthSetup({ onComplete }: { onComplete: (locale: string) => void }) {
+export default function AuthSetup({ locale, onLocaleChange, onComplete }: { locale: AppLocale; onLocaleChange: (locale: AppLocale) => void; onComplete: (locale: string) => void }) {
   const [stage, setStage] = useState(0)
-  const [locale, setLocale] = useState(() => {
-    try { return loadAppLocalePreference() } catch { return 'auto' }
-  })
+  const trUi = createUiTranslator(locale)
   const [permissions, setPermissions] = useState<Partial<Record<Permission, PermissionState>>>({})
   const [busy, setBusy] = useState<Permission | null>(null)
   const [error, setError] = useState('')
@@ -43,7 +43,7 @@ export default function AuthSetup({ onComplete }: { onComplete: (locale: string)
       }
     } catch {
       status = 'denied'
-      setError('Không thể cấp quyền. Bạn vẫn có thể tiếp tục và bật quyền sau trong trình duyệt.')
+      setError(trUi('auth.permissionDenied'))
     } finally {
       setPermissions((current) => ({ ...current, [permission]: status }))
       setBusy(null)
@@ -56,33 +56,29 @@ export default function AuthSetup({ onComplete }: { onComplete: (locale: string)
   }
 
   return (
-    <section className="auth-card auth-setup" aria-label="Thiết lập ban đầu">
+    <section className="auth-card auth-setup" aria-label={trUi("auth.setup")}>
       <div className="auth-setup-heading">
-        <h2>Thiết lập ban đầu</h2>
-        <p>Chỉ những quyền cần thiết mới được yêu cầu khi bạn sử dụng.</p>
+        <h2>{trUi("auth.setup")}</h2>
+        <p>{trUi('auth.setupPermission')}</p>
       </div>
-      <div className="auth-setup-progress" aria-label="Các bước thiết lập">
+      <div className="auth-setup-progress" aria-label={trUi("auth.setupSteps")}>
         {stages.map((label, index) => (
           <div key={label} className={index === stage ? 'is-current' : index < stage ? 'is-complete' : ''}>
             <span className="auth-step-number">{index < stage ? <Check size={13} /> : index + 1}</span>
-            <span>{label}</span>
+            <span>{trUi(label)}</span>
           </div>
         ))}
       </div>
 
       {stage === 0 && (
         <div className="auth-setup-body">
-          <div className="auth-setup-title"><Languages size={19} /><h3>Ngôn ngữ hiển thị</h3></div>
-          <p>Chọn ngôn ngữ bạn muốn sử dụng trên SocCo. Bạn có thể đổi trong cài đặt.</p>
-          <div className="auth-language-list" role="group" aria-label="Chọn ngôn ngữ">
-            {([
-              ['auto', 'Theo thiết bị', 'Tự động theo ngôn ngữ trình duyệt'],
-              ['vi', 'Tiếng Việt', 'Giao diện tiếng Việt'],
-              ['en', 'English', 'English interface'],
-            ] as const).map(([value, label, description]) => (
+          <div className="auth-setup-title"><Languages size={19} /><h3>{trUi("auth.displayLanguage")}</h3></div>
+          <p>{trUi('auth.setupLanguageHint')}</p>
+          <div className="auth-language-list" role="group" aria-label={trUi("auth.chooseLanguage")}>
+            {APP_LOCALES.map(value => (
               <label key={value} className={locale === value ? 'is-selected' : ''}>
-                <span><strong>{label}</strong><small>{description}</small></span>
-                <input type="radio" name="setup-language" value={value} checked={locale === value} onChange={() => setLocale(value)} />
+                <span><strong>{APP_LOCALE_LABELS[value]}</strong></span>
+                <input type="radio" name="setup-language" value={value} checked={locale === value} onChange={() => onLocaleChange(value)} />
               </label>
             ))}
           </div>
@@ -91,38 +87,38 @@ export default function AuthSetup({ onComplete }: { onComplete: (locale: string)
 
       {stage === 1 && (
         <div className="auth-setup-body">
-          <div className="auth-setup-title"><Bell size={19} /><h3>Không bỏ lỡ cuộc trò chuyện</h3></div>
-          <p>SocCo có thể thông báo khi bạn có tin nhắn hoặc cuộc gọi mới. Bạn có thể bật thông báo sau trong ứng dụng.</p>
+          <div className="auth-setup-title"><Bell size={19} /><h3>{trUi('auth.setupNotificationTitle')}</h3></div>
+          <p>{trUi('auth.setupNotificationHint')}</p>
           <div className="auth-notification-box">
             <span className="auth-permission-icon"><Bell size={24} /></span>
-            <div><strong>Thông báo trên thiết bị</strong><small>{permissions.notification === 'granted' ? 'Trình duyệt đã cấp quyền thông báo.' : 'Chỉ hỏi quyền nếu bạn nhấn nút bên dưới.'}</small></div>
+            <div><strong>{trUi("auth.deviceNotice")}</strong><small>{permissions.notification === 'granted' ? trUi('auth.notificationGranted') : trUi('auth.notificationPrompt')}</small></div>
           </div>
           <button className="auth-outline-button" type="button" disabled={busy !== null || permissions.notification === 'granted'}
             onClick={() => void requestPermission('notification')}>
-            {permissions.notification === 'granted' ? 'Đã cấp quyền' : 'Cho phép thông báo'}
+            {permissions.notification === 'granted' ? trUi('common.grant') : trUi('auth.allowNotifications')}
           </button>
-          <p className="auth-permission-note">Đăng ký nhận push sẽ được hoàn tất trong phần cài đặt thông báo của ứng dụng.</p>
+          <p className="auth-permission-note">{trUi('auth.pushHint')}</p>
         </div>
       )}
 
       {stage === 2 && (
         <div className="auth-setup-body">
-          <div className="auth-setup-title"><ShieldCheck size={19} /><h3>Quyền thiết bị</h3></div>
-          <p>Bạn có thể thay đổi các quyền này bất kỳ lúc nào trong trình duyệt.</p>
+          <div className="auth-setup-title"><ShieldCheck size={19} /><h3>{trUi("auth.devicePermission")}</h3></div>
+          <p>{trUi('auth.permissionHint')}</p>
           <div className="auth-permissions-list">
             {([
-              ['microphone', Mic, 'Microphone', 'Dùng khi ghi âm hoặc gọi thoại', 'Khi dùng'],
-              ['camera', Camera, 'Camera', 'Dùng khi gọi video hoặc quét QR', 'Khi dùng'],
-              ['notification', Bell, 'Thông báo', 'Nhận tin nhắn và cuộc gọi mới', 'Để sau'],
-              ['location', MapPin, 'Vị trí', 'Chỉ dùng khi khám phá gần đây', 'Để sau'],
+              ['microphone', Mic, 'Microphone', trUi('auth.microphoneHint'), trUi('auth.whenUsed')],
+              ['camera', Camera, 'Camera', trUi('auth.cameraHint'), trUi('auth.whenUsed')],
+              ['notification', Bell, trUi('common.notifications'), trUi('auth.notificationHint'), trUi('common.later')],
+              ['location', MapPin, trUi('common.location'), trUi('auth.locationHint'), trUi('common.later')],
             ] as const).map(([key, Icon, name, hint, defaultLabel]) => (
               <div className="auth-permission-row" key={key}>
                 <span className="auth-permission-icon"><Icon size={20} /></span>
                 <div className="auth-permission-text"><strong>{name}</strong><small>{hint}</small></div>
-                <button type="button" aria-label={`Cấp quyền ${name} (${defaultLabel.toLowerCase()})`}
+                <button type="button" aria-label={trUi("auth.permissionAria", { name, when: defaultLabel.toLowerCase() })}
                   disabled={busy !== null || permissions[key] === 'granted'}
                   onClick={() => void requestPermission(key)}>
-                  {permissions[key] === 'granted' ? 'Đã cấp' : permissions[key] === 'denied' ? 'Thử lại' : permissions[key] === 'unsupported' ? 'Không hỗ trợ' : 'Cấp quyền'}
+                  {permissions[key] === 'granted' ? trUi('common.granted') : permissions[key] === 'denied' ? trUi("common.retry") : permissions[key] === 'unsupported' ? trUi('common.unsupported') : trUi("calls.grantPermission")}
                 </button>
               </div>
             ))}
@@ -132,10 +128,10 @@ export default function AuthSetup({ onComplete }: { onComplete: (locale: string)
       )}
 
       <div className="auth-setup-actions">
-        {stage > 0 && <button className="auth-outline-button" type="button" onClick={() => setStage(stage - 1)}><ChevronLeft size={16} /> Quay lại</button>}
-        <button className="auth-setup-skip" type="button" onClick={finish}>Để sau</button>
+        {stage > 0 && <button className="auth-outline-button" type="button" onClick={() => setStage(stage - 1)}><ChevronLeft size={16} />{trUi("common.back")}</button>}
+        <button className="auth-setup-skip" type="button" onClick={finish}>{trUi("common.later")}</button>
         <button className="auth-submit" type="button" onClick={() => stage === 2 ? finish() : setStage(stage + 1)}>
-          <Check size={17} /> <span>{stage === 2 ? 'Hoàn tất thiết lập' : 'Tiếp tục'}</span>
+          <Check size={17} /> <span>{stage === 2 ? trUi('auth.setupDone') : trUi("common.next")}</span>
         </button>
       </div>
     </section>

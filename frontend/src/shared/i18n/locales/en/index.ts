@@ -1,0 +1,13 @@
+import common from './common'
+import chat from './chat'
+import contacts from './contacts'
+import feed from './feed'
+import discover from './discover'
+import profile from './profile'
+import calls from './calls'
+import notifications from './notifications'
+import search from './search'
+import auth from './auth'
+import settings from './settings'
+import app from './app'
+export default { ...common, ...chat, ...contacts, ...feed, ...discover, ...profile, ...calls, ...notifications, ...search, ...auth, ...settings, ...app } as const

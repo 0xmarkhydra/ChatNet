@@ -102,7 +102,7 @@ describe('post heart burst', () => {
     const react = vi.fn(async () => {})
     act(() => root.render(<FeedReactionControl post={post} busy={false} react={react} />))
     act(() => host.querySelector('button')!.focus())
-    act(() => host.querySelector<HTMLButtonElement>('[aria-label="Love"]')!.click())
+    act(() => host.querySelector<HTMLButtonElement>('[aria-label="Yêu thích"]')!.click())
     expect(animate).toHaveBeenCalledTimes(14)
     expect(react).toHaveBeenCalledExactlyOnceWith(post, '❤️')
   })

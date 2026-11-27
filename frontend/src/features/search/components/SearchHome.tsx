@@ -1,3 +1,4 @@
+import { useUiTranslation, type UiCopyKey } from '@/shared/i18n/locale'
 import { Bell, BookmarkCheck, Clock, FileText, Package, UserRoundCheck, UsersRound, X } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/button'
@@ -23,11 +24,11 @@ export type SearchHomeProps = {
   onOpenOpened: (item: OpenedResult) => void
 }
 
-const SCOPES: { label: string; icon: typeof Package; params: Record<string, string> }[] = [
-  { label: 'Bài viết đã lưu', icon: BookmarkCheck, params: { type: 'posts', in: 'saved' } },
-  { label: 'Người bạn theo dõi', icon: UserRoundCheck, params: { type: 'posts', in: 'following' } },
-  { label: 'Cộng đồng', icon: UsersRound, params: { type: 'communities' } },
-  { label: 'Sản phẩm', icon: Package, params: { type: 'products' } },
+const SCOPES: { label: UiCopyKey; icon: typeof Package; params: Record<string, string> }[] = [
+  { label: 'search.savedPosts', icon: BookmarkCheck, params: { type: 'posts', in: 'saved' } },
+  { label: 'search.following', icon: UserRoundCheck, params: { type: 'posts', in: 'following' } },
+  { label: 'discover.communities', icon: UsersRound, params: { type: 'communities' } },
+  { label: 'common.ui.productTitle', icon: Package, params: { type: 'products' } },
 ]
 
 const list = 'm-0 grid list-none p-0'
@@ -39,6 +40,8 @@ const railIcon = 'inline-grid size-9 shrink-0 place-items-center rounded-full bg
 function SavedSearchCard({ saved, request, sessionId, onOpen, onRemove }: {
   saved: SavedSearch; request: ApiRequest; sessionId: string; onOpen: () => void; onRemove: () => void
 }) {
+  const trUi = useUiTranslation()
+
   const search = usePostSearch({ query: saved.query, scope: 'all', enabled: true, sessionId, request })
   const visible = search.posts.filter(isPublicPost)
   const fresh = visible.filter(post => new Date(post.createdAt).getTime() > saved.seenAt).length
@@ -50,18 +53,18 @@ function SavedSearchCard({ saved, request, sessionId, onOpen, onRemove }: {
         <span className="inline-grid size-10 shrink-0 place-items-center rounded-full bg-secondary text-primary" aria-hidden="true"><Bell size={18} /></span>
         <div className="min-w-0 flex-1">
           <h3 className="m-0 truncate text-[length:var(--soco-type-subtitle)] font-bold text-foreground">{saved.query}</h3>
-          <p className="m-0 text-[length:var(--soco-type-label)] text-muted-foreground">Bài viết</p>
+          <p className="m-0 text-[length:var(--soco-type-label)] text-muted-foreground">{trUi("feed.post")}</p>
         </div>
-        {fresh > 0 && <span className="shrink-0 rounded-full bg-primary px-ui-3 py-0.5 text-[length:var(--soco-type-caption)] font-semibold text-primary-foreground">{freshLabel} mới</span>}
-        <button type="button" className={iconButton} aria-label={'Bỏ lưu tìm kiếm ' + saved.query} onClick={onRemove}><X size={16} /></button>
+        {fresh > 0 && <span className="shrink-0 rounded-full bg-primary px-ui-3 py-0.5 text-[length:var(--soco-type-caption)] font-semibold text-primary-foreground">{trUi('search.newCount', { count: freshLabel })}</span>}
+        <button type="button" className={iconButton} aria-label={trUi('search.removeSaved', { name: saved.query })} onClick={onRemove}><X size={16} /></button>
       </header>
       {search.loading && (
         <div className="grid gap-ui-2" aria-hidden="true">
           {[0, 1].map(index => <Skeleton key={index} className="h-14" />)}
         </div>
       )}
-      {search.error && <div className={inline} role="alert">{search.error} <button type="button" className={link} onClick={search.retry}>Thử lại</button></div>}
-      {!search.loading && !search.error && visible.length === 0 && <p className={inline}>Chưa có bài viết nào khớp với tìm kiếm này.</p>}
+      {search.error && <div className={inline} role="alert">{search.error} <button type="button" className={link} onClick={search.retry}>{trUi("common.retry")}</button></div>}
+      {!search.loading && !search.error && visible.length === 0 && <p className={inline}>{trUi('search.noMatchingPosts')}</p>}
       <ul className={cn(list, 'gap-ui-2')}>
         {visible.slice(0, 2).map(post => {
           const author = post.authorDisplayName || post.author
@@ -70,26 +73,28 @@ function SavedSearchCard({ saved, request, sessionId, onOpen, onRemove }: {
               <UserAvatar name={author} username={post.author} className={avatarSmall} />
               <div className={rowCopy}>
                 <strong className={rowTitle}>{author}</strong>
-                <small className={cn(rowMeta, clamp2)}>{post.content || 'Bài viết có tệp đính kèm'}</small>
+                <small className={cn(rowMeta, clamp2)}>{post.content || trUi('search.attachmentPost')}</small>
               </div>
               {new Date(post.createdAt).getTime() > saved.seenAt && (
-                <span className="size-2 shrink-0 rounded-full bg-primary"><span className="sr-only">Mới</span></span>
+                <span className="size-2 shrink-0 rounded-full bg-primary"><span className="sr-only">{trUi('common.new')}</span></span>
               )}
             </li>
           )
         })}
       </ul>
       <Button variant="ghost" className="mt-ui-3 h-10 w-full bg-border hover:bg-border/70" onClick={onOpen}>
-        {fresh > 0 ? 'Xem cả ' + freshLabel + ' kết quả mới' : 'Xem tất cả kết quả'}
+        {fresh > 0 ? trUi('search.viewNew', { count: freshLabel }) : trUi('search.viewAll')}
       </Button>
     </article>
   )
 }
 
 const OPENED_ICON = { person: UserRoundCheck, post: FileText, community: UsersRound }
-const OPENED_LABEL = { person: 'Trang cá nhân', post: 'Bài viết', community: 'Cộng đồng' }
+const OPENED_LABEL = { person: 'profile.profile', post: 'feed.post', community: 'feed.community' } as const
 
 export default function SearchHome({ history, request, sessionId, ...actions }: SearchHomeProps) {
+  const trUi = useUiTranslation()
+
 
   return (
     <>
@@ -98,15 +103,15 @@ export default function SearchHome({ history, request, sessionId, ...actions }: 
           <div className="grid min-w-0 gap-ui-4">
             <section className="grid gap-ui-4" aria-labelledby="srch-updates-title">
               <div>
-                <h2 id="srch-updates-title" className="m-0 text-[length:var(--soco-type-page)] font-bold text-foreground">Có gì mới từ tìm kiếm của bạn</h2>
-                <p className="m-0 mt-ui-1 text-[length:var(--soco-type-body)] text-muted-foreground">Bài viết mới cho các tìm kiếm bạn đã lưu, kể từ lần xem trước</p>
+                <h2 id="srch-updates-title" className="m-0 text-[length:var(--soco-type-page)] font-bold text-foreground">{trUi('search.updates')}</h2>
+                <p className="m-0 mt-ui-1 text-[length:var(--soco-type-body)] text-muted-foreground">{trUi('search.updatesHint')}</p>
               </div>
               {history.saved.length === 0 ? (
                 <div className={cn(card, 'flex items-center gap-ui-4')}>
                   <span className={emptyIcon} aria-hidden="true"><Bell size={24} /></span>
                   <div>
-                    <strong className="text-[length:var(--soco-type-body)] text-foreground">Lưu một tìm kiếm để theo dõi bài viết mới</strong>
-                    <p className="m-0 mt-ui-1 text-[length:var(--soco-type-label)] text-muted-foreground">Bấm “Lưu tìm kiếm” ở trang kết quả. Bài viết mới khớp với từ khóa sẽ hiện ở đây.</p>
+                    <strong className="text-[length:var(--soco-type-body)] text-foreground">{trUi('search.saveToFollow')}</strong>
+                    <p className="m-0 mt-ui-1 text-[length:var(--soco-type-label)] text-muted-foreground">{trUi('search.saveToFollowHint')}</p>
                   </div>
                 </div>
               ) : history.saved.slice(0, 3).map(saved => (
@@ -117,7 +122,7 @@ export default function SearchHome({ history, request, sessionId, ...actions }: 
 
             {history.opened.length > 0 && (
               <section className={card} aria-labelledby="srch-opened-title">
-                <h2 id="srch-opened-title" className={cn(cardTitle, 'mb-ui-3')}>Bạn đã mở từ kết quả tìm kiếm</h2>
+                <h2 id="srch-opened-title" className={cn(cardTitle, 'mb-ui-3')}>{trUi('search.opened')}</h2>
                 <ul className={cn(list, 'grid-cols-3 gap-ui-3 max-sm:grid-cols-1')}>
                   {history.opened.slice(0, 3).map(item => {
                     const Icon = OPENED_ICON[item.kind]
@@ -130,7 +135,7 @@ export default function SearchHome({ history, request, sessionId, ...actions }: 
                             : <span className={cn(iconTile, 'size-14')} aria-hidden="true"><Icon size={22} /></span>}
                           <span className="grid min-w-0 gap-0.5">
                             <strong className={cn(rowTitle, 'text-center max-sm:text-left')}>{item.title}</strong>
-                            <small className={cn(rowMeta, clamp2)}>{item.kind !== 'person' && item.subtitle ? item.subtitle : OPENED_LABEL[item.kind]}</small>
+                            <small className={cn(rowMeta, clamp2)}>{item.kind !== 'person' && item.subtitle ? item.subtitle : trUi(OPENED_LABEL[item.kind])}</small>
                           </span>
                         </button>
                       </li>
@@ -141,20 +146,20 @@ export default function SearchHome({ history, request, sessionId, ...actions }: 
             )}
           </div>
 
-          <aside className="grid gap-ui-4" aria-label="Lối tắt tìm kiếm">
+          <aside className="grid gap-ui-4" aria-label={trUi("common.ui.searchShortcuts")}>
             <section className={railCard}>
               <header className={railHead}>
-                <h2 className={cardTitle}>Gần đây</h2>
-                {history.recent.length > 0 && <button type="button" className={link} onClick={actions.onClearRecent}>Xóa hết</button>}
+                <h2 className={cardTitle}>{trUi("common.recent")}</h2>
+                {history.recent.length > 0 && <button type="button" className={link} onClick={actions.onClearRecent}>{trUi('search.clearAll')}</button>}
               </header>
-              {history.recent.length === 0 ? <p className={cn(inline, 'px-ui-2')}>Các từ khóa bạn tìm sẽ hiện ở đây.</p> : (
+              {history.recent.length === 0 ? <p className={cn(inline, 'px-ui-2')}>{trUi('search.recentHint')}</p> : (
                 <ul className={list}>
                   {history.recent.map(query => (
                     <li key={query} className="flex items-center gap-ui-1">
                       <button type="button" className={railRow} onClick={() => actions.onSearch(query)}>
                         <span className={railIcon}><Clock size={16} aria-hidden="true" /></span><span className="truncate">{query}</span>
                       </button>
-                      <button type="button" className={iconButton} aria-label={'Xóa ' + query + ' khỏi gần đây'} onClick={() => actions.onRemoveRecent(query)}><X size={14} /></button>
+                      <button type="button" className={iconButton} aria-label={trUi('search.removeRecent', { name: query })} onClick={() => actions.onRemoveRecent(query)}><X size={14} /></button>
                     </li>
                   ))}
                 </ul>
@@ -163,7 +168,7 @@ export default function SearchHome({ history, request, sessionId, ...actions }: 
 
             {history.saved.length > 0 && (
               <section className={railCard}>
-                <header className={railHead}><h2 className={cardTitle}>Đã lưu</h2></header>
+                <header className={railHead}><h2 className={cardTitle}>{trUi("common.saved")}</h2></header>
                 <ul className={list}>
                   {history.saved.map(saved => (
                     <li key={saved.query} className="flex">
@@ -177,12 +182,12 @@ export default function SearchHome({ history, request, sessionId, ...actions }: 
             )}
 
             <section className={railCard}>
-              <header className={railHead}><h2 className={cardTitle}>Tìm trong</h2></header>
+              <header className={railHead}><h2 className={cardTitle}>{trUi('search.searchIn')}</h2></header>
               <ul className={list}>
                 {SCOPES.map(scope => (
                   <li key={scope.label} className="flex">
                     <button type="button" className={railRow} onClick={() => actions.onSearch('', scope.params)}>
-                      <scope.icon size={18} aria-hidden="true" className="shrink-0 text-primary" />{scope.label}
+                      <scope.icon size={18} aria-hidden="true" className="shrink-0 text-primary" />{trUi(scope.label)}
                     </button>
                   </li>
                 ))}

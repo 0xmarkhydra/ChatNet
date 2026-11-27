@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState } from "react";
 import { Bell, BellOff, Pin, PinOff, Trash2, Tag, Check, Mail, MailOpen } from "lucide-react";
 import { type SetStateAction } from "react";
@@ -29,13 +30,15 @@ export default function ConversationActionDialog({
   setConversationActionId,
   onSetUnread, toggleConversationPin, notificationBusy, onToggleNotifications, categories, categoryBusy, onAssignCategory,
 }: ConversationActionDialogProps) {
+  const trUi = useUiTranslation()
+
   const [classifying, setClassifying] = useState(false);
   const [muting, setMuting] = useState(false);
   const close = () => setConversationActionId(null);
   return (
       <div className={conversationMenuPosition ? 'conversation-context-backdrop' : 'message-context-backdrop'}
             role="dialog" aria-modal="true"
-            aria-label={`Tùy chọn cuộc trò chuyện ${activeConversationAction.name}`}
+            aria-label={trUi("common.ui.conversationOptionsName", { v1: String(activeConversationAction.name) })}
             onMouseDown={(event) => {
               if (event.currentTarget === event.target) setConversationActionId(null)
             }}
@@ -61,15 +64,15 @@ export default function ConversationActionDialog({
                     void toggleConversationPin(activeConversationAction)
                   }}>
                   <span aria-hidden="true">{activeConversationAction.pinnedAt ? <PinOff size={19} /> : <Pin size={19} />}</span>
-                  <b>{activeConversationAction.pinnedAt ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}</b>
+                  <b>{activeConversationAction.pinnedAt ? trUi("chat.unpinConversation") : trUi("chat.pinConversation")}</b>
                 </button>
                 {onSetUnread && <button type="button" onClick={() => { close(); void onSetUnread(activeConversationAction, !(activeConversationAction.unreadCount || activeConversationAction.manualUnread)); }}>
                   <span aria-hidden="true">{activeConversationAction.unreadCount || activeConversationAction.manualUnread ? <MailOpen size={19}/> : <Mail size={19}/>}</span>
-                  <b>{activeConversationAction.unreadCount || activeConversationAction.manualUnread ? 'Đánh dấu đã đọc' : 'Đánh dấu chưa đọc'}</b>
+                  <b>{activeConversationAction.unreadCount || activeConversationAction.manualUnread ? trUi("chat.markRead") : trUi("chat.markUnread")}</b>
                 </button>}
                 <button type="button" disabled={notificationBusy} onClick={() => { close(); void onToggleNotifications(activeConversationAction); }}>
                   <span aria-hidden="true">{activeConversationAction.muted ? <Bell size={19} /> : <BellOff size={19} />}</span>
-                  <b>{activeConversationAction.muted ? 'Bật thông báo' : 'Tắt thông báo'}</b>
+                  <b>{activeConversationAction.muted ? trUi("common.enableNotice") : trUi("chat.mute")}</b>
                 </button>
                 {!activeConversationAction.muted && <>
                   <button type="button" disabled={notificationBusy} aria-expanded={muting} onClick={() => setMuting(value => !value)}>
@@ -80,7 +83,7 @@ export default function ConversationActionDialog({
                   ))}
                 </>}
                 <button type="button" aria-expanded={classifying} disabled={categoryBusy} onClick={() => setClassifying(value => !value)}>
-                  <span aria-hidden="true"><Tag size={19} /></span><b>Phân loại hội thoại</b>
+                  <span aria-hidden="true"><Tag size={19} /></span><b>{trUi("chat.categories")}</b>
                 </button>
                 {classifying && [{ id: 0, name: 'Chưa phân loại', color: 'slate' }, ...categories].map(category => (
                   <button type="button" key={category.id} disabled={categoryBusy}
@@ -91,12 +94,12 @@ export default function ConversationActionDialog({
                   </button>
                 ))}
                 <button type="button" disabled={historyActionBusy} onClick={() => { close(); void clearSelectedConversationHistory(activeConversationAction) }}>
-                  <span aria-hidden="true"><Trash2 size={19} className="text-danger" /></span><b className="text-danger">Xóa lịch sử trò chuyện</b>
+                  <span aria-hidden="true"><Trash2 size={19} className="text-danger" /></span><b className="text-danger">{trUi("chat.clearHistory")}</b>
                 </button>
               </div>
               {!conversationMenuPosition && (
                 <button type="button" className="message-context-cancel"
-                  onClick={() => setConversationActionId(null)}>Đóng</button>
+                  onClick={() => setConversationActionId(null)}>{trUi("common.close")}</button>
               )}
             </section>
           </div>

@@ -1,9 +1,12 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Link, useLocation } from "react-router-dom";
 import AppPageErrorBoundary from "../layouts/AppPageErrorBoundary";
 import { ROUTE, TAB_PATH, fallbackPathForRoute } from "./routes";
 
 /** Standalone invalid-route page that preserves the existing shell and CSS. */
 export default function NotFoundPage() {
+  const trUi = useUiTranslation()
+
   const { pathname } = useLocation();
   const fallbackPath = fallbackPathForRoute(pathname);
   const fallbackLabel = fallbackPath === TAB_PATH.chat ? "Tin nhắn"
@@ -18,9 +21,9 @@ export default function NotFoundPage() {
     <AppPageErrorBoundary>
       <section className="phone-frame modern-frame" aria-labelledby="route-not-found-title">
       <div className="soco-empty-state">
-        <h1 id="route-not-found-title">Không tìm thấy trang</h1>
-        <p>Đường dẫn này không tồn tại hoặc chưa được hỗ trợ.</p>
-        <Link to={fallbackPath}>Về {fallbackLabel}</Link>
+        <h1 id="route-not-found-title">{trUi("app.notFound")}</h1>
+        <p>{trUi("app.notFoundHint")}</p>
+        <Link to={fallbackPath}>{trUi("common.backShort") + ' '}{fallbackLabel}</Link>
       </div>
       </section>
     </AppPageErrorBoundary>

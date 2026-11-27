@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import QrScanner from 'qr-scanner'
@@ -22,6 +23,8 @@ export default function ProfileQr({ username, displayName, url, initialMode, onC
   onClose: () => void
   onConnect: (username: string) => void
 }) {
+  const trUi = useUiTranslation()
+
   const dialog = useRef<HTMLDialogElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const scanner = useRef<QrScanner | null>(null)
@@ -121,15 +124,15 @@ export default function ProfileQr({ username, displayName, url, initialMode, onC
 
   return (
     <dialog ref={dialog} className="connection-dialog qr-dialog" aria-labelledby="qr-title" onCancel={onClose} onClose={onClose}>
-      <header><h2 id="qr-title">Kết nối bằng QR</h2><button type="button" onClick={onClose} aria-label="Đóng QR" title="Đóng QR"><X size={20} /></button></header>
-      <div className="connection-segments" aria-label="Chế độ QR">
-        <button type="button" aria-pressed={mode === 'mine'} onClick={() => { fileRead.current++; setReading(false); setMode('mine'); setCamera(false); setMessage(''); setMatch('') }}>QR của tôi</button>
-        <button type="button" aria-pressed={mode === 'scan'} onClick={() => { setMode('scan'); setMessage('') }}>Quét QR</button>
+      <header><h2 id="qr-title">{trUi("contacts.qrConnect")}</h2><button type="button" onClick={onClose} aria-label={trUi("profile.closeQr")} title={trUi("profile.closeQr")}><X size={20} /></button></header>
+      <div className="connection-segments" aria-label={trUi("common.ui.qrMode")}>
+        <button type="button" aria-pressed={mode === 'mine'} onClick={() => { fileRead.current++; setReading(false); setMode('mine'); setCamera(false); setMessage(''); setMatch('') }}>{trUi("profile.myQr")}</button>
+        <button type="button" aria-pressed={mode === 'scan'} onClick={() => { setMode('scan'); setMessage('') }}>{trUi("profile.scanQr")}</button>
       </div>
       {mode === 'mine' ? (
         <div className="qr-identity">
           <strong>{displayName}</strong><span>@{username}</span>
-          <div className="qr-image">{image && <img src={image} alt={`Mã QR hồ sơ ${username}`} />}</div>
+          <div className="qr-image">{image && <img src={image} alt={trUi("common.ui.profileQRNamed", { v1: String(username) })} />}</div>
           <div className="connection-actions">
             <button type="button" disabled={!image || sharing} onClick={() => void share()}><Share2 size={18} />Chia sẻ QR</button>
             {image && <a href={image} download={`chatnet-${username}.png`}><Download size={18} />Tải ảnh QR</a>}
@@ -138,12 +141,12 @@ export default function ProfileQr({ username, displayName, url, initialMode, onC
       ) : (
         <div className="qr-scan">
           <div className="qr-camera">
-            {camera && <video ref={video} muted playsInline aria-label="Camera quét mã QR" />}
+            {camera && <video ref={video} muted playsInline aria-label={trUi("common.ui.qrCamera")} />}
             {!camera && <strong>{match ? `@${match}` : 'Camera chưa bật'}</strong>}
           </div>
           {match ? <button type="button" className="connection-primary" onClick={() => onConnect(match)}>Xem hồ sơ @{match}</button> : (
             <button type="button" className="connection-primary" disabled={reading} onClick={() => { setMessage(''); setCamera(!camera) }}>
-              {camera ? 'Tắt camera' : 'Bật camera'}
+              {camera ? trUi("calls.cameraOff") : trUi("calls.cameraOn")}
             </button>
           )}
           <label className="qr-upload">{reading ? 'Đang đọc ảnh...' : 'Chọn ảnh QR'}

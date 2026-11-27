@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEventHandler, ReactNode, RefObject } from "react";
 import { ArrowLeft, Search } from "lucide-react";
@@ -28,6 +29,8 @@ export default function HeaderSearch({
   anchorRef, value, placeholder, ariaLabel, maxLength, expanded, controls,
   onChange, onFocus, onClick, onMobileSearchSubmit, onKeyDown, results, icon,
 }: HeaderSearchProps) {
+  const trUi = useUiTranslation()
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,10 +45,10 @@ export default function HeaderSearch({
 
   return (
     <div className={`appbar-search-anchor${mobileOpen ? " mobile-search-expanded" : ""}`} ref={anchorRef}>
-      <button className="appbar-mobile-search-trigger" type="button" aria-label="Mở tìm kiếm" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>
+      <button className="appbar-mobile-search-trigger" type="button" aria-label={trUi("search.openSearch")} aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>
         <Search size={23} aria-hidden="true" />
       </button>
-      <button className="appbar-mobile-search-back" type="button" aria-label="Đóng tìm kiếm" onClick={closeMobileSearch}>
+      <button className="appbar-mobile-search-back" type="button" aria-label={trUi("common.closeSearch")} onClick={closeMobileSearch}>
         <ArrowLeft size={22} aria-hidden="true" />
       </button>
       <SearchField
@@ -70,7 +73,7 @@ export default function HeaderSearch({
               <SearchForm
                 className="w-full"
                 initialQuery=""
-                placeholder="Tìm người, bài viết, cộng đồng, sản phẩm…"
+                placeholder={trUi("search.allPlaceholder")}
                 autoFocus
                 onSubmit={(query) => {
                   closeMobileSearch();

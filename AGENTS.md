@@ -6,6 +6,8 @@ Read this project policy and the relevant local skills before editing code.
 
 **Frontend mandatory policy (all AI agents and human contributors):** New UI uses Tailwind v4 and SocCO tokens; no handwritten CSS in new or existing stylesheets without explicit user approval. The PR CSS gate enforces this. Follow `docs/engineering/FRONTEND_STANDARDS.md`. Read it before any `frontend/` change; follow `docs/engineering/FRONTEND_STRUCTURE.md` for the directory map. New code must not copy legacy architecture or React Hooks violations. No unreviewed baseline increases or CI bypasses.
 
+**Mandatory i18n policy:** Every new or changed user-facing UI must support vi, en, zh (Simplified Chinese), ja and ko from the first PR. Use the shared typed catalogue and locale-aware formatting; never translate user data, names or filenames as UI copy. Read the internationalization section in FRONTEND_STANDARDS.md. Run `npm --prefix frontend run check:i18n` and test language switching before reporting completion. Do not increase i18n baselines or bypass the PR gate.
+
 ## Product and implementation context
 - Phase 1 delivers **Web and PWA**. Do not add native iOS/Android release work without an explicit request; preserve existing mobile source and compatibility.
 - Current stack: React + TypeScript + Vite/PWA frontend; Go services, PostgreSQL and Redis backend. Inspect actual modules, APIs and configuration before choosing an approach.

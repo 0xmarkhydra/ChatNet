@@ -1,35 +1,36 @@
+import { createUiTranslator, type UiCopyKey } from '@/shared/i18n/locale'
 import type { Post } from '../../feed'
 import type { CommunityResult, PersonResult, ProductResult } from '../api/search'
 
 export type SearchType = 'all' | 'people' | 'posts' | 'communities' | 'products'
-export const SEARCH_TYPES: { key: SearchType; label: string }[] = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'people', label: 'Mọi người' },
-  { key: 'posts', label: 'Bài viết' },
-  { key: 'communities', label: 'Cộng đồng' },
-  { key: 'products', label: 'Sản phẩm' },
+export const SEARCH_TYPES: { key: SearchType; label: UiCopyKey }[] = [
+  { key: 'all', label: 'common.all' },
+  { key: 'people', label: 'discover.people' },
+  { key: 'posts', label: 'discover.posts' },
+  { key: 'communities', label: 'discover.communities' },
+  { key: 'products', label: 'common.ui.productTitle' },
 ]
 
-type Option = { value: string; label: string }
-type GroupDef = { label: string; options: Option[] }
+type Option = { value: string; label: UiCopyKey }
+type GroupDef = { label: UiCopyKey; options: Option[] }
 
 /** Only filters the current APIs can honour; each option's first value is the default. */
 export const FILTER_GROUPS = {
-  sort: { label: 'Sắp xếp theo', options: [{ value: 'relevant', label: 'Liên quan nhất' }, { value: 'newest', label: 'Mới nhất' }] },
-  time: { label: 'Ngày đăng', options: [
-    { value: 'any', label: 'Bất kỳ lúc nào' }, { value: 'day', label: '24 giờ qua' },
-    { value: 'week', label: '7 ngày qua' }, { value: 'month', label: '30 ngày qua' },
+  sort: { label: 'search.sortBy', options: [{ value: 'relevant', label: 'search.relevant' }, { value: 'newest', label: 'common.newest' }] },
+  time: { label: 'search.postedDate', options: [
+    { value: 'any', label: 'search.anyTime' }, { value: 'day', label: 'search.lastDay' },
+    { value: 'week', label: 'search.lastWeek' }, { value: 'month', label: 'search.lastMonth' },
   ] },
-  in: { label: 'Nguồn', options: [
-    { value: 'all', label: 'Mọi bài viết' }, { value: 'following', label: 'Người bạn theo dõi' }, { value: 'saved', label: 'Bài viết đã lưu' },
+  in: { label: 'search.source', options: [
+    { value: 'all', label: 'search.allPosts' }, { value: 'following', label: 'search.following' }, { value: 'saved', label: 'search.savedPosts' },
   ] },
-  has: { label: 'Có chứa', options: [{ value: 'any', label: 'Bất kỳ' }, { value: 'image', label: 'Ảnh' }, { value: 'video', label: 'Video' }] },
-  status: { label: 'Trạng thái', options: [{ value: 'any', label: 'Bất kỳ' }, { value: 'online', label: 'Đang hoạt động' }] },
-  gsort: { label: 'Sắp xếp theo', options: [{ value: 'relevant', label: 'Liên quan nhất' }, { value: 'members', label: 'Nhiều thành viên nhất' }] },
-  psort: { label: 'Sắp xếp theo', options: [
-    { value: 'newest', label: 'Mới đăng' }, { value: 'price-asc', label: 'Giá thấp đến cao' }, { value: 'price-desc', label: 'Giá cao đến thấp' },
+  has: { label: 'search.contains', options: [{ value: 'any', label: 'search.any' }, { value: 'image', label: 'search.photo' }, { value: 'video', label: 'common.ui.video' }] },
+  status: { label: 'search.status', options: [{ value: 'any', label: 'search.any' }, { value: 'online', label: 'profile.active' }] },
+  gsort: { label: 'search.sortBy', options: [{ value: 'relevant', label: 'search.relevant' }, { value: 'members', label: 'search.mostMembers' }] },
+  psort: { label: 'search.sortBy', options: [
+    { value: 'newest', label: 'search.recentlyListed' }, { value: 'price-asc', label: 'search.priceAsc' }, { value: 'price-desc', label: 'search.priceDesc' },
   ] },
-  stock: { label: 'Tình trạng', options: [{ value: 'any', label: 'Bất kỳ' }, { value: 'in', label: 'Còn hàng' }] },
+  stock: { label: 'search.availability', options: [{ value: 'any', label: 'search.any' }, { value: 'in', label: 'search.inStock' }] },
 } satisfies Record<string, GroupDef>
 
 export type FilterId = keyof typeof FILTER_GROUPS
@@ -65,12 +66,14 @@ export function parsePrice(value: string | null) {
 }
 
 export const isDefault = (id: FilterId, value: string) => FILTER_GROUPS[id].options[0].value === value
-export const optionLabel = (id: FilterId, value: string) =>
-  (FILTER_GROUPS[id].options as Option[]).find(option => option.value === value)?.label ?? value
+export const optionLabel = (id: FilterId, value: string, t = createUiTranslator('vi')) => {
+  const option = (FILTER_GROUPS[id].options as Option[]).find(option => option.value === value)
+  return option ? t(option.label) : value
+}
 
 /** Active, non-default filters visible for the current type, in display order. */
-export function activeFilters(type: SearchType, values: FilterValues) {
-  return GROUPS_FOR[type].filter(id => !isDefault(id, values[id])).map(id => ({ id, label: optionLabel(id, values[id]) }))
+export function activeFilters(type: SearchType, values: FilterValues, t = createUiTranslator('vi')) {
+  return GROUPS_FOR[type].filter(id => !isDefault(id, values[id])).map(id => ({ id, label: optionLabel(id, values[id], t) }))
 }
 
 const TIME_WINDOW: Record<string, number> = { day: 864e5, week: 7 * 864e5, month: 30 * 864e5 }
@@ -111,7 +114,7 @@ export function filterProducts(products: ProductResult[], query: string, values:
   return result
 }
 
-export const formatPrice = (amount: number, unit: string) => amount.toLocaleString('vi-VN') + ' ' + unit
+export const formatPrice = (amount: number, unit: string, locale = 'vi') => amount.toLocaleString(locale) + ' ' + unit
 
 /** Filters outside the current type's groups fall back to their defaults. */
 export function effectiveFilters(type: SearchType, values: FilterValues): FilterValues {

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, FileArchive, FileCode2, FileText, Search, UserRound, X } from 'lucide-react'
 import type { Message } from '../types'
@@ -35,6 +36,8 @@ function highlight(value: string, keyword: string) {
 
 
 export default function MessageSearchPanel({ conversationId, channelId = 0, request, onJump, onClose }: Props) {
+  const trUi = useUiTranslation()
+
   const { keyword,setKeyword,sender,setSender,from,setFrom,to,setTo,loading,loadingFiles,loadingMore,error,filesError,hasMore,nextFilesBefore,messageLimit,setMessageLimit,fileLimit,setFileLimit,jumpingId,hasFilters,invalidDates,messageHits,files,people,jumpTo,loadMoreMessages,loadMoreFiles } = useMessageSearchData({ conversationId, channelId, request, onJump, onClose })
   const [filterOpen, setFilterOpen] = useState<'sender' | 'date' | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -53,17 +56,17 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
   const showResults = hasFilters && !invalidDates
 
   return (
-    <section className="message-search-panel" role="dialog" aria-modal="true" aria-label="Tìm kiếm trong trò chuyện">
+    <section className="message-search-panel" role="dialog" aria-modal="true" aria-label={trUi("chat.searchInChat")}>
       <header className="message-search-panel-head">
-        <strong>Tìm kiếm trong trò chuyện</strong>
-        <button type="button" onClick={onClose} aria-label="Đóng tìm kiếm"><X size={22} /></button>
+        <strong>{trUi("chat.searchInChat")}</strong>
+        <button type="button" onClick={onClose} aria-label={trUi("common.closeSearch")}><X size={22} /></button>
       </header>
       <div className="message-search-panel-controls">
         <div className="message-search-input">
           <Search size={21} aria-hidden="true" />
-          <input ref={inputRef} value={keyword} placeholder="Tìm kiếm tin nhắn, file..." aria-label="Từ khóa tin nhắn"
+          <input ref={inputRef} value={keyword} placeholder={trUi("common.ui.searchMessagesFiles")} aria-label={trUi("common.ui.messageKeyword")}
             onChange={(event) => setKeyword(event.target.value)} />
-          {keyword && <button className="message-search-clear" type="button" aria-label="Xóa từ khóa tìm kiếm" title="Xóa từ khóa" onClick={() => { setKeyword(''); inputRef.current?.focus() }}><X size={17} aria-hidden="true" /></button>}
+          {keyword && <button className="message-search-clear" type="button" aria-label={trUi("common.ui.clearSearchKeyword")} title={trUi("common.ui.clearKeyword")} onClick={() => { setKeyword(''); inputRef.current?.focus() }}><X size={17} aria-hidden="true" /></button>}
         </div>
         <div className="message-search-filters">
           <span>Lọc theo:</span>
@@ -73,8 +76,8 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
               onClick={() => setFilterOpen((current) => current === 'sender' ? null : 'sender')}>
               <UserRound size={17} aria-hidden="true" /><span>{sender ? (people.find((item) => item.username === sender)?.name || sender) : 'Người gửi'}</span><ChevronDown size={16} />
             </button>
-            {sender && <button type="button" className="message-search-filter-remove" aria-label="Xóa lọc người gửi"
-              title="Xóa lọc người gửi" onClick={() => { setSender(''); setFilterOpen(null) }}><X size={15} aria-hidden="true" /></button>}
+            {sender && <button type="button" className="message-search-filter-remove" aria-label={trUi("chat.clearSenderFilter")}
+              title={trUi("chat.clearSenderFilter")} onClick={() => { setSender(''); setFilterOpen(null) }}><X size={15} aria-hidden="true" /></button>}
             {filterOpen === 'sender' && <div className="message-search-popover" id="message-search-senders">
               <p>Chọn người gửi</p>
               <button type="button" className={!sender ? 'active' : ''} onClick={() => { setSender(''); setFilterOpen(null) }}>Tất cả người gửi</button>
@@ -83,7 +86,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
                 <UserAvatar className="message-search-sender-avatar" name={person.name} username={person.username} />
                 <span>{person.name}</span>
               </button>)}
-              <input type="search" aria-label="Nhập tên tài khoản người gửi" placeholder="@Tên tài khoản"
+              <input type="search" aria-label={trUi("common.ui.senderUsername")} placeholder={trUi("common.ui.usernameAt")}
                 value={sender} onChange={(event) => setSender(event.target.value.replace(/^@/, ''))} />
             </div>}
           </div>
@@ -93,15 +96,15 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
               onClick={() => setFilterOpen((current) => current === 'date' ? null : 'date')}>
               <CalendarDays size={17} aria-hidden="true" /><span>Ngày gửi</span><ChevronDown size={16} />
             </button>
-            {(from || to) && <button type="button" className="message-search-filter-remove" aria-label="Xóa lọc ngày gửi"
-              title="Xóa lọc ngày gửi" onClick={() => { setFrom(''); setTo(''); setFilterOpen(null) }}><X size={15} aria-hidden="true" /></button>}
+            {(from || to) && <button type="button" className="message-search-filter-remove" aria-label={trUi("chat.clearDateFilter")}
+              title={trUi("chat.clearDateFilter")} onClick={() => { setFrom(''); setTo(''); setFilterOpen(null) }}><X size={15} aria-hidden="true" /></button>}
             {filterOpen === 'date' && <div className="message-search-popover message-search-date-popover" id="message-search-dates">
               <p>Khoảng thời gian</p>
               <label>Từ ngày<input type="date" value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} /></label>
               <label>Đến ngày<input type="date" min={from || undefined} value={to} onChange={(event) => setTo(event.target.value)} /></label>
               <div className="message-search-date-actions">
                 <button type="button" onClick={() => { setFrom(''); setTo('') }}>Xóa ngày</button>
-                <button type="button" onClick={() => setFilterOpen(null)}>Xong</button>
+                <button type="button" onClick={() => setFilterOpen(null)}>{trUi("common.done")}</button>
               </div>
             </div>}
           </div>
@@ -113,7 +116,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
         {!hasFilters && <p className="message-search-state">Nhập từ khóa hoặc chọn bộ lọc để tìm tin nhắn và file.</p>}
         {showResults && <>
           <section className="message-search-section">
-            <h3>Tin nhắn</h3>
+            <h3>{trUi("chat.messages")}</h3>
 
             {error && <p className="message-search-state error">{error}</p>}
             {!loading && !loadingFiles && !error && messageHits.length === 0 && <p className="message-search-state">Không tìm thấy tin nhắn phù hợp.</p>}
@@ -130,9 +133,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
               </button>
             })}
             {(messageHits.length > messageLimit || hasMore) && <button className="message-search-load-more" type="button" disabled={loadingMore}
-              onClick={() => { if (messageLimit < messageHits.length) setMessageLimit((value) => value + 10); else void loadMoreMessages() }}>
-              Xem thêm
-            </button>}
+              onClick={() => { if (messageLimit < messageHits.length) setMessageLimit((value) => value + 10); else void loadMoreMessages() }}>{trUi("common.seeMore")}</button>}
           </section>
 
           <section className="message-search-section message-search-file-section">
@@ -153,9 +154,7 @@ export default function MessageSearchPanel({ conversationId, channelId = 0, requ
               </button>
             })}
             {(files.length > fileLimit || Boolean(nextFilesBefore)) && <button className="message-search-load-more" type="button" disabled={loadingMore}
-              onClick={() => { if (fileLimit < files.length) setFileLimit((value) => value + 10); else void loadMoreFiles() }}>
-              Xem thêm
-            </button>}
+              onClick={() => { if (fileLimit < files.length) setFileLimit((value) => value + 10); else void loadMoreFiles() }}>{trUi("common.seeMore")}</button>}
           </section>
         </>}
       </div>

@@ -1,7 +1,10 @@
+import { createUiTranslator } from '@/shared/i18n/locale'
+import { loadAppLocalePreference } from '../shared/i18n/supportedLocales'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { desktopBridge, type DesktopScreenRequest } from './desktop'
 
 export default function DesktopScreenPicker() {
+  const trUi = createUiTranslator(loadAppLocalePreference())
   const [request, setRequest] = useState<DesktopScreenRequest | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -40,16 +43,16 @@ export default function DesktopScreenPicker() {
       // An expired native request must never trap the user in an unclosable modal.
       if (latest.current?.requestId !== requestId) return
       if (index === null) setRequest(null)
-      else setError('Yêu cầu chia sẻ đã hết hạn hoặc bị hủy. Đóng bảng này rồi thử lại.')
+      else setError('expired')
     } finally { if (latest.current?.requestId === requestId) setBusy(false) }
   }
   if (!request) return null
   return (
     <dialog ref={dialog} className="desktop-screen-picker" aria-labelledby="desktop-screen-title"
       onCancel={(event) => { event.preventDefault(); void choose(null) }}>
-      <h2 id="desktop-screen-title">Chọn nguồn chia sẻ</h2>
-      <p>Chỉ chia sẻ video của màn hình hoặc cửa sổ đã chọn. Không chia sẻ âm thanh hệ thống.</p>
-      {error && <p role="alert">{error}</p>}
+      <h2 id="desktop-screen-title">{trUi("common.ui.screenSource")}</h2>
+      <p>{trUi("common.ui.screenHint")}</p>
+      {error && <p role="alert">{trUi("common.ui.screenExpired")}</p>}
       <div className="desktop-screen-grid">
         {request.sources.map((source) => <button type="button" key={source.index} disabled={busy}
           onClick={() => void choose(source.index)}>
@@ -57,7 +60,7 @@ export default function DesktopScreenPicker() {
           <span>{source.name}</span>
         </button>)}
       </div>
-      <button type="button" className="desktop-screen-cancel" disabled={busy} onClick={() => void choose(null)}>Hủy chia sẻ</button>
+      <button type="button" className="desktop-screen-cancel" disabled={busy} onClick={() => void choose(null)}>{trUi("common.ui.cancelShare")}</button>
     </dialog>
   )
 }

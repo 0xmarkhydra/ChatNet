@@ -1,3 +1,4 @@
+import { useUiTranslation, useUiLocale, formatUiNumber } from '@/shared/i18n/locale'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Copy, MessageCircle, Quote, Repeat2, Share } from 'lucide-react'
 import { Button } from '../../../shared/ui/button'
@@ -18,6 +19,9 @@ type Props = {
 }
 
 export default function FeedRepostAction({ post, request, onUpdated, onRemoved, onChanged, onFeedback, onShareToChat }: Props) {
+  const trUi = useUiTranslation()
+  const locale = useUiLocale()
+
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [quote, setQuote] = useState(false)
@@ -82,40 +86,38 @@ export default function FeedRepostAction({ post, request, onUpdated, onRemoved, 
 
   return <>
     <button type="button" className={`feed-share-action feed-repost-action ${postActionClassName} data-[reposted=true]:text-primary!`} data-reposted={Boolean(removedId)} aria-haspopup="dialog"
-      aria-expanded={open} aria-label="Chia sẻ bài viết" onClick={() => { setError(''); setQuote(false); setOpen(true) }}>
-      <Share size={18} aria-hidden="true" /><span>Chia sẻ</span>
+      aria-expanded={open} aria-label={trUi("feed.sharePost")} onClick={() => { setError(''); setQuote(false); setOpen(true) }}>
+      <Share size={18} aria-hidden="true" /><span>{trUi("common.share")}</span>
     </button>
     {open && <dialog ref={dialog} aria-labelledby={title} aria-busy={busy}
       className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] overflow-auto rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-xl backdrop:bg-black/50"
       onCancel={(event) => { event.preventDefault(); if (!busy) setOpen(false) }}>
       <div className="grid gap-3">
-        <h2 id={title} className="text-lg font-semibold">{quote ? 'Đăng lại kèm lời' : 'Chia sẻ bài viết'}</h2>
+        <h2 id={title} className="text-lg font-semibold">{quote ? trUi("feed.repostWithText") : trUi("feed.sharePost")}</h2>
         {quote ? <form className="grid gap-3" onSubmit={(event) => { event.preventDefault(); if (count > 0 && count <= 5000) void submit('quote') }}>
-          <label className="grid gap-2">Ý kiến của bạn
+          <label className="grid gap-2">{trUi('feed.quoteOpinion')}
             <textarea className="min-h-24 w-full resize-y rounded-lg border border-border bg-background p-3 text-foreground"
               value={draft} maxLength={10000} onChange={(event) => setDraft(event.target.value)} disabled={busy} />
           </label>
-          <span className="text-sm text-muted-foreground">{count.toLocaleString('vi-VN')} / 5.000</span>
-          <Button type="submit" disabled={busy || count === 0 || count > 5000}>Đăng bài trích dẫn</Button>
+          <span className="text-sm text-muted-foreground">{formatUiNumber(count, locale)} / {formatUiNumber(5000, locale)}</span>
+          <Button type="submit" disabled={busy || count === 0 || count > 5000}>{trUi('feed.publishQuote')}</Button>
         </form> : <>
           {canRepost && <>
             <Button type="button" variant="outline" disabled={busy} onClick={() => void submit(removedId ? 'undo' : 'quick')}>
-              <Repeat2 aria-hidden="true" />{removedId ? 'Bỏ đăng lại' : 'Đăng lại ngay'}
+              <Repeat2 aria-hidden="true" />{trUi(removedId ? 'feed.undoRepost' : 'feed.repostNow')}
             </Button>
             <Button type="button" variant="outline" disabled={busy} onClick={() => setQuote(true)}>
-              <Quote aria-hidden="true" />Đăng lại kèm lời
-            </Button>
+              <Quote aria-hidden="true" />{trUi("feed.repostWithText")}</Button>
           </>}
           {onShareToChat && post.visibility !== 'private' && <Button type="button" variant="outline" disabled={busy}
             onClick={() => { setOpen(false); onShareToChat(link()) }}>
-            <MessageCircle aria-hidden="true" />Gửi qua chat
+            <MessageCircle aria-hidden="true" />{trUi('feed.shareToChat')}
           </Button>}
           <Button type="button" variant="outline" disabled={busy} onClick={() => void copyLink()}>
-            <Copy aria-hidden="true" />Sao chép liên kết
-          </Button>
+            <Copy aria-hidden="true" />{trUi("feed.copyLink")}</Button>
         </>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <Button type="button" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>Hủy</Button>
+        <Button type="button" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>{trUi("common.cancel")}</Button>
       </div>
     </dialog>}
   </>

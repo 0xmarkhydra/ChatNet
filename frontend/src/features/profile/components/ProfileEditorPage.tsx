@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, type FormEvent } from 'react'
 import { ArrowLeft, Camera, RotateCcw, Save } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -44,6 +45,8 @@ export default function ProfileEditorPage({
   privacy, privacyBusy, privacyLoading, privacyError, retryPrivacy, changePrivacy,
   onSave, onDiscard, onChangeAvatar, onChangeCover,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => { heading.current?.focus({ preventScroll: true }) }, [])
 
@@ -60,21 +63,20 @@ export default function ProfileEditorPage({
 
   const cover = (preview: boolean) => (
     <div className={preview ? 'profile-editor-cover profile-editor-preview-cover' : 'profile-editor-cover'}>
-      {profile?.coverSet && coverUrl && <img src={coverUrl} alt={preview ? '' : 'Ảnh bìa hiện tại'}
+      {profile?.coverSet && coverUrl && <img src={coverUrl} alt={preview ? '' : trUi("profile.currentCover")}
         onError={event => { event.currentTarget.hidden = true }} />}
-      {!preview && <button type="button" className="profile-editor-cover-button" onClick={onChangeCover} disabled={mediaBusy} aria-label="Đổi ảnh bìa">
-        <Camera size={17} aria-hidden="true" /> Đổi ảnh bìa
-      </button>}
+      {!preview && <button type="button" className="profile-editor-cover-button" onClick={onChangeCover} disabled={mediaBusy} aria-label={trUi("profile.coverChange")}>
+        <Camera size={17} aria-hidden="true" />{trUi("profile.coverChange")}</button>}
     </div>
   )
 
   return (
-    <div className="profile-editor-page" aria-label="Chỉnh sửa hồ sơ">
+    <div className="profile-editor-page" aria-label={trUi("profile.editProfile")}>
       <form className="profile-editor-form-card" onSubmit={onSave}>
         <div className="profile-editor-form-heading app-desktop:flex app-desktop:min-h-[77px] app-desktop:items-start app-desktop:gap-[9px] app-desktop:[&>div]:min-w-0 app-desktop:[&>div]:flex-1">
-          <button type="button" className="profile-editor-back" onClick={onDiscard} aria-label="Quay lại hồ sơ" title="Quay lại hồ sơ"><ArrowLeft size={20} aria-hidden="true" /></button>
+          <button type="button" className="profile-editor-back" onClick={onDiscard} aria-label={trUi("profile.backProfile")} title={trUi("profile.backProfile")}><ArrowLeft size={20} aria-hidden="true" /></button>
           <div>
-            <h1 ref={heading} tabIndex={-1} className="app-desktop:m-0 app-desktop:text-[22px] app-desktop:font-[780] app-desktop:leading-[30px] app-desktop:tracking-[-.3px] app-desktop:text-[#192c4c]">Thông tin cơ bản</h1>
+            <h1 ref={heading} tabIndex={-1} className="app-desktop:m-0 app-desktop:text-[22px] app-desktop:font-[780] app-desktop:leading-[30px] app-desktop:tracking-[-.3px] app-desktop:text-[#192c4c]">{trUi("profile.basicInfo")}</h1>
             <p className="app-desktop:mt-[5px] app-desktop:text-[13px] app-desktop:leading-5 app-desktop:text-[#8492aa]">Chỉ thay đổi những thông tin bạn muốn người khác nhìn thấy.</p>
           </div>
         </div>
@@ -83,32 +85,32 @@ export default function ProfileEditorPage({
         <div className="profile-editor-avatar-ring">
           <UserAvatar username={username} name={displayName} className="profile-editor-avatar" online />
           <button type="button" className="profile-editor-avatar-button" disabled={mediaBusy} onClick={event => onChangeAvatar(event.currentTarget)}
-            aria-label="Đổi ảnh đại diện" title="Đổi ảnh đại diện"><Camera size={17} aria-hidden="true" /></button>
+            aria-label={trUi("profile.avatarChange")} title={trUi("profile.avatarChange")}><Camera size={17} aria-hidden="true" /></button>
         </div>
 
         <div className="profile-editor-fields app-desktop:mt-[27px] app-desktop:mb-[30px] app-desktop:mr-[6px] app-desktop:ml-[14px] app-desktop:grid app-desktop:gap-[15px] app-desktop:max-[1000px]:mx-0">
           <label className={profileEditorFieldClass}>
-            <span className={profileEditorLabelClass}>Tên hiển thị</span>
+            <span className={profileEditorLabelClass}>{trUi("profile.displayName")}</span>
             <input className={profileEditorInputClass} autoComplete="name" type="text" name="displayName" required maxLength={100} disabled={profileSaving}
               value={displayNameDraft} onChange={event => setDisplayNameDraft(event.target.value)}
-              placeholder="Nhập tên hiển thị" />
+              placeholder={trUi("common.ui.displayNamePlaceholder")} />
           </label>
           <label className={profileEditorFieldClass}>
-            <span className={profileEditorLabelClass}>Tên người dùng</span>
+            <span className={profileEditorLabelClass}>{trUi("profile.username")}</span>
             <input className={profileEditorInputClass} autoComplete="username" type="text" name="username" required minLength={3} maxLength={32}
               autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={profileSaving}
               value={usernameDraft} onChange={event => setUsernameDraft(event.target.value.toLowerCase())}
-              placeholder="Tên người dùng duy nhất" />
+              placeholder={trUi("common.ui.uniqueUsername")} />
           </label>
           <label className={profileEditorFieldClass}>
-            <span className={profileEditorLabelClass}>Tiểu sử</span>
+            <span className={profileEditorLabelClass}>{trUi("profile.bio")}</span>
             <input className={profileEditorInputClass} type="text" name="bio" maxLength={160} disabled={profileSaving} value={bioDraft}
-              onChange={event => setBioDraft(event.target.value)} placeholder="Một chút giới thiệu về bạn" />
+              onChange={event => setBioDraft(event.target.value)} placeholder={trUi("common.ui.aboutYou")} />
           </label>
           <label className={profileEditorFieldClass}>
-            <span className={profileEditorLabelClass}>Thành phố</span>
+            <span className={profileEditorLabelClass}>{trUi("profile.city")}</span>
             <input className={profileEditorInputClass} type="text" name="city" maxLength={100} disabled={profileSaving} value={cityDraft}
-              onChange={event => setCityDraft(event.target.value)} placeholder="Thành phố bạn muốn chia sẻ" />
+              onChange={event => setCityDraft(event.target.value)} placeholder={trUi("common.ui.cityShare")} />
           </label>
           <ProfilePublicDetailsFields value={publicDetailsDraft} onChange={setPublicDetailsDraft}
             fieldClass={profileEditorFieldClass} labelClass={profileEditorLabelClass} inputClass={profileEditorInputClass} disabled={profileSaving} />
@@ -124,7 +126,7 @@ export default function ProfileEditorPage({
         </footer>
       </form>
 
-      <aside className="profile-editor-side app-desktop:grid app-desktop:min-w-0 app-desktop:content-start app-desktop:gap-6 app-desktop:max-[1380px]:w-full app-desktop:max-[1380px]:shrink-0 app-desktop:max-[1380px]:grid-cols-2 app-desktop:max-[1380px]:gap-[15px] app-desktop:max-[1000px]:grid-cols-1" aria-label="Xem trước và quyền hiển thị">
+      <aside className="profile-editor-side app-desktop:grid app-desktop:min-w-0 app-desktop:content-start app-desktop:gap-6 app-desktop:max-[1380px]:w-full app-desktop:max-[1380px]:shrink-0 app-desktop:max-[1380px]:grid-cols-2 app-desktop:max-[1380px]:gap-[15px] app-desktop:max-[1000px]:grid-cols-1" aria-label={trUi("common.ui.profilePreviewVisibility")}>
         <ProfileEditorPreview profile={profile} cover={cover(true)} username={username} displayName={displayName} displayNameDraft={displayNameDraft} usernameDraft={usernameDraft} bioDraft={bioDraft} cityDraft={cityDraft} />
 
         <ProfileEditorPrivacyCard privacy={privacy} privacyBusy={privacyBusy} privacyError={privacyError} retryPrivacy={retryPrivacy} changePrivacy={changePrivacy} />

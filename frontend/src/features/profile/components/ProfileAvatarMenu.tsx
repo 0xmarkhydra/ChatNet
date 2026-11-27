@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useRef, useState } from 'react'
 import { Camera, Image, ImagePlus } from 'lucide-react'
 import UserAvatar, { profileAssetUrl } from '@/shared/ui/UserAvatar'
@@ -17,6 +18,8 @@ type Props = {
 }
 
 export default function ProfileAvatarMenu({ username, displayName, avatarClassName, avatarVersion, avatarSet, editBusy, onChangeAvatar, cameraBadge = false }: Props) {
+  const trUi = useUiTranslation()
+
   const [previewOpen, setPreviewOpen] = useState(false)
   const [failedUrl, setFailedUrl] = useState('')
   const trigger = useRef<HTMLButtonElement>(null)
@@ -27,15 +30,15 @@ export default function ProfileAvatarMenu({ username, displayName, avatarClassNa
 
   return <>
     <UserAvatar username={username} name={displayName} className={`${avatarClassName} profile-hero-avatar`} initialsOnly={!avatarSet} online />
-    <span className="sr-only">Đang hoạt động</span>
+    <span className="sr-only">{trUi("profile.active")}</span>
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button ref={trigger} type="button" aria-label="Tùy chọn ảnh đại diện"
+        <button ref={trigger} type="button" aria-label={trUi("common.ui.avatarOptions")}
           className="absolute inset-0 size-full cursor-pointer appearance-none rounded-full border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           {cameraBadge && <span className="absolute bottom-1 right-1 box-border grid size-control-touch place-items-center rounded-full border-4 border-solid border-card bg-secondary text-foreground" aria-hidden="true"><Camera size={20} /></span>}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" aria-label="Ảnh đại diện" onCloseAutoFocus={event => {
+      <DropdownMenuContent align="start" aria-label={trUi("profile.avatar")} onCloseAutoFocus={event => {
         if (openingDialog.current) {
           openingDialog.current = false
           event.preventDefault()
@@ -50,8 +53,7 @@ export default function ProfileAvatarMenu({ username, displayName, avatarClassNa
           openingDialog.current = true
           onChangeAvatar(trigger.current)
         }}>
-          <ImagePlus size={18} aria-hidden="true" />Đổi ảnh đại diện
-        </DropdownMenuItem>
+          <ImagePlus size={18} aria-hidden="true" />{trUi("profile.avatarChange")}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
     <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
@@ -63,11 +65,11 @@ export default function ProfileAvatarMenu({ username, displayName, avatarClassNa
         else trigger.current?.focus()
       }}>
         <DialogHeader className="pr-10">
-          <DialogTitle className="m-0">Ảnh đại diện</DialogTitle>
+          <DialogTitle className="m-0">{trUi("profile.avatar")}</DialogTitle>
           <DialogDescription className="m-0">{displayName}</DialogDescription>
         </DialogHeader>
         {showPhoto
-          ? <img src={url} alt={`Ảnh đại diện của ${displayName}`} onError={() => setFailedUrl(url)}
+          ? <img src={url} alt={trUi("common.ui.avatarOfNamed", { v1: String(displayName) })} onError={() => setFailedUrl(url)}
               className="mx-auto block max-h-[65dvh] max-w-full rounded-ui-md object-contain" />
           : <div className="grid justify-items-center gap-4 rounded-ui-lg border border-solid border-border bg-linear-to-b from-primary/10 to-card p-4 text-center">
               <UserAvatar name={displayName} username={username} initialsOnly
@@ -79,7 +81,7 @@ export default function ProfileAvatarMenu({ username, displayName, avatarClassNa
               <DialogClose asChild>
                 <Button size="lg" disabled={editBusy} onClick={() => { changeAfterPreview.current = true }}>
                   <ImagePlus size={17} aria-hidden="true" />
-                  {url ? 'Đổi ảnh đại diện' : 'Thêm ảnh đại diện'}
+                  {url ? trUi("profile.avatarChange") : 'Thêm ảnh đại diện'}
                 </Button>
               </DialogClose>
             </div>}

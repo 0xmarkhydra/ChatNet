@@ -31,3 +31,8 @@
 - Branch/commit SHA:
 - Any `lint-baseline.json` or `architecture-baseline.json` change? Explain each **removed** violation; additions are prohibited.
 - [ ] No self-merge or deployment. Human reviewer should verify branch protection checks.
+## Internationalization (required for UI changes)
+
+- [ ] All new or changed UI copy uses typed translation keys in all five locales (vi/en/zh/ja/ko), including config labels, tooltips, empty/error states and notification templates; or N/A with reason.
+- [ ] Dates, relative time, counts and pluralization follow the selected locale; names, filenames and user content are unchanged.
+- [ ] `npm --prefix frontend run check:i18n`, extended inventory review, and relevant language-switch tests passed (include evidence).

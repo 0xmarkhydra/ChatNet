@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { CalendarClock, ClipboardList, FileText, Pin, PinOff, X } from 'lucide-react'
 import type { GroupActivityKind } from '../types/groupActivities'
 import { useGroupActivityDialog, type GroupActivityDialogProps } from '../hooks/useGroupActivityDialog'
@@ -8,6 +9,8 @@ const labels: Record<GroupActivityKind, string> = {
 const icons = { poll: ClipboardList, note: FileText, reminder: CalendarClock }
 
 export function GroupActivityDialog(props: GroupActivityDialogProps) {
+  const trUi = useUiTranslation()
+
   const { kind, activity } = props
   const { body, setBody, options, setOptions, scheduledAt, setScheduledAt, pinOnCreate, setPinOnCreate,
     selection, setSelection, busy, error, panelRef, submit, togglePinned, castVote } =
@@ -32,8 +35,8 @@ export function GroupActivityDialog(props: GroupActivityDialogProps) {
         aria-modal="true"
         aria-label={
           kind
-            ? `Tạo ${labels[kind].toLowerCase()}`
-            : `Chi tiết ${labels[activity?.kind || "poll"].toLowerCase()}`
+            ? trUi("common.ui.createNamed", { v1: String(labels[kind].toLowerCase()) })
+            : trUi("common.ui.detailsNamed", { v1: String(labels[activity?.kind || "poll"].toLowerCase()) })
         }
       >
         <header>
@@ -42,7 +45,7 @@ export function GroupActivityDialog(props: GroupActivityDialogProps) {
           </span>
           <div>
             <small>
-              {kind ? "Tạo hoạt động nhóm" : labels[activity?.kind || "poll"]}
+              {kind ? trUi("chat.createActivity") : labels[activity?.kind || "poll"]}
             </small>
             <strong>
               {kind ? labels[kind] : labels[activity?.kind || "poll"]}
@@ -50,7 +53,7 @@ export function GroupActivityDialog(props: GroupActivityDialogProps) {
           </div>
           <button
             type="button"
-            aria-label="Đóng"
+            aria-label={trUi("common.close")}
             className="group-activity-close"
             disabled={busy}
             onClick={onClose}
@@ -67,7 +70,7 @@ export function GroupActivityDialog(props: GroupActivityDialogProps) {
               {kind === "poll"
                 ? "Nội dung bình chọn (không bắt buộc)"
                 : kind === "note"
-                  ? "Nội dung ghi chú"
+                  ? trUi("chat.noteContent")
                   : "Nội dung nhắc hẹn (không bắt buộc)"}
               <textarea
                 rows={3}
@@ -75,7 +78,7 @@ export function GroupActivityDialog(props: GroupActivityDialogProps) {
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
                 required={kind === "note"}
-                placeholder={kind === "poll" ? "Nhập nội dung bình chọn..." : kind === "note" ? "Nhập ghi chú..." : "Nhập nội dung nhắc hẹn..."}
+                placeholder={kind === "poll" ? trUi("common.ui.pollPlaceholder") : kind === "note" ? trUi("common.ui.notePlaceholder") : trUi("common.ui.reminderPlaceholder")}
               />
             </label>
             {kind === "poll" && (
@@ -84,11 +87,11 @@ export function GroupActivityDialog(props: GroupActivityDialogProps) {
                 {options.map((option, index) => (
                   <div key={index} className="group-activity-option-input">
                     <input
-                      aria-label={`Lựa chọn ${index + 1}`}
+                      aria-label={trUi('common.ui.pollOption', { count: index + 1 })}
                       maxLength={120}
                       required
                       value={option}
-                      placeholder={`Lựa chọn ${index + 1}`}
+                      placeholder={trUi('common.ui.pollOption', { count: index + 1 })}
                       onChange={(event) =>
                         setOptions((current) =>
                           current.map((value, i) =>
@@ -100,7 +103,7 @@ export function GroupActivityDialog(props: GroupActivityDialogProps) {
                     {options.length > 2 && (
                       <button
                         type="button"
-                        aria-label={`Bỏ lựa chọn ${index + 1}`}
+                        aria-label={trUi('common.ui.removePollOption', { count: index + 1 })}
                         onClick={() =>
                           setOptions((current) =>
                             current.filter((_, i) => i !== index),
@@ -152,12 +155,8 @@ export function GroupActivityDialog(props: GroupActivityDialogProps) {
               </p>
             )}
             <footer>
-              <button type="button" onClick={onClose} disabled={busy}>
-                Hủy
-              </button>
-              <button type="submit" disabled={busy}>
-                Tạo mới
-              </button>
+              <button type="button" onClick={onClose} disabled={busy}>{trUi("common.cancel")}</button>
+              <button type="submit" disabled={busy}>{trUi("common.new")}</button>
             </footer>
           </form>
         ) : activity ? (
@@ -246,18 +245,14 @@ export function GroupActivityDialog(props: GroupActivityDialogProps) {
               </p>
             )}
             <footer>
-              <button type="button" onClick={onClose}>
-                Đóng
-              </button>
+              <button type="button" onClick={onClose}>{trUi("common.close")}</button>
             </footer>
           </div>
         ) : (
           <div className="group-activity-view">
             <p>Không tìm thấy hoạt động này.</p>
             <footer>
-              <button type="button" onClick={onClose}>
-                Đóng
-              </button>
+              <button type="button" onClick={onClose}>{trUi("common.close")}</button>
             </footer>
           </div>
         )}

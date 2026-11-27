@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { conversationPreview } from '../utils/conversationPreview'
 import { Plus, Search, Pin, RefreshCw, X } from "lucide-react";
 import UiIcon from "../../../shared/ui/UiIcon";
@@ -14,14 +15,16 @@ import type { useMessageLongPress } from "../hooks/useMessageLongPress";
 type Props = Pick<ChatSectionProps, "activeConversationId" | "actOnFriend" | "chatCreateError" | "chatListConversations" | "chatListFilter" | "chatListQuery" | "conversationCategories" | "conversationListSearch" | "conversationLoadingMore" | "copyInviteLink" | "createDirect" | "directUsername" | "friendBusyIds" | "friendQuery" | "friendRelationship" | "friendResults" | "friends" | "friendSearchError" | "friendSearching" | "hasMoreConversations" | "loadMoreConversations" | "newChatMode" | "openConnectSurface" | "quickSearchControl" | "searchInConversationList" | "session" | "setActiveConversationId" | "setChatCreateError" | "setChatListFilter" | "setChatListQuery" | "setChatSearchJump" | "setConversationActionId" | "setConversationMenuPosition" | "setConversations" | "setDirectUsername" | "setFriendQuery" | "setFriendResults" | "setFriendSearchRetry" | "setNewChatMode" | "setQrOpen" | "setQuickSearchOpen" | "setTranslationMenuOpen" | "setTranslationOriginals" | "setTranslations" | "shareMyProfile" | "sortedChatListConversations" | "t" | "visibleConversations"> & { chatFiltersPill: ReturnType<typeof useSlidingPill<HTMLDivElement>> } & Pick<ReturnType<typeof useMessageLongPress>, "beginConversationLongPress" | "cancelConversationLongPress" | "moveConversationLongPress" | "suppressConversationClick">;
 
 export default function ConversationList({ activeConversationId, actOnFriend, beginConversationLongPress, cancelConversationLongPress, chatCreateError, chatListConversations, chatListFilter, chatListQuery, conversationCategories, conversationListSearch, conversationLoadingMore, copyInviteLink, createDirect, directUsername, friendBusyIds, friendQuery, friendRelationship, friendResults, friends, friendSearchError, friendSearching, hasMoreConversations, loadMoreConversations, moveConversationLongPress, newChatMode, openConnectSurface, quickSearchControl, searchInConversationList, session, setActiveConversationId, setChatCreateError, setChatListFilter, setChatListQuery, setChatSearchJump, setConversationActionId, setConversationMenuPosition, setConversations, setDirectUsername, setFriendQuery, setFriendResults, setFriendSearchRetry, setNewChatMode, setQrOpen, setQuickSearchOpen, setTranslationMenuOpen, setTranslationOriginals, setTranslations, shareMyProfile, sortedChatListConversations, suppressConversationClick, t, visibleConversations, chatFiltersPill }: Props) {
+  const trUi = useUiTranslation()
+
   const { hostRef: chatFiltersPillSetHost, activeRef: chatFiltersPillSetActive, pillRef: chatFiltersPillSetPill } = chatFiltersPill;
   return (
-    <aside className="conversation-sidebar social-chat-list" aria-label="Danh sách cuộc trò chuyện">
+    <aside className="conversation-sidebar social-chat-list" aria-label={trUi("chat.chatList")}>
               <div className="social-chat-list-header">
                 <div className="social-chat-list-title">
-                  <h2>Cuộc trò chuyện</h2>
-                  <button type="button" className="social-chat-new" aria-label="Tạo cuộc trò chuyện mới"
-                    title="Tạo cuộc trò chuyện" onClick={() => { setChatCreateError(''); setNewChatMode('direct') }}>
+                  <h2>{trUi("chat.conversation")}</h2>
+                  <button type="button" className="social-chat-new" aria-label={trUi("chat.newConversationFull")}
+                    title={trUi("chat.newConversation")} onClick={() => { setChatCreateError(''); setNewChatMode('direct') }}>
                     <Plus size={20} aria-hidden="true" />
                   </button>
                 </div>
@@ -29,11 +32,11 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                   <label className="social-chat-list-search">
                     <Search size={19} aria-hidden="true" />
                     <input type="search" value={chatListQuery} onChange={(event) => setChatListQuery(event.target.value)}
-                      maxLength={120} placeholder="Tìm cuộc trò chuyện hoặc tin nhắn..."
-                      aria-label="Tìm kiếm toàn bộ cuộc trò chuyện" />
+                      maxLength={120} placeholder={trUi("chat.searchConversationsFull")}
+                      aria-label={trUi("chat.searchAllChats")} />
                   </label>
                 )}
-                <div ref={chatFiltersPillSetHost} className="social-chat-list-filters sliding-pill-host" role="group" aria-label="Lọc cuộc trò chuyện">
+                <div ref={chatFiltersPillSetHost} className="social-chat-list-filters sliding-pill-host" role="group" aria-label={trUi("chat.filterConversation")}>
                   <span ref={chatFiltersPillSetPill} className="sliding-pill social-chat-active-pill" aria-hidden="true" />
                   {([{ key: 'all', label: 'Tất cả' }, { key: 'unread', label: 'Chưa đọc' }, { key: 'groups', label: 'Nhóm' }] as const).map((filter) => (
                     <button ref={chatListFilter === filter.key ? chatFiltersPillSetActive : undefined} key={filter.key} type="button" aria-pressed={chatListFilter === filter.key}
@@ -47,7 +50,7 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                   <button
                     type="button"
                     className="connect-modal-scrim"
-                    aria-label="Đóng tìm và kết nối"
+                    aria-label={trUi("chat.closeFindConnect")}
                     onClick={() => { setNewChatMode('none'); setFriendQuery(''); setFriendResults([]) }}
                   />
                   <section
@@ -59,14 +62,14 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                     <div className="connect-modal-handle" aria-hidden="true" />
                     <div className="connect-ios-header">
                       <div>
-                        <strong id="connect-modal-title">Kết nối</strong>
-                        <small>Tìm bạn bè trên SocCO</small>
+                        <strong id="connect-modal-title">{trUi("contacts.connect")}</strong>
+                        <small>{trUi("contacts.findOnSocco")}</small>
                       </div>
                       <button
                         type="button"
                         className="friend-search-close"
                         onClick={() => { setNewChatMode('none'); setFriendQuery(''); setFriendResults([]) }}
-                        aria-label="Đóng tìm và kết nối"
+                        aria-label={trUi("chat.closeFindConnect")}
                       >×</button>
                     </div>
 
@@ -75,15 +78,15 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                       <input
                         value={friendQuery}
                         onChange={(event) => setFriendQuery(event.target.value)}
-                        placeholder="Tên, @username hoặc email"
-                        aria-label="Tìm bạn bằng tên, username hoặc email"
+                        placeholder={trUi("contacts.nameEmail")}
+                        aria-label={trUi("contacts.findName")}
                         autoCapitalize="none"
                         autoComplete="off"
                         spellCheck={false}
                         maxLength={254}
                       />
                       {friendQuery && (
-                        <button type="button" aria-label="Xóa tìm kiếm" onClick={() => setFriendQuery('')}>×</button>
+                        <button type="button" aria-label={trUi("common.clearSearch")} onClick={() => setFriendQuery('')}>×</button>
                       )}
                     </label>
 
@@ -93,24 +96,24 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                         <strong>{session.user.displayName || session.user.username}</strong>
                         <span>@{session.user.username}</span>
                       </div>
-                      <div className="connect-identity-actions" aria-label="Chia sẻ hồ sơ">
-                        <button type="button" onClick={() => setQrOpen('mine')} aria-label="QR của tôi" title="QR của tôi"><UiIcon name="qr" size={20} /></button>
-                        <button type="button" onClick={() => void shareMyProfile()} aria-label="Chia sẻ hồ sơ của tôi" title="Chia sẻ">↗</button>
-                        <button type="button" onClick={() => void copyInviteLink()} aria-label="Sao chép link hồ sơ" title="Sao chép link">⧉</button>
+                      <div className="connect-identity-actions" aria-label={trUi("profile.shareProfile")}>
+                        <button type="button" onClick={() => setQrOpen('mine')} aria-label={trUi("profile.myQr")} title={trUi("profile.myQr")}><UiIcon name="qr" size={20} /></button>
+                        <button type="button" onClick={() => void shareMyProfile()} aria-label={trUi("profile.shareMyProfile")} title={trUi("common.share")}>↗</button>
+                        <button type="button" onClick={() => void copyInviteLink()} aria-label={trUi("profile.copyProfileLink")} title={trUi("profile.copyLink")}>⧉</button>
                       </div>
                     </div>
 
                     <div className="friend-search-results connect-results">
 
                       {!friendSearching && !friendQuery.trim() && friendResults.length > 0 && (
-                        <div className="friend-suggestion-label">Người bạn có thể biết</div>
+                        <div className="friend-suggestion-label">{trUi("contacts.peopleYouMayKnow")}</div>
                       )}
                       {friendSearchError && !friendSearching && (
-                        <div className="friend-search-state" role="alert">Không tải được kết quả. <button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>Thử lại</button></div>
+                        <div className="friend-search-state" role="alert">{trUi("common.retryLoad") + ' '}<button type="button" onClick={() => setFriendSearchRetry((n) => n + 1)}>{trUi("common.retry")}</button></div>
                       )}
                       {!friendSearching && !friendSearchError && friendQuery.trim() && friendResults.length === 0 && (
                         <div className="friend-search-state">
-                          <strong>Không tìm thấy người phù hợp</strong>
+                          <strong>{trUi("contacts.noPeople")}</strong>
                           <span>Thử tên khác, @username hoặc email chính xác.</span>
                         </div>
                       )}
@@ -153,9 +156,9 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
 
               {newChatMode === 'direct' && (
                 <form className="new-chat-panel" onSubmit={createDirect}>
-                  <div className="panel-line"><strong>Tạo chat riêng</strong><button type="button" onClick={() => setNewChatMode('none')}>×</button></div>
-                  <input value={directUsername} onChange={(event) => setDirectUsername(event.target.value)} placeholder="Username người muốn chat" maxLength={64} autoFocus />
-                  <button>Tạo cuộc trò chuyện</button>
+                  <div className="panel-line"><strong>{trUi("chat.createPrivate")}</strong><button type="button" onClick={() => setNewChatMode('none')}>×</button></div>
+                  <input value={directUsername} onChange={(event) => setDirectUsername(event.target.value)} placeholder={trUi("common.ui.directUsername")} maxLength={64} autoFocus />
+                  <button>{trUi("chat.newConversation")}</button>
                 </form>
               )}
 
@@ -165,13 +168,13 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
               <div className="conversation-list zalo-conversation-list" aria-busy={conversationListSearch.active && conversationListSearch.loading}>
 
                 {!conversationListSearch.active && conversationCategories.selected !== null && conversationCategories.listError && <div role="alert" className="category-error">
-                  {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>Thử lại</button>
+                  {conversationCategories.listError}<button type="button" onClick={() => void conversationCategories.load(false,true)}>{trUi("common.retry")}</button>
                 </div>}
 
                 {conversationListSearch.active && conversationListSearch.error && (
                   <p className="conversation-search-status" role="alert">
                     {conversationListSearch.error}
-                    <button type="button" onClick={conversationListSearch.retry}>Thử lại</button>
+                    <button type="button" onClick={conversationListSearch.retry}>{trUi("common.retry")}</button>
                   </p>
                 )}
                 {chatListConversations.length === 0 &&
@@ -180,14 +183,14 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                   <div className="conversation-list-empty">
                     <SocoEmptyState
                       kind="chat"
-                      title={conversationListSearch.active ? 'Không tìm thấy cuộc trò chuyện'
-                        : visibleConversations.length ? 'Không có hội thoại phù hợp' : 'Chưa có cuộc trò chuyện'}
+                      title={conversationListSearch.active ? trUi("common.ui.noChatTitle")
+                        : visibleConversations.length ? trUi("common.ui.noChatMatching") : trUi("common.ui.noChatYet")}
                       description={conversationListSearch.active || visibleConversations.length
-                        ? 'Thử thay đổi từ khóa hoặc chọn bộ lọc khác.'
-                        : 'Tìm bạn bè để bắt đầu kết nối và trò chuyện.'}
+                        ? trUi("common.ui.tryDifferentFilter")
+                        : trUi("common.ui.findFriendsStartChat")}
                       action={conversationListSearch.active || visibleConversations.length
-                        ? <SocoTextAction onClick={() => { setChatListQuery(''); setChatListFilter('all') }}>Xóa bộ lọc</SocoTextAction>
-                        : <SocoTextAction onClick={() => openConnectSurface()}>Tìm bạn bè</SocoTextAction>}
+                        ? <SocoTextAction onClick={() => { setChatListQuery(''); setChatListFilter('all') }}>{trUi("common.clearFilter")}</SocoTextAction>
+                        : <SocoTextAction onClick={() => openConnectSurface()}>{trUi("contacts.findFriendsAlt")}</SocoTextAction>}
                     />
                   </div>
                 )}
@@ -232,14 +235,14 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                       <div className="conversation-copy">
                         <div>
                           <span className="conversation-title">
-                            {conversation.pinnedAt && <Pin size={13} aria-label="Đã ghim" className="conversation-pin-indicator" />}
+                            {conversation.pinnedAt && <Pin size={13} aria-label={trUi("common.pinned")} className="conversation-pin-indicator" />}
                             <strong>{conversation.name}</strong>
                             <CategoryBadge iconOnly category={conversationCategories.categories.find(c => c.id === conversation.categoryId)} />
                           </span>
                           <time>{formatTime(conversation.lastMessageAt) || (conversation.online ? 'online' : '')}</time>
                         </div>
                         <div>
-                          <span>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : 'Bắt đầu trò chuyện')}</span>
+                          <span>{conversationPreview(conversation.lastMessage) || (conversation.type === 'group' ? `${conversation.memberCount} thành viên` : trUi("chat.startChat"))}</span>
                           {(conversation.unreadCount > 0 || conversation.manualUnread) && <b>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount || '•'}</b>}
                         </div>
                       </div>
@@ -254,9 +257,7 @@ export default function ConversationList({ activeConversationId, actOnFriend, be
                     disabled={conversationListSearch.active ? conversationListSearch.loadingMore || Boolean(conversationListSearch.error)
                       : conversationLoadingMore || conversationCategories.loading}
                     aria-busy={conversationListSearch.active ? conversationListSearch.loadingMore : conversationLoadingMore || conversationCategories.loading}>
-                    <RefreshCw size={15} aria-hidden="true" />
-                    Tải thêm hội thoại
-                  </button>
+                    <RefreshCw size={15} aria-hidden="true" />{trUi("chat.moreConversations")}</button>
                 )}
               </div>
             </aside>

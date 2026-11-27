@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Plus, Search, ShieldCheck, Users, X } from 'lucide-react'
 import type { FriendConnection } from '../../contacts'
@@ -17,6 +18,8 @@ type Props = {
 }
 
 export default function CommunityGroupWizard({ friends, userId, myName, step, onStep, onCancel, onCreate, error }: Props) {
+  const trUi = useUiTranslation()
+
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [topic, setTopic] = useState('')
@@ -44,22 +47,22 @@ export default function CommunityGroupWizard({ friends, userId, myName, step, on
     finally { setBusy(false) }
   }
 
-  return <div className="cg-page cg-wizard" aria-label="Tạo cộng đồng mới">
+  return <div className="cg-page cg-wizard" aria-label={trUi("chat.communityCreate")}>
     <div className="cg-card cg-wizard-card">
-      <nav className="cg-steps" aria-label="Quy trình tạo nhóm">
+      <nav className="cg-steps" aria-label={trUi("common.ui.groupCreationSteps")}>
         {([1,2,3] as const).map(num => <div key={num} className={'cg-step ' + (step===num?'active':step>num?'completed':'')}>
-          <b>{String(num).padStart(2,'0')}</b><strong>{num===1?'Thông tin':num===2?'Thành viên':'Xác nhận'}</strong>
+          <b>{String(num).padStart(2,'0')}</b><strong>{num===1?trUi("common.information"):num===2?trUi("chat.members"):trUi("common.confirm")}</strong>
         </div>)}
       </nav>
       {step === 1 && <div className="cg-create-info">
         <section className="cg-fields">
-          <h2>Thông tin nhóm</h2><p className="cg-muted">Đặt tên và chọn cách mọi người tham gia cộng đồng.</p>
-          <label>Tên nhóm *<input type="text" aria-label="Tên nhóm" maxLength={120} value={name} onChange={e=>{setName(e.target.value);setValidation('')}} placeholder="SocCo Product Community"/></label>
-          <label>Mô tả<input type="text" aria-label="Mô tả" value={description} maxLength={300} onChange={e=>setDescription(e.target.value)} placeholder="Nơi chia sẻ ý tưởng và cập nhật sản phẩm"/></label>
-          <label>Chủ đề<input type="text" aria-label="Chủ đề" value={topic} maxLength={100} onChange={e=>setTopic(e.target.value)} placeholder="Công nghệ · Sản phẩm · Cộng đồng"/></label>
-          <strong>Quyền truy cập</strong>
-          <label className={visibility==='public'?'cg-access selected':'cg-access'}><input type="radio" checked={visibility==='public'} name="cg-privacy" onChange={()=>setVisibility('public')}/><span><b>Công khai</b><small>Mọi người có thể tìm thấy và tham gia hoặc gửi yêu cầu duyệt.</small></span></label>
-          <label className={visibility==='private'?'cg-access selected':'cg-access'}><input type="radio" checked={visibility==='private'} name="cg-privacy" onChange={()=>setVisibility('private')}/><span><b>Riêng tư</b><small>Tham gia khi được mời hoặc phê duyệt.</small></span></label>
+          <h2>{trUi("chat.groupInfo")}</h2><p className="cg-muted">Đặt tên và chọn cách mọi người tham gia cộng đồng.</p>
+          <label>Tên nhóm *<input type="text" aria-label={trUi("chat.groupName")} maxLength={120} value={name} onChange={e=>{setName(e.target.value);setValidation('')}} placeholder="SocCo Product Community"/></label>
+          <label>{trUi("common.description")}<input type="text" aria-label={trUi("common.description")} value={description} maxLength={300} onChange={e=>setDescription(e.target.value)} placeholder={trUi("common.ui.communityDescriptionExample")}/></label>
+          <label>{trUi("common.topic")}<input type="text" aria-label={trUi("common.topic")} value={topic} maxLength={100} onChange={e=>setTopic(e.target.value)} placeholder={trUi("common.ui.communityTopicExample")}/></label>
+          <strong>{trUi("common.access")}</strong>
+          <label className={visibility==='public'?'cg-access selected':'cg-access'}><input type="radio" checked={visibility==='public'} name="cg-privacy" onChange={()=>setVisibility('public')}/><span><b>{trUi("common.public")}</b><small>Mọi người có thể tìm thấy và tham gia hoặc gửi yêu cầu duyệt.</small></span></label>
+          <label className={visibility==='private'?'cg-access selected':'cg-access'}><input type="radio" checked={visibility==='private'} name="cg-privacy" onChange={()=>setVisibility('private')}/><span><b>{trUi("common.private")}</b><small>Tham gia khi được mời hoặc phê duyệt.</small></span></label>
         </section>
         <aside className="cg-preview">
           <h3>Xem trước cộng đồng</h3>
@@ -72,13 +75,13 @@ export default function CommunityGroupWizard({ friends, userId, myName, step, on
       {step === 2 && <>
         <div className="cg-wizard-title"><div><h2>Mời thành viên đầu tiên</h2><p className="cg-muted">Bạn có thể thêm bạn bè ngay bây giờ hoặc sau khi tạo.</p></div><small>1. Thông tin　2. Thành viên　3. Xong</small></div>
         <div className="cg-member-picker">
-          <section className="cg-card cg-pick-list"><h3>Danh sách bạn bè</h3>
-            <label className="cg-search"><Search size={18}/><input type="search" aria-label="Tìm thành viên" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm theo tên hoặc ID SocCo..."/></label>
+          <section className="cg-card cg-pick-list"><h3>{trUi("contacts.friendList")}</h3>
+            <label className="cg-search"><Search size={18}/><input type="search" aria-label={trUi("chat.memberSearch")} value={query} onChange={e=>setQuery(e.target.value)} placeholder={trUi("common.ui.searchNameId")}/></label>
             <div className="cg-pick-options">{filtered.map(friend => <button type="button" key={friend.id} className={'cg-pick-row'+(selected.includes(friend.id)?' selected':'')} aria-pressed={selected.includes(friend.id)} onClick={()=>toggle(friend.id)}>
               <UserAvatar username={friend.username} name={friend.displayName||friend.username} className="avatar cg-avatar" online={friend.online}/>
-              <span><strong>{friend.displayName||friend.username}</strong><small>{selected.includes(friend.id)?'Đã chọn':'Bạn bè'}</small></span>
+              <span><strong>{friend.displayName||friend.username}</strong><small>{selected.includes(friend.id)?trUi("common.selected"):trUi("contacts.friends")}</small></span>
               {selected.includes(friend.id)&&<CheckCircle2 size={21}/>}
-            </button>)}{!filtered.length&&<p className="cg-empty">Không có bạn bè phù hợp.</p>}</div>
+            </button>)}{!filtered.length&&<p className="cg-empty">{trUi("chat.noFriends")}</p>}</div>
           </section>
           <aside className="cg-card cg-selected-members"><h3>Đã chọn ({chosen.length})</h3><p className="cg-muted">Chủ nhóm có thể quản lý thành viên sau này.</p>
             <div>{chosen.map(friend=><div key={friend.id} className="cg-selected-row"><UserAvatar username={friend.username} name={friend.displayName||friend.username} className="avatar cg-avatar"/><strong>{friend.displayName||friend.username}</strong><button type="button" aria-label={'Bỏ chọn '+(friend.displayName||friend.username)} onClick={()=>toggle(friend.id)}><X size={17}/></button></div>)}</div>
@@ -88,14 +91,14 @@ export default function CommunityGroupWizard({ friends, userId, myName, step, on
       </>}
       {step === 3 && <div className="cg-confirm">
         <CheckCircle2 size={45}/><h2>Xác nhận tạo nhóm</h2><p>Kiểm tra thông tin trước khi lưu.</p>
-        <dl><dt>Tên nhóm</dt><dd>{name}</dd><dt>Quyền truy cập</dt><dd>{visibility==='public'?'Công khai':'Riêng tư'}</dd><dt>Chủ đề</dt><dd>{topic||'Chưa đặt'}</dd><dt>Thành viên mời</dt><dd>{chosen.length} người</dd></dl>
+        <dl><dt>{trUi("chat.groupName")}</dt><dd>{name}</dd><dt>{trUi("common.access")}</dt><dd>{visibility==='public'?trUi("common.public"):trUi("common.private")}</dd><dt>{trUi("common.topic")}</dt><dd>{topic||trUi("common.notSet")}</dd><dt>Thành viên mời</dt><dd>{chosen.length} người</dd></dl>
         {chosen.length>0&&<p>{chosen.map(friend=>friend.displayName||friend.username).join(', ')}</p>}
         {description&&<p>Mô tả: {description}</p>}
       </div>}
       {(validation||error)&&<p className="cg-error" role="alert">{validation||error}</p>}
-      <footer className="cg-wizard-footer"><button type="button" className="cg-secondary" disabled={busy} onClick={()=>step===1?onCancel():onStep(step===3?2:1)}><X size={18}/>{step===1?'Hủy':'Quay lại'}</button>
-        {step<3?<button type="button" className="cg-primary" onClick={goNext}><ArrowRight size={18}/>Tiếp: {step===1?'Mời thành viên':'Xác nhận'}</button>:
-        <button type="button" className="cg-primary" onClick={()=>void create()} disabled={busy}><Check size={17}/>Tạo nhóm</button>}
+      <footer className="cg-wizard-footer"><button type="button" className="cg-secondary" disabled={busy} onClick={()=>step===1?onCancel():onStep(step===3?2:1)}><X size={18}/>{step===1?trUi("common.cancel"):trUi("common.back")}</button>
+        {step<3?<button type="button" className="cg-primary" onClick={goNext}><ArrowRight size={18}/>Tiếp: {step===1?trUi("chat.inviteMembers"):trUi("common.confirm")}</button>:
+        <button type="button" className="cg-primary" onClick={()=>void create()} disabled={busy}><Check size={17}/>{trUi("chat.groupCreate")}</button>}
       </footer>
     </div>
   </div>

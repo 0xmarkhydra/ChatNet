@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { UserPrivacy } from "../../profile";
@@ -17,6 +18,8 @@ const privacyKeys = [
 ] as const;
 
 export default function PrivacySettingsPanel({ privacy, privacyLoading, privacyBusy, privacyError, onPrivacyRetry, onSavePrivacy }: Props) {
+  const trUi = useUiTranslation()
+
   const [draft, setDraft] = useState<UserPrivacy | null>(privacy);
   const [previousPrivacy, setPreviousPrivacy] = useState(privacy);
 
@@ -44,19 +47,19 @@ export default function PrivacySettingsPanel({ privacy, privacyLoading, privacyB
           onChange={(event) => setPrivacyField(key, event.target.value === "everyone")}
           aria-label={label}
         >
-          <option value="everyone">Mọi người</option>
-          <option value="private">Chỉ mình tôi</option>
+          <option value="everyone">{trUi("common.everyone")}</option>
+          <option value="private">{trUi("profile.onlyMe")}</option>
         </select>
         <ChevronDown size={17} aria-hidden="true" />
       </span>
     </label>
   );
 
-  const toggleRow = (label: string, key: keyof UserPrivacy, onText = "Bật") => (
+  const toggleRow = (label: string, key: keyof UserPrivacy, onText = trUi('common.on')) => (
     <div className="settings-workspace-toggle-row" key={key}>
       <span>{label}</span>
       <div>
-        <small>{draft?.[key] ? onText : "Tắt"}</small>
+        <small>{draft?.[key] ? onText : trUi("common.off")}</small>
         <button
           type="button"
           role="switch"
@@ -73,49 +76,46 @@ export default function PrivacySettingsPanel({ privacy, privacyLoading, privacyB
   return (
           <div className="settings-workspace-privacy">
             <section aria-labelledby="settings-workspace-profile-heading">
-              <h3 id="settings-workspace-profile-heading">Hiển thị hồ sơ</h3>
+              <h3 id="settings-workspace-profile-heading">{trUi('settings.profileVisibility')}</h3>
               <p className="settings-workspace-note">
-                Quyền xem bài viết và Story được chọn riêng khi đăng.
+                {trUi('settings.audienceHint')}
               </p>
               <div className="settings-workspace-audience-list">
                 <div className="settings-workspace-audience settings-workspace-audience-readonly">
-                  <span>Ai xem bài viết?</span><span>Theo từng bài viết</span>
+                  <span>{trUi('settings.postAudience')}</span><span>{trUi('settings.perPost')}</span>
                 </div>
                 <div className="settings-workspace-audience settings-workspace-audience-readonly">
-                  <span>Ai xem Story?</span><span>Theo từng Story</span>
+                  <span>{trUi('settings.storyAudience')}</span><span>{trUi('settings.perStory')}</span>
                 </div>
-                {audienceRow("Ai tìm thấy tài khoản?", "searchableByUsername")}
-                {audienceRow("Ai tìm bằng tên hiển thị?", "searchableByName")}
+                {audienceRow(trUi('settings.accountSearch'), "searchableByUsername")}
+                {audienceRow(trUi('settings.nameSearch'), "searchableByName")}
               </div>
             </section>
             <section aria-labelledby="settings-workspace-connections-heading">
-              <h3 id="settings-workspace-connections-heading">Tin nhắn & kết nối</h3>
+              <h3 id="settings-workspace-connections-heading">{trUi('settings.connections')}</h3>
               <div className="settings-workspace-toggle-list">
-                {toggleRow("Cho phép lời mời kết bạn", "allowFriendRequests", "Từ mọi người")}
-                {toggleRow("Cho phép tìm bằng email", "searchableByEmail")}
-                {toggleRow("Hiển thị trạng thái online", "showOnlineStatus")}
+                {toggleRow(trUi('settings.allowRequests'), "allowFriendRequests", trUi('settings.fromEveryone'))}
+                {toggleRow(trUi('settings.emailSearch'), "searchableByEmail")}
+                {toggleRow(trUi('settings.onlineStatus'), "showOnlineStatus")}
               </div>
             </section>
 
             {privacyError && (
               <div role="alert" className="settings-workspace-error">
-                <span>{privacyError}</span>
-                <button type="button" onClick={onPrivacyRetry}>Thử lại</button>
+                <span>{privacyError === 'Lưu thất bại. Cài đặt trước đó vẫn được giữ.' ? trUi('settings.saveFailed') : privacyError}</span>
+                <button type="button" onClick={onPrivacyRetry}>{trUi("common.retry")}</button>
               </div>
             )}
             <footer className="settings-workspace-footer">
-              <span aria-live="polite">{changed ? "Bạn có thay đổi chưa lưu" : "Cài đặt được lưu trên máy chủ"}</span>
-              <button type="button" className="settings-workspace-cancel" disabled={!changed || privacyBusy} onClick={() => setDraft(privacy)}>
-                Hủy
-              </button>
+              <span aria-live="polite">{changed ? trUi('settings.unsavedChanges') : trUi('settings.savedOnServer')}</span>
+              <button type="button" className="settings-workspace-cancel" disabled={!changed || privacyBusy} onClick={() => setDraft(privacy)}>{trUi("common.cancel")}</button>
               <button
                 type="button"
                 className="settings-workspace-save"
                 disabled={!changed || privacyBusy || privacyLoading}
                 onClick={() => { if (draft) void onSavePrivacy(draft); }}
               >
-                <Check size={16} aria-hidden="true" /> Lưu thay đổi
-              </button>
+                <Check size={16} aria-hidden="true" />{trUi("common.saveChanges")}</button>
             </footer>
           </div>
   );

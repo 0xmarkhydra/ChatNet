@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useMemo, useState } from 'react'
 import { ChevronRight, Search, UsersRound } from 'lucide-react'
 import type { Conversation } from '../../chat'
@@ -13,29 +14,31 @@ type Props = {
 
 /** Community discovery stays in the Feed layout; all chat and management lives in Messages. */
 export default function FeedCommunitiesList({ groups, onOpen, hasMore, loadingMore, onLoadMore }: Props) {
+  const trUi = useUiTranslation()
+
   const [query, setQuery] = useState('')
   const communities = useMemo(() => groups
     .filter(group => group.type === 'group' && group.name.toLocaleLowerCase('vi-VN').includes(query.trim().toLocaleLowerCase('vi-VN')))
     .sort((a, b) => a.name.localeCompare(b.name, 'vi')), [groups, query])
 
   return (
-    <section className="feed-community-list" aria-label="Danh sách cộng đồng">
+    <section className="feed-community-list" aria-label={trUi("common.ui.communityList")}>
       <header className="feed-community-list-heading">
         <div>
-          <h2>Cộng đồng</h2>
+          <h2>{trUi("feed.community")}</h2>
           <p>Chọn một cộng đồng để mở cuộc trò chuyện trong Tin nhắn.</p>
         </div>
-        <span className="feed-community-count">{communities.length} cộng đồng</span>
+        <span className="feed-community-count">{communities.length}{trUi("common.ui.communityLower")}</span>
       </header>
       <label className="feed-community-search">
         <Search size={18} aria-hidden="true" />
         <input type="search" value={query} onChange={event => setQuery(event.target.value)}
-          placeholder="Tìm cộng đồng..." aria-label="Tìm cộng đồng" />
+          placeholder={trUi("common.ui.findCommunityPlaceholder")} aria-label={trUi("common.ui.findCommunity")} />
       </label>
       <div className="feed-community-rows">
         {communities.map(group => (
           <button type="button" key={group.id} className="feed-community-row"
-            onClick={() => onOpen(group.id)} aria-label={`Mở cuộc trò chuyện ${group.name}`}>
+            onClick={() => onOpen(group.id)} aria-label={trUi("common.ui.openConversationNamed", { v1: String(group.name) })}>
             <UserAvatar name={group.name} className="feed-community-avatar" imageUrl={group.avatarUrl} group />
             <span className="feed-community-row-copy">
               <strong>{group.name}</strong>
@@ -46,11 +49,11 @@ export default function FeedCommunitiesList({ groups, onOpen, hasMore, loadingMo
           </button>
         ))}
         {communities.length === 0 && (
-          <p className="feed-community-empty">{query ? 'Không tìm thấy cộng đồng phù hợp.' : 'Bạn chưa tham gia cộng đồng nào.'}</p>
+          <p className="feed-community-empty">{query ? 'Không tìm thấy cộng đồng phù hợp.' : trUi("discover.noCommunities")}</p>
         )}
       </div>
       {hasMore && <button className="feed-community-load" type="button" disabled={loadingMore} onClick={onLoadMore}>
-        {loadingMore ? 'Đang tải...' : 'Tải thêm cộng đồng'}
+        {loadingMore ? trUi("common.loadingDots") : 'Tải thêm cộng đồng'}
       </button>}
     </section>
   )

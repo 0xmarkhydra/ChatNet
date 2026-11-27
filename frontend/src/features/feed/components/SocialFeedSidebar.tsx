@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowRight, UserPlus, UsersRound } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from '../../contacts'
@@ -24,6 +25,8 @@ export default function SocialFeedSidebar({
   request, onFriend, onViewUser, onViewContacts,
   onSearchSubmit, communityCard,
 }: Props) {
+  const trUi = useUiTranslation()
+
   const [searchQuery, setSearchQuery] = useState('')
   const requestRef = useLatest(request)
   const [revision, setRevision] = useState(0)
@@ -65,10 +68,10 @@ export default function SocialFeedSidebar({
   }, [sessionId, revision, requestRef])
 
   return (
-    <aside className="social-feed-side box-border hidden min-w-0 app-desktop:grid app-desktop:grid-cols-[minmax(0,1fr)] app-desktop:content-start app-desktop:gap-4 app-desktop:[&>*]:box-border app-desktop:[&>*]:w-full app-desktop:[&>*]:min-w-0 app-wide:sticky app-wide:top-4 app-wide:flex app-wide:max-h-[calc(100dvh-126px)] app-wide:min-h-0 app-wide:flex-col app-wide:self-start app-wide:gap-[14px] app-wide:overflow-x-hidden app-wide:overflow-y-auto app-wide:overscroll-y-contain app-wide:pr-[5px] app-wide:pb-px app-wide:[scrollbar-width:thin] app-wide:[scrollbar-color:#c5d2e7_transparent] app-wide:[&>*]:flex-none" aria-label="Gợi ý trên bảng tin">
-      <section className="social-feed-side-card social-feed-search-card" aria-label="Tìm kiếm trên Bảng tin">
+    <aside className="social-feed-side box-border hidden min-w-0 app-desktop:grid app-desktop:grid-cols-[minmax(0,1fr)] app-desktop:content-start app-desktop:gap-4 app-desktop:[&>*]:box-border app-desktop:[&>*]:w-full app-desktop:[&>*]:min-w-0 app-wide:sticky app-wide:top-4 app-wide:flex app-wide:max-h-[calc(100dvh-126px)] app-wide:min-h-0 app-wide:flex-col app-wide:self-start app-wide:gap-[14px] app-wide:overflow-x-hidden app-wide:overflow-y-auto app-wide:overscroll-y-contain app-wide:pr-[5px] app-wide:pb-px app-wide:[scrollbar-width:thin] app-wide:[scrollbar-color:#c5d2e7_transparent] app-wide:[&>*]:flex-none" aria-label={trUi("common.ui.feedSuggestions")}>
+      <section className="social-feed-side-card social-feed-search-card" aria-label={trUi("common.ui.searchFeed")}>
         <SearchField value={searchQuery} onValueChange={setSearchQuery} maxLength={120}
-          placeholder="Tìm kiếm trên SocCo" aria-label="Tìm bài viết hoặc tác giả"
+          placeholder={trUi("search.searchSocco")} aria-label={trUi("common.ui.findPostAuthor")}
           onKeyDown={event => {
             if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
             event.preventDefault()
@@ -76,13 +79,13 @@ export default function SocialFeedSidebar({
             if (query) onSearchSubmit(query)
           }}
           className="focus-within:ring-inset"
-          trailing={<kbd className="shrink-0 rounded-ui-sm border border-border bg-card px-1.5 py-0.5 text-xs text-muted-foreground" aria-label="Phím tắt tìm kiếm toàn cục">Ctrl K</kbd>} />
+          trailing={<kbd className="shrink-0 rounded-ui-sm border border-border bg-card px-1.5 py-0.5 text-xs text-muted-foreground" aria-label={trUi("common.ui.globalSearchShortcut")}>Ctrl K</kbd>} />
       </section>
-      <section className="social-feed-side-card social-feed-suggestions" aria-label="Gợi ý kết nối">
-        <header><h2>Gợi ý kết nối</h2><button type="button" onClick={onViewContacts}>Xem tất cả <ArrowRight size={16} aria-hidden="true" /></button></header>
+      <section className="social-feed-side-card social-feed-suggestions" aria-label={trUi("contacts.connectSuggestions")}>
+        <header><h2>{trUi("contacts.connectSuggestions")}</h2><button type="button" onClick={onViewContacts}>{trUi("common.seeAll") + ' '}<ArrowRight size={16} aria-hidden="true" /></button></header>
 
         {!suggestionsBusy && suggestionsError && <div className="social-feed-side-status" role="alert">Không tải được gợi ý.
-          <button type="button" onClick={() => setRevision(value => value + 1)}>Thử lại</button>
+          <button type="button" onClick={() => setRevision(value => value + 1)}>{trUi("common.retry")}</button>
         </div>}
         {!suggestionsBusy && !suggestionsError && visible.length === 0 && (
           <div className="social-feed-side-empty"><UsersRound size={23} aria-hidden="true" />
@@ -94,18 +97,18 @@ export default function SocialFeedSidebar({
           {visible.map(user => (
             <article key={user.id} className="social-feed-suggestion-row">
               <button type="button" className="social-feed-suggestion-person" onClick={() => onViewUser(user.username)}
-                aria-label={`Xem hồ sơ ${user.displayName || user.username}`}>
+                aria-label={trUi("common.ui.viewProfileNamed", { v1: String(user.displayName || user.username) })}>
                 <UserAvatar username={user.username} name={user.displayName || user.username} className="social-feed-suggestion-avatar" online={user.online} />
                 <span className="social-feed-suggestion-info">
                   <strong>{user.displayName || user.username}</strong>
                   <small>{typeof user.mutualGroups === 'number' && user.mutualGroups > 0
                     ? `${user.mutualGroups} nhóm chung`
-                    : user.online ? 'Đang hoạt động' : '@' + user.username}</small>
+                    : user.online ? trUi("profile.active") : '@' + user.username}</small>
                 </span>
               </button>
               <button type="button" className="social-feed-connect"
                 disabled={friendBusyIds.has(user.id)}
-                onClick={() => onFriend(user)}><UserPlus size={15} aria-hidden="true" /> Kết bạn</button>
+                onClick={() => onFriend(user)}><UserPlus size={15} aria-hidden="true" />{trUi("contacts.addFriend")}</button>
             </article>
           ))}
         </div>

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Bell, Check, MessageCircle, UserPlus, X } from 'lucide-react'
 import type { FriendConnection } from '../../contacts'
 
@@ -22,24 +23,26 @@ export default function NotificationsPanel({
   onEnableNotifications,
   onClose,
 }: Props) {
+  const trUi = useUiTranslation()
+
   return (
-    <div className="app-notifications-overlay" role="dialog" aria-modal="true" aria-label="Thông báo">
-      <button type="button" className="app-notifications-backdrop" aria-label="Đóng thông báo" onClick={onClose} />
+    <div className="app-notifications-overlay" role="dialog" aria-modal="true" aria-label={trUi("common.notifications")}>
+      <button type="button" className="app-notifications-backdrop" aria-label={trUi("common.closeNotice")} onClick={onClose} />
       <section className="app-notifications-panel">
         <header className="app-notifications-header">
           <div>
-            <span className="app-eyebrow">SOCIAL UPDATES</span>
-            <h2>Thông báo</h2>
-            <p>Cập nhật mới nhất từ bạn bè và các cuộc trò chuyện.</p>
+            <span className="app-eyebrow">{trUi('notifications.socialUpdates')}</span>
+            <h2>{trUi("common.notifications")}</h2>
+            <p>{trUi('notifications.latestUpdates')}</p>
           </div>
-          <button type="button" className="app-close-button" aria-label="Đóng thông báo" onClick={onClose}><X size={18} /></button>
+          <button type="button" className="app-close-button" aria-label={trUi("common.closeNotice")} onClick={onClose}><X size={18} /></button>
         </header>
 
         {!pushEnabled && (
           <button type="button" className="app-notification-banner" onClick={onEnableNotifications}>
             <Bell size={20} aria-hidden="true" />
-            <span><strong>Bật thông báo</strong><small>Nhận cập nhật ngay cả khi bạn đang ở màn hình khác.</small></span>
-            <span className="app-notification-banner-action">Bật</span>
+            <span><strong>{trUi("common.enableNotice")}</strong><small>{trUi('notifications.pushHint')}</small></span>
+            <span className="app-notification-banner-action">{trUi("common.on")}</span>
           </button>
         )}
 
@@ -49,28 +52,28 @@ export default function NotificationsPanel({
               <span className="app-notification-icon is-purple"><UserPlus size={18} /></span>
               <div>
                 <strong>{request.displayName || request.username}</strong>
-                <p>đã gửi lời mời kết bạn cho bạn.</p>
-                <button type="button" className="app-notification-action" onClick={() => onAccept(request)}><Check size={14} /> Chấp nhận</button>
+                <p>{trUi('notifications.friendSubtitle')}</p>
+                <button type="button" className="app-notification-action" onClick={() => onAccept(request)}><Check size={14} />{trUi("common.accept")}</button>
               </div>
             </article>
           ))}
           {unreadTotal > 0 && (
             <button type="button" className="app-notification-item is-button" onClick={onOpenChat}>
               <span className="app-notification-icon is-blue"><MessageCircle size={18} /></span>
-              <div><strong>Tin nhắn mới</strong><p>Bạn có {unreadTotal > 99 ? '99+' : unreadTotal} tin nhắn chưa đọc.</p><small>Mở hộp thư để xem ngay</small></div>
+              <div><strong>{trUi('notifications.newMessages')}</strong><p>{trUi('notifications.unreadTotal', { count: unreadTotal > 99 ? '99+' : unreadTotal })}</p><small>{trUi('notifications.openInbox')}</small></div>
             </button>
           )}
           {requests.filter(request => request.direction === 'incoming').length === 0 && unreadTotal === 0 && pushEnabled && (
             <div className="app-notification-empty">
               <span><Bell size={22} /></span>
-              <strong>Bạn đã xem hết thông báo</strong>
-              <p>Khi có hoạt động mới, chúng sẽ xuất hiện ở đây.</p>
+              <strong>{trUi('notifications.allSeen')}</strong>
+              <p>{trUi('notifications.newActivityHint')}</p>
             </div>
           )}
         </div>
 
         <button type="button" className="app-notifications-footer" onClick={onOpenContacts}>
-          Xem danh bạ và lời mời <span aria-hidden="true">→</span>
+          {trUi('notifications.contactsRequests')} <span aria-hidden="true">→</span>
         </button>
       </section>
     </div>

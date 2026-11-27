@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarClock, ClipboardList, FileText, MoreHorizontal } from 'lucide-react'
 import { createPortal } from 'react-dom'
@@ -13,6 +14,8 @@ export function GroupActivityComposerMenu({
 }: {
   onCreate: (kind: GroupActivityKind) => void;
 }) {
+  const trUi = useUiTranslation()
+
   const [position, setPosition] = useState<{ left: number; top: number; below: boolean } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -53,10 +56,10 @@ export function GroupActivityComposerMenu({
         ref={triggerRef}
         className="ghost-action group-activity-composer-trigger"
         type="button"
-        aria-label="Tùy chọn nhóm: bình chọn, ghi chú và nhắc hẹn"
+        aria-label={trUi("common.ui.groupTools")}
         aria-haspopup="menu"
         aria-expanded={Boolean(position)}
-        title="Tùy chọn nhóm"
+        title={trUi("common.ui.groupOptions")}
         onClick={() => {
           if (position) {
             close();
@@ -78,7 +81,7 @@ export function GroupActivityComposerMenu({
           ref={menuRef}
           className={`group-activity-composer-menu${position.below ? " below" : ""}`}
           role="menu"
-          aria-label="Tạo hoạt động nhóm"
+          aria-label={trUi("chat.createActivity")}
           style={{ left: position.left, top: position.top }}
         >
           {(["poll", "note", "reminder"] as const).map((kind) => {

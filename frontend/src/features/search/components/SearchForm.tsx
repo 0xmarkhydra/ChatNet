@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useId, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { CornerDownLeft } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
@@ -21,6 +22,8 @@ export type SearchFormProps = {
 
 /** Owns only the draft text; the committed query lives in the URL and replaces the draft whenever it changes. */
 export default function SearchForm({ initialQuery, placeholder, large = false, autoFocus = false, className, suggest, onSubmit }: SearchFormProps) {
+  const trUi = useUiTranslation()
+
   const listId = useId()
   const [draft, setDraft] = useState(initialQuery)
   const [committed, setCommitted] = useState(initialQuery)
@@ -61,11 +64,11 @@ export default function SearchForm({ initialQuery, placeholder, large = false, a
   return (
     <form role="search" onSubmit={submit} className={cn('m-0 flex min-w-0 items-center', large && 'gap-ui-3 max-sm:gap-ui-2', className)}>
       <div className={cn('relative min-w-0', large ? 'min-w-60 flex-1 max-sm:min-w-0' : 'w-full')}>
-        <SearchField role="combobox" aria-label="Tìm kiếm trên SocCo" aria-autocomplete="list" aria-expanded={showList} aria-controls={showList ? listId : undefined}
+        <SearchField role="combobox" aria-label={trUi("search.searchSocco")} aria-autocomplete="list" aria-expanded={showList} aria-controls={showList ? listId : undefined}
           aria-activedescendant={showList ? listId + '-' + active : undefined} autoComplete="off" maxLength={120} placeholder={placeholder} autoFocus={autoFocus} enterKeyHint="search"
           value={draft} onValueChange={edit} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onKeyDown={onKeyDown}
           trailing={large ? (
-            <Button type="submit" size="icon" aria-label="Tìm kiếm" className="-mr-3 h-auto w-12 shrink-0 self-stretch rounded-l-none rounded-r-ui-md bg-secondary text-primary shadow-[inset_1px_0_0_var(--soco-line)] transition-colors hover:bg-primary hover:text-white disabled:bg-transparent disabled:text-muted-foreground/60 disabled:opacity-100" disabled={!draft.trim()}><CornerDownLeft size={16} strokeWidth={2.4} aria-hidden="true" /></Button>
+            <Button type="submit" size="icon" aria-label={trUi("common.search")} className="-mr-3 h-auto w-12 shrink-0 self-stretch rounded-l-none rounded-r-ui-md bg-secondary text-primary shadow-[inset_1px_0_0_var(--soco-line)] transition-colors hover:bg-primary hover:text-white disabled:bg-transparent disabled:text-muted-foreground/60 disabled:opacity-100" disabled={!draft.trim()}><CornerDownLeft size={16} strokeWidth={2.4} aria-hidden="true" /></Button>
           ) : undefined} />
         {showList && <SearchSuggestions listId={listId} draft={draft} options={options} active={active} onPick={pick} />}
       </div>

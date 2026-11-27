@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal } from 'lucide-react'
@@ -26,6 +27,8 @@ function HighlightPreview({ item, full }: { item: StoryHighlight; full: boolean 
 }
 
 export default function StoryHighlights({ request, username, owner = false, className, mobileProfile = false }: Props) {
+  const trUi = useUiTranslation()
+
   const [items, setItems] = useState<StoryHighlight[] | null>(null)
   const [revision, setRevision] = useState(0)
   const [activeStoryId, setActiveStoryId] = useState<number | null>(null)
@@ -71,10 +74,10 @@ export default function StoryHighlights({ request, username, owner = false, clas
   const activeStory = items?.find(item => item.id === activeStoryId)
   if (!owner && (!items || items.length === 0)) return null
   return (
-    <section className={cn('min-w-0 bg-card text-foreground', full ? 'py-ui-1' : 'rounded-ui-lg border border-solid border-border p-ui-4', className)} aria-label="Tin nổi bật">
-      <h2 className={cn("m-0 mb-3", full ? "text-[length:var(--soco-type-section)]! font-semibold! tracking-[-0.3px] text-foreground!" : "text-ui-section font-semibold")}>Tin nổi bật</h2>
-      {refreshError ? <div><p role="status">Không tải được Tin nổi bật.</p><Button size={full ? "lg" : "sm"} type="button" variant="outline" onClick={refresh}>Tải lại</Button></div>
-        : !items ? <p role="status" className={full ? "min-h-46" : undefined}>Đang tải…</p>
+    <section className={cn('min-w-0 bg-card text-foreground', full ? 'py-ui-1' : 'rounded-ui-lg border border-solid border-border p-ui-4', className)} aria-label={trUi("feed.highlights")}>
+      <h2 className={cn("m-0 mb-3", full ? "text-[length:var(--soco-type-section)]! font-semibold! tracking-[-0.3px] text-foreground!" : "text-ui-section font-semibold")}>{trUi("feed.highlights")}</h2>
+      {refreshError ? <div><p role="status">Không tải được Tin nổi bật.</p><Button size={full ? "lg" : "sm"} type="button" variant="outline" onClick={refresh}>{trUi("common.reload")}</Button></div>
+        : !items ? <p role="status" className={full ? "min-h-46" : undefined}>{trUi("common.loading")}</p>
         : items.length === 0 && <p className={cn("text-sm", full ? "text-foreground/80" : "text-muted-foreground")}>Mở Story của bạn và chọn “Thêm vào Tin nổi bật” để giữ tin trên hồ sơ.</p>}
       {items && items.length > 0 && (
         <ul role="list" className={cn("m-0 mt-2 grid list-none grid-flow-col gap-ui-2 overflow-x-auto overscroll-x-contain p-1", full ? "auto-cols-[calc(var(--spacing)*28)]" : "auto-cols-[calc((100%_-_1rem)/3)]")}>
@@ -112,7 +115,7 @@ export default function StoryHighlights({ request, username, owner = false, clas
                     <p>Gỡ tin khỏi hồ sơ? Story chưa hết hạn vẫn xuất hiện trong danh sách Story thường.</p>
                     <div className="flex flex-wrap gap-2">
                       <Button type="button" disabled={busy} onClick={() => void remove(item.id)}>Xác nhận gỡ</Button>
-                      <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmRemove(false)}>Giữ lại</Button>
+                      <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmRemove(false)}>{trUi("common.keep")}</Button>
                     </div>
                   </div> : <Button type="button" variant="outline" disabled={busy || edit} onClick={() => setConfirmRemove(true)}>Gỡ khỏi Tin nổi bật</Button>}
                 </DialogContent>

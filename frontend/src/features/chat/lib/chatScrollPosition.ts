@@ -32,12 +32,12 @@ export function reconcileChatScroll(activeConversationId: number | null, refs: C
   }
 }
 
-export function resetChatScrollRestore(refs: Pick<ChatScrollRefs, "pendingMessageScrollRestore">) {
-  refs.pendingMessageScrollRestore.current = null;
-}
-
 export function resetChatFollowBottom(refs: Pick<ChatScrollRefs, "messageScrollAtBottom">) {
   refs.messageScrollAtBottom.current = true;
+}
+
+export function resetChatScrollRestore(refs: Pick<ChatScrollRefs, "pendingMessageScrollRestore">) {
+  refs.pendingMessageScrollRestore.current = null;
 }
 
 /** Set the initial position exactly once without smooth-scroll layout jumps. */

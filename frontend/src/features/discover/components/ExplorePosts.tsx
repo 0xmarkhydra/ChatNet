@@ -1,3 +1,4 @@
+import { useUiTranslation, useUiLocale, formatUiNumber } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, ChevronDown, FileText, Globe, LocateFixed, MapPin, SlidersHorizontal } from 'lucide-react'
@@ -12,12 +13,14 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLab
 import { listExplorePosts, type ExplorePost, type ExplorePostCursor, type ExplorePostLocation } from '../api/explore'
 import { getCurrentPositionSmart, geolocationErrorMessage } from '../lib/geolocation'
 
-function distanceLabel(meters: number) {
-  if (meters < 100) return 'Dưới 100 m'
-  return 'Khoảng ' + (meters / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' km'
+function distanceLabel(meters: number, trUi: ReturnType<typeof useUiTranslation>, locale: string) {
+  if (meters < 100) return trUi('discover.under100')
+  return trUi('discover.distance', { count: formatUiNumber(meters / 1000, locale, { maximumFractionDigits: 1 }) })
 }
 
 export default function ExplorePosts({ request, preview, onViewAll }: { request: ApiRequest; preview: boolean; onViewAll: () => void }) {
+  const trUi = useUiTranslation()
+
   const [radiusKm, setRadiusKm] = useState(5)
   const [location, setLocation] = useState<ExplorePostLocation | null>(null)
   const [locating, setLocating] = useState(false)
@@ -58,45 +61,47 @@ export default function ExplorePosts({ request, preview, onViewAll }: { request:
         <div className="flex min-w-0 items-center gap-ui-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-ui-md bg-secondary text-primary"><MapPin size={20} aria-hidden="true" /></span>
           <div className="grid min-w-0 gap-1">
-            <h2 id="explore-posts-title" className="text-ui-section!">Bài viết quanh bạn</h2>
-            <span className="text-ui-caption text-muted-foreground">Công khai · Gần nhất trước</span>
+            <h2 id="explore-posts-title" className="text-ui-section!">{trUi('discover.postsAround')}</h2>
+            <span className="text-ui-caption text-muted-foreground">{trUi('discover.publicNearest')}</span>
           </div>
         </div>
-        {preview && location && <Button variant="ghost" size="sm" onClick={onViewAll}>Xem tất cả bài viết <ArrowRight size={16} aria-hidden="true" /></Button>}
+        {preview && location && <Button variant="ghost" size="sm" onClick={onViewAll} >{trUi('discover.allPosts')} <ArrowRight size={16} aria-hidden="true" /></Button>}
       </div>
       <div className="flex flex-wrap items-center gap-ui-2">
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" disabled={locating} aria-label="Bán kính bài viết" className="group min-h-control-touch gap-ui-2 rounded-ui-md bg-muted px-ui-3 font-normal data-[state=open]:border-primary data-[state=open]:bg-secondary">
+            <Button variant="outline" disabled={locating} aria-label={trUi("common.ui.postRadius")} className="group min-h-control-touch gap-ui-2 rounded-ui-md bg-muted px-ui-3 font-normal data-[state=open]:border-primary data-[state=open]:bg-secondary">
               <SlidersHorizontal size={16} className="text-muted-foreground" aria-hidden="true" />
-              <span className="text-muted-foreground">Bán kính</span>
+              <span className="text-muted-foreground">{trUi('discover.radius')}</span>
               <span className="font-semibold tabular-nums">{radiusKm} km</span>
               <ChevronDown size={16} className="text-muted-foreground transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" sideOffset={8} collisionPadding={12} className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-44 rounded-ui-lg p-ui-1 shadow-ui-overlay">
-            <DropdownMenuLabel>Khoảng cách tìm kiếm</DropdownMenuLabel>
+            <DropdownMenuLabel>{trUi('discover.searchRadius')}</DropdownMenuLabel>
             <DropdownMenuRadioGroup value={String(radiusKm)} onValueChange={value => setRadiusKm(Number(value))}>
               {[1, 5, 10, 25, 50].map(radius => <DropdownMenuRadioItem key={radius} value={String(radius)}>{radius} km</DropdownMenuRadioItem>)}
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button className="min-h-control-touch flex-1" disabled={locating} onClick={() => void locate()}><LocateFixed size={17} />{location ? 'Cập nhật vị trí' : 'Tìm bài viết gần tôi'}</Button>
+        <Button className="min-h-control-touch flex-1" disabled={locating} onClick={() => void locate()}><LocateFixed size={17} />{trUi(location ? 'discover.updateLocation' : 'discover.findPostsNear')}</Button>
       </div>
-      <p className="text-ui-caption leading-relaxed">Vị trí chỉ dùng để tìm bài viết gần bạn, không bật hiển thị Quanh đây.</p>
-      {locating && <p role="status" className="text-ui-label">Đang xác định vị trí…</p>}
-      {locationError && <div role="alert" className="grid gap-ui-2 rounded-ui-sm border border-destructive/30 bg-destructive/5 p-ui-3 text-destructive">{locationError} <Button variant="secondary" size="sm" onClick={() => void locate()}>Thử lại</Button></div>}
+      <p className="text-ui-caption leading-relaxed">{trUi('discover.postPrivacy')}</p>
+      {locating && <p role="status" className="text-ui-label">{trUi("discover.locating")}</p>}
+      {locationError && <div role="alert" className="grid gap-ui-2 rounded-ui-sm border border-destructive/30 bg-destructive/5 p-ui-3 text-destructive">{locationError} <Button variant="secondary" size="sm" onClick={() => void locate()}>{trUi("common.retry")}</Button></div>}
     </div>
     {!location && !locating && !locationError && <div className="grid justify-items-center gap-ui-2 rounded-ui-lg border border-border bg-card p-ui-6 text-center">
       <span className="grid size-12 place-items-center rounded-ui-lg bg-muted text-muted-foreground"><FileText size={23} aria-hidden="true" /></span>
-      <strong className="text-ui-body">Khám phá những chia sẻ ở gần bạn</strong>
-      <p className="text-ui-label leading-relaxed">Chọn bán kính và dùng vị trí hiện tại để bắt đầu.</p>
+      <strong className="text-ui-body">{trUi('discover.nearbyShares')}</strong>
+      <p className="text-ui-label leading-relaxed">{trUi('discover.chooseRadius')}</p>
     </div>}
     {location && <NearbyPostResults key={revision + ':' + radiusKm} request={request} location={location} radiusKm={radiusKm} preview={preview} />}
   </section>
 }
 
 function NearbyPostResults({ request, location, radiusKm, preview }: { request: ApiRequest; location: ExplorePostLocation; radiusKm: number; preview: boolean }) {
+  const trUi = useUiTranslation()
+
   const requestRef = useLatest(request)
   const [page, setPage] = useState<{ cursor: ExplorePostCursor | null; attempt: number }>({ cursor: null, attempt: 0 })
   const [result, setResult] = useState<{ posts: ExplorePost[]; attempt: number; error: string; nextCursor: ExplorePostCursor | null }>({ posts: [], attempt: -1, error: '', nextCursor: null })
@@ -124,14 +129,17 @@ function NearbyPostResults({ request, location, radiusKm, preview }: { request: 
     <div className="grid min-w-0 gap-ui-3" aria-busy={loading}>
       {posts.map(post => <NearbyPostCard key={post.id} post={post} />)}
     </div>
-    {loading ? <p role="status" className="rounded-ui-lg border border-border bg-card p-ui-4 text-center text-ui-label">Đang tìm bài viết trong {radiusKm} km…</p>
-      : result.error ? <div role="alert" className="flex flex-wrap items-center gap-ui-2 rounded-ui-sm border border-destructive/30 bg-destructive/5 p-ui-3 text-destructive">{result.error} <Button variant="secondary" size="sm" onClick={() => setPage(current => ({ ...current, attempt: current.attempt + 1 }))}>Thử lại</Button></div>
-      : posts.length === 0 ? <p className="rounded-ui-lg border border-border bg-card p-ui-4 text-center text-ui-label leading-relaxed">Chưa có bài viết công khai trong {radiusKm} km. Hãy thử tăng bán kính.</p>
-      : !preview && result.nextCursor ? <Button variant="outline" className="min-h-control-touch w-full" onClick={() => setPage(current => ({ cursor: result.nextCursor, attempt: current.attempt + 1 }))}>Tải thêm bài viết</Button> : null}
+    {loading ? <p role="status" className="rounded-ui-lg border border-border bg-card p-ui-4 text-center text-ui-label">{trUi('discover.postsLoading', { count: radiusKm })}</p>
+      : result.error ? <div role="alert" className="flex flex-wrap items-center gap-ui-2 rounded-ui-sm border border-destructive/30 bg-destructive/5 p-ui-3 text-destructive">{result.error === 'Không tải được bài viết công khai. Hãy kiểm tra kết nối mạng.' ? trUi('discover.postsFailed') : result.error} <Button variant="secondary" size="sm" onClick={() => setPage(current => ({ ...current, attempt: current.attempt + 1 }))}>{trUi("common.retry")}</Button></div>
+      : posts.length === 0 ? <p className="rounded-ui-lg border border-border bg-card p-ui-4 text-center text-ui-label leading-relaxed">{trUi('discover.postsEmpty', { count: radiusKm })}</p>
+      : !preview && result.nextCursor ? <Button variant="outline" className="min-h-control-touch w-full" onClick={() => setPage(current => ({ cursor: result.nextCursor, attempt: current.attempt + 1 }))}>{trUi("discover.loadPosts")}</Button> : null}
   </>
 }
 
 function NearbyPostCard({ post }: { post: ExplorePost }) {
+  const trUi = useUiTranslation()
+
+  const locale = useUiLocale()
   const navigate = useNavigate()
   const extras = parsePostExtras(post.content)
   const postPath = feedPostPath(post.id)
@@ -139,14 +147,14 @@ function NearbyPostCard({ post }: { post: ExplorePost }) {
 
   return <article className="grid min-w-0 gap-ui-3 overflow-hidden rounded-ui-lg border border-border bg-card p-ui-4 shadow-ui-sm">
     <header className="flex min-w-0 items-center gap-ui-3">
-      <Link to={profilePath(post.author)} aria-label={'Xem hồ sơ ' + (post.authorDisplayName || post.author)} className="shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-ring">
+      <Link to={profilePath(post.author)} aria-label={trUi('common.ui.viewProfileNamed', { v1: post.authorDisplayName || post.author })} className="shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-ring">
         <UserAvatar name={post.authorDisplayName || post.author} username={post.author} className="avatar size-10 shrink-0" />
       </Link>
       <div className="grid min-w-0 flex-1 gap-1">
         <Link className="truncate text-ui-body font-semibold text-foreground no-underline hover:underline" to={profilePath(post.author)}>{post.authorDisplayName || post.author}</Link>
-        <span className="flex items-center gap-1 text-ui-caption text-muted-foreground"><Globe size={13} aria-hidden="true" /> Công khai</span>
+        <span className="flex items-center gap-1 text-ui-caption text-muted-foreground"><Globe size={13} aria-hidden="true" />{trUi("common.public")}</span>
       </div>
-      <span className="inline-flex max-w-full shrink-0 items-center gap-1 rounded-full bg-secondary px-ui-2 py-1 text-ui-caption font-semibold text-primary"><MapPin size={14} aria-hidden="true" />{distanceLabel(post.distanceMeters)}</span>
+      <span className="inline-flex max-w-full shrink-0 items-center gap-1 rounded-full bg-secondary px-ui-2 py-1 text-ui-caption font-semibold text-primary"><MapPin size={14} aria-hidden="true" />{distanceLabel(post.distanceMeters, trUi, locale)}</span>
     </header>
     <div className="grid min-w-0 gap-ui-2">
       <PostExtrasView extras={extras} onAuthorOpen={username => navigate(profilePath(username))} />
@@ -157,7 +165,7 @@ function NearbyPostCard({ post }: { post: ExplorePost }) {
     </div>}
     <div className="border-t border-border-subtle pt-ui-2">
       <Button asChild variant="ghost" className="min-h-control-touch w-full justify-between text-muted-foreground hover:text-primary">
-        <Link to={postPath} className="no-underline">Xem bài viết chi tiết <ArrowRight size={17} aria-hidden="true" /></Link>
+        <Link to={postPath} className="no-underline" >{trUi('discover.viewPost')} <ArrowRight size={17} aria-hidden="true" /></Link>
       </Button>
     </div>
   </article>

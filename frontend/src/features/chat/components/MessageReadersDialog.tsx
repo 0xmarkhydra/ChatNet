@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useId, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import UserAvatar from '../../../shared/ui/UserAvatar'
@@ -17,6 +18,8 @@ export function MessageReadersInline({
   members: Reader[]
   onOpen: () => void
 }) {
+  const trUi = useUiTranslation()
+
   const memberById = new Map(members.map((member) => [member.id, member]))
   const uniqueReaderIds = [...new Set(readerIds)]
   const resolvedReaders = uniqueReaderIds.flatMap((id) => {
@@ -34,7 +37,7 @@ export function MessageReadersInline({
           type="button"
           className="message-readers-preview"
           aria-haspopup="dialog"
-          aria-label={`Mở danh sách ${resolvedReaderCount} người đã xem${preview[0] ? `: ${preview[0].displayName.trim() || preview[0].username}` : ''}`}
+          aria-label={trUi("common.ui.readerListCount", { v1: String(resolvedReaderCount), v2: String(preview[0] ? `: ${preview[0].displayName.trim() || preview[0].username}` : '') })}
           title={preview.map((reader) => reader.displayName.trim() || reader.username).join(', ')}
           onClick={(event) => { event.stopPropagation(); onOpen() }}
         >
@@ -78,6 +81,8 @@ export default function MessageReadersDialog({
   request: ApiRequest
   onClose: () => void
 }) {
+  const trUi = useUiTranslation()
+
   const dialogRef = useRef<HTMLDialogElement>(null)
   const requestRef = useRef(request)
   const titleId = useId()
@@ -139,10 +144,10 @@ export default function MessageReadersDialog({
     >
       <header className="message-readers-dialog__header">
         <div>
-          <h2 id={titleId}>Người đã xem</h2>
+          <h2 id={titleId}>{trUi("chat.seenBy")}</h2>
           <p>Danh sách người đã xem tin nhắn này</p>
         </div>
-        <button type="button" className="message-readers-dialog__close" aria-label="Đóng danh sách người đã xem" onClick={closeDialog}>
+        <button type="button" className="message-readers-dialog__close" aria-label={trUi("common.ui.closeReaders")} onClick={closeDialog}>
           <X size={19} aria-hidden="true" />
         </button>
       </header>
@@ -152,7 +157,7 @@ export default function MessageReadersDialog({
         {!loading && error && (
           <div className="message-readers-dialog__state" role="alert">
             <p>{error}</p>
-            <button type="button" onClick={() => setRetry((current) => current + 1)}>Thử lại</button>
+            <button type="button" onClick={() => setRetry((current) => current + 1)}>{trUi("common.retry")}</button>
           </div>
         )}
         {!loading && !error && readers.length === 0 && (

@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import type { FormEvent } from 'react'
 import { Input } from '../../../shared/ui/input'
 import { Button } from '../../../shared/ui/button'
@@ -31,6 +32,8 @@ export default function ProfileIdentityForm({
   profileMedia,
   cityDraft, setCityDraft, publicDetailsDraft, setPublicDetailsDraft,
 }: Props) {
+  const trUi = useUiTranslation()
+
   return (
     <form className="profile-edit-card" onSubmit={saveProfileIdentity}>
       <div className="profile-edit-heading">
@@ -74,7 +77,7 @@ export default function ProfileIdentityForm({
       <label className="profile-edit-field">
         <span>Nơi sống</span>
         <Input name="city" maxLength={100} value={cityDraft} onChange={event => setCityDraft(event.target.value)}
-          placeholder="Tùy chọn · hiển thị trên hồ sơ" disabled={profileSaving} />
+          placeholder={trUi("profile.profileVisibility")} disabled={profileSaving} />
       </label>
       <ProfilePublicDetailsFields value={publicDetailsDraft} onChange={setPublicDetailsDraft}
         fieldClass="profile-edit-field" disabled={profileSaving} />

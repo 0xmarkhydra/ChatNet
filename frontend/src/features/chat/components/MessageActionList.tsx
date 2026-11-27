@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Copy, Forward, Languages, Pin, Reply } from 'lucide-react'
 import type { MessageActionsProps } from '../types/messageActions'
 
@@ -6,6 +7,8 @@ export default function MessageActionList({
  setMessageActionId, setReplyingTo, copyTarget, copyMessageContent,
  translateMessage, editOwnMessage, recallOwnMessage,
 }: MessageActionsProps) {
+  const trUi = useUiTranslation()
+
  const mine = activeMessageAction.senderId === userId
  return <>
         <div className="message-context-actions">
@@ -17,7 +20,7 @@ export default function MessageActionList({
             }}
           >
             <span aria-hidden="true"><Reply size={21} strokeWidth={2} /></span>
-            <b>Trả lời</b>
+            <b>{trUi("chat.reply")}</b>
           </button>
 
           {!activeMessageAction.deleted && (
@@ -26,14 +29,14 @@ export default function MessageActionList({
               onForwardMessage(activeMessageAction)
             }}>
               <span aria-hidden="true"><Forward size={20} strokeWidth={2} /></span>
-              <b>Chuyển tiếp</b>
+              <b>{trUi("chat.forward")}</b>
             </button>
           )}
 
           {copyTarget && (
             <button type="button" onClick={() => void copyMessageContent(activeMessageAction, copyTarget)}>
               <span aria-hidden="true"><Copy size={20} strokeWidth={2} /></span>
-              <b>Sao chép</b>
+              <b>{trUi("common.copy")}</b>
             </button>
           )}
 
@@ -43,7 +46,7 @@ export default function MessageActionList({
                 void toggleMessagePin(activeMessageAction)
               }}>
               <span aria-hidden="true"><Pin size={20} strokeWidth={2} /></span>
-              <b>{isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}</b>
+              <b>{isPinned ? trUi("chat.unpinMessage") : 'Ghim tin nhắn'}</b>
             </button>
           )}
 
@@ -56,7 +59,7 @@ export default function MessageActionList({
               }}
             >
               <span aria-hidden="true"><Languages size={21} strokeWidth={2} /></span>
-              <b>Dịch</b>
+              <b>{trUi("chat.translate")}</b>
             </button>
           )}
 
@@ -69,7 +72,7 @@ export default function MessageActionList({
               }}
             >
               <span aria-hidden="true">✎</span>
-              <b>Sửa</b>
+              <b>{trUi("common.edit")}</b>
             </button>
           )}
 
@@ -83,7 +86,7 @@ export default function MessageActionList({
               }}
             >
               <span aria-hidden="true">⌫</span>
-              <b>Thu hồi</b>
+              <b>{trUi("chat.recall")}</b>
             </button>
           )}
         </div>

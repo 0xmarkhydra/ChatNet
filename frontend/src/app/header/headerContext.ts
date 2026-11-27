@@ -1,22 +1,23 @@
+import { createUiTranslator, type UiCopyKey } from '../../shared/i18n/locale'
 import type { Tab } from "../../shared/types/navigation";
 
 export type DesktopSection = "groups" | "calls" | null;
 
-export function searchLabels(tab: Tab) {
+export function searchLabels(tab: Tab, t: (key: UiCopyKey) => string = createUiTranslator('vi')) {
   switch (tab) {
     case "notifications":
-      return { placeholder: "Tìm kiếm thông báo...", ariaLabel: "Tìm thông báo..." };
+      return { placeholder: t('common.ui.searchNotifications'), ariaLabel: t('common.ui.findNotifications') };
     case "contacts":
-      return { placeholder: "Tên, @username hoặc email", ariaLabel: "Tìm bạn bằng tên, username hoặc email" };
+      return { placeholder: t('contacts.nameEmail'), ariaLabel: t('contacts.findName') };
     case "discover":
-      return { placeholder: "Tìm người và kết nối...", ariaLabel: "Tìm người trên Khám phá" };
+      return { placeholder: t('common.ui.findConnect'), ariaLabel: t('common.ui.findDiscover') };
     case "market":
-      return { placeholder: "Tìm kiếm sản phẩm...", ariaLabel: "Tìm sản phẩm trên Marketplace" };
+      return { placeholder: t('common.ui.searchProducts'), ariaLabel: t('common.ui.findMarketplace') };
     case "profile":
-      return { placeholder: "Tìm kiếm trên SocCo...", ariaLabel: "Tìm bài viết trên SocCo" };
+      return { placeholder: t('common.ui.searchSocco'), ariaLabel: t('common.ui.searchSoccoPosts') };
     case "feed":
-      return { placeholder: "Tìm tác giả hoặc nội dung bài viết", ariaLabel: "Tìm bài viết" };
+      return { placeholder: t('common.ui.searchPostAuthor'), ariaLabel: t('common.ui.findPosts') };
     default:
-      return { placeholder: "Tìm liên hệ, tin nhắn, file", ariaLabel: "Tìm cuộc trò chuyện" };
+      return { placeholder: t('common.ui.searchContactsMessages'), ariaLabel: t('common.ui.findConversation') };
   }
 }

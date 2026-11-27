@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState } from 'react'
 import { Heart } from 'lucide-react'
 import { searchStickers, stickerFile, type Sticker } from '../utils/stickerCatalog'
@@ -15,6 +16,8 @@ function readLibrary(key: string): Library {
 }
 
 export default function ChatStickerPicker({ onSelect, disabled, userId }: Props) {
+  const trUi = useUiTranslation()
+
   const storageKey = 'soco.stickers.' + (userId ?? 'guest')
   const [library, setLibrary] = useState(() => readLibrary(storageKey))
   const [query, setQuery] = useState('')
@@ -49,7 +52,7 @@ export default function ChatStickerPicker({ onSelect, disabled, userId }: Props)
         <button type="button" key={id} aria-pressed={tab === id} onClick={() => setTab(id)}
           className="min-h-control-touch flex-1 rounded-ui-md border-0 bg-transparent text-ui-label text-foreground aria-pressed:bg-accent aria-pressed:text-primary">{label}</button>)}
     </div>
-    <input type="search" aria-label="Tìm sticker" placeholder="Tìm sticker..." value={query}
+    <input type="search" aria-label={trUi("chat.stickerSearch")} placeholder={trUi("chat.stickerPlaceholder")} value={query}
       onChange={event => setQuery(event.target.value)}
       className="min-h-control-touch w-full rounded-ui-md border border-border bg-card px-ui-3 text-foreground" />
     <div className="grid max-h-64 grid-cols-4 gap-ui-2 overflow-y-auto overscroll-contain">
@@ -64,7 +67,7 @@ export default function ChatStickerPicker({ onSelect, disabled, userId }: Props)
         </button>
       </div>)}
     </div>
-    {!items.length && <p role="status" className="text-ui-label text-muted-foreground">Không tìm thấy sticker.</p>}
+    {!items.length && <p role="status" className="text-ui-label text-muted-foreground">{trUi("chat.noSticker")}</p>}
     {error && <p role="alert" className="text-ui-label text-danger">{error}</p>}
   </div>
 }

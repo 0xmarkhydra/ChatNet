@@ -1,3 +1,5 @@
+import { createUiTranslator, type UiCopyKey } from '@/shared/i18n/locale'
+import { loadAppLocalePreference } from '../features/i18n'
 import { useEffect, useState } from 'react'
 import App from './App'
 import DesktopScreenPicker from '../platform/DesktopScreenPicker'
@@ -7,9 +9,11 @@ import { clearChatOutbox } from '../features/chat/lib/chatOutbox'
 import { API } from '../shared/lib/config'
 import { desktopBridge, initializeDesktopPlatform } from '../platform/desktop'
 
-type Startup = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready'; session: Session | null }
+type Startup = { phase: 'loading' } | { phase: 'error'; message: UiCopyKey } | { phase: 'ready'; session: Session | null }
 
 export default function DesktopBootstrap() {
+  const trUi = createUiTranslator(loadAppLocalePreference())
+
   const [attempt, setAttempt] = useState(0)
   const [startupResult, setStartupResult] = useState<{ attempt: number; value: Startup }>({
     attempt: 0,
@@ -47,11 +51,11 @@ export default function DesktopBootstrap() {
     void restore().catch((error: unknown) => {
       if (!active) return
       const detail = error instanceof Error ? error.message : ''
-      const message = detail.includes('VAULT_')
-        ? 'Không mở được kho phiên an toàn của hệ điều hành. Kiểm tra quyền Keychain hoặc tài khoản Windows rồi thử lại.'
+      const message: UiCopyKey = detail.includes('VAULT_')
+        ? 'common.ui.desktopVault'
         : detail.includes('DESKTOP_')
-          ? 'Bản Desktop thiếu bridge hoặc cấu hình API không khớp. Hãy dùng đúng bộ cài SocCO.'
-          : 'Chưa xác minh được phiên đăng nhập. Kiểm tra kết nối rồi thử lại. Tin đang chờ và bản nháp vẫn được giữ.'
+          ? 'common.ui.desktopMismatch'
+          : 'common.ui.desktopSessionFailed'
       setStartupResult({ attempt, value: { phase: 'error', message } })
     })
     return () => { active = false; unsubscribe?.() }
@@ -61,9 +65,9 @@ export default function DesktopBootstrap() {
   return (
     <main className="desktop-startup" aria-live="polite">
       <h1>SocCO</h1>
-      {startup.phase === 'loading' ? <p role="status">Đang khôi phục phiên an toàn…</p> : <>
-        <p role="alert">{startup.message}</p>
-        <button type="button" onClick={() => setAttempt((value) => value + 1)}>Thử lại</button>
+      {startup.phase === 'loading' ? <p role="status">{trUi("common.ui.desktopRestoring")}</p> : <>
+        <p role="alert">{trUi(startup.message)}</p>
+        <button type="button" onClick={() => setAttempt((value) => value + 1)}>{trUi("common.retry")}</button>
       </>}
     </main>
   )

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import ProfileTabs from './ProfileTabs'
 import ProfileHero from './ProfileHero'
 import ProfileDetailsCard from './ProfileDetailsCard'
+import { UiLocaleContext, createUiTranslator } from '@/shared/i18n/locale'
 
 describe('Profile shared presentation tokens', () => {
   it('uses the same semantic colors for accessible tab navigation', () => {
@@ -27,4 +28,14 @@ describe('Profile shared presentation tokens', () => {
     expect(details).toContain('Có ')
     expect(details).not.toContain('text-[#17233d]')
   })
+})
+
+it('localizes the grouped desktop profile while preserving personal details', () => {
+  for (const locale of ['vi', 'en', 'zh', 'ja', 'ko']) {
+    const t = createUiTranslator(locale)
+    const markup = renderToStaticMarkup(<UiLocaleContext.Provider value={{ locale }}>
+      <ProfileDetailsCard grouped username="demo" city="Hà Nội" workplace="Đội sản phẩm" friendCount={4} hasPrivateEmail onEdit={() => {}} />
+    </UiLocaleContext.Provider>)
+    for (const value of [t('profile.personalInfo'), t('profile.work'), t('profile.education'), t('profile.friendCount', { count: 4 }), t('profile.privateEmail'), t('profile.editWork'), 'Hà Nội', 'Đội sản phẩm', '@demo']) expect(markup).toContain(value)
+  }
 })

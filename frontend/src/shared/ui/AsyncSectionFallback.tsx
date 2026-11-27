@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { Button } from "./button";
 
 type AsyncSectionFallbackProps = {
@@ -9,6 +10,8 @@ type AsyncSectionFallbackProps = {
 
 /** Shared async boundary for route code-splitting and recoverable render errors. */
 export function AsyncSectionFallback({ title, loading = false, onRetry, onReload }: AsyncSectionFallbackProps) {
+  const trUi = useUiTranslation()
+
   return (
     <section
       className="mx-auto flex min-h-40 w-full flex-col items-center justify-center gap-3 p-6 text-center"
@@ -23,11 +26,11 @@ export function AsyncSectionFallback({ title, loading = false, onRetry, onReload
           <div className="h-3 w-4/5 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
         </div>
       )}
-      <p className="text-sm text-muted-foreground">{loading ? `Đang tải ${title}…` : `Không thể hiển thị ${title}.`}</p>
+      <p className="text-sm text-muted-foreground">{loading ? trUi("common.ui.loadingSection", { name: title }) : trUi("common.ui.failedSection", { name: title })}</p>
       {!loading && (onRetry || onReload) && (
         <div className="flex flex-wrap justify-center gap-2">
-          {onRetry && <Button variant="outline" className="min-h-11" onClick={onRetry}>Thử lại</Button>}
-          {onReload && <Button variant="outline" className="min-h-11" onClick={onReload}>Tải lại trang</Button>}
+          {onRetry && <Button variant="outline" className="min-h-11" onClick={onRetry}>{trUi("common.retry")}</Button>}
+          {onReload && <Button variant="outline" className="min-h-11" onClick={onReload}>{trUi("common.ui.reloadPage")}</Button>}
         </div>
       )}
     </section>

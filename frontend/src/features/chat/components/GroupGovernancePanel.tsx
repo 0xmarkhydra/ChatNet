@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import {
   ClipboardCopy,
   Link2,
@@ -38,6 +39,8 @@ function GroupGovernancePanelContent({
   onMembersChanged,
   section,
 }: GroupGovernanceProps) {
+  const trUi = useUiTranslation()
+
   const { settings,setSettings,expiryHours,setExpiryHours,maxUses,setMaxUses,createdUrl,invites,now,requests,audit,before,busy,error,isOwner,canInvite,canApprove,canAudit,createInvite,saveSettings,revokeInvite,review,loadMoreAudit,run,refreshRequests,setError } = useGroupGovernance({ conversationId, role, request, notify, onMembersChanged });
 
   if (role === "member") return null;
@@ -45,7 +48,7 @@ function GroupGovernancePanelContent({
   return (
     <div className="group-governance" data-section={section}>
       <h3>
-        <ShieldCheck size={18} /> {section === "requests" ? "Yêu cầu tham gia" : section === "activity" ? "Nhật ký hoạt động" : "Quyền quản trị"}
+        <ShieldCheck size={18} /> {section === "requests" ? trUi("chat.joinRequests") : section === "activity" ? trUi("chat.activityLog") : trUi("chat.adminRights")}
       </h3>
       {error && (
         <p className="group-governance-error" role="alert">
@@ -53,7 +56,7 @@ function GroupGovernancePanelContent({
         </p>
       )}
       {(!section || section === "permissions") && <section>
-        <h4>Quyền quản trị</h4>
+        <h4>{trUi("chat.adminRights")}</h4>
         <label>
           <input
             type="checkbox"
@@ -144,7 +147,7 @@ function GroupGovernancePanelContent({
             <label>
               Số lượt tối đa
               <input
-                aria-label="Số lượt sử dụng link mời"
+                aria-label={trUi("common.ui.inviteUses")}
                 type="number"
                 min={0}
                 max={10000}
@@ -167,7 +170,7 @@ function GroupGovernancePanelContent({
           {createdUrl && (
             <div className="group-governance-link">
               <input
-                aria-label="Link mời vừa tạo"
+                aria-label={trUi("common.ui.newInviteLink")}
                 value={createdUrl}
                 readOnly
               />
@@ -180,8 +183,7 @@ function GroupGovernancePanelContent({
                     .catch(() => setError("Không thể sao chép link."))
                 }
               >
-                <ClipboardCopy size={16} /> Sao chép
-              </button>
+                <ClipboardCopy size={16} />{trUi("common.copy")}</button>
             </div>
           )}
           {invites.map((link) => {
@@ -204,8 +206,7 @@ function GroupGovernancePanelContent({
                     disabled={busy}
                     onClick={() => void revokeInvite(link.id)}
                   >
-                    <Ban size={14} /> Thu hồi
-                  </button>
+                    <Ban size={14} />{trUi("chat.recall")}</button>
                 ) : (
                   <small>Hết hiệu lực</small>
                 )}
@@ -223,9 +224,7 @@ function GroupGovernancePanelContent({
               type="button"
               disabled={busy}
               onClick={() => void run(refreshRequests)}
-            >
-              Làm mới
-            </button>
+            >{trUi("common.refresh")}</button>
           </h4>
           {requests.length === 0 && <small>Chưa có yêu cầu đang chờ.</small>}
           {requests.map((item) => (
@@ -247,9 +246,7 @@ function GroupGovernancePanelContent({
                 type="button"
                 disabled={busy}
                 onClick={() => void review(item, false)}
-              >
-                Từ chối
-              </button>
+              >{trUi("common.decline")}</button>
             </div>
           ))}
         </section>

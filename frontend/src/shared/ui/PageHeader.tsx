@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import type { ReactNode } from 'react'
 import { cn } from '../lib/utils'
 
@@ -15,11 +16,13 @@ type PageHeaderProps = {
 
 /** Page-owned toolbar. The surrounding page owns scrolling; this component never does. */
 export default function PageHeader({ title, tabs, activeTab, onTabChange, search, actions, className }: PageHeaderProps) {
+  const trUi = useUiTranslation()
+
   return (
     <header className={cn('flex min-h-14 min-w-0 flex-wrap items-center gap-3 border-b border-border bg-background px-4 py-2 md:px-6', className)}>
       <h1 className="m-0 shrink-0 text-lg font-bold text-foreground">{title}</h1>
       {tabs && tabs.length > 0 && (
-        <div role="tablist" aria-label={`Điều hướng ${title}`} className="flex min-w-0 flex-wrap items-center gap-1">
+        <div role="tablist" aria-label={trUi("common.ui.navigationNamed", { v1: String(title) })} className="flex min-w-0 flex-wrap items-center gap-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}

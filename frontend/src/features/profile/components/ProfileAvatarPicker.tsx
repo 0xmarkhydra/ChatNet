@@ -1,3 +1,4 @@
+import { useUiTranslation } from '@/shared/i18n/locale'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Camera, Check, ChevronDown, ImagePlus, RotateCcw, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
@@ -21,6 +22,8 @@ type Choice = { kind: 'file'; file: File; url: string } | { kind: 'photo'; photo
 const PHOTO_LIMIT = 6
 
 export default function ProfileAvatarPicker({ username, avatarUrl, posts, busy, opener, inputRef, onSave, onClose }: Props) {
+  const trUi = useUiTranslation()
+
   const [choice, setChoice] = useState<Choice | null>(null)
   const [error, setError] = useState('')
   const [brokenPreview, setBrokenPreview] = useState('')
@@ -95,19 +98,19 @@ export default function ProfileAvatarPicker({ username, avatarUrl, posts, busy, 
           <span className="flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
             <Camera size={14} aria-hidden="true" /> Hồ sơ SocCo
           </span>
-          <DialogTitle className="m-0 text-xl">Đổi ảnh đại diện</DialogTitle>
+          <DialogTitle className="m-0 text-xl">{trUi("profile.avatarChange")}</DialogTitle>
           <DialogDescription className="m-0">
             {photos.length ? 'Tải ảnh mới hoặc chọn một ảnh từ bài viết của bạn.' : 'Tải ảnh từ thiết bị và xem trước khi lưu.'}
           </DialogDescription>
         </header>
 
         <div className={photos.length ? 'grid min-w-0 gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,5fr)]' : 'grid min-w-0'}>
-          <section aria-label="Xem trước ảnh đại diện"
+          <section aria-label={trUi("common.ui.previewAvatar")}
             className="grid min-w-0 content-start justify-items-center gap-3 rounded-ui-lg border border-border bg-linear-to-br from-primary/10 via-accent/50 to-card p-4 text-center">
-            <div className="m-0 text-sm font-semibold text-foreground">Xem trước</div>
+            <div className="m-0 text-sm font-semibold text-foreground">{trUi("common.preview")}</div>
             <div className="grid size-24 place-items-center overflow-hidden rounded-full border-4 border-card bg-card text-primary shadow-sm sm:size-28">
               {preview && preview !== brokenPreview
-                ? <img src={preview} alt="Ảnh đại diện xem trước" referrerPolicy="no-referrer"
+                ? <img src={preview} alt={trUi("common.ui.avatarPreview")} referrerPolicy="no-referrer"
                     onError={() => setBrokenPreview(preview)} className="size-full object-cover" />
                 : <ImagePlus size={28} aria-hidden="true" />}
             </div>
@@ -127,7 +130,7 @@ export default function ProfileAvatarPicker({ username, avatarUrl, posts, busy, 
               <Upload size={17} aria-hidden="true" /> Tải ảnh lên
             </Button>
             <p className="m-0 text-xs text-muted-foreground">JPG, PNG, WebP, GIF, HEIC · Tối đa 12 MB</p>
-            <input type="file" hidden ref={inputRef} disabled={disabled} aria-label="Tệp ảnh đại diện"
+            <input type="file" hidden ref={inputRef} disabled={disabled} aria-label={trUi("common.ui.avatarFile")}
               accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif"
               onChange={event => {
                 selectFile(event.currentTarget.files?.[0])
@@ -154,8 +157,7 @@ export default function ProfileAvatarPicker({ username, avatarUrl, posts, busy, 
               </div>
               {photos.length > visibleCount && (
                 <Button size="lg" variant="outline" className="w-fit px-3" onClick={() => setVisibleCount(visibleCount + PHOTO_LIMIT)}>
-                  <ChevronDown size={16} aria-hidden="true" /> Xem thêm
-                </Button>
+                  <ChevronDown size={16} aria-hidden="true" />{trUi("common.seeMore")}</Button>
               )}
             </section>
           )}
@@ -166,17 +168,15 @@ export default function ProfileAvatarPicker({ username, avatarUrl, posts, busy, 
           {avatarUrl && choice?.kind !== 'remove' && (
             <Button variant="ghost" size="lg" className="mr-auto px-2.5 text-destructive" disabled={disabled}
               onClick={() => { setError(''); setChoice({ kind: 'remove' }) }}>
-              <Trash2 size={16} aria-hidden="true" /> Gỡ ảnh
-            </Button>
+              <Trash2 size={16} aria-hidden="true" />{trUi("chat.removePhoto")}</Button>
           )}
           {choice && (
-            <Button aria-label="Hoàn tác lựa chọn" variant="ghost" size="lg" className="px-2.5" disabled={disabled}
+            <Button aria-label={trUi("common.ui.undoSelection")} variant="ghost" size="lg" className="px-2.5" disabled={disabled}
               onClick={() => { setError(''); setChoice(null) }}>
-              <RotateCcw size={16} aria-hidden="true" /> Hoàn tác
-            </Button>
+              <RotateCcw size={16} aria-hidden="true" />{trUi("common.undo")}</Button>
           )}
           <Button size="lg" className="px-4" disabled={!choice || disabled} onClick={() => void save()}>
-            <Check size={17} aria-hidden="true" /> {disabled ? 'Đang lưu…' : 'Lưu ảnh'}
+            <Check size={17} aria-hidden="true" /> {disabled ? trUi("common.saving") : trUi("chat.savePhoto")}
           </Button>
         </DialogFooter>
       </DialogContent>
