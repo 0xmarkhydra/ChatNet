@@ -1,6 +1,7 @@
+import { Link } from "react-router-dom";
 import { StoryHighlights } from '../../feed'
 import { SettingsWorkspace } from "../../settings";
-import { PencilLine, Download, LogOut, ChevronDown, ChevronRight, Volume2, ArrowLeft, Settings, Images, RefreshCw, Camera, Plus, Ellipsis } from "lucide-react";
+import { PencilLine, Download, LogOut, ChevronDown, ChevronRight, Volume2, ArrowLeft, Settings, Images, RefreshCw, Camera, Plus, Ellipsis, Menu, Search } from "lucide-react";
 import { BlockedUsersPanel, type FriendConnection } from "../../contacts";
 import PostComposerLauncher from "@/shared/ui/PostComposerLauncher";
 import ProfileFriendsPreview from "./ProfileFriendsPreview";
@@ -8,6 +9,7 @@ import { isDesktopBuild } from "../../../platform/desktop";
 import { AccountSessionsPanel } from "../../auth";
 import UserAvatar, { avatarTone, profileAssetUrl } from "../../../shared/ui/UserAvatar";
 import { Button } from "@/shared/ui/button";
+import { CoverHeader, CoverHeaderAction, COVER_HEADER_OFFSET } from "@/shared/ui/CoverHeader";
 import UiIcon from "../../../shared/ui/UiIcon";
 import ProfileNote from "./ProfileNote";
 import ProfileAvatarMenu from "./ProfileAvatarMenu";
@@ -28,7 +30,7 @@ import { useState, type SetStateAction } from "react";
 import type { Tab } from "../../../shared/types/navigation";
 import { UI_MESSAGES } from "../../i18n";
 import type { LanguageOption } from "../../i18n";
-import type { Dispatch, RefObject, ReactNode } from "react";
+import type { Dispatch, RefObject, ReactNode, CSSProperties } from "react";
 
 export type ProfileSectionProps = {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
@@ -230,9 +232,9 @@ export default function ProfileSection({
   const [avatarPicker, setAvatarPicker] = useState<{ opener: HTMLButtonElement | null } | null>(null);
   const openAvatarPicker = (opener: HTMLButtonElement | null) => setAvatarPicker({ opener });
   const displayName = userLabel(profileMedia?.displayName || session.user.displayName, name);
-  const [timelineView, setTimelineView] = useState<"all" | "media">("all");
+  const [timelineView, setTimelineView] = useState<"all" | "image" | "video">("all");
   const mobileTimeline = profileTimelineOpen && !isProfileDesktop;
-  const mediaSelected = mobileTimeline && timelineView === "media";
+  const mediaSelected = mobileTimeline && timelineView !== "all";
   const activeSettings = mobileTimeline ? settingsView : null;
   const editingProfile = isMobileProfileEdit(activeSettings);
   const openEdit = (fromMenu: boolean) => setSettingsView(fromMenu ? "edit-from-menu" : "edit");
@@ -462,6 +464,15 @@ export default function ProfileSection({
                 {activeSettings === "blocked" && <section className="rounded-ui-lg bg-card p-ui-3"><BlockedUsersPanel blockedBusy={blockedBusy} blockedOpen={blockedOpen} setBlockedOpen={setBlockedOpen} loadBlockedUsers={loadBlockedUsers} blockedError={blockedError} blockedUsers={blockedUsers} unblockContact={unblockContact} />{blockedBusy && <p role="status">Đang tải…</p>}</section>}
               </MobileProfileScreen>
             ) : <>
+            {mobileTimeline && (
+                <CoverHeader label="Điều hướng trang cá nhân"
+                  leading={<CoverHeaderAction label="Menu tài khoản" onClick={closeProfileTimeline}><Menu size={24} aria-hidden="true" /></CoverHeaderAction>}
+                >
+                  <CoverHeaderAction label="Chỉnh sửa trang cá nhân" onClick={() => openEdit(false)}><PencilLine size={24} aria-hidden="true" /></CoverHeaderAction>
+                  <CoverHeaderAction label="Tìm kiếm" asChild><Link to="/search"><Search size={24} aria-hidden="true" /></Link></CoverHeaderAction>
+                  <CoverHeaderAction label="Cài đặt trang cá nhân" onClick={() => setSettingsView("menu")}><Ellipsis size={25} className="rounded-full border-2 border-current p-0.5" aria-hidden="true" /></CoverHeaderAction>
+                </CoverHeader>
+            )}
             <ProfileHero username={name}
               compact={!profileTimelineOpen && !isProfileDesktop}
               centered={mobileTimeline}
@@ -472,7 +483,7 @@ export default function ProfileSection({
               friendCount={friendCount}
               coverUrl={profileMedia?.coverSet ? profileAssetUrl(name, "cover", profileMedia.updatedAt) : undefined}
               fallbackCoverTone={isProfileDesktop ? undefined : avatarTone(displayName)}
-              coverAction={<>{mobileTimeline && <button type="button" aria-label="Cài đặt trang cá nhân" className="absolute right-4 top-4 z-20 grid size-control-touch place-items-center rounded-ui-md border-0 bg-black/60 text-white focus-visible:outline-2 focus-visible:outline-white" onClick={() => setSettingsView("menu")}><Ellipsis size={22} aria-hidden="true" /></button>}<button type="button" className={mobileTimeline ? "absolute right-4 bottom-9 z-20 grid size-control-touch place-items-center rounded-ui-md border-0 bg-black/60 text-white disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" : "profile-page-cover-action"}
+              coverAction={<><button type="button" className={mobileTimeline ? "absolute right-4 bottom-9 z-20 grid size-control-touch place-items-center rounded-ui-md border-0 bg-black/60 text-white disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" : "profile-page-cover-action"}
                 aria-label={coverLabel} title={coverLabel}
                 disabled={profileBusy !== null || mediaUploading === "profile"}
                 onClick={() => coverFileInputRef.current?.click()}>
@@ -509,26 +520,28 @@ export default function ProfileSection({
               )} />
 
             {mobileTimeline && (
-              <div className="flex w-full shrink-0 flex-wrap gap-ui-2 px-ui-4 py-ui-2 box-border" role="group" aria-label="Nội dung trang cá nhân">
+              <div className="sticky top-[var(--cover-header-offset)] z-20 flex w-full shrink-0 flex-wrap gap-ui-2 bg-card px-ui-4 py-ui-2 box-border" style={{ "--cover-header-offset": COVER_HEADER_OFFSET } as CSSProperties} role="group" aria-label="Nội dung trang cá nhân">
                 <Button size="lg" variant={timelineView === "all" ? "secondary" : "ghost"}
                   className="min-h-control-touch rounded-full! text-[14px]! font-semibold! text-foreground! aria-pressed:bg-[#e2ecff]! aria-pressed:font-bold! aria-pressed:text-primary!"
-                  aria-pressed={timelineView === "all"} onClick={() => setTimelineView("all")}>Tất cả</Button>
-                <Button size="lg" variant={timelineView === "media" ? "secondary" : "ghost"}
-                  className="min-h-control-touch rounded-full! text-[14px]! font-semibold! text-foreground! aria-pressed:bg-[#e2ecff]! aria-pressed:font-bold! aria-pressed:text-primary!"
-                  aria-pressed={timelineView === "media"} onClick={() => setTimelineView("media")}>Ảnh &amp; video</Button>
+                  aria-pressed={timelineView === "all"} onClick={() => setTimelineView("all")}>Bài viết</Button>
+                {(["image", "video"] as const).map(kind => (
+                  <Button key={kind} size="lg" variant={timelineView === kind ? "secondary" : "ghost"}
+                    className="min-h-control-touch rounded-full! text-[14px]! font-semibold! text-foreground! aria-pressed:bg-primary/10! aria-pressed:text-primary!"
+                    aria-pressed={timelineView === kind} onClick={() => setTimelineView(kind)}>{kind === "image" ? "Ảnh" : "Video"}</Button>
+                ))}
                 <Button variant="ghost" size="icon" className="ml-auto size-control-touch rounded-full! text-muted-foreground!" aria-label="Cài đặt" onClick={closeProfileTimeline}><Settings size={20} aria-hidden="true" /></Button>
               </div>
             )}
 
             {mediaSelected ? (
-              <section className="personal-timeline-content profile-mobile-media w-full! px-ui-4!" aria-label="Ảnh và video">
+              <section className="personal-timeline-content profile-mobile-media w-full! px-ui-4!" aria-label={timelineView === "image" ? "Ảnh" : "Video"}>
                 {profilePostsError && <p role="alert">{profilePostsError}{" "}
                   <Button variant="outline" onClick={() => void loadProfilePosts(false, true)}>Thử lại</Button></p>}
                 <ProfileMediaGallery
                   items={profilePosts.flatMap(post => (post.attachments ?? []).flatMap((attachment, index) =>
-                    attachment.kind === "image" || attachment.kind === "video" ? [{ postId: post.id, attachment, index }] : [],
+                    attachment.kind === timelineView && attachment.url ? [{ postId: post.id, attachment, index }] : [],
                   ))}
-                  emptyText="Chưa có ảnh hoặc video trong các bài viết đã tải."
+                  emptyText={timelineView === "image" ? "Chưa có ảnh trong các bài viết đã tải." : "Chưa có video trong các bài viết đã tải."}
                   postsBusy={profilePostsBusy} onOpenPost={onOpenPost} onCreatePost={() => setProfileComposerOpen(true)} />
                 {profileHasMore && <Button variant="outline" disabled={profilePostsBusy}
                   onClick={() => void loadProfilePosts(true)}>Xem thêm từ bài viết cũ</Button>}
