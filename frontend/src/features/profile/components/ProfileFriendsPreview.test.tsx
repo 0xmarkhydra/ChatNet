@@ -33,3 +33,19 @@ it('hides empty or unavailable connections and navigates from the four accepted 
     vi.unstubAllGlobals()
   }
 })
+
+it('shows translated loading skeleton while mobile profile friends load', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  try {
+    await act(async () => root.render(<ProfileFriendsPreview friends={[]} loading onViewFriend={vi.fn()} onViewAll={vi.fn()} />))
+    expect(host.querySelector('[role="status"][aria-busy="true"] [aria-hidden="true"]')).not.toBeNull()
+    expect(host.querySelectorAll('[role="status"] li')).toHaveLength(4)
+  } finally {
+    await act(async () => root.unmount())
+    host.remove()
+    vi.unstubAllGlobals()
+  }
+})

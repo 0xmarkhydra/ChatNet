@@ -139,6 +139,22 @@ export default function ProfilePage({
                   <h2 className="text-foreground!">{trUi('feed.post')}</h2>
                   <Button variant="secondary" size="sm" disabled={postsBusy} onClick={onReloadPosts}><RefreshCw size={16} aria-hidden="true" />{trUi('common.refresh')}</Button>
                 </div>
+                {postsBusy && posts.length === 0 && !pendingPost && !postsError && (
+                  <div role="status" aria-live="polite" aria-busy="true" className="grid gap-ui-3">
+                    <span className="sr-only">{trUi('common.ui.loadingPosts')}</span>
+                    <div aria-hidden="true" className="grid animate-pulse gap-ui-3 rounded-ui-lg border border-border bg-card p-ui-3 motion-reduce:animate-none">
+                      <div className="flex items-center gap-ui-3">
+                        <div className="size-10 shrink-0 rounded-full bg-muted" />
+                        <div className="grid flex-1 gap-ui-2">
+                          <div className="h-3 w-28 rounded bg-muted" />
+                          <div className="h-2 w-16 rounded bg-muted" />
+                        </div>
+                      </div>
+                      <div className="h-3 w-3/4 rounded bg-muted" />
+                      <div className="aspect-[4/3] w-full rounded-ui-md bg-muted" />
+                    </div>
+                  </div>
+                )}
                 {postsError && <div className="profile-page-error" role="alert">{postsError}
                   <button type="button" onClick={onReloadPosts}>{trUi("common.retry")}</button></div>}
                 <div className="profile-page-post-feed feed zalo-feed app-desktop:flex app-desktop:min-w-0 app-desktop:flex-col app-desktop:gap-4">{postCards}</div>
