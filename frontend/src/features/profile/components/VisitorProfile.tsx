@@ -59,15 +59,16 @@ export default function VisitorProfile({ username, mobile = false, friendOnline,
  const sequence=useRef(0)
  const previousUpdates=useRef(updates)
  useEffect(()=>{
+  const generation=sequence
   alive.current=true
-  return ()=>{alive.current=false;sequence.current++}
+  return ()=>{alive.current=false;generation.current++}
  },[])
  useEffect(()=>{
   if(previousUpdates.current===updates)return
   previousUpdates.current=updates
   const byId=new Map(updates.map(post=>[post.id,post]))
   setPosts(current=>current.map(post=>byId.get(post.id)||post))
- },[updates])
+ },[updates,setPosts])
  useEffect(()=>{
   const id=++sequence.current
   let cancelled=false
@@ -122,21 +123,23 @@ export default function VisitorProfile({ username, mobile = false, friendOnline,
  }
  const relation=profile?relationship(profile.id):'none'
  const previousRelation=useRef<string|null>(null)
+ // Only a new relation or profile may rerun this: a rerun cancels the reload, so request is read through its ref.
+ const profileName=profile?.username
  useEffect(()=>{
-  if(!profile)return
+  if(!profileName)return
   const previous=previousRelation.current
   previousRelation.current=relation
   if(previous===null||previous===relation||(previous!=='accepted'&&relation!=='accepted'))return
   const id=++sequence.current
   let cancelled=false
   setLoading(true);setError('')
-  void loadVisitorPosts(request, profile.username)
+  void loadVisitorPosts(latestRequest.current, profileName)
    .then(async response=>{if(!response.ok)throw new Error('Không tải được dòng thời gian.');return await response.json() as Post[]})
    .then(items=>{if(!cancelled&&id===sequence.current){setPosts(items);setMore(items.length===15)}})
    .catch(cause=>{if(!cancelled&&id===sequence.current)setError(cause instanceof Error?cause.message:'Không tải được bài viết.')})
    .finally(()=>{if(!cancelled&&id===sequence.current)setLoading(false)})
   return ()=>{cancelled=true}
- },[relation,profile?.username])
+ },[relation,profileName,latestRequest,setPosts,setMore,setLoading,setError])
  const action=relation==='accepted'?'Bạn bè':relation==='incoming'?'Chấp nhận kết bạn':relation==='outgoing'?'Hủy lời mời':'Kết bạn'
  const media=posts.flatMap(post=>(post.attachments||[]).filter(attachment=>(attachment.kind==='image'||attachment.kind==='video')&&Boolean(attachment.url)).map(attachment=>({...attachment,postId:post.id})))
  const tabs=mobile ? [{id:'posts',label:'Tất cả'}, {id:'media',label:'Ảnh & video'}] : [{id:'posts',label:'Bài viết'},...(media.length?[{id:'media',label:'Ảnh & video'}]:[]),...(profile?.bio||profile?.city?[{id:'about',label:'Giới thiệu'}]:[])]

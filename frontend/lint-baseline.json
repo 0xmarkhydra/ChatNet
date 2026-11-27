@@ -1,14 +1,13 @@
 {
-  "total": 18,
+  "total": 14,
   "byRule": {
-    "react-hooks/exhaustive-deps": 16,
+    "react-hooks/exhaustive-deps": 12,
     "react-hooks/set-state-in-effect": 2
   },
   "counts": {
     "src/app/AuthedApp.tsx|react-hooks/exhaustive-deps": 10,
     "src/app/AuthedApp.tsx|react-hooks/set-state-in-effect": 2,
     "src/app/hooks/useAppRealtime.ts|react-hooks/exhaustive-deps": 1,
-    "src/features/profile/components/VisitorProfile.tsx|react-hooks/exhaustive-deps": 4,
     "src/platform/DesktopScreenPicker.tsx|react-hooks/exhaustive-deps": 1
   }
 }
