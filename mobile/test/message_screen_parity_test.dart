@@ -119,7 +119,7 @@ void main() {
     expect(api.historyStarts, greaterThan(0));
     api.preferencesGate.complete();
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('composer-quick-like')), findsOneWidget);
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
@@ -303,21 +303,41 @@ void main() {
     expect(find.text('Tắt thông báo nhóm'), findsOneWidget);
   });
 
-  testWidgets('quick Like sends alone and preserves the composed text', (
+  testWidgets('Like and Send share a fixed composer action', (
     tester,
   ) async {
     final api = DemoApi();
     await openChatParityDemo(tester, api);
     await tester.tap(find.text('Linh Nguyễn').first);
     await tester.pumpAndSettle();
-    final like = find.byKey(const ValueKey('composer-quick-like'));
-    expect(like, findsOneWidget);
+    final action = find.byKey(const ValueKey('composer-primary-action'));
     final input = find.byType(TextField).last;
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
+    expect(find.byTooltip('Gửi tin nhắn'), findsNothing);
+    final initialSize = tester.getSize(action);
+    final initialPosition = tester.getTopLeft(action);
+    await tester.enterText(input, '   ');
+    await tester.pump();
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
     await tester.enterText(input, 'Bản nháp');
-    await tester.tap(like);
+    await tester.pump();
+    expect(find.byTooltip('Gửi Like'), findsNothing);
+    expect(find.byTooltip('Gửi tin nhắn'), findsOneWidget);
+    expect(tester.getSize(action), initialSize);
+    expect(tester.getTopLeft(action), initialPosition);
+    await tester.enterText(input, '');
+    await tester.pump();
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
+    await tester.tap(action);
     await tester.pumpAndSettle();
     expect(find.text('👍'), findsOneWidget);
-    expect(tester.widget<TextField>(input).controller?.text, 'Bản nháp');
+    await tester.enterText(input, 'Bản nháp');
+    await tester.pump();
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.text('Bản nháp'), findsOneWidget);
+    expect(tester.widget<TextField>(input).controller?.text, isEmpty);
+    expect(find.byTooltip('Gửi Like'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();

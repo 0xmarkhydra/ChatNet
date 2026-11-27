@@ -301,10 +301,31 @@
     flex: 1 0 100%;
   }
 }
-/* A compact, independent Like action alongside the existing send control. */
-.social-chat-layout .media-composer > .chat-quick-like {
-  display: grid; place-items: center; flex: 0 0 40px; width: 40px; min-width: 40px;
-  height: 44px; padding: 0; border: 0; background: transparent; color: var(--soco-blue);
+/* Like and Send share one fixed-size, transparent action slot. */
+.modern-shell.app-layout .social-chat-layout .media-composer > .send-button.chat-composer-primary {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--soco-blue);
+  box-shadow: none;
 }
-.social-chat-layout .media-composer > .chat-quick-like:hover:not(:disabled) { background: var(--soco-soft-blue); }
-.social-chat-layout .media-composer > .chat-quick-like:disabled { opacity: .45; cursor: not-allowed; }
+.modern-shell.app-layout .social-chat-layout .media-composer > .send-button.chat-composer-primary svg {
+  width: 21px;
+  height: 21px;
+}
+.modern-shell.app-layout .social-chat-layout .media-composer > .send-button.chat-composer-primary:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--soco-soft-blue);
+}
+.modern-shell.app-layout .social-chat-layout .media-composer > .send-button.chat-composer-primary:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
