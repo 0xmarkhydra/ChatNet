@@ -17,6 +17,7 @@ export type ConversationRailProps = {
   /** Keep the rail search/rows stable while the shared splitter moves. */
   keepDetailsMounted?: boolean
   onSelect: (conversation: Conversation) => void
+  onPrefetch?: (conversation: Conversation) => void
   onCreate: () => void
   onSearchCompact: () => void
   onCollapse: () => void
@@ -40,7 +41,7 @@ export type ConversationRailProps = {
 
 /** Shared desktop and mobile rail; retain platform-specific layout classes and mounting behavior. */
 export default function ConversationAvatarRail({
-  conversations, selectedId, expanded, keepDetailsMounted = false, onSelect, onCreate, onSearchCompact, onCollapse,
+  conversations, selectedId, expanded, keepDetailsMounted = false, onSelect, onPrefetch, onCreate, onSearchCompact, onCollapse,
   hasMore, loadingMore, onLoadMore, loadError, onRetry, searchValue, onSearchChange, categoryControls, filter, onFilterChange, categories, visibleConversationIds,
   onEntryContextMenu, onEntryPointerDown, onEntryPointerMove, onEntryPointerEnd, desktop = false,
 }: ConversationRailProps & { desktop?: boolean }) {
@@ -80,7 +81,8 @@ export default function ConversationAvatarRail({
             aria-label={`Mở ${conversation.type === 'group' ? 'nhóm' : desktop ? 'tin nhắn' : 'cuộc trò chuyện'} ${conversation.name}${conversation.unreadCount ? `, ${conversation.unreadCount}${desktop ? ' chưa đọc' : ' tin chưa đọc'}` : ''}`}
             aria-current={selectedId === conversation.id ? 'page' : undefined}
             title={conversation.name} onClick={() => onSelect(conversation)}
-            onPointerDown={event => onEntryPointerDown(conversation, event)}
+            onPointerEnter={event => { if (event.pointerType === 'mouse' && selectedId !== conversation.id) onPrefetch?.(conversation) }}
+            onPointerDown={event => { onPrefetch?.(conversation); onEntryPointerDown(conversation, event) }}
             onPointerMove={onEntryPointerMove}
             onPointerUp={onEntryPointerEnd} onPointerCancel={onEntryPointerEnd} onPointerLeave={onEntryPointerEnd}
             onContextMenu={event => onEntryContextMenu(conversation, event)}>

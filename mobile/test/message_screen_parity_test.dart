@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soco/app.dart';
 import 'package:soco/demo.dart';
+import 'package:soco/api.dart';
 import 'package:soco/presentation/channel_list_presenter.dart';
 import 'package:soco/presentation/conversation_avatar.dart';
 import 'package:soco/widgets.dart';
@@ -14,7 +16,87 @@ Future<void> openChatParityDemo(WidgetTester tester, DemoApi api) async {
   await tester.pumpAndSettle();
 }
 
+class _SlowPreferencesApi extends DemoApi {
+  final preferencesGate = Completer<void>();
+  bool delayPreferences = false;
+  int historyStarts = 0;
+
+  @override
+  Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (delayPreferences && method == 'GET' && path == '/api/preferences') {
+      await preferencesGate.future;
+    }
+    if (delayPreferences &&
+        method == 'GET' &&
+        RegExp(r'/api/conversations/\d+/messages\?').hasMatch(path)) {
+      historyStarts++;
+    }
+    return super.request(method, path, body);
+  }
+}
+
+class _WarmHistoryApi extends DemoApi {
+  final secondLoad = Completer<void>();
+  int historyReads = 0;
+  @override
+  Future<dynamic> request(String method, String path, [Json? body]) async {
+    if (method == 'GET' && path.startsWith('/api/conversations/2/messages?')) {
+      historyReads++;
+      if (historyReads == 2) await secondLoad.future;
+    }
+    return super.request(method, path, body);
+  }
+}
+
 void main() {
+  testWidgets(
+    'recent conversation remains visible during history revalidation',
+    (tester) async {
+      final api = _WarmHistoryApi();
+      api.preferences['autoTranslate'] = false;
+      api.rooms.firstWhere((room) => room['id'] == 2)['unreadCount'] = 0;
+      for (final message in api.messages[2]!) {
+        message.remove('firstUnreadMessageId');
+      }
+      await openChatParityDemo(tester, api);
+      await tester.tap(find.text('Linh Nguyễn').first);
+      await tester.pumpAndSettle();
+      final latestMessage = api.messages[2]!.last['text'].toString();
+      expect(find.text(latestMessage), findsOneWidget);
+      await tester.tap(find.byTooltip('Quay lại'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Linh Nguyễn').first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 220));
+      expect(api.historyReads, 2);
+      expect(find.text(latestMessage), findsOneWidget);
+      api.secondLoad.complete();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('conversation history starts before slow preferences finish', (
+    tester,
+  ) async {
+    final api = _SlowPreferencesApi();
+    api.preferences['autoTranslate'] = false;
+    await openChatParityDemo(tester, api);
+    api.delayPreferences = true;
+    await tester.tap(find.text('Linh Nguyễn').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(api.historyStarts, greaterThan(0));
+    api.preferencesGate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('composer-quick-like')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   test(
     'PWA channel search includes topic and latest message, not name alone',
     () {
@@ -193,7 +275,9 @@ void main() {
     expect(find.text('Tắt thông báo nhóm'), findsOneWidget);
   });
 
-  testWidgets('quick Like sends alone and preserves the composed text', (tester) async {
+  testWidgets('quick Like sends alone and preserves the composed text', (
+    tester,
+  ) async {
     final api = DemoApi();
     await openChatParityDemo(tester, api);
     await tester.tap(find.text('Linh Nguyễn').first);

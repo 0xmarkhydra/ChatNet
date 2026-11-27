@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Two adjacent viewports share one animated boundary. Keeping both panes
-/// mounted during the transition preserves scroll positions, text input and
-/// channel selection exactly as the mobile PWA does.
+/// Stable, independently painted panes. Only the clip and translation change
+/// while the shared seam moves; the lists keep their layout and scroll state.
 class MobileAvatarChannelSplit extends StatelessWidget {
   const MobileAvatarChannelSplit({
     super.key,
@@ -23,48 +22,55 @@ class MobileAvatarChannelSplit extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The panes are constructed outside the animation builder; their widget
-    // subtrees no longer rebuild on every animation frame.
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, child) {
-        final railWidth = showChannels
-            ? compactRailWidth + (width - compactRailWidth) * animation.value
-            : width;
-        return Row(
-          key: const ValueKey('mobile-avatar-channel-split'),
-          children: [
-            SizedBox(
-              key: const ValueKey('mobile-avatar-viewport'),
-              width: railWidth,
-              child: ClipRect(
-                child: OverflowBox(
-                  alignment: Alignment.topLeft,
-                  minWidth: width,
-                  maxWidth: width,
-                  child: avatarRail,
-                ),
+    final rail = RepaintBoundary(child: avatarRail);
+    final channels = RepaintBoundary(
+      child: Material(
+        color: Colors.white,
+        child: channelPicker ?? const SizedBox.shrink(),
+      ),
+    );
+    return ClipRect(
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, _) {
+          final travel = (width - compactRailWidth) * animation.value;
+          final seam = showChannels ? compactRailWidth + travel : width;
+          return Stack(
+            key: const ValueKey('mobile-avatar-channel-split'),
+            fit: StackFit.expand,
+            children: [
+              ClipRect(
+                key: const ValueKey('mobile-avatar-viewport'),
+                clipper: _AvatarViewportClip(seam),
+                child: rail,
               ),
-            ),
-            if (showChannels)
-              SizedBox(
-                key: const ValueKey('mobile-channel-viewport'),
-                width: width - railWidth,
-                child: ClipRect(
-                  child: OverflowBox(
-                    alignment: Alignment.topLeft,
-                    minWidth: width - compactRailWidth,
-                    maxWidth: width - compactRailWidth,
-                    child: Material(
-                      color: Colors.white,
-                      child: channelPicker ?? const SizedBox.shrink(),
-                    ),
+              if (showChannels)
+                Positioned(
+                  left: compactRailWidth,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Transform.translate(
+                    key: const ValueKey('mobile-channel-viewport'),
+                    offset: Offset(travel, 0),
+                    child: channels,
                   ),
                 ),
-              ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
+}
+
+class _AvatarViewportClip extends CustomClipper<Rect> {
+  const _AvatarViewportClip(this.seam);
+  final double seam;
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTWH(0, 0, seam.clamp(0.0, size.width).toDouble(), size.height);
+  @override
+  bool shouldReclip(covariant _AvatarViewportClip oldClipper) =>
+      seam != oldClipper.seam;
 }

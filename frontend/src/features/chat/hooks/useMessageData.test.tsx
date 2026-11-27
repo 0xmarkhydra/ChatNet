@@ -235,8 +235,11 @@ describe('chat message pagination visit isolation', () => {
       let oldPage!: Promise<void>
       await act(async () => { oldPage = app.current.loadOlderMessages() })
       expect(app.jobs).toHaveLength(2)
+      const pagingSignal = app.request.mock.calls[1]?.[1]?.signal
+      expect(pagingSignal?.aborted).toBe(false)
 
       await app.render(account('B'))
+      expect(pagingSignal?.aborted).toBe(true)
       await app.render(account('A'))
       expect(app.jobs).toHaveLength(4)
       await app.respond(3, page(101))

@@ -72,6 +72,28 @@ describe("useChatScrollCoordinator", () => {
     expect(element.scrollTop).toBe(250);
   });
 
+  it("positions cached history before revalidation and preserves manual scrolling", () => {
+    const app = mountScroll();
+    app.render(1, 0, []);
+    const element = app.element;
+    Object.defineProperty(element, "scrollHeight", { configurable: true, value: 1200 });
+    Object.defineProperty(element, "clientHeight", { configurable: true, value: 400 });
+    app.render(2, 0, [msg(1), msg(2)], undefined, true);
+    expect(element.scrollTop).toBe(1200);
+    element.scrollTop = 200;
+    app.state.follow.current = false;
+    app.render(2, 0, [msg(1), msg(2), msg(3)], 2, false);
+    expect(element.scrollTop).toBe(200);
+  });
+
+  it("clears stale paging scroll restoration when switching channels", () => {
+    const app = mountScroll();
+    app.render(1, 0, []);
+    app.state.restore.current = { top: 10, height: 400 };
+    app.render(1, 2, [msg(1)], undefined, true);
+    expect(app.state.restore.current).toBeNull();
+  });
+
   it("follows incoming messages only when reader is at the bottom", () => {
     const app = mountScroll();
     app.render(1, 0, []);

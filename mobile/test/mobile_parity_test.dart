@@ -121,7 +121,16 @@ void main() {
       await openMobile(tester, api);
       final rail = find.byKey(const ValueKey('mobile-avatar-viewport'));
       final channel = find.byKey(const ValueKey('mobile-channel-viewport'));
-      expect(tester.getSize(rail).width, closeTo(390, 1));
+      double railVisibleWidth() => tester
+          .widget<ClipRect>(rail)
+          .clipper!
+          .getClip(tester.getSize(rail))
+          .width;
+      double channelVisibleWidth() =>
+          (334 - tester.widget<Transform>(channel).transform.getTranslation().x)
+              .clamp(0.0, 334.0)
+              .toDouble();
+      expect(railVisibleWidth(), closeTo(390, 1));
 
       await tester.tap(find.text('SocCO Design Team').first);
       await tester.pumpAndSettle();
@@ -130,24 +139,22 @@ void main() {
         find.byKey(const ValueKey('mobile-channel-picker')),
         findsOneWidget,
       );
-      expect(tester.getSize(rail).width, closeTo(56, 1));
+      expect(railVisibleWidth(), closeTo(56, 1));
       expect(tester.getSize(channel).width, closeTo(334, 1));
+      expect(tester.getSize(rail).width, closeTo(390, 1));
 
       expect(find.byKey(const ValueKey('mobile-avatar-toggle')), findsNothing);
       await tester.tap(find.byKey(const ValueKey('mobile-chat-menu')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Mở rộng cột avatar').last);
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 170));
-      final inFlightRail = tester.getSize(rail).width;
+      await tester.pump(const Duration(milliseconds: 60));
+      final inFlightRail = railVisibleWidth();
       expect(inFlightRail, greaterThan(56));
       expect(inFlightRail, lessThan(390));
-      expect(
-        tester.getSize(rail).width + tester.getSize(channel).width,
-        closeTo(390, 1),
-      );
+      expect(railVisibleWidth() + channelVisibleWidth(), closeTo(390, 1));
       await tester.pumpAndSettle();
-      expect(tester.getSize(rail).width, closeTo(390, 1));
+      expect(railVisibleWidth(), closeTo(390, 1));
       expect(
         find.byKey(const ValueKey('mobile-channel-picker')),
         findsOneWidget,
@@ -157,19 +164,56 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Thu gọn cột avatar').last);
       await tester.pumpAndSettle();
-      expect(tester.getSize(rail).width, closeTo(56, 1));
+      expect(railVisibleWidth(), closeTo(56, 1));
 
       await tester.tap(find.text('Thảo luận chung'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('bottom-navigation')), findsNothing);
       await tester.tap(find.byTooltip('Quay lại'));
       await tester.pumpAndSettle();
-      expect(tester.getSize(rail).width, closeTo(56, 1));
+      expect(railVisibleWidth(), closeTo(56, 1));
       expect(
         find.byKey(const ValueKey('mobile-channel-picker')),
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('bottom-navigation')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'switching groups retracts the previous picker and reveals the next',
+    (tester) async {
+      final api = DemoApi();
+      api.rooms.add({...api.rooms.first, 'id': 4, 'name': 'Nhóm Kỹ thuật'});
+      api.channels[4] = [
+        {'id': 0, 'name': 'Thảo luận chung', 'description': 'Kênh chính'},
+        {'id': 9, 'name': 'Kỹ thuật', 'description': 'Thảo luận kỹ thuật'},
+      ];
+      await openMobile(tester, api);
+      await tester.tap(find.text('SocCO Design Team').first);
+      await tester.pumpAndSettle();
+      final rail = find.byKey(const ValueKey('mobile-avatar-viewport'));
+      double seam() => tester
+          .widget<ClipRect>(rail)
+          .clipper!
+          .getClip(tester.getSize(rail))
+          .width;
+      expect(seam(), closeTo(56, 1));
+      final other = find.text('Nhóm Kỹ thuật').first;
+      await tester.tapAt(Offset(28, tester.getCenter(other).dy));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(seam(), greaterThan(56));
+      expect(seam(), lessThan(390));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(seam(), greaterThan(350));
+      await tester.pumpAndSettle();
+      expect(seam(), closeTo(56, 1));
+      expect(find.text('Kỹ thuật'), findsOneWidget);
+      expect(find.text('Thiết kế UI'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
     },
   );
 

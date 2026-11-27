@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import type { MediaAttachment } from '../utils/media'
 import { formatBytes } from '../utils/format'
 import MediaViewer from './MediaViewer'
@@ -6,14 +6,16 @@ import MediaViewer from './MediaViewer'
 const previewable = (item: MediaAttachment): item is MediaAttachment & { url: string } =>
   Boolean(item.url) && (item.kind === 'image' || item.kind === 'video')
 
-export default function MediaAttachmentsView({
+function MediaAttachmentsView({
   items,
   pending = false,
+  deferVideo = false,
   onRemove,
   onImageClick,
 }: {
   items?: MediaAttachment[]
   pending?: boolean
+  deferVideo?: boolean
   onRemove?: (index: number) => void
   onImageClick?: (index: number) => void
 }) {
@@ -41,6 +43,7 @@ export default function MediaAttachmentsView({
                   src={item.url}
                   alt={item.name}
                   loading="lazy"
+                  decoding="async"
                   onLoad={(event) => {
                     const image = event.currentTarget
                     image.classList.toggle(
@@ -51,7 +54,7 @@ export default function MediaAttachmentsView({
                 />
               </button>
             ) : item.kind === 'video' && item.url ? (
-              <video src={item.url} controls playsInline preload="metadata" aria-label={`Video: ${item.name}`} />
+              <video src={item.url} controls playsInline preload={deferVideo ? 'none' : 'metadata'} aria-label={`Video: ${item.name}`} />
             ) : item.kind === 'audio' && item.url ? (
               <div className="media-file-card">
                 <span>🎙️</span>
@@ -86,3 +89,4 @@ export default function MediaAttachmentsView({
     </>
   )
 }
+export default memo(MediaAttachmentsView)
