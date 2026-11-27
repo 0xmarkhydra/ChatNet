@@ -44,7 +44,7 @@ type Props = {
   activities?: GroupActivity[]
   onActivity?: (id: number) => void
   onRefresh?: () => Promise<void>
-  onContactSaved?: (id: number, metadata: import('../../contacts/utils/contactMetadata').PersonalContactMetadata) => void
+  onContactSaved?: (id: number, metadata: import('../../contacts').PersonalContactMetadata) => void
 }
 
 export default function ConversationDetailsPanel(props: Props) {
