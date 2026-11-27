@@ -25,6 +25,7 @@ export default function ConversationAvatar({ conversation, className }: Props) {
           <UserAvatar
             key={username}
             className="conversation-avatar-member"
+            storyStatus="none"
             name={username}
             username={username}
           />
