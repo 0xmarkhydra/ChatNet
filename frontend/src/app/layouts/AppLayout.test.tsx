@@ -58,9 +58,16 @@ it("renders header and sidebar around the outlet without extra DOM wrappers", ()
         <Route element={<Shell />}>
           <Route path="feed" element={<PageRoute page="feed" />} />
           <Route path="contacts" element={<PageRoute page="contacts" />} />
+          <Route path="profile" element={<PageRoute page="profile" />} />
+          <Route path="users/:username" element={<PageRoute page="profile" />} />
+          <Route path="settings" element={<PageRoute page="profile" />} />
         </Route>
       </Routes>
       <Link to="/contacts" data-testid="navigate">Contacts</Link>
+      <Link to="/profile" data-testid="own-profile">Profile</Link>
+      <Link to="/users/example" data-testid="visitor-profile">Visitor</Link>
+      <Link to="/settings" data-testid="settings">Settings</Link>
+      <Link to="/feed" data-testid="feed">Feed</Link>
     </MemoryRouter>,
   ));
 
@@ -77,6 +84,15 @@ it("renders header and sidebar around the outlet without extra DOM wrappers", ()
   expect(container.querySelector(".app-sidebar")).not.toBeNull();
   expect(container.querySelector(".chatnet-appbar")).not.toBeNull();
   expect(container.querySelector('[data-testid="page"]')?.textContent).toBe("Stable page content");
+
+  for (const destination of ["own-profile", "visitor-profile", "settings", "feed"]) {
+    act(() => container.querySelector<HTMLAnchorElement>(`[data-testid="${destination}"]`)!.click());
+    const profileRoute = destination === "own-profile" || destination === "visitor-profile";
+    expect(Boolean(container.querySelector(".chatnet-appbar"))).toBe(!profileRoute);
+    expect(container.querySelector(".app-sidebar")).not.toBeNull();
+    expect(onShellMount).toHaveBeenCalledTimes(1);
+    expect(app?.style.getPropertyValue("--mobile-header-height")).toBe("0px");
+  }
 
   dispose.push(() => {
     act(() => root.unmount());
