@@ -725,11 +725,12 @@
     .social-chat-layout
     .messages
     .message:has(.chat-message-photo) {
-    width: min(220px, calc(100% - 46px));
+    width: fit-content;
+    max-width: min(220px, calc(100% - 46px));
   }
   .modern-shell.app-layout .social-chat-layout .chat-message-photo {
     position: relative;
-    width: 220px;
+    width: fit-content;
     max-width: 100%;
   }
   .modern-shell.app-layout
@@ -743,7 +744,8 @@
     .media-item
     > .media-image-button {
     display: block;
-    width: 100%;
+    width: fit-content;
+    max-width: 100%;
   }
   .modern-shell.app-layout
     .social-chat-layout
@@ -751,36 +753,14 @@
     .media-item
     img {
     display: block;
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     height: auto;
     max-height: 220px;
     min-height: 0;
     object-fit: contain;
     border-radius: 14px;
     background: #e9edf2;
-  }
-  .modern-shell.app-layout
-    .social-chat-layout
-    .chat-message-photo
-    .chat-image-time {
-    position: absolute;
-    right: auto;
-    left: 12px;
-    bottom: 7px;
-    z-index: 1;
-    box-sizing: border-box;
-    min-width: 62px;
-    padding: 5px 10px;
-    border-radius: 9px;
-    background: rgba(27, 46, 85, 0.88);
-    color: var(--soco-surface);
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 15px;
-    pointer-events: none;
-  }
-  .modern-shell.app-layout .social-chat-layout .chat-photo-stamp {
-    display: none;
   }
   .modern-shell.app-layout .social-chat-layout .media-composer.composer {
     position: relative;
@@ -960,8 +940,7 @@
     align-self: center;
     justify-self: center;
   }
-  .social-chat-layout .chat-message-sender-avatar,
-  .social-chat-layout .chat-image-time {
+  .social-chat-layout .chat-message-sender-avatar {
     display: none;
   }
 }

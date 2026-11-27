@@ -98,6 +98,16 @@ describe('MessageActions subcomponents', () => {
     expect(page.callbacks.copyMessageContent).toHaveBeenCalledWith(page.callbacks.activeMessageAction, { kind: 'text' })
   })
 
+  it('offers image downloads only for available, non-deleted attachments', () => {
+    const photo = { ...message(11), attachments: [{ kind: 'image' as const, name: 'photo.jpg', storageRef: 'photo', contentType: 'image/jpeg', sizeBytes: 10, url: 'https://media.example/photo.jpg' }] }
+    const page = mount('actions', photo)
+    expect(page.button('Tải ảnh')).toBeTruthy()
+    page.render({ activeMessageAction: { ...photo, deleted: true } })
+    expect(page.host.querySelector('[aria-label="Tải ảnh"]')).toBeNull()
+    page.render({ activeMessageAction: message(12) })
+    expect(page.host.querySelector('[aria-label="Tải ảnh"]')).toBeNull()
+  })
+
   it('routes replies to the original message and closes its action menu', () => {
     const page = mount()
     act(() => page.button('Trả lời').click())

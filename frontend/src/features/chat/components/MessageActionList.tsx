@@ -1,5 +1,6 @@
 import { Copy, Forward, Languages, Pin, Reply } from 'lucide-react'
 import type { MessageActionsProps } from '../types/messageActions'
+import ImageDownloadButton from '../../../shared/ui/ImageDownloadButton'
 
 export default function MessageActionList({
  activeMessageAction, onForwardMessage, userId, isPinned, toggleMessagePin,
@@ -7,6 +8,8 @@ export default function MessageActionList({
  translateMessage, editOwnMessage, recallOwnMessage,
 }: MessageActionsProps) {
  const mine = activeMessageAction.senderId === userId
+ const image = !activeMessageAction.deleted ? (copyTarget?.kind === 'image' && copyTarget.attachment.url
+   ? copyTarget.attachment : activeMessageAction.attachments?.find(item => item.kind === 'image' && item.url)) : undefined
  return <>
         <div className="message-context-actions">
           {!activeMessageAction.deleted && (
@@ -45,6 +48,8 @@ export default function MessageActionList({
               <b>Sao chép</b>
             </button>
           )}
+
+          {image && <ImageDownloadButton key={`${activeMessageAction.id}:${image.storageRef}`} image={image} menu onComplete={() => setMessageActionId(null)} />}
 
           {!mine && Boolean(activeMessageAction.text.trim()) && (
             <button
