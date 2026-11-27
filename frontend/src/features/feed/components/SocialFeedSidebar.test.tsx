@@ -12,19 +12,37 @@ it('shows actionable connection suggestions without the unused feed sections', a
   const friend = { id: 2, username: 'linh', displayName: 'Linh' }
   const request = vi.fn(async () => Response.json([friend]))
   const onFriend = vi.fn()
-  const onSearchChange = vi.fn()
+  const onSearchSubmit = vi.fn()
   try {
     await act(async () => root.render(
       <SocialFeedSidebar username="alice" sessionId="test-session" friends={[]} friendRequests={[]}
         friendBusyIds={new Set()} request={request} onFriend={onFriend} onViewUser={vi.fn()} onViewContacts={vi.fn()}
-        searchQuery="hello" onSearchChange={onSearchChange}
+        onSearchSubmit={onSearchSubmit}
         communityCard={<section aria-label="Cộng đồng của bạn"><h2>Cộng đồng của bạn</h2></section>} />,
     ))
     expect(Array.from(host.querySelectorAll('aside section'), section => section.getAttribute('aria-label')))
       .toEqual(['Tìm kiếm trên Bảng tin', 'Gợi ý kết nối', 'Cộng đồng của bạn'])
     expect(host.textContent).toContain('Linh')
-    expect(host.querySelector('input[aria-label="Tìm bài viết hoặc tác giả"]')?.getAttribute('value')).toBe('hello')
+    expect(host.querySelector('input[aria-label="Tìm bài viết hoặc tác giả"]')?.getAttribute('value')).toBe('')
+    expect(host.querySelector('[data-slot="search-field"] input[data-slot="search-field-input"]')).not.toBeNull()
     expect(host.querySelector('kbd')?.textContent).toBe('Ctrl K')
+    const input = host.querySelector('input')!
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => {
+      setValue.call(input, '  hello  ')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(input.value).toBe('  hello  ')
+    expect(onSearchSubmit).not.toHaveBeenCalled()
+    await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, isComposing: true })))
+    expect(onSearchSubmit).not.toHaveBeenCalled()
+    await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })))
+    expect(onSearchSubmit).toHaveBeenCalledOnce()
+    expect(onSearchSubmit).toHaveBeenCalledWith('hello')
+    await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Xóa từ khóa"]')?.click())
+    expect(input.value).toBe('')
+    await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })))
+    expect(onSearchSubmit).toHaveBeenCalledOnce()
     const connect = Array.from(host.querySelectorAll('button')).find(button => button.textContent?.trim() === 'Kết bạn')
     expect(connect).toBeDefined()
     act(() => connect?.click())

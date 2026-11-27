@@ -48,7 +48,7 @@ export type ChatSectionProps = {
   nextChatSearchJumpRevision: () => number;
   clearActiveConversationHistory: () => Promise<void>;
   conversationBlocked: boolean;
-  conversationCategories: { categories: ConversationCategory[]; selected: number | null; select: (id: number | null) => void; items: Conversation[]; hasMore: boolean; loading: boolean; busy: boolean; error: string; listError: string; load: (more?: boolean, force?: boolean) => Promise<void>; save: (value: Omit<ConversationCategory, "id">, id?: number) => Promise<boolean>; remove: (id: number) => Promise<boolean>; assign: (id: number, categoryId: number | null) => Promise<boolean>; refreshCategories: (force?: boolean) => Promise<void>; refreshFiltered: () => void; applyAssignment: (id: number, categoryId: number | null) => void; };
+  conversationCategories: { categories: ConversationCategory[]; selected: number | null; select: (id: number | null) => void; items: Conversation[]; hasMore: boolean; loading: boolean; busy: boolean; error: string; listError: string; load: (more?: boolean, force?: boolean) => Promise<void>; save: (value: Omit<ConversationCategory, "id">, id?: number) => Promise<boolean>; remove: (id: number) => Promise<boolean>; assign: (id: number, categoryId: number | null) => Promise<boolean>; refreshCategories: (force?: boolean) => Promise<void>; refreshFiltered: () => void; applyAssignment: (id: number, categoryId: number | null) => void; removeClearedConversation: (id: number) => void; };
   conversationDetailsOpen: boolean;
   conversationListSearch: { active: boolean; items: Conversation[]; loading: boolean; loadingMore: boolean; hasMore: boolean; error: string; retry: () => void; loadMore: () => Promise<void>; };
   conversationLoadingMore: boolean;

@@ -803,197 +803,27 @@
   line-height: 1.4;
 }
 
-.stories-row {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 10px;
-  padding: 10px 10px 11px;
-  overflow-x: auto;
-  border-bottom: 1px solid #e4e6e8;
-  background: var(--soco-surface);
-  scrollbar-width: none;
-}
 
-.stories-row::-webkit-scrollbar {
-  display: none;
-}
 
-.story-card {
-  width: 104px;
-  flex: 0 0 104px;
-  display: grid;
-  gap: 5px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--soco-surface);
-  text-align: left;
-}
 
-.story-card > span {
-  width: 100%;
-  overflow: hidden;
-  padding: 0 7px;
-  margin-top: -30px;
-  z-index: 2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  text-shadow: 0 1px 5px rgba(0, 0, 0, .6);
-}
 
-.story-visual {
-  position: relative;
-  height: 142px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 10px;
-  background: linear-gradient(160deg, #2859d8, #2859d8);
-  font-size: 34px;
-  font-weight: 800;
-}
 
-.story-visual > img,
-.story-visual > video {
-  position: absolute;
-  z-index: 1;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 
-.story-visual::after {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  inset: 45% 0 0;
-  background: linear-gradient(transparent, rgba(0, 0, 0, .46));
-}
 
-.self-story {
-  background: linear-gradient(160deg, #d5dfc5, #2859d8);
-}
 
-.story-camera,
-.story-avatar-mini {
-  position: absolute;
-  z-index: 3;
-  left: 50%;
-  bottom: 32px;
-  transform: translateX(-50%);
-  width: 35px;
-  height: 35px;
-  display: grid;
-  place-items: center;
-  border: 3px solid var(--soco-surface);
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2859d8, #7156ea);
-  color: var(--soco-surface);
-  font-size: 13px;
-}
 
-.story-camera {
-  bottom: 50%;
-  transform: translate(-50%, 50%);
-}
 
-.story-avatar-mini {
-  left: 12px;
-  bottom: 30px;
-  transform: none;
-  width: 31px;
-  height: 31px;
-  border-width: 2px;
-  font-size: 11px;
-}
 
-.story-avatar-mini.smart-avatar {
-  position: absolute;
-}
 
-.story-viewer-backdrop {
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 0, 0, .94);
-}
 
-.story-viewer {
-  position: relative;
-  width: min(100%, 540px);
-  height: 100dvh;
-  overflow: hidden;
-  background: #080808;
-  color: var(--soco-surface);
-}
 
-.story-viewer > header {
-  position: absolute;
-  z-index: 4;
-  top: 0;
-  right: 0;
-  left: 0;
-  min-height: 78px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: max(24px, env(safe-area-inset-top)) 12px 10px;
-  background: linear-gradient(rgba(0, 0, 0, .68), transparent);
-}
 
-.story-viewer-avatar {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  border: 2px solid rgba(255, 255, 255, .85);
-}
 
-.story-viewer-owner {
-  min-width: 0;
-  flex: 1;
-}
 
-.story-viewer > header strong,
-.story-viewer > header time {
-  display: block;
-}
 
-.story-viewer > header strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-}
 
-.story-viewer > header time {
-  margin-top: 2px;
-  color: rgba(255, 255, 255, .76);
-  font-size: 11px;
-}
 
-.story-viewer-media {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-}
 
-.story-viewer-media img,
-.story-viewer-media video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: #080808;
-  object-fit: contain;
-}
-
-@keyframes story-progress {
-  to { width: 100%; }
-}
 
 .zalo-post-composer {
   position: relative;
@@ -1885,7 +1715,6 @@
  */
 
 .smart-avatar {
-  --avatar-radius: 50%;
   position: relative;
   isolation: isolate;
   overflow: visible;
@@ -2873,14 +2702,7 @@
     font-size: 10px;
   }
 
-  .story-card {
-    width: 88px;
-    flex-basis: 88px;
-  }
 
-  .story-visual {
-    height: 116px;
-  }
 
   .conversation-open .chatnet-appbar,
   .conversation-open .bottom-navigation {
@@ -3139,7 +2961,7 @@ input[type="checkbox"] { accent-color: var(--chatnet-accent-ink); }
   overflow-wrap: anywhere;
 }
 
-button:focus-visible,
+button:where(:not([data-slot="story-card"])):focus-visible,
 a:focus-visible {
   outline: 2px solid var(--chatnet-accent-ink);
   outline-offset: 3px;

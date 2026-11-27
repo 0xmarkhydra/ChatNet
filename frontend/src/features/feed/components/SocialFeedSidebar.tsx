@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowRight, Search, UserPlus, UsersRound } from 'lucide-react'
+import { ArrowRight, UserPlus, UsersRound } from 'lucide-react'
 import type { FriendConnection, FriendSearchResult } from '../../contacts'
+import { SearchField } from '../../../shared/ui/search-field'
 import UserAvatar from '../../../shared/ui/UserAvatar'
 import { useLatest } from '../../../shared/hooks/useLatest'
 
@@ -14,16 +15,16 @@ type Props = {
   onFriend: (friend: FriendSearchResult) => void
   onViewUser: (username: string) => void
   onViewContacts: () => void
-  searchQuery: string
-  onSearchChange: (query: string) => void
+  onSearchSubmit: (query: string) => void
   communityCard: ReactNode
 }
 
 export default function SocialFeedSidebar({
   username, sessionId, friends, friendRequests, friendBusyIds,
   request, onFriend, onViewUser, onViewContacts,
-  searchQuery, onSearchChange, communityCard,
+  onSearchSubmit, communityCard,
 }: Props) {
+  const [searchQuery, setSearchQuery] = useState('')
   const requestRef = useLatest(request)
   const [revision, setRevision] = useState(0)
   const [suggestionsResult, setSuggestionsResult] = useState<{
@@ -66,13 +67,16 @@ export default function SocialFeedSidebar({
   return (
     <aside className="social-feed-side box-border hidden min-w-0 app-desktop:grid app-desktop:grid-cols-[minmax(0,1fr)] app-desktop:content-start app-desktop:gap-4 app-desktop:[&>*]:box-border app-desktop:[&>*]:w-full app-desktop:[&>*]:min-w-0 app-wide:sticky app-wide:top-4 app-wide:flex app-wide:max-h-[calc(100dvh-126px)] app-wide:min-h-0 app-wide:flex-col app-wide:self-start app-wide:gap-[14px] app-wide:overflow-x-hidden app-wide:overflow-y-auto app-wide:overscroll-y-contain app-wide:pr-[5px] app-wide:pb-px app-wide:[scrollbar-width:thin] app-wide:[scrollbar-color:#c5d2e7_transparent] app-wide:[&>*]:flex-none" aria-label="Gợi ý trên bảng tin">
       <section className="social-feed-side-card social-feed-search-card" aria-label="Tìm kiếm trên Bảng tin">
-        <label className="social-feed-search-field">
-          <Search size={19} aria-hidden="true" />
-          <input type="search" value={searchQuery} maxLength={120}
-            onChange={event => onSearchChange(event.target.value)}
-            placeholder="Tìm kiếm trên SocCo" aria-label="Tìm bài viết hoặc tác giả" />
-          <kbd aria-label="Phím tắt tìm kiếm toàn cục">Ctrl K</kbd>
-        </label>
+        <SearchField value={searchQuery} onValueChange={setSearchQuery} maxLength={120}
+          placeholder="Tìm kiếm trên SocCo" aria-label="Tìm bài viết hoặc tác giả"
+          onKeyDown={event => {
+            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+            event.preventDefault()
+            const query = searchQuery.trim()
+            if (query) onSearchSubmit(query)
+          }}
+          className="focus-within:ring-inset"
+          trailing={<kbd className="shrink-0 rounded-ui-sm border border-border bg-card px-1.5 py-0.5 text-xs text-muted-foreground" aria-label="Phím tắt tìm kiếm toàn cục">Ctrl K</kbd>} />
       </section>
       <section className="social-feed-side-card social-feed-suggestions" aria-label="Gợi ý kết nối">
         <header><h2>Gợi ý kết nối</h2><button type="button" onClick={onViewContacts}>Xem tất cả <ArrowRight size={16} aria-hidden="true" /></button></header>

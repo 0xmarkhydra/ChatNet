@@ -77,6 +77,14 @@ CREATE TABLE IF NOT EXISTS conversation_members (
 );
 
 ALTER TABLE conversation_members ADD COLUMN IF NOT EXISTS cleared_through_message_id BIGINT NOT NULL DEFAULT 0;
+-- Preserve previously cleared conversations when introducing the per-member visibility flag.
+DO $history_visibility$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'conversation_members'::regclass AND attname = 'history_hidden' AND NOT attisdropped) THEN
+        ALTER TABLE conversation_members ADD COLUMN history_hidden BOOLEAN NOT NULL DEFAULT FALSE;
+        UPDATE conversation_members SET history_hidden = TRUE WHERE cleared_through_message_id > 0;
+    END IF;
+END $history_visibility$;
 
 CREATE INDEX IF NOT EXISTS idx_conversation_members_user
 ON conversation_members(user_id, conversation_id);

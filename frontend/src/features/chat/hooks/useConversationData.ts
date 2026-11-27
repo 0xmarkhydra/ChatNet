@@ -142,6 +142,19 @@ export function useConversationData({
     void loadEarlierGroups(sessionId)
   }
 
+  function removeClearedConversation(id: number) {
+    // Invalidate pre-clear pages so an older response cannot restore the row.
+    ++refreshSequence.current
+    ++pagingSequence.current
+    ++olderGroupScanSequence.current
+    olderGroupScan.current = null
+    lastGroupSync.current = null
+    conversationOffset.current = 0
+    conversationPagingBusy.current = false
+    setConversationLoadingMore(false)
+    setConversations(current => current.filter(item => item.id !== id))
+  }
+
   async function loadMoreConversations() {
     if (!session || sessionRef.current?.sessionId !== session.sessionId || !hasMoreConversations) return
     const sessionId = session.sessionId
@@ -198,6 +211,7 @@ export function useConversationData({
     conversationOffset,
     reconcileConversationMemberships,
     refreshConversations,
+    removeClearedConversation,
     loadMoreConversations,
   }
 }

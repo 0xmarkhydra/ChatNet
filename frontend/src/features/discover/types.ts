@@ -8,7 +8,7 @@ export type DiscoverSectionProps = {
   request: ApiRequest
   sessionId: string
   actOnFriend: (friend: FriendSearchResult | FriendConnection, decline?: boolean) => Promise<void>
-  findNearby: () => Promise<void>
+  findNearby: () => Promise<void | string>
   friendActionBusy: number | null
   friendRelationship: (userId: number) => 'accepted' | 'incoming' | 'outgoing' | 'none'
   globalSearch: string

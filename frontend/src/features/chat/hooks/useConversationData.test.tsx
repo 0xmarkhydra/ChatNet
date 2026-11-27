@@ -71,6 +71,32 @@ describe("useConversationData request ordering", () => {
     expect(app.data.conversations.map(item => item.id)).toEqual([22]);
   });
 
+  it("does not restore a cleared conversation from a request started before deletion", async () => {
+    const pending = deferred<Response>();
+    let requests = 0;
+    const request = vi.fn(async (url: string) => {
+      if (url.includes("type=group")) return response([]);
+      requests++;
+      if (requests === 1) return response([conversation(42), conversation(43)]);
+      if (requests === 2) return pending.promise;
+      if (requests === 3) return response([conversation(43)]);
+      return response([conversation(42), conversation(43)]);
+    });
+    const app = mountConversationData(request);
+    app.render();
+    await act(async () => { await app.data.refreshConversations(); });
+    let old!: Promise<void>;
+    await act(async () => { old = app.data.refreshConversations(); });
+    await act(async () => {
+      app.data.removeClearedConversation(42);
+      await app.data.refreshConversations();
+    });
+    await act(async () => { pending.resolve(response([conversation(42), conversation(43)])); await old; });
+    expect(app.data.conversations.map(item => item.id)).toEqual([43]);
+    await act(async () => { await app.data.refreshConversations(); });
+    expect(app.data.conversations.map(item => item.id)).toEqual([42, 43]);
+  });
+
   it("never advances the pagination offset on a malformed page, then retries at the same offset", async () => {
     const first = Array.from({ length: 25 }, (_, i) => conversation(i + 1));
     const visited: string[] = [];

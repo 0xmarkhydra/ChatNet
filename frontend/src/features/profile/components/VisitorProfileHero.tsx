@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, MessageCircle, UserPlus, UserMinus, UserCheck } from 'lucide-react'
-import UserAvatar, { profileAssetUrl } from '../../../shared/ui/UserAvatar'
+import UserAvatar, { profileAssetUrl, avatarTone } from '../../../shared/ui/UserAvatar'
 import { userLabel } from '../../../shared/utils/userLabel'
 import type { FriendSearchResult } from '../../contacts'
 import ProfileNote from './ProfileNote'
@@ -19,6 +19,7 @@ export type VisitorProfileData = FriendSearchResult & {
 }
 
 type Props = {
+  mobile?: boolean
   profile: VisitorProfileData
   online?: boolean
   relation: string
@@ -31,7 +32,7 @@ type Props = {
 }
 
 export default function VisitorProfileHero({
-  profile, online = false, relation, friendBusy, action, request, onMessage, onFriendAction, onRemoveFriendAction,
+  profile, mobile = false, online = false, relation, friendBusy, action, request, onMessage, onFriendAction, onRemoveFriendAction,
 }: Props) {
   const [menuForUserId, setMenuForUserId] = useState<number | null>(null)
   const friendMenuOpen = relation === 'accepted' && menuForUserId === profile.id
@@ -48,13 +49,17 @@ export default function VisitorProfileHero({
   }, [friendMenuOpen])
 
   const displayName = userLabel(profile.displayName, profile.username)
-  return <ProfileHero displayName={displayName} username={profile.username} city={profile.city}
+  const buttonClass = 'flex min-h-control-touch w-full min-w-0 items-center justify-center gap-ui-1 rounded-ui-md border-0 px-ui-2 text-[14px] font-bold whitespace-normal disabled:opacity-50'
+  const primary = mobile ? buttonClass + ' bg-primary text-white' : 'profile-page-primary'
+  const secondary = mobile ? buttonClass + ' bg-secondary text-foreground' : 'profile-page-secondary'
+  return <ProfileHero centered={mobile} bio={mobile ? profile.bio : undefined} fallbackCoverTone={mobile ? avatarTone(displayName) : undefined}
+    note={mobile ? <ProfileNote username={profile.username} request={request} refreshKey={relation} /> : undefined} displayName={displayName} username={profile.username} city={profile.city}
     workplace={profile.workplace} school={profile.school} friendCount={profile.friendCount}
     coverUrl={profile.coverSet ? profileAssetUrl(profile.username, 'cover', profile.updatedAt) : undefined}
     avatar={<>
-      <UserAvatar username={profile.username} name={displayName} className="profile-page-avatar profile-hero-avatar" online={online} />
+      <UserAvatar username={profile.username} name={displayName} className={mobile ? "avatar profile-hero-avatar size-full! rounded-full! text-5xl font-bold [&>.presence-dot]:right-auto! [&>.presence-dot]:left-2!" : "profile-page-avatar profile-hero-avatar"} online={online} />
       {online && <span className="sr-only">Đang hoạt động</span>}
-      <ProfileNote username={profile.username} request={request} refreshKey={relation} />
+      {!mobile && <ProfileNote username={profile.username} request={request} refreshKey={relation} />}
     </>}
     identityNotice={!profile.allowFriendRequests && relation === 'none' && <small className="profile-page-hint">Tài khoản này đang tắt nhận lời mời kết bạn.</small>}
     actions={<>
@@ -70,7 +75,7 @@ export default function VisitorProfileHero({
                 setMenuForUserId(null)
                 friendMenuTrigger.current?.focus()
               }}>
-              <button ref={friendMenuTrigger} type="button" className="profile-page-secondary"
+              <button ref={friendMenuTrigger} type="button" className={secondary}
                 aria-haspopup="menu" aria-expanded={friendMenuOpen} disabled={friendBusy === profile.id}
                 onClick={() => setMenuForUserId(current => current === profile.id ? null : profile.id)}>
                 <UserCheck size={18} aria-hidden="true" />Bạn bè<ChevronDown size={16} aria-hidden="true" />
@@ -85,14 +90,14 @@ export default function VisitorProfileHero({
               )}
             </div>
           ) : (
-            <button type="button" className={relation === 'outgoing' ? 'profile-page-secondary' : 'profile-page-primary'}
+            <button type="button" className={relation === 'outgoing' ? secondary : primary}
               disabled={friendBusy === profile.id || (!profile.allowFriendRequests && relation === 'none')}
               onClick={onFriendAction}>
               {relation === 'outgoing' ? <UserMinus size={18} aria-hidden="true" /> : relation === 'incoming' ? <UserCheck size={18} aria-hidden="true" /> : <UserPlus size={18} aria-hidden="true" />}
               {action}
             </button>
           )}
-          <button type="button" className={relation === 'accepted' || relation === 'outgoing' ? 'profile-page-primary' : 'profile-page-secondary'} onClick={() => void onMessage(profile.username)}>
+          <button type="button" className={relation === 'accepted' || relation === 'outgoing' ? primary : secondary} onClick={() => void onMessage(profile.username)}>
             <MessageCircle size={18} aria-hidden="true" />Nhắn tin
           </button>
     </>} />

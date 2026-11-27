@@ -19,7 +19,7 @@ it.each([null, { x: 20, y: 30 }])('offers pin, notification and category actions
   try {
     act(() => root.render(<ConversationActionDialog
       activeConversationAction={room} conversationMenuPosition={position} pinBusy={false}
-      notificationBusy={false} categoryBusy={false} categories={[{ id: 4, name: 'Công việc', color: 'blue' }]}
+      notificationBusy={false} historyActionBusy={false} clearSelectedConversationHistory={vi.fn(async () => {})} categoryBusy={false} categories={[{ id: 4, name: 'Công việc', color: 'blue' }]}
       onAssignCategory={assign} onToggleNotifications={mute}
       setConversationActionId={close} toggleConversationPin={togglePin} />))
     const button = (name: string) => [...host.querySelectorAll('button')].find(item => item.textContent === name)!

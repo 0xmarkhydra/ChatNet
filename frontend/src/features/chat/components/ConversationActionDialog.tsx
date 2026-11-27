@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, BellOff, Pin, Tag, Check, Mail, MailOpen } from "lucide-react";
+import { Bell, BellOff, Pin, PinOff, Trash2, Tag, Check, Mail, MailOpen } from "lucide-react";
 import { type SetStateAction } from "react";
 import { type Conversation } from "../types";
 import type { Dispatch } from "react";
@@ -10,6 +10,8 @@ export type ConversationActionDialogProps = {
   pinBusy: boolean;
   onSetUnread?: (conversation: Conversation, unread: boolean) => Promise<void>;
   notificationBusy: boolean;
+  historyActionBusy: boolean;
+  clearSelectedConversationHistory: (conversation: Conversation) => Promise<void>;
   onToggleNotifications: (conversation: Conversation, muteMinutes?: number) => Promise<void>;
   categories: { id: number; name: string; color: string }[];
   categoryBusy: boolean;
@@ -22,6 +24,8 @@ export default function ConversationActionDialog({
   activeConversationAction,
   conversationMenuPosition,
   pinBusy,
+  historyActionBusy,
+  clearSelectedConversationHistory,
   setConversationActionId,
   onSetUnread, toggleConversationPin, notificationBusy, onToggleNotifications, categories, categoryBusy, onAssignCategory,
 }: ConversationActionDialogProps) {
@@ -56,7 +60,7 @@ export default function ConversationActionDialog({
                     setConversationActionId(null)
                     void toggleConversationPin(activeConversationAction)
                   }}>
-                  <span aria-hidden="true"><Pin size={19} /></span>
+                  <span aria-hidden="true">{activeConversationAction.pinnedAt ? <PinOff size={19} /> : <Pin size={19} />}</span>
                   <b>{activeConversationAction.pinnedAt ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}</b>
                 </button>
                 {onSetUnread && <button type="button" onClick={() => { close(); void onSetUnread(activeConversationAction, !(activeConversationAction.unreadCount || activeConversationAction.manualUnread)); }}>
@@ -86,6 +90,9 @@ export default function ConversationActionDialog({
                     <b>{category.name}</b>
                   </button>
                 ))}
+                <button type="button" disabled={historyActionBusy} onClick={() => { close(); void clearSelectedConversationHistory(activeConversationAction) }}>
+                  <span aria-hidden="true"><Trash2 size={19} className="text-danger" /></span><b className="text-danger">Xóa lịch sử trò chuyện</b>
+                </button>
               </div>
               {!conversationMenuPosition && (
                 <button type="button" className="message-context-cancel"

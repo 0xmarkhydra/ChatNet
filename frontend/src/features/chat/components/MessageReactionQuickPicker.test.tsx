@@ -13,7 +13,7 @@ it('keeps only one reaction strip and opens the full emoji catalog once', () => 
   const root = createRoot(host)
   const toggleReaction = vi.fn(async (_message: Message, _emoji: string) => {})
   const openMessageReactions = vi.fn()
-  const messages = [1,2].map(id => ({id, conversationId: 1, senderId: 3, text:'Xin chào', reactions:[], attachments:[], createdAt:'2026-11-27T01:00:00Z'} as Message))
+  const messages = [1,2].map(id => ({id, conversationId: 1, senderId: 3, sender: 'other', text:'Xin chào', reactions:[], attachments:[], createdAt:'2026-11-27T01:00:00Z'} as Message))
   try {
     act(() => root.render(<>{messages.map(message => <MessageReactionQuickPicker key={message.id} message={message} busy={false} toggleReaction={toggleReaction} openMessageReactions={openMessageReactions}/>)}</>))
     const buttons = host.querySelectorAll<HTMLButtonElement>('.reaction-add')
