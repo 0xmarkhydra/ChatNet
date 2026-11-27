@@ -270,3 +270,13 @@ describe('NearbyExplorer location fallback', () => {
     expect(host.textContent).not.toContain('Đang xác định vị trí')
   })
 })
+
+it('announces people scan progress and shows a retryable error instead of an empty result', async () => {
+  await act(async () => root.render(<NearbyExplorer {...props} peopleScanning />))
+  expect(host.querySelector('[role="status"]')?.textContent).toContain('Đang xác định vị trí')
+  expect(host.textContent).not.toContain('Bật và tìm người')
+  await act(async () => root.render(<NearbyExplorer {...props} peopleError="Dịch vụ Quanh đây đang gặp lỗi" />))
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('Dịch vụ Quanh đây đang gặp lỗi')
+  await act(async () => button('Thử lại')?.click())
+  expect(props.onScanPeople).toHaveBeenCalledTimes(1)
+})

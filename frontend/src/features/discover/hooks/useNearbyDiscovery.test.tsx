@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 import type { Session } from '../../../shared/types/session'
-import { getCurrentPositionSmart } from '../lib/geolocation'
+import { getCurrentPositionSmart, geolocationErrorMessage } from '../lib/geolocation'
 import { useNearbyDiscovery } from './useNearbyDiscovery'
 
 vi.mock('../lib/geolocation', () => ({
@@ -26,7 +26,8 @@ describe('nearby discovery concurrency', () => {
     const sessionRef = { current: session }
     const nearbyRequest = { current: 0 }
     const setNearbyBusy = vi.fn()
-    let findNearby: (() => Promise<void>) | undefined
+    const setNotice = vi.fn()
+    let findNearby: (() => Promise<void | string>) | undefined
     function Probe() {
       const actions = useNearbyDiscovery({
         apiFetch,
@@ -40,15 +41,15 @@ describe('nearby discovery concurrency', () => {
         setNearbyScanning: vi.fn(),
         setNearbyUntil: vi.fn(),
         setNearbyUsers: vi.fn(),
-        setNotice: vi.fn(),
+        setNotice,
       })
       findNearby = actions.findNearby
       return null
     }
     try {
       await act(async () => root.render(<Probe />))
-      let first!: Promise<void>
-      let second!: Promise<void>
+      let first!: Promise<void | string>
+      let second!: Promise<void | string>
       await act(async () => {
         first = findNearby!()
         second = findNearby!()
@@ -59,6 +60,12 @@ describe('nearby discovery concurrency', () => {
       await act(async () => responsePending[0](new Response(JSON.stringify({ users: [], expiresAt: new Date().toISOString() }))))
       await act(async () => { await Promise.all([first, second]) })
       expect(setNearbyBusy).toHaveBeenCalledWith(false)
+      let failed!: Promise<void | string>
+      await act(async () => { failed = findNearby!(); await Promise.resolve() })
+      await act(async () => responsePending[1](new Response(null, { status: 503 })))
+      await expect(failed).resolves.toContain('Dịch vụ tìm người quanh đây đang gặp lỗi')
+      expect(geolocationErrorMessage).not.toHaveBeenCalled()
+      expect(setNotice).toHaveBeenLastCalledWith('Dịch vụ tìm người quanh đây đang gặp lỗi. Thử lại sau.', 'error')
     } finally {
       await act(async () => root.unmount())
       host.remove()

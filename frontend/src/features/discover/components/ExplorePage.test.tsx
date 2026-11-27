@@ -4,6 +4,9 @@ import { createRoot } from 'react-dom/client'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, expect, it, vi } from 'vitest'
 import ExplorePage from './ExplorePage'
+import { getCurrentPositionSmart } from '../lib/geolocation'
+
+vi.mock('../lib/geolocation', () => ({ getCurrentPositionSmart: vi.fn(async () => ({ coords: { latitude: 21, longitude: 105 } })), geolocationErrorMessage: vi.fn(async () => 'Không lấy được vị trí') }))
 import type { DiscoverSectionProps } from '../types'
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -75,6 +78,8 @@ it('puts communities in the main column and people plus nearby card in the rail'
   expect(view.host.querySelector('.explore-rail .explore-near')).not.toBeNull()
   await act(async () => view.button('Quét người gần đây')?.click())
   expect(view.route()).toBe('/discover?tab=recent')
+  expect(view.props.findNearby).toHaveBeenCalledTimes(1)
+  expect(view.props.setGlobalSearch).toHaveBeenCalledWith('')
   expect(view.host.querySelector('.explore-content-layout')).toBeNull()
 })
 
@@ -155,12 +160,12 @@ it('resets join message and error state on account switch', async () => {
 })
 
 it('does not repeat public-group fetch when switching all and communities without leaving discovery', async () => {
-  const request = vi.fn(async () => ok([]))
+  const request = vi.fn(async (_path: string) => ok([]))
   const view = mount(request)
   await view.render()
   await act(async () => view.button('Cộng đồng')?.click())
   await act(async () => view.button('Tất cả')?.click())
-  expect(request).toHaveBeenCalledTimes(1)
+  expect(request.mock.calls.filter(([path]) => String(path).startsWith('/api/groups/public'))).toHaveLength(1)
 })
 
 it('shows API error and retries safely', async () => {
@@ -186,7 +191,7 @@ it('preserves public-group join semantics and does not invent other groups', asy
   expect(request).toHaveBeenCalledWith('/api/groups/5/join', { method: 'POST' })
 })
 it('derives unique topic chips from loaded community data and filters without requesting again', async () => {
-  const request = vi.fn(async () => ok([
+  const request = vi.fn(async (_path: string) => ok([
     { id: 1, name: 'Nhóm Ảnh', topic: 'Ảnh', visibility: 'public' },
     { id: 2, name: 'Nhóm Sách', topic: 'Sách', visibility: 'public' },
     { id: 3, name: 'Nhóm Ảnh khác', topic: 'Ảnh', visibility: 'public' },
@@ -204,7 +209,7 @@ it('derives unique topic chips from loaded community data and filters without re
   await act(async () => chips[0].click())
   expect(chips[0].getAttribute('aria-pressed')).toBe('false')
   expect(view.host.querySelectorAll('.explore-community-card:not(.explore-skeleton)')).toHaveLength(4)
-  expect(request).toHaveBeenCalledTimes(1)
+  expect(request.mock.calls.filter(([path]) => String(path).startsWith('/api/groups/public'))).toHaveLength(1)
 })
 
 it('hides topic chips when no topic exists in real community data', async () => {
@@ -254,12 +259,13 @@ it('hero buttons navigate to real nearby, community and post-search flows', asyn
   await act(async () => view.button('Tham gia cộng đồng')?.click())
   expect(view.route()).toBe('/discover?tab=communities')
   await act(async () => view.button('Tất cả')?.click())
-  await act(async () => view.button('Xem bài viết mới')?.click())
-  expect(view.route()).toBe('/search?type=posts')
+  await act(async () => view.button('Xem bài viết gần đây')?.click())
+  expect(view.route()).toBe('/discover?tab=posts')
   const nearby = mount(vi.fn(async () => ok([])))
   await nearby.render()
   await act(async () => nearby.button('Tìm người gần đây')?.click())
   expect(nearby.route()).toBe('/discover?tab=recent')
+  expect(nearby.props.findNearby).toHaveBeenCalledTimes(1)
 })
 
 it('guide buttons navigate to the correct tabs and keep the nearby rail on All', async () => {
@@ -304,4 +310,130 @@ it('ignores malformed community topics without hiding valid public communities',
   await view.render()
   expect(view.host.textContent).toContain('Nhóm thiếu topic')
   expect([...view.host.querySelectorAll('.explore-topic-list button')].map(chip => chip.textContent)).toEqual(['Âm nhạc'])
+})
+
+it('loads real suggestions without location and supports friend actions', async () => {
+  const user = { id: 41, username: 'linh', displayName: 'Bạn Linh', online: false }
+  const request = vi.fn(async (path: string) => ok(path === '/api/users/suggestions' ? [user] : []))
+  const view = mount(request, '/discover?tab=people')
+  await view.render()
+  expect(view.host.textContent).toContain('Bạn Linh')
+  expect(view.props.findNearby).not.toHaveBeenCalled()
+  await act(async () => view.button('Kết bạn')?.click())
+  expect(view.props.actOnFriend).toHaveBeenCalledWith(user)
+})
+
+it('only searches after consent and shows public posts within the selected radius', async () => {
+  const posts = [
+    { id: 42, author: 'linh', content: 'Bài viết thật', visibility: 'public', distanceMeters: 1200 },
+    { id: 43, author: 'linh', content: 'Riêng tư', visibility: 'private', distanceMeters: 100 },
+    { id: 44, author: 'linh', content: 'Ngoài bán kính', visibility: 'public', distanceMeters: 6000 },
+  ]
+  const request = vi.fn(async (_path: string, _init?: RequestInit) => ({ ok: true, json: async () => ({ posts, nextCursor: null }) }) as Response)
+  const view = mount(request, '/discover?tab=posts')
+  await view.render()
+  expect(request).not.toHaveBeenCalled()
+  expect(getCurrentPositionSmart).not.toHaveBeenCalled()
+  await act(async () => view.button('Tìm bài viết gần tôi')?.click())
+  expect(request.mock.calls[0]?.[0]).toBe('/api/posts/nearby')
+  expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toMatchObject({ latitude: 21, longitude: 105, radiusKm: 5 })
+  expect(view.host.textContent).toContain('Bài viết thật')
+  expect(view.host.textContent).toContain('1,2 km')
+  expect(view.host.textContent).not.toContain('Riêng tư')
+  expect(view.host.textContent).not.toContain('Ngoài bán kính')
+  expect(view.host.querySelector('a[href="/feed/posts/42"]')).not.toBeNull()
+  const radius = view.host.querySelector<HTMLSelectElement>('select[aria-label="Bán kính bài viết"]')!
+  await act(async () => { radius.value = '10'; radius.dispatchEvent(new Event('change', { bubbles: true })) })
+  expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body)).radiusKm).toBe(10)
+  expect(view.host.textContent).toContain('Ngoài bán kính')
+})
+
+it('paginates nearby posts by distance and id and retries without duplication', async () => {
+  const first = Array.from({ length: 15 }, (_, index) => ({ id: 30 - index, author: 'an', content: 'Bài ' + (30 - index), visibility: 'public', distanceMeters: 200 + index * 10 }))
+  const last = { id: 15, author: 'an', content: 'Bài xa hơn', visibility: 'public', distanceMeters: 400 }
+  const cursor = { id: 16, distanceMeters: 340 }
+  let attempts = 0
+  const request = vi.fn(async (_path: string, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body))
+    if (body.cursor) {
+      expect(body.cursor).toEqual(cursor)
+      if (++attempts === 1) return { ok: false, status: 500 } as Response
+      return { ok: true, json: async () => ({ posts: [last], nextCursor: null }) } as Response
+    }
+    return { ok: true, json: async () => ({ posts: first, nextCursor: cursor }) } as Response
+  })
+  const view = mount(request, '/discover?tab=posts')
+  await view.render()
+  await act(async () => view.button('Tìm bài viết gần tôi')?.click())
+  await act(async () => view.button('Tải thêm bài viết')?.click())
+  expect(view.host.textContent).toContain('Không tải được bài viết công khai.')
+  await act(async () => view.button('Thử lại')?.click())
+  expect(view.host.textContent).toContain('Bài xa hơn')
+  expect(view.host.querySelectorAll('article')).toHaveLength(16)
+  expect(view.button('Tải thêm bài viết')).toBeUndefined()
+})
+
+it('does not start sharing location just by opening the recent tab', async () => {
+  const view = mount(vi.fn(async () => ok([])), '/discover?tab=recent')
+  await view.render()
+  expect(view.props.findNearby).not.toHaveBeenCalled()
+})
+
+it('opens every quick shortcut and displays its dedicated content', async () => {
+  const request = vi.fn(async (path: string) => {
+    if (path.startsWith('/api/groups/public')) return ok([{ id: 1, name: 'Nhóm thử', visibility: 'public' }])
+    if (path.startsWith('/api/users/suggestions')) return ok([{ id: 2, username: 'an', displayName: 'Bạn An', online: false }])
+    return ok([{ id: 3, author: 'an', content: 'Bài thử', visibility: 'public' }])
+  })
+  const view = mount(request)
+  await view.render()
+  for (const [index, tab, selector] of [
+    [0, 'people', '.explore-main-column .explore-people'],
+    [1, 'posts', '[aria-labelledby="explore-posts-title"]'],
+    [2, 'communities', '.explore-main-column .explore-communities'],
+    [3, 'recent', '[aria-label="Khám phá quanh đây"]'],
+  ] as const) {
+    await act(async () => view.button('Tất cả')?.click())
+    await act(async () => view.host.querySelectorAll<HTMLButtonElement>('.explore-shortcut-grid button')[index]?.click())
+    expect(view.route()).toBe('/discover?tab=' + tab)
+    expect(view.host.querySelector('.explore-tabs [aria-current="page"]')).not.toBeNull()
+    if (tab !== 'recent') expect(view.host.querySelector(selector)).not.toBeNull()
+  }
+  expect(view.props.findNearby).not.toHaveBeenCalled()
+})
+
+it('keeps post tab open and explains a missing nearby posts API', async () => {
+  const request = vi.fn(async (path: string) => path.startsWith('/api/posts')
+    ? ({ ok: false, status: 404 }) as Response
+    : ok([]))
+  const view = mount(request)
+  await view.render()
+  await act(async () => view.host.querySelectorAll<HTMLButtonElement>('.explore-shortcut-grid button')[1]?.click())
+  expect(view.route()).toBe('/discover?tab=posts')
+  await act(async () => view.button('Tìm bài viết gần tôi')?.click())
+  expect(view.host.querySelector('[role="alert"]')?.textContent).toContain('404')
+  expect(view.host.querySelector('[role="alert"]')?.textContent).toContain('Máy chủ')
+  expect(view.button('Thử lại')).toBeDefined()
+})
+
+it('excludes accepted friends from both suggestion and nearby sources and updates when a request is accepted', async () => {
+  const person = (id: number, displayName: string) => ({ id, username: 'user' + id, displayName, online: false })
+  const view = mount(vi.fn(async (path: string) => ok(path === '/api/users/suggestions' ? [person(1, 'Bạn đã kết nối API'), person(3, 'Lời mời đã gửi'), person(4, 'Người mới')] : [])), '/discover?tab=people')
+  view.props.nearbyUsers = [person(2, 'Bạn đã kết nối gần đây'), person(4, 'Người mới'), person(5, 'Lời mời đến')]
+  const accepted = new Set([1, 2])
+  view.props.friendRelationship = id => accepted.has(id) ? 'accepted' : id === 3 ? 'outgoing' : id === 5 ? 'incoming' : 'none'
+  await view.render()
+  expect(view.host.textContent).not.toContain('Bạn đã kết nối API')
+  expect(view.host.textContent).not.toContain('Bạn đã kết nối gần đây')
+  expect(view.host.querySelectorAll('.explore-person')).toHaveLength(3)
+  expect(view.button('Nhắn tin')).toBeUndefined()
+  expect(view.button('Hủy lời mời')).toBeDefined()
+  expect(view.button('Chấp nhận')).toBeDefined()
+  accepted.add(5)
+  await view.rerender()
+  expect(view.host.textContent).not.toContain('Lời mời đến')
+  expect(view.host.querySelectorAll('.explore-person')).toHaveLength(2)
+  await act(async () => view.button('Tất cả')?.click())
+  expect(view.host.textContent).not.toContain('Bạn đã kết nối API')
+  expect(view.host.textContent).not.toContain('Bạn đã kết nối gần đây')
 })
