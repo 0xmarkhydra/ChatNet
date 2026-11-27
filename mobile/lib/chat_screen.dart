@@ -3192,21 +3192,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                         if (unread > 0 ||
                                             room['manualUnread'] == true)
                                           Positioned(
-                                            right: -6,
-                                            top: -3,
-                                            child: CircleAvatar(
-                                              radius: 10,
-                                              backgroundColor: socoBlue,
-                                              child: Text(
-                                                unread > 99
-                                                    ? '99+'
-                                                    : unread == 0
-                                                    ? '•'
-                                                    : '$unread',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 8,
-                                                  fontWeight: FontWeight.w800,
+                                            left: -2,
+                                            top: -2,
+                                            child: Semantics(
+                                              label: unread > 0
+                                                  ? '$unread tin chưa đọc'
+                                                  : 'Đánh dấu chưa đọc',
+                                              child: Container(
+                                                key: ValueKey(
+                                                  'rail-unread-${room['id']}',
+                                                ),
+                                                constraints:
+                                                    const BoxConstraints(
+                                                      minWidth: 18,
+                                                    ),
+                                                height: 18,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 3,
+                                                    ),
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: socoBlue,
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 1.5,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  unread > 99
+                                                      ? '99+'
+                                                      : unread == 0
+                                                      ? '•'
+                                                      : '$unread',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w800,
+                                                    height: 1,
+                                                  ),
                                                 ),
                                               ),
                                             ),
