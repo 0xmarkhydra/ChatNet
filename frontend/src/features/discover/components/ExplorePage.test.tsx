@@ -342,8 +342,14 @@ it('only searches after consent and shows public posts within the selected radiu
   expect(view.host.textContent).not.toContain('Riêng tư')
   expect(view.host.textContent).not.toContain('Ngoài bán kính')
   expect(view.host.querySelector('a[href="/feed/posts/42"]')).not.toBeNull()
-  const radius = view.host.querySelector<HTMLSelectElement>('select[aria-label="Bán kính bài viết"]')!
-  await act(async () => { radius.value = '10'; radius.dispatchEvent(new Event('change', { bubbles: true })) })
+  const radius = view.host.querySelector<HTMLButtonElement>('button[aria-label="Bán kính bài viết"]')!
+  await act(async () => { radius.focus(); radius.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })
+  const options = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitemradio"]'))
+  expect(options.map(option => option.textContent?.trim())).toEqual(['1 km', '5 km', '10 km', '25 km', '50 km'])
+  expect(options.find(option => option.textContent?.trim() === '5 km')?.getAttribute('aria-checked')).toBe('true')
+  await act(async () => options.find(option => option.textContent?.trim() === '10 km')?.click())
+  expect(radius.textContent).toContain('10 km')
+  expect(document.querySelector('[role="menu"]')).toBeNull()
   expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body)).radiusKm).toBe(10)
   expect(view.host.textContent).toContain('Ngoài bán kính')
 })
@@ -436,4 +442,20 @@ it('excludes accepted friends from both suggestion and nearby sources and update
   await act(async () => view.button('Tất cả')?.click())
   expect(view.host.textContent).not.toContain('Bạn đã kết nối API')
   expect(view.host.textContent).not.toContain('Bạn đã kết nối gần đây')
+})
+
+it('renders nearby post extras as separate metadata and opens media in post detail', async () => {
+  const post = { id: 42, author: 'linh', content: '👥 Cùng với @an\n😌 Đang cảm thấy bình yên\nMột buổi sáng', visibility: 'public', distanceMeters: 1200, attachments: [{ kind: 'image', name: 'Ảnh núi', url: 'https://example.invalid/mountain.jpg', storageRef: 'mountain', sizeBytes: 123, contentType: 'image/jpeg' }] }
+  const request = vi.fn(async () => ({ ok: true, json: async () => ({ posts: [post], nextCursor: null }) }) as Response)
+  const view = mount(request, '/discover?tab=posts')
+  await view.render()
+  await act(async () => view.button('Tìm bài viết gần tôi')?.click())
+  const card = view.host.querySelector('article')!
+  expect(card.querySelector('.feed-post-extras')?.textContent).toContain('bình yên')
+  expect(card.querySelector('.feed-post-extras')?.textContent).toContain('@an')
+  expect(card.textContent).toContain('Một buổi sáng')
+  expect(card.querySelector('img[alt="Ảnh núi"]')).not.toBeNull()
+  expect(card.querySelector('a[href="/feed/posts/42"]')).not.toBeNull()
+  await act(async () => card.querySelector<HTMLButtonElement>('button[aria-label="Xem bài viết có ảnh Ảnh núi"]')?.click())
+  expect(view.route()).toBe('/feed/posts/42')
 })
